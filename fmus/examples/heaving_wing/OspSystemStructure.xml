@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
+    
+    <StartTime>0.0</StartTime>
+    <BaseStepSize>0.1</BaseStepSize>
+    <Algorithm>fixedStep</Algorithm>
+    
+    <Simulators>
+        <Simulator name="quasi_steady_model" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
+            <InitialValues>
+                <InitialValue variable = "setup_file_path"> <String value="stormbird_setup/quasi_steady_wing.json"/> </InitialValue>
+                
+                <InitialValue variable = "freestream_u"> <Real value="8.0"/> </InitialValue>
+
+            </InitialValues>
+        </Simulator>
+
+        <Simulator name="dynamic_model" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
+            <InitialValues>
+                <InitialValue variable = "setup_file_path"> <String value="stormbird_setup/dynamic_wing.json"/> </InitialValue>
+                
+                <InitialValue variable = "freestream_u"> <Real value="8.0"/> </InitialValue>
+
+            </InitialValues>
+        </Simulator>
+
+        <Simulator name="harmonic_signal" source="fmus/HarmonicSignal.fmu">
+            <InitialValues>
+                <InitialValue variable="amplitude"> <Real value="1.0"/> </InitialValue>
+                <InitialValue variable="frequency"> <Real value="0.6283"/> </InitialValue>
+            </InitialValues>
+        </Simulator>
+
+    </Simulators>
+
+    <Connections>
+        <VariableConnection>
+            <Variable simulator="harmonic_signal" name="signal"/>
+            <Variable simulator="quasi_steady_model" name="translation_y"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="harmonic_signal" name="signal"/>
+            <Variable simulator="dynamic_model" name="translation_y"/>
+        </VariableConnection>
+        
+    </Connections>
+
+</OspSystemStructure>

@@ -1,0 +1,54 @@
+{
+    "line_force_model": {
+        "wing_builders": [
+            {
+                "section_points": [
+                    [125.0, 0.0, -20.0],
+                    [125.0, 0.0, -60.0]
+                ],
+                "chord_vectors": [
+                    [-10.0, 0.0, 0.0],
+                    [-10.0, 0.0, 0.0]
+                ],
+                "section_model": {
+                    "Foil": {
+                        "mean_stall_angle": 2.00
+                    }
+                }
+            },
+            {
+                "section_points": [
+                    [45.0, 0.0, -20.0],
+                    [45.0, 0.0, -60.0]
+                ],
+                "chord_vectors": [
+                    [-10.0, 0.0, 0.0],
+                    [-10.0, 0.0, 0.0]
+                ],
+                "section_model": {
+                    "Foil": {
+                        "mean_stall_angle": 2.00
+                    }
+                }
+            }
+        ],
+        "nr_sections": 10
+    },
+    "simulation_mode": {
+        "Dynamic": {
+            "wake": {
+                "ratio_of_wake_affected_by_induced_velocities": 0.5,
+                "viscous_core_length_off_body": {
+                    "Absolute": 8.0
+                }
+            },
+            "solver": {
+                "damping_factor": 0.2,
+                "max_iterations_per_time_step": 1
+            }
+        }
+    },
+    "write_wake_data_to_file": true,
+    "wake_files_folder_path": "wake_files",
+    "initial_velocity": {"x": -10.0, "y": -4.0, "z": 0.0}
+}

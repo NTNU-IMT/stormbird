@@ -1,0 +1,6 @@
+[book]
+authors = ["Jarle Kramer"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Stormbird"

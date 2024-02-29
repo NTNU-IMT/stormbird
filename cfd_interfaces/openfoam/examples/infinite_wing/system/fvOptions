@@ -1,0 +1,16 @@
+
+FoamFile
+{
+    version    2.0;
+    format    ascii;
+    class     dictionary;
+    object    fvOptions;
+}
+
+actuatorLine
+{
+    type actuatorLine;
+    selectionMode   all;
+    fields (U);
+    name actuatorLine;
+}

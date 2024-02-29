@@ -1,0 +1,3 @@
+*.fmu
+!.gitignore
+!HarmonicSignal.fmu

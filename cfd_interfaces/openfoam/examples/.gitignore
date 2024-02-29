@@ -1,0 +1,7 @@
+[0-9]*
+!0.org
+
+polyMesh/
+processor*
+actuator_line_results.json
+actuator_line_results_history.json
