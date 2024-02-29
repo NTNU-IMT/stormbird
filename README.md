@@ -18,10 +18,9 @@ layer suction).
  - Unsteady effects (kites, analysis of ships operating in waves, maneuvering simulations).
 
 At the same time, it is also often necessary with efficient computations. The user will usually be interested in testing 
-many different weather conditions, ship speeds, sail configurations, and operational variables.
-
-The goal is, therefore, to find the right balance between accuracy and speed for the intended use case. To achieve this, 
-the library  supports the following methods, that offer different levels of complexity and computational speed:
+many different weather conditions, ship speeds, sail configurations, and operational variables. The goal is, therefore, 
+to find the right balance between accuracy and speed for the intended use case. To achieve this, the library 
+supports the following methods, that offer different levels of complexity and computational speed:
 
  1) Discrete static lifting line, for steady- or quasi-steady cases
  2) Discrete dynamic lifting line, for unsteady or steady cases with large wake deformations
@@ -38,14 +37,14 @@ in the CFD simulation).
 See the `stormbird` docs or the `book` for more details on the methods
 
 ## Folder structure
-- `stormbird` contains the core library, written in Rust.
-- `book` contains a `mdBook` that aims to explain the methods implemented in Stormbird more 
+- `stormbird` contains the core library, written in [Rust](https://www.rust-lang.org/).
+- `book` contains a [mdBook](https://github.com/rust-lang/mdBook) that aims to explain the methods implemented in Stormbird more 
 thoroughly than what is done in the code docs, together with references to papers with more 
-information. This is currently very much a work in progress.
+information. **Waring**: This is currently very much a work in progress.
 - `pystormbird` contains a Python interface to the core library. This can either be used to run 
 lifting line simulations directly, for instance using a scripting approach, or to test individual 
 parts of the library, for instance when plotting is useful. The interface is generated using the 
-`pyo3` crate.
+[PyO3](https://pyo3.rs/v0.20.3/) crate.
 - `cfd_interfaces` contains interfaces to the actuator line functionality for specific CFD solvers. 
 At the moment, only [OpenFOAM](https://www.openfoam.com/) is covered, but this might be extended in 
 the future. In addition, there is a general C++ interface to the actuator line functionality, as 
@@ -62,10 +61,22 @@ Each of the folders contains its own `README` file with install instructions.
 
 For an explanation of how to set up models for different cases, see the `book` (work in progress)
 
-## Developing principles
-Although there are no absolute rules, if anything, the code loosely follows 
+## How to contribute
+1) **Contact Jarle Vinje Kramer**, for instance at jarle.a.kramer@ntnu.no, for a discussion about what and how. 
+2) Make a **separate branch** where you can implement your modification without affecting the main branch. 
+3) If you add new functionality or fix a newly discovered bug, strongly consider **implementing a 
+test** for this. 
+4) When you think you are done, make sure to run test builds and the actual tests written for the library. 
+**They should all pass!**
+5) When you are done, make a pull-request. Wait for the pull-request to be **reviewed and approved**.
+6) When the pull-request is approved, it should be merged into the main branch using a **squash commit**, 
+with a **descriptive commit message**.
+
+### Developing principles
+Although there are no absolute rules, if anything, the code loosely follows
 [data orientation](https://en.wikipedia.org/wiki/Data-oriented_design). This can mean different 
 things to different people, but in this case, the following principles are seen as important:
+
 - It is better to use many arrays with simple data structures rather than a few arrays with complex 
 structures. This can make it easier to process things in parallel and avoid computational delays
 due to cache misses.
@@ -86,6 +97,14 @@ not a present problem. The goal is to be **done** at some point.
 post-processing phase if possible. That is, adding some complexity in the setup or post-processing 
 steps is seen as acceptable if it reduces the complexity of the library itself. If the setup becomes
 very complex, it is possible to add a separate library for this task...
+
+### Code Style
+- The code should follow the official [Rust style guide](https://doc.rust-lang.org/nightly/style-guide/)
+- Use descriptive names for both functions and variables.
+- **Doc strings are good!** Use them! However, explainer comments inside a method or function are generally
+a sign of bad code. Can you re-structure or re-name the code such that the explainer comment is not 
+needed?
+
 
 ## Developing status
 All parts of this repository are work in progress. Breaking changes is therefore expected on all 
