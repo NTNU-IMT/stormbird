@@ -13,6 +13,3 @@ pub mod viscous_wakes;
 
 /// Correction factors that can be applied to a calculated circulation distribution.
 pub mod tip_loss_factors;
-
-/// Models for circulation distributions with a fixed shape.
-pub mod prescribed_circulation_shape;

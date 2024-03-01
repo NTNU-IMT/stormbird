@@ -11,16 +11,17 @@
 pub mod solver_utils;
 pub mod span_line;
 pub mod builder;
+pub mod prescribed_circulations;
 pub mod prelude;
 
 use std::ops::Range;
-
 
 use crate::math_utils::statistics::mean;
 
 use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
+use prescribed_circulations::PrescribedCirculation;
 
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
@@ -52,6 +53,8 @@ pub struct LineForceModel {
     pub local_wing_angles: Vec<f64>,
     /// Density used in force calculations
     pub density: f64,
+    /// Optional prescribed circulation shape
+    pub prescribed_circulation: Option<PrescribedCirculation>,
 }
 
 impl LineForceModel {
@@ -68,6 +71,7 @@ impl LineForceModel {
             rotation: Vec3::default(),
             local_wing_angles: Vec::new(),
             density,
+            prescribed_circulation: None,
         }
     }
 
@@ -235,7 +239,10 @@ impl LineForceModel {
         ).collect()  
     }
 
-    /// Calculates the angle of attack from a velocity vector.
+    /// Return the angle of attack at each control point.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
     pub fn angle_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
         let chord_vectors = self.chord_vectors();
         let span_lines    = self.span_lines();
@@ -248,9 +255,24 @@ impl LineForceModel {
         }).collect()
     }
 
-    /// Calculates the circulation strength on each line from a velocity vector. This is the primary 
-    /// function used to update the solution in a solver. 
+    /// Returns the circulation strength, either directly or based on the prescribed shape, 
+    /// depending on the fields in self.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(&self, velocity: &[Vec3]) -> Vec<f64> {
+        if self.prescribed_circulation.is_some() {
+            self.prescribed_circulation_strength(velocity)
+        } else {
+            self.circulation_strength_raw(velocity)
+        }
+    }
+
+    /// Returns the circulation strength on each line based on the lifting line equation.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
+    pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
         let cl = self.lift_coefficients(&velocity);
 
         (0..velocity.len()).map(|index| {
@@ -258,7 +280,10 @@ impl LineForceModel {
         }).collect()
     }
 
-    /// Calculates the local lift coefficient on each line element based on the local velocity.
+    /// Returns the local lift coefficient on each line element.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
         // TODO: change the match statement to the outside of the for loop
         let angle_of_attack = self.angle_of_attack(velocity);
@@ -282,9 +307,11 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Calculates the viscous drag coefficient on each line element, based on the section model
-    /// and the input velocity. The velocity vector needs to have the same length as the number of 
-    /// line elements.
+    /// Returns the viscous drag coefficient on each line element, based on the section model
+    /// and the input velocity. 
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
         // TODO: change the match statement to the outside of the for loop
 

@@ -10,18 +10,14 @@
 //! simulations of this sail type tends to become very unstable. Second, most rotor sails have an 
 //! end plate that is not possible to capture in a lifting line simulation. 
 
+pub mod shape;
+
 use serde::{Serialize, Deserialize};
 
 use crate::line_force_model::LineForceModel;
 use crate::vec3::Vec3;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-/// Enum used to specify different models for circulation distributions that follows a fixed 
-/// pattern.
-pub enum PrescribedCirculationShape {
-    #[default]
-    Elliptic,
-}
+use shape::PrescribedCirculationShape;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// Determines which ends that should have zero circulation
@@ -33,6 +29,8 @@ pub enum EndsWithZeroCirculation {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+/// Model for prescribing the circulation distribution based on empirical models.
 pub struct PrescribedCirculation {
     #[serde(default)]
     pub shape: PrescribedCirculationShape,
@@ -41,10 +39,16 @@ pub struct PrescribedCirculation {
 }
 
 impl PrescribedCirculation {
-    /// Returns values for the shape of the circualtion distribution, based on the relative span 
+    /// Returns values for the shape of the circulation distribution, based on the relative span 
     /// values and the variant specified in the Self.
-    pub fn get_shape(&self, relative_span_distance: &[f64]) -> Vec<f64> {
-        let effective_span_distance: Vec<f64> = match self.ends_with_zero_circulation {
+    pub fn get_values(&self, relative_span_distance: &[f64]) -> Vec<f64> {
+        let effective_span_distance = self.effective_span_distance(relative_span_distance);
+
+        self.shape.get_values(&effective_span_distance)
+    }
+
+    pub fn effective_span_distance(&self, relative_span_distance: &[f64]) -> Vec<f64> {
+        match self.ends_with_zero_circulation {
             EndsWithZeroCirculation::Both => relative_span_distance.to_vec(),
             EndsWithZeroCirculation::First => {
                 relative_span_distance.iter().map(
@@ -60,24 +64,6 @@ impl PrescribedCirculation {
                     }
                 ).collect()
             }
-        };
-        
-        match self.shape {
-            PrescribedCirculationShape::Elliptic => {
-                let average_value = match self.ends_with_zero_circulation {
-                    EndsWithZeroCirculation::Both => 0.785398,
-                    EndsWithZeroCirculation::First | EndsWithZeroCirculation::Last => 0.392699
-                };
-
-                effective_span_distance.iter()
-                    .map(|x| {
-                        if x.abs() >= 0.5 {
-                            0.0
-                        } else {
-                            (1.0 - (2.0 * x).powi(2)).sqrt() / average_value
-                        }
-                    }).collect()
-            },
         }
     }
 }
@@ -85,14 +71,18 @@ impl PrescribedCirculation {
 impl LineForceModel {
     /// Returns a circulation distribution that is forced to follow a specific distribution where 
     /// magnitude and direction is based on the average quantities for each wing.
-    pub fn prescribed_circulation_strength(&self, velocity: &[Vec3], prescribed_circulation: &PrescribedCirculation) -> Vec<f64> {
-        let raw_circulation_strength = self.circulation_strength(velocity);
+    pub fn prescribed_circulation_strength(&self, velocity: &[Vec3]) -> Vec<f64> {
+        let effective_velocity = self.prescribed_circulation_shape_velocity(velocity);
+
+        let raw_circulation_strength = self.circulation_strength_raw(&effective_velocity);
 
         let average_circulation_strength = self.wing_averaged_values(&raw_circulation_strength);
 
         let relative_span_distance = self.relative_span_distance();
 
-        let prescribed_circulation_shape = prescribed_circulation.get_shape(&relative_span_distance);
+        let prescribed_circulation = self.prescribed_circulation.clone().unwrap();
+
+        let prescribed_circulation_shape = prescribed_circulation.get_values(&relative_span_distance);
 
         let mut corrected_circulation: Vec<f64> = Vec::with_capacity(raw_circulation_strength.len());
 

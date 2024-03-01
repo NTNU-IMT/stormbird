@@ -11,10 +11,6 @@ use std::io::BufWriter;
 use serde::{Serialize, Deserialize};
 
 use rayon::prelude::*;
-// Copyright (C) 2024, NTNU 
-// Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
-// License: GPL v3.0 (see seperate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
-
 use rayon::iter::ParallelIterator;
 
 use std::ops::Range;
@@ -29,12 +25,22 @@ use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilde
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub enum FirstPanelBehaviour {
+/// Enum to choose how to treat the first panel in the wake. 
+/// # Variants
+/// * `ChordFixed` - The first panel has the same orientation as the chord vector at the given span
+/// line
+/// * `VelocityFixed` - The first panel has the same orientation as the velocity at the given span
+/// ctrl point
+///
+/// # Data
+/// The `f64` value connected to each variant specifies how far downstream the first panel should be,
+/// relative to the chord length of the span line.
+pub enum FirstPanelBehavior {
     ChordFixed(f64),
     VelocityFixed(f64)
 }
 
-impl Default for FirstPanelBehaviour {
+impl Default for FirstPanelBehavior {
     fn default() -> Self {
         Self::ChordFixed(0.75)
     }
@@ -52,7 +58,7 @@ pub struct UnsteadyWakeBuilder {
     pub viscous_core_length: ViscousCoreLength,
     #[serde(default)]
     /// How the first panel in the wake is treated
-    pub first_panel_behaviour: FirstPanelBehaviour,
+    pub first_panel_behavior: FirstPanelBehavior,
     #[serde(default="UnsteadyWakeBuilder::default_strength_damping_last_panel_ratio")]
     /// Determines the damping factor for the wake strength. Specifies how much damping there should
     /// be on the last panel. The actual damping factor also depends on the number of wake panels.
@@ -70,7 +76,7 @@ pub struct UnsteadyWakeBuilder {
     pub far_field_ratio: f64,
     #[serde(default)]
     /// Damping factor for the shape of the wake. A value of 0.0 means no damping (the wake moves
-    /// freely), while a valye of 1.0 means that the wake points are fixed in space.
+    /// freely), while a value of 1.0 means that the wake points are fixed in space.
     pub shape_damping_factor: f64,
     #[serde(default)]
     /// Optional corrections for the calculated induced velocity.
@@ -118,9 +124,9 @@ impl UnsteadyWakeBuilder {
         );
 
         // Initialize wake points
-        let first_panel_ratio = match self.first_panel_behaviour {
-            FirstPanelBehaviour::ChordFixed(ratio) => ratio,
-            FirstPanelBehaviour::VelocityFixed(ratio) => ratio,
+        let first_panel_ratio = match self.first_panel_behavior {
+            FirstPanelBehavior::ChordFixed(ratio) => ratio,
+            FirstPanelBehavior::VelocityFixed(ratio) => ratio,
         };
 
         for i_stream in 0..nr_wake_points_per_line_element {
@@ -148,7 +154,7 @@ impl UnsteadyWakeBuilder {
         let strength_damping_factor =self.strength_damping_factor(nr_wake_panels_per_line_element);
 
         let settings = UnsteadyWakeSettings {
-            first_panel_behaviour: self.first_panel_behaviour.clone(),
+            first_panel_behavior: self.first_panel_behavior.clone(),
             strength_damping_factor,
             nr_wake_points_along_span,
             nr_wake_panels_along_span,
@@ -207,7 +213,7 @@ impl Default for UnsteadyWakeBuilder {
         Self {
             wake_length_factor: Self::default_wake_length_factor(),
             viscous_core_length: Default::default(),
-            first_panel_behaviour: Default::default(),
+            first_panel_behavior: Default::default(),
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: None,
@@ -220,8 +226,9 @@ impl Default for UnsteadyWakeBuilder {
 }
 
 #[derive(Debug, Clone)]
+/// Settings for the unsteady wake
 pub struct UnsteadyWakeSettings {
-    pub first_panel_behaviour: FirstPanelBehaviour,
+    pub first_panel_behavior: FirstPanelBehavior,
     pub strength_damping_factor: f64,
     pub nr_wake_points_along_span: usize,
     pub nr_wake_panels_along_span: usize,
@@ -258,7 +265,7 @@ pub struct UnsteadyWake {
     /// Panel geometry data used to determine what method to use for calculating the induced 
     /// velocities, and in the far field methods for the same purpose
     panel_geometry: Vec<PanelGeometry>,
-    /// Settings for the wake behaviour
+    /// Settings for the wake behavior
     settings: UnsteadyWakeSettings,
     /// The model used to calculate induced velocities from vortex lines
     potential_theory_model: PotentialTheoryModel,
@@ -273,6 +280,9 @@ pub struct UnsteadyWake {
 impl UnsteadyWake {
     /// Takes a line force vector as input, that might have a different position and orientation 
     /// than the current model, and updates the relevant internal geometry
+    ///
+    /// # Argument
+    /// * `line_force_model` - The line force model that the wake is based on
     pub fn synchronize_wing_geometry(&mut self, line_force_model: &LineForceModel) {
         let span_points = line_force_model.span_points();
 
@@ -284,19 +294,34 @@ impl UnsteadyWake {
     }
 
     /// Calculates the induced velocities from all the panels in the wake
+    ///
+    /// # Arguments
+    /// * `points` - The points at which the induced velocities are calculated
+    /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
+    /// the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
         self.induced_velocities_local(points, 0, self.strengths.len(), off_body)
     }
 
     /// Calculates the induced velocity from the first panels in the stream wise direction only. This
     /// is used to calculate the velocity at the control points in the strength solver more 
-    /// efficiently, as eahc iteration only updates the strength of these panels.
+    /// efficiently, as each iteration only updates the strength of these panels.
+    ///
+    /// # Arguments
+    /// * `points` - The points at which the induced velocities are calculated
+    /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
+    /// the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities_from_first_panels(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
         self.induced_velocities_local(points, 0, self.settings.nr_wake_panels_along_span, off_body)
     }
 
-    /// Calculates the induced velocties from all the panels in the free wake, neglecting the first 
+    /// Calculates the induced velocities from all the panels in the free wake, neglecting the first 
     /// panels, at the input points. 
+    ///
+    /// # Arguments
+    /// * `points` - The points at which the induced velocities are calculated
+    /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
+    /// the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities_from_free_wake(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
         self.induced_velocities_local(
             points, 
@@ -332,6 +357,7 @@ impl UnsteadyWake {
         self.number_of_time_steps_completed += 1;
     }
 
+    /// Update the panel geometry based on the current wake points
     fn update_panel_geometry_from_wake_points(&mut self) {
         for i in 0..self.strengths.len() {
             let (stream_index, span_index) = self.reverse_panel_index(i);
@@ -426,13 +452,13 @@ impl UnsteadyWake {
             &line_force_model.chord_vectors(), true
         );
         
-        match self.settings.first_panel_behaviour {
-            FirstPanelBehaviour::ChordFixed(chord_ratio) => {
+        match self.settings.first_panel_behavior {
+            FirstPanelBehavior::ChordFixed(chord_ratio) => {
                 for i in 0..self.settings.nr_wake_points_along_span {
                     self.wake_points[i + self.settings.nr_wake_points_along_span] = self.wake_points[i] + chord_ratio * chord_vectors[i];
                 }
             },
-            FirstPanelBehaviour::VelocityFixed(chord_ratio) => {
+            FirstPanelBehavior::VelocityFixed(chord_ratio) => {
                 let ctrl_points = line_force_model.ctrl_points();
 
                 let u_inf: Vec<Vec3> = vec![velocity_input.freestream; ctrl_points.len()];
@@ -493,10 +519,15 @@ impl UnsteadyWake {
         self.stream_free_wake_points(time_step, velocity_input); 
     }
 
-    /// Stream all free wake points based on the euler method
-    fn stream_free_wake_points(&mut self, time_step: f64, velocity_input: &VelocityInput) {
-        let old_wake_points = self.wake_points.clone();
-
+    /// Returns the velocity at all the wake points.
+    ///
+    /// The velocity is calculated as the sum of the freestream velocity and the induced velocity.
+    /// However, if the settings contains and end-index for the induced velocities, the induced
+    /// velocities can be neglected for the last panels. This is useful for speeding up simulations.
+    ///
+    /// # Argument
+    /// * `velocity_input` - The input velocity which contains the freestream velocity
+    pub fn velocity_at_wake_points(&self, velocity_input: &VelocityInput) -> Vec<Vec3> {
         let mut velocity: Vec<Vec3> = vec![velocity_input.freestream; self.wake_points.len()];
 
         let end_index: usize = if let Some(end_index) = self.settings.end_index_induced_velocities_on_wake {
@@ -506,18 +537,26 @@ impl UnsteadyWake {
         };
 
         if end_index > 0 && self.number_of_time_steps_completed > 2 {
-            let u_i_calc: Vec<Vec3> = self.induced_velocities(&old_wake_points[0..end_index], true);
+            let u_i_calc: Vec<Vec3> = self.induced_velocities(&self.wake_points[0..end_index], true);
 
             for i in 0..end_index {
                 velocity[i] += u_i_calc[i];
             }
         }
 
+        velocity
+    }
+
+    /// Stream all free wake points based on the Euler method.
+    fn stream_free_wake_points(&mut self, time_step: f64, velocity_input: &VelocityInput) {
+        let old_wake_points = self.wake_points.clone();
+
+        let velocity = self.velocity_at_wake_points(velocity_input);
+
         // Don't move the first panel. This is done in another function
         let start_index = 2 * self.settings.nr_wake_points_along_span;
-        let end_index   = self.wake_points.len();
 
-        for i in start_index..end_index {
+        for i in start_index..self.wake_points.len() {
             let previous_wake_point = old_wake_points[i - self.settings.nr_wake_points_along_span];
             let previous_velocity   = velocity[i - self.settings.nr_wake_points_along_span];
 
@@ -534,7 +573,6 @@ impl UnsteadyWake {
         }
     }
 
-    #[inline(always)]
     /// Calculates the induced velocity from a single panel at the input point
     fn induced_velocity_from_panel(&self, panel_index: usize, point: Vec3, off_body: bool) -> Vec3 {
         if self.strengths[panel_index] == 0.0 {
@@ -557,6 +595,9 @@ impl UnsteadyWake {
     /// 
     /// Principle: the strength of each panel is updated to be the same as the previous panel in the
     /// stream wise direction in the last time step.
+    ///
+    /// # Argument
+    /// * `new_circulation_strength` - The new circulation strength for the wing
     fn update_strength_after_completed_time_step(&mut self, new_circulation_strength: &[f64]) {
         let update_factor = 1.0 - self.settings.strength_damping_factor; // TODO: implement more sophisticated damping...
 
@@ -574,7 +615,10 @@ impl UnsteadyWake {
         self.update_wing_strength(new_circulation_strength);
     }
 
-    /// Export the wake geoemtry as an obj file
+    /// Export the wake geometry as an obj file
+    ///
+    /// # Argument
+    /// * `file_path` - The path to the file to be written
     pub fn write_wake_to_obj_file(&self, file_path: &str) -> Result<(), Error> {
         let f = File::create(file_path)?;
 
@@ -612,7 +656,10 @@ impl UnsteadyWake {
         Ok(())
     }
 
-    /// Export the wake geoemtry and strength as a VTK file 
+    /// Export the wake geometry and strength as a VTK file
+    ///
+    /// # Argument
+    /// * `file_path` - The path to the file to be written
     pub fn write_wake_to_vtk_file(&self, file_path: &str) -> Result<(), Error> {
         let f = File::create(file_path)?;
 
