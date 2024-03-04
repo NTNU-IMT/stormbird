@@ -84,6 +84,14 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default)]
     /// Optional viscous core to be used when calculating induced velocities off body.
     pub viscous_core_length_off_body: Option<ViscousCoreLength>,
+    /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is 
+    /// useful if the effect of self-induced velocities on lift and drag is calculated in another 
+    /// way, for example with CFD, and the only reason for running lifting-line simulations is to 
+    /// calculate the wing-to-wing interaction.
+    /// 
+    /// **WARNING**: should probably always be used in combination with a prescribed circulation 
+    /// shape in the line force model to maintain a realistic local shape.
+    pub neglect_self_induced_velocities: bool
 }
 
 impl UnsteadyWakeBuilder {
@@ -161,6 +169,7 @@ impl UnsteadyWakeBuilder {
             nr_wake_panels_per_line_element,
             end_index_induced_velocities_on_wake,
             shape_damping_factor: self.shape_damping_factor,
+            neglect_self_induced_velocities: self.neglect_self_induced_velocities
         };
 
         let potential_theory_model = PotentialTheoryModel {
@@ -221,6 +230,7 @@ impl Default for UnsteadyWakeBuilder {
             shape_damping_factor: 0.0,
             induced_velocity_corrections: Default::default(),
             viscous_core_length_off_body: None,
+            neglect_self_induced_velocities: false
         }
     }
 }
@@ -235,6 +245,7 @@ pub struct UnsteadyWakeSettings {
     pub nr_wake_panels_per_line_element: usize,
     pub end_index_induced_velocities_on_wake: Option<usize>,
     pub shape_damping_factor: f64,
+    pub neglect_self_induced_velocities: bool
 }
 
 #[derive(Debug, Clone)]
@@ -300,7 +311,7 @@ impl UnsteadyWake {
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
-        self.induced_velocities_local(points, 0, self.strengths.len(), off_body)
+        self.induced_velocities_local(points, 0, self.strengths.len(), off_body, false)
     }
 
     /// Calculates the induced velocity from the first panels in the stream wise direction only. This
@@ -312,7 +323,7 @@ impl UnsteadyWake {
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities_from_first_panels(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
-        self.induced_velocities_local(points, 0, self.settings.nr_wake_panels_along_span, off_body)
+        self.induced_velocities_local(points, 0, self.settings.nr_wake_panels_along_span, off_body, self.settings.neglect_self_induced_velocities)
     }
 
     /// Calculates the induced velocities from all the panels in the free wake, neglecting the first 
@@ -327,7 +338,8 @@ impl UnsteadyWake {
             points, 
             self.settings.nr_wake_panels_along_span, 
             self.strengths.len(),
-            off_body
+            off_body,
+            self.settings.neglect_self_induced_velocities
         )
     }
 
@@ -374,11 +386,26 @@ impl UnsteadyWake {
         points: &[Vec3], 
         start_index: usize, 
         end_index: usize, 
-        off_body: bool
+        off_body: bool,
+        neglect_self_induced: bool
     ) -> Vec<Vec3> {
-        let mut induced_velocities: Vec<Vec3> = points.par_iter().map(|point| {
+        let mut induced_velocities: Vec<Vec3> = points.par_iter().enumerate().map(|(point_index, point)| {
             (start_index..end_index).into_iter().map(|i_panel| {
-                self.induced_velocity_from_panel(i_panel, *point, off_body)
+                if neglect_self_induced {
+                    let (_stream_index, span_index) = self.reverse_panel_index(i_panel);
+
+                    let wing_index_panel = self.wing_index(span_index);
+                    let wing_index_point = self.wing_index(point_index);
+
+                    if wing_index_panel == wing_index_point {
+                        Vec3::default()
+                    } else {
+                        self.induced_velocity_from_panel(i_panel, *point, off_body)
+                    }
+
+                } else {
+                    self.induced_velocity_from_panel(i_panel, *point, off_body)
+                }
             }).sum()
         }).collect();
 
@@ -410,19 +437,24 @@ impl UnsteadyWake {
         stream_index * self.settings.nr_wake_points_along_span + span_index
     }
 
+    /// Returns the index of the wing that the span index belongs to
+    /// 
+    fn wing_index(&self, span_index: usize) -> usize {
+        for i in 0..self.wing_indices.len() {
+            if self.wing_indices[i].contains(&span_index) {
+                return i;
+            }
+        }
+
+        panic!("Span index not found in any wing");
+    }
+
     /// Returns the the indices to the four points that make up a panel at the given indices.
     /// 
     /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom 
     /// left corner when viewing the panel from above.
     fn panel_wake_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
-        let mut wing_index: usize = 0;
-
-        for i in 0..self.wing_indices.len() {
-            if self.wing_indices[i].contains(&panel_span_index) {
-                wing_index = i;
-                break;
-            }
-        }
+        let wing_index = self.wing_index(panel_span_index);
         
         [
             self.wake_point_index(panel_stream_index,     panel_span_index + wing_index),

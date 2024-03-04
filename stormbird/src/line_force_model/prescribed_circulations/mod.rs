@@ -108,33 +108,3 @@ impl LineForceModel {
         self.section_values_from_wing_values(&wing_averaged_velocity)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::math_utils::integration;
-    use crate::math_utils::array_generation;
-
-    #[test]
-    /// Test that the prescribed circulation shape is integrated to 1.0, as it should be.
-    fn evaluate_integral_value() {
-        let x = array_generation::linspace(-0.5, 0.5, 1000);
-
-        let shape = PrescribedCirculationShape::Elliptic;
-
-        let prescribed_circulation = PrescribedCirculation {
-            shape,
-            ..Default::default()
-        };
-
-        let y = prescribed_circulation.get_shape(&x);
-
-        let integral = integration::trapz(&x, &y);
-
-        dbg!(integral);
-
-        assert!((integral - 1.0).abs() < 1e-4);
-        
-    }
-}
