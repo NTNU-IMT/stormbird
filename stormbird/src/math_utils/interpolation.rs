@@ -6,13 +6,12 @@
 
 use super::smoothing::gaussian_kernel;
 
-/// Returns a value that is linearly interpolated on the input values.
-///
+/// Linear interpolation of a target value based on input data.
+/// 
 /// # Arguments
-/// * `x_target` - the x value for the interpolated value
-/// * `x_data` - x values for the input data used in the interpolation
-/// * `y_dara` - y values for the input data used in the interpolation. The y values can be of any
-/// type that supports the mathematical operations necessary to perform linear interpolation.
+/// * `x_target` - The x target value to interpolate to.
+/// * `x_data` - The input x data.
+/// * `y_data` - The input y data.
 pub fn linear_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T]) -> T 
 where T: 
     std::ops::Mul<f64, Output = T> + 
@@ -23,20 +22,34 @@ where T:
     match x_data.len() {
         0 => panic!("x_data is empty"),
         1 => y_data[0],
-        2 => linear_interpolation_two_data_points(x_target, x_data, y_data),
+        2 => {
+            let local_x_data = [x_data[0], x_data[1]];
+            let local_y_data = [y_data[0], y_data[1]];
+
+            linear_interpolation_two_data_points(x_target, &local_x_data, &local_y_data)
+        },
         _ => {
             let index_min = binary_search(x_target, x_data);
 
             if index_min == x_data.len() - 1 {
                 y_data[index_min]
             } else {
-                linear_interpolation_two_data_points(x_target, &x_data[index_min..index_min+2], &y_data[index_min..index_min+2])
+                let local_x_data = [x_data[index_min], x_data[index_min + 1]];
+                let local_y_data = [y_data[index_min], y_data[index_min + 1]];
+                
+                linear_interpolation_two_data_points(x_target, &local_x_data, &local_y_data)
             }
             
         }
     }
 }
 
+/// Binary search for the index of the largest element in a slice that is less than or equal to 
+/// a target value.
+/// 
+/// # Arguments
+/// * `x_target` - The target value to search for.
+/// * `x_data` - The data to search in.
 pub fn binary_search(x_target: f64, x_data: &[f64]) -> usize {
     let mut index_min = 0;
     let mut index_max = x_data.len() - 1;
@@ -54,7 +67,13 @@ pub fn binary_search(x_target: f64, x_data: &[f64]) -> usize {
     index_min
 }
 
-pub fn linear_interpolation_two_data_points<T>(x_target: f64, x_data: &[f64], y_data: &[T]) -> T 
+/// Linear interpolation of a target value based on two input data points.
+/// 
+/// # Arguments
+/// * `x_target` - The x target value to interpolate to.
+/// * `x_data` - The input x data.
+/// * `y_data` - The input y data.
+pub fn linear_interpolation_two_data_points<T>(x_target: f64, x_data: &[f64; 2], y_data: &[T; 2]) -> T 
 where T: 
     std::ops::Mul<f64, Output = T> + 
     std::ops::Add<T, Output = T> + 
@@ -63,46 +82,23 @@ where T:
 {
     if x_target <= x_data[0] {
         y_data[0]
-    } else if x_target >= *x_data.last().unwrap() {
-        *y_data.last().unwrap()
+    } else if x_target >= x_data[1] {
+        y_data[1]
     } else {
-        let mut x_min = x_data[0];
-        let mut x_max = *x_data.last().unwrap();
-        let mut y_min = y_data[0];
-        let mut y_max = *y_data.last().unwrap();
+        let delta_y = y_data[1] - y_data[0];
+        let delta_x = x_data[1] - x_data[0];
 
-        for i in 0..x_data.len() {
-            if x_data[i] > x_min && x_data[i] <= x_target {
-                x_min = x_data[i];
-                y_min = y_data[i];
-            } else if x_data[i] < x_max && x_data[i] >= x_target {
-                x_max = x_data[i];
-                y_max = y_data[i];
-            }
-        }
-
-        let delta_y = y_max - y_min;
-
-        y_min + delta_y * ((x_target - x_min) / (x_max - x_min))
+        y_data[0] + delta_y * ((x_target - x_data[0]) / delta_x)
     }
 }
 
-pub fn linear_array_interpolation<T>(x_target_array: &[f64], x_data: &[f64], y_data: &[T]) -> Vec<T>
-where T: 
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
-    Copy
-{
-    let mut y_target_array: Vec<T> = Vec::with_capacity(x_target_array.len());
 
-    for x_target in x_target_array {
-        y_target_array.push(linear_interpolation(*x_target, x_data, y_data));
-    }
-
-    y_target_array
-}
-
+/// Gaussian interpolation of a target value based on input data.
+/// 
+/// # Arguments
+/// * `x_target` - The x target value to interpolate to.
+/// * `x_data` - The input x data.
+/// * `y_data` - The input y data.
 pub fn gaussian_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T], smoothing_length: f64) -> T
 where T:
     std::ops::Mul<f64, Output = T> + 
@@ -132,7 +128,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_linear_interpolation() {
+    fn linear_interpolation_test() {
         let allowable_error = 1e-6;
 
         let x_data = vec![0.0, 1.0, 2.0, 4.0, 5.0];
@@ -152,5 +148,16 @@ mod tests {
         let error = (y_int - y_comp).abs();
 
         assert!(error < allowable_error)
+    }
+
+    #[test]
+    fn binary_search_test() {
+        let x_data = vec![0.0, 1.0];
+
+        let x_target = 0.999999;
+
+        let index = binary_search(x_target, &x_data);
+
+        assert_eq!(index, 0);
     }
 }
