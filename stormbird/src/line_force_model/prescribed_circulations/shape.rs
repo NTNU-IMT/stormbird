@@ -1,7 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-use crate::math_utils::integration;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Parametric model used to calculate the circulation distribution 
@@ -33,12 +31,6 @@ impl PrescribedCirculationShape {
             if x.abs() < 0.5 {
                 values[i] = (1.0 - (2.0 * x.abs()).powf(self.inner_power)).powf(self.outer_power);
             }
-        }
-
-        let integrated_value = integration::trapz(&relative_span_distance, &values); // TODO: Find way to avoid running this multiple times.
-
-        for i in 0..values.len() {
-            values[i] /= integrated_value;
         }
 
         values

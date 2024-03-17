@@ -98,6 +98,16 @@ impl UnsteadyWakeBuilder {
     fn default_wake_length_factor() -> f64 {50.0}
     fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
 
+    /// Short hand for loading default settings for a rotor sail
+    pub fn new_rotor_sail(diameter: f64) -> Self {
+        Self {
+            first_panel_behavior: FirstPanelBehavior::VelocityFixed(1.0),
+            neglect_self_induced_velocities: true,
+            viscous_core_length_off_body: Some(ViscousCoreLength::Absolute(0.5 * diameter)),
+            ..Default::default()
+        }
+    }
+
     pub fn build(
         &self,
         time_step: f64, 

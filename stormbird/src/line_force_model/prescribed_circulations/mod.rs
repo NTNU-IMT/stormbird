@@ -72,17 +72,19 @@ impl LineForceModel {
     /// Returns a circulation distribution that is forced to follow a specific distribution where 
     /// magnitude and direction is based on the average quantities for each wing.
     pub fn prescribed_circulation_strength(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let effective_velocity = self.prescribed_circulation_shape_velocity(velocity);
+        let wing_averaged_velocity = self.wing_averaged_values(velocity);
+
+        let effective_velocity = self.section_values_from_wing_values(&wing_averaged_velocity);
 
         let raw_circulation_strength = self.circulation_strength_raw(&effective_velocity);
-
-        let average_circulation_strength = self.wing_averaged_values(&raw_circulation_strength);
 
         let relative_span_distance = self.relative_span_distance();
 
         let prescribed_circulation = self.prescribed_circulation.clone().unwrap();
 
         let prescribed_circulation_shape = prescribed_circulation.get_values(&relative_span_distance);
+        
+        let wing_averaged_prescribed_circulation_shape = self.wing_averaged_values(&prescribed_circulation_shape);
 
         let mut corrected_circulation: Vec<f64> = Vec::with_capacity(raw_circulation_strength.len());
 
@@ -90,21 +92,10 @@ impl LineForceModel {
             let wing_index = self.wing_index_from_global(i);
 
             corrected_circulation.push(
-                average_circulation_strength[wing_index] * prescribed_circulation_shape[i]
+                raw_circulation_strength[i] * prescribed_circulation_shape[i] / wing_averaged_prescribed_circulation_shape[wing_index]
             );
         }
 
         corrected_circulation
-    }
-
-    /// Correct the raw velocity when using a prescribed circulation shape
-    /// 
-    /// Current implementation: constant values across the wing, based on average values. 
-    /// 
-    /// Should be updated to something more sophisticated in the future...
-    pub fn prescribed_circulation_shape_velocity(&self, raw_velocity: &[Vec3]) -> Vec<Vec3> {
-        let wing_averaged_velocity = self.wing_averaged_values(raw_velocity);
-
-        self.section_values_from_wing_values(&wing_averaged_velocity)
     }
 }
