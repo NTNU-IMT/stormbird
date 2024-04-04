@@ -18,6 +18,8 @@ pub struct LineForceModelBuilder {
     pub nr_sections: usize,
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,
+    #[serde(default)]
+    pub prescribed_circulation: Option<PrescribedCirculation>,
 }
 
 impl LineForceModelBuilder {
@@ -26,6 +28,7 @@ impl LineForceModelBuilder {
             wing_builders: Vec::new(),
             nr_sections,
             density: LineForceModel::default_density(),
+            prescribed_circulation: None,
         }
     }
 
@@ -49,6 +52,8 @@ impl LineForceModelBuilder {
 
             line_force_model.add_wing(&wing);
         }
+
+        line_force_model.prescribed_circulation = self.prescribed_circulation.clone();
 
         line_force_model
     }    

@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 
 use super::*;
 
-use crate::math_utils::interpolation::linear_interpolation;
+use crate::math_utils::interpolation;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,13 +72,21 @@ impl RotatingCylinder {
     }
 
     pub fn lift_coefficient_from_spin_ratio(&self, spin_ratio: f64) -> f64 {
-        let cl = linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &self.cl_data);
+        let cl = interpolation::linear_interpolation(
+            spin_ratio.abs(), 
+            &self.spin_ratio_data, 
+            &self.cl_data
+        );
 
         cl * spin_ratio.signum()
     }
 
     pub fn drag_coefficient_from_spin_ratio(&self, spin_ratio: f64) -> f64 {
-        linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &self.cd_data)
+        interpolation::linear_interpolation(
+            spin_ratio.abs(), 
+            &self.spin_ratio_data, 
+            &self.cd_data,
+        )
     }
 
     pub fn lift_coefficient(&self, diameter: f64, velocity: f64) -> f64 {
@@ -96,8 +104,21 @@ impl RotatingCylinder {
     pub fn wake_angle(&self, diameter: f64, velocity: f64) -> f64 {
         let spin_ratio = self.spin_ratio(diameter, velocity);
 
-        let angle_magnitude = linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &self.wake_angle_data);
+        let angle_magnitude = interpolation::linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &self.wake_angle_data);
 
         -angle_magnitude * spin_ratio.signum()
+    }
+
+    /// Helper function to calculate revolutions per second from a target spin ratio, diameter and
+    /// velocity.
+    pub fn revolutions_per_second_from_spin_ratio(spin_ratio: f64, diameter: f64, velocity: f64) -> f64 {
+        if velocity == 0.0 {
+            0.0
+        } else {
+            let circumference = PI * diameter;
+            let tangential_velocity = velocity * spin_ratio;
+            
+            tangential_velocity / circumference
+        }
     }
 }
