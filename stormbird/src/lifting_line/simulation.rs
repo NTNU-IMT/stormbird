@@ -170,7 +170,7 @@ impl Simulation {
                 )
             },
             SimulationMode::Dynamic(settings) => {
-                if self.unsteady_wake.is_none() {
+                if self.unsteady_wake.is_none() && velocity_input.freestream.length() > 0.1 {
                     self.unsteady_wake = Some(
                         settings.wake.build(
                             time_step,
@@ -180,33 +180,37 @@ impl Simulation {
                     );
                 }
 
-                let mut wake = self.unsteady_wake.as_mut().unwrap();
+                if let Some(_) = &mut self.unsteady_wake {
+                    let mut wake = self.unsteady_wake.as_mut().unwrap();
 
-                let result = unsteady_solvers::solve_one_time_step(
-                    time_step,
-                    &self.line_force_model,
-                    &velocity_input,
-                    &mut wake,
-                    &settings.solver,
-                    &self.previous_circulation_strength
-                );
+                    let result = unsteady_solvers::solve_one_time_step(
+                        time_step,
+                        &self.line_force_model,
+                        &velocity_input,
+                        &mut wake,
+                        &settings.solver,
+                        &self.previous_circulation_strength
+                    );
 
-                let time_step_index = (time / time_step) as usize;
+                    let time_step_index = (time / time_step) as usize;
 
-                if self.write_wake_data_to_file {
-                    let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
+                    if self.write_wake_data_to_file {
+                        let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
 
-                    let write_result = wake.write_wake_to_vtk_file(&wake_file_path);
+                        let write_result = wake.write_wake_to_vtk_file(&wake_file_path);
 
-                    match write_result {
-                        Ok(_) => {},
-                        Err(e) => {
-                            println!("Error writing wake data to file: {}", e);
+                        match write_result {
+                            Ok(_) => {},
+                            Err(e) => {
+                                println!("Error writing wake data to file: {}", e);
+                            }
                         }
                     }
-                }
 
-                result
+                    result
+                } else {
+                    SimulationResult::default()
+                }
             }
         };
 

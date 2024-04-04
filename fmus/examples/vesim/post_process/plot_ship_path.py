@@ -57,6 +57,9 @@ if __name__ == '__main__':
         plt.xlabel('north [m]')
         plt.ylabel('east [m]')
 
+        plt.xlim(-0.25*np.max(x), 0.25 * np.max(x))
+        plt.ylim(0, np.max(x))
+
         plt.sca(ax2)
         plt.plot(time, velocity_mag)
         plt.xlabel('time [s]')

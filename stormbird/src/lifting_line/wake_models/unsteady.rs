@@ -84,6 +84,7 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default)]
     /// Optional viscous core to be used when calculating induced velocities off body.
     pub viscous_core_length_off_body: Option<ViscousCoreLength>,
+    #[serde(default)]
     /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is 
     /// useful if the effect of self-induced velocities on lift and drag is calculated in another 
     /// way, for example with CFD, and the only reason for running lifting-line simulations is to 

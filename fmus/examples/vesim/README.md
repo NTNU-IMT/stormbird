@@ -7,4 +7,8 @@ by your local ShipX install. However, the purpose is to show how this can be ach
 way. 
 
 ## Steps to reproduce this setup for another model
-To come
+### Ensure Vesim models can be executed by OSP
+To allow the exported FMU-model to be executed by an external model, the `SINTEF_FMU_CRT_DIR`
+environmental variable must be set to point to the binaries folder of the ShipX FMUs.
+
+This can be found in: `[shipx-folder]/`

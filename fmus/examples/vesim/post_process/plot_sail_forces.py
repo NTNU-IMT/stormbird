@@ -35,9 +35,11 @@ if __name__ == '__main__':
         time = sails_df['Time'].to_numpy()
 
         surge_force = sails_df['force_x'].to_numpy()
-        sway_force = sails_df['force_y'].to_numpy()
+        sway_force  = sails_df['force_y'].to_numpy()
 
-        plt.plot(time, surge_force)
-        plt.plot(time, sway_force)
+        plt.plot(time, surge_force, label='Surge force')
+        plt.plot(time, sway_force, label='Sway force')
+
+    plt.legend()
 
     plt.show()

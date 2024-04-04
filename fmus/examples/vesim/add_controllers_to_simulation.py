@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 
-import numpy as np
+from pathlib import Path
 
 import argparse
 
@@ -27,11 +27,12 @@ if __name__ == '__main__':
     ship_name = "SOBC1"
 
     thruster_names = [
-        'propeller_and_rudder_port_prop',
-        'propeller_and_rudder_stbd_prop'
+        'propeller_and_rudder_propeller_and_rudder'
     ]
 
-    pid_source = '../../pid_controller/PIDController.fmu'
+    home_folder = Path.home()
+
+    pid_source = '../../../../../github/fmu_from_struct/examples/pid_controller/PIDController.fmu'
 
     namespace = "http://opensimulationplatform.com/MSMI/OSPSystemStructure"
     
