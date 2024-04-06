@@ -18,7 +18,7 @@ if __name__ == "__main__":
     wake_files_folder_path  = home / Path("wake_files")
 
     if not wake_files_folder_path.exists():
-        raise FileNotFoundError(f"Folder {wake_files_folder_path} does not exist")
+        raise FileNotFoundError(f"Folder {wake_files_folder_path} does not exist. Create it to allow storage of wake files.")
 
     args = parser.parse_args()
 

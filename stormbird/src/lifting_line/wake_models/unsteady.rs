@@ -5,8 +5,7 @@
 //! Functionality for calculating lift-induced velocities from full dynamic wake.
 
 use std::fs::File;
-use std::io::{Write, Error};
-use std::io::BufWriter;
+use std::io::{Write, BufWriter, Error};
 
 use serde::{Serialize, Deserialize};
 
@@ -48,11 +47,42 @@ impl Default for FirstPanelBehavior {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Enum to choose how to set the length of the wake. 
+/// 
+/// # Variants
+/// * `NrPanels` - The wake length is determined by the number of panels in the wake. This makes it
+/// independent of the freestream velocity and the mean chord length.
+/// * `TargetLengthFactor` - The wake length is determined by the freestream velocity and the mean
+/// chord length, multiplied by the given factor. This variant can only be used safely when the 
+/// freestream velocity is properly defined when initializing the wake. This is not always the case, 
+/// and the `NrPanels` variant is therefore the default.
+pub enum WakeLength {
+    NrPanels(usize),
+    TargetLengthFactor(f64),
+}
+
+impl Default for WakeLength {
+    fn default() -> Self {
+        Self::NrPanels(100)
+    }
+}
+
+impl WakeLength {
+    fn nr_wake_panels_from_target_length_factor(&self, chord_length: f64, velocity: f64, time_step: f64) -> Result<usize, String> {
+        match self {
+            Self::NrPanels(_) => Err("This function is only intended for the TargetLengthFactor variant".to_string()),
+            Self::TargetLengthFactor(factor) => Ok((factor * chord_length / (velocity * time_step)).ceil() as usize)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Variables used to build an unsteady wake. 
 pub struct UnsteadyWakeBuilder {
-    #[serde(default="UnsteadyWakeBuilder::default_wake_length_factor")]
-    /// Length of the wake relative to the free stream velocity and the mean chord length
-    pub wake_length_factor: f64,
+    #[serde(default)]
+    /// Data used to determine the length of the wake. 
+    pub wake_length: WakeLength,
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
     pub viscous_core_length: ViscousCoreLength,
@@ -96,7 +126,6 @@ pub struct UnsteadyWakeBuilder {
 }
 
 impl UnsteadyWakeBuilder {
-    fn default_wake_length_factor() -> f64 {50.0}
     fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
 
     /// Short hand for loading default settings for a rotor sail
@@ -132,9 +161,12 @@ impl UnsteadyWakeBuilder {
             .map(|chord| chord.length())
             .sum::<f64>() / chord_vectors.len() as f64;
         
-        let nr_wake_panels_per_line_element = self.nr_wake_panels_per_line_element(
-            mean_chord_length, freestream_velocity.length(), time_step
-        );
+        let nr_wake_panels_per_line_element = match self.wake_length {
+            WakeLength::NrPanels(nr_panels) => nr_panels,
+            WakeLength::TargetLengthFactor(_) => self.wake_length.nr_wake_panels_from_target_length_factor(
+                mean_chord_length, freestream_velocity.length(), time_step
+            ).unwrap()
+        };
 
         let nr_wake_points_per_line_element = nr_wake_panels_per_line_element + 1;
 
@@ -215,10 +247,6 @@ impl UnsteadyWakeBuilder {
         wake
     }
 
-    fn nr_wake_panels_per_line_element(&self, chord_length: f64, velocity: f64, time_step: f64) -> usize {
-        (self.wake_length_factor * chord_length / (velocity * time_step)).ceil() as usize
-    }
-
     fn strength_damping_factor(&self, nr_wake_panels_per_line_element: usize) -> f64 {
         let estimated_value = 1.0 - self.strength_damping_last_panel_ratio.powf(
             1.0 / (nr_wake_panels_per_line_element - 1) as f64
@@ -231,7 +259,7 @@ impl UnsteadyWakeBuilder {
 impl Default for UnsteadyWakeBuilder {
     fn default() -> Self {
         Self {
-            wake_length_factor: Self::default_wake_length_factor(),
+            wake_length: Default::default(),
             viscous_core_length: Default::default(),
             first_panel_behavior: Default::default(),
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
