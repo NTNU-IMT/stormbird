@@ -49,5 +49,5 @@
         }
     },
     "write_wake_data_to_file": true,
-    "wake_files_folder_path": "wake_files"
+    "wake_files_folder_path": "output/wake_files"
 }

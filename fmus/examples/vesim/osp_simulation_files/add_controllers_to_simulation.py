@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     home_folder = Path.home()
 
-    pid_source = '../../../../../github/fmu_from_struct/examples/pid_controller/PIDController.fmu'
+    pid_source = '../../../../../../github/fmu_from_struct/examples/pid_controller/PIDController.fmu'
 
     namespace = "http://opensimulationplatform.com/MSMI/OSPSystemStructure"
     

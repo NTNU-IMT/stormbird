@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 
 import os
-import shutil
 
 import argparse
 
@@ -21,7 +20,7 @@ def delete_old_output_files(output_path: Path):
             print(e)
 
 def delete_old_wake_files():
-    wake_path = Path('wake_files')
+    wake_path = Path('output/wake_files')
     current_wake_files = os.listdir(wake_path)
 
     for file in current_wake_files:
@@ -42,17 +41,17 @@ if __name__ == '__main__':
     cosim_executable_path = Path("C:/Program Files/Open Simulation Platform/cosim-v0.7.1-win64/bin/cosim.exe") # Must be updated based on your installation
     
     if args.with_stormbird:
-        output_path = Path('output_with_stormbird')
+        output_path = Path('output/output_with_stormbird')
     else:
-        output_path = Path('output_no_stormbird')
+        output_path = Path('output/output_no_stormbird')
 
     delete_old_output_files(output_path)
     delete_old_wake_files()
 
     if args.with_stormbird:
-        sim_name = 'OspSystemStructure_with_stormbird.xml'
+        sim_name = 'osp_simulation_files/OspSystemStructure_with_stormbird.xml'
     else:
-        sim_name = 'OspSystemStructure_with_controllers.xml'
+        sim_name = 'osp_simulation_files/OspSystemStructure_with_controllers.xml'
 
     start_time = time.time()
     subprocess.run(

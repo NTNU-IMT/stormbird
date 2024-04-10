@@ -15,8 +15,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    output_path_w_sb = Path('../output_with_stormbird')
-    output_path_n_sb = Path('../output_no_stormbird')
+    output_path_w_sb = Path('../output/output_with_stormbird')
+    output_path_n_sb = Path('../output/output_no_stormbird')
 
     output_path_list = [output_path_w_sb, output_path_n_sb]
     output_names = ['with stormbird', 'without stormbird']
@@ -31,6 +31,8 @@ if __name__ == '__main__':
 
     for output_path, name in zip(output_path_list, output_names):
         all_output_files = os.listdir(output_path)
+
+        print(all_output_files)
 
         sobc_files = []
         for f in all_output_files:

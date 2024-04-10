@@ -1,3 +1,7 @@
+'''
+Contains functions for manipulating a OSP model description xml file.
+'''
+
 import xml.etree.ElementTree as ET
 
 def add_initial_value(initial_values, *, variable: str, value: float | bool | str | int):

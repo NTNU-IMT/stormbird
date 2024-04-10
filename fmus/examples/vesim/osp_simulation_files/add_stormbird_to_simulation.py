@@ -26,13 +26,17 @@ if __name__ == '__main__':
     ship_name = "SOBC1"
     additional_body_force_index = 1
 
-    if args.dynamic:
-        stormbird_setup_path = 'stormbird_setup_dynamic.json'
-    else:
-        stormbird_setup_path = 'stormbird_setup_quasi_steady.json'
+    stormbird_setup_folder = 'stormbird_setup/'
 
-    stormbird_source      = '../../stormbird_lifting_line/StormbirdLiftingLine.fmu'
-    velocity_input_source = '../../vesim_to_stormbird/VesimToStormbird.fmu'
+    if args.dynamic:
+        stormbird_setup_path = stormbird_setup_folder + 'stormbird_setup_dynamic.json'
+    else:
+        stormbird_setup_path = stormbird_setup_folder + 'stormbird_setup_quasi_steady.json'
+
+    fmu_source_folder     = '../../../'
+    
+    stormbird_source      = fmu_source_folder + 'stormbird_lifting_line/StormbirdLiftingLine.fmu'
+    velocity_input_source = fmu_source_folder + 'vesim_to_stormbird/VesimToStormbird.fmu'
 
     namespace = "http://opensimulationplatform.com/MSMI/OSPSystemStructure"
     
