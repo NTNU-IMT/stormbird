@@ -384,7 +384,11 @@ impl LineForceModel {
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let mut section_force = strength[index] * velocity[index].cross(span_lines[index].relative_vector());
+                let mut section_force = if velocity[index].length() == 0.0 {
+                    Vec3::default()
+                } else {
+                    strength[index] * velocity[index].cross(span_lines[index].relative_vector())
+                };
                 
                 if let Some(cd) = &viscous_cd {
                     let drag_direction = velocity[index].normalize();

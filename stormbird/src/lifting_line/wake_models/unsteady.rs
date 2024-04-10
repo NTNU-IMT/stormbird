@@ -163,9 +163,15 @@ impl UnsteadyWakeBuilder {
         
         let nr_wake_panels_per_line_element = match self.wake_length {
             WakeLength::NrPanels(nr_panels) => nr_panels,
-            WakeLength::TargetLengthFactor(_) => self.wake_length.nr_wake_panels_from_target_length_factor(
-                mean_chord_length, freestream_velocity.length(), time_step
-            ).unwrap()
+            WakeLength::TargetLengthFactor(_) => {
+                if freestream_velocity.length() == 0.0 {
+                    panic!("Freestream velocity is zero. Cannot calculate wake length.");
+                }
+
+                self.wake_length.nr_wake_panels_from_target_length_factor(
+                    mean_chord_length, freestream_velocity.length(), time_step
+                ).unwrap()
+            }
         };
 
         let nr_wake_points_per_line_element = nr_wake_panels_per_line_element + 1;
@@ -180,6 +186,12 @@ impl UnsteadyWakeBuilder {
             FirstPanelBehavior::VelocityFixed(ratio) => ratio,
         };
 
+        let wake_building_velocity = if freestream_velocity.length() == 0.0 {
+            Vec3::new(1e-6, 1e-6, 1e-6)
+        } else {
+            freestream_velocity
+        };
+
         for i_stream in 0..nr_wake_points_per_line_element {
             for i_span in 0..span_points.len() {
                 let start_point = span_points[i_span];
@@ -190,7 +202,7 @@ impl UnsteadyWakeBuilder {
                     wake_points.push(
                         start_point + 
                         first_panel_ratio * span_points_chord_vectors[i_span] +
-                        ((i_stream-1) as f64) * time_step * freestream_velocity
+                        ((i_stream-1) as f64) * time_step * wake_building_velocity
                     );
                 }
             }
