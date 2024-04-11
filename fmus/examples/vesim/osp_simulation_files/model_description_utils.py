@@ -52,7 +52,6 @@ def add_simulator(
     for var_name, var_value in initial_variables.items():
         add_initial_value(initial_values, variable=var_name, value=var_value)
         
-
     return simulator
 
 def add_connection(connections, *, simulators: list[str], variables: list[str]):
