@@ -47,8 +47,6 @@ impl FmuFunctions for StormbirdLiftingLine {
     fn do_step(&mut self, current_time: f64, time_step: f64) {
         let input_state = self.input_state();
 
-        dbg!(&self.relative_angle);
-
         if self.use_relative_angle {
             self.apply_relative_angle(input_state.freestream_velocity);
         }
