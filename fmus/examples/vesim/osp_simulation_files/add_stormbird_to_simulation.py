@@ -62,7 +62,7 @@ if __name__ == '__main__':
         initial_variables = {
             'setup_file_path': stormbird_setup_path,
             'angles_in_degrees': True,
-            'relative_angle': 20.0,
+            'relative_angle': 0.0,
             "use_relative_angle": True
         }
     )

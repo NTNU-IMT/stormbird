@@ -17,10 +17,10 @@ if __name__ == '__main__':
     # ------------------------------- Settings -----------------------------------------------------
     parser = argparse.ArgumentParser(description='Add stormbird to simulation.')
     parser.add_argument('--velocity_in_knots', type=float, default=12.0, help='Velocity of ship.')
-    parser.add_argument('--max_rpm',           type=float, default=75.0, help='Maximum rpm of propellers.')
-    parser.add_argument('--max_rudder_angle_deg',  type=float, default=35.0, help='Maximum rudder angle.')
-    parser.add_argument('--speed_prop_gain',   type=float, default=10.0, help='Proportional gain of speed controller.')
-    parser.add_argument('--heading_prop_gain', type=float, default=1.0, help='Proportional gain of heading controller.')
+    parser.add_argument('--max-rpm',           type=float, default=75.0, help='Maximum rpm of propellers.')
+    parser.add_argument('--max-rudder-angle-deg',  type=float, default=35.0, help='Maximum rudder angle.')
+    parser.add_argument('--speed-prop-gain',   type=float, default=10.0, help='Proportional gain of speed controller.')
+    parser.add_argument('--heading-prop-gain', type=float, default=1.0, help='Proportional gain of heading controller.')
 
     args = parser.parse_args()
 
@@ -61,6 +61,7 @@ if __name__ == '__main__':
             'integral_gain':     0.5 * args.speed_prop_gain,
             'derivative_gain':   1.0 * args.speed_prop_gain,
             'max_value': args.max_rpm,
+            'reverse_error_sign': False
         }
     )
 
@@ -71,11 +72,11 @@ if __name__ == '__main__':
         initial_variables = {
             'set_point': 0.0,
             'proportional_gain': 1.0 * args.heading_prop_gain,
-            'integral_gain':     0.5 * args.heading_prop_gain,
-            'derivative_gain':   4.0 * args.heading_prop_gain,
+            'integral_gain':     0.005 * args.heading_prop_gain,
+            'derivative_gain':   0.0 * args.heading_prop_gain,
             'max_value':  args.max_rudder_angle_deg,
             'min_value': -args.max_rudder_angle_deg,
-            'reverse_output': True
+            'reverse_error_sign': True
         }
     )
 
