@@ -15,8 +15,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    output_path_w_sb = Path('../output_with_stormbird')
-    output_path_n_sb = Path('../output_no_stormbird')
+    output_path_w_sb = Path('../output/output_with_stormbird')
+    output_path_n_sb = Path('../output/output_no_stormbird')
 
     output_path_list = [output_path_w_sb, output_path_n_sb]
 
