@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
+    
+    <StartTime>0.0</StartTime>
+    <BaseStepSize>0.1</BaseStepSize>
+    <Algorithm>fixedStep</Algorithm>
+    
+    <Simulators>
+        <Simulator name="wing" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
+            <InitialValues>
+                <InitialValue variable = "setup_file_path"> <String value="setup_files/stormbird.json"/> </InitialValue>
+                <InitialValue variable = "use_relative_angle"> <Boolean value="true"/> </InitialValue>
+                <InitialValue variable = "angles_in_degrees"> <Boolean value="true"/> </InitialValue>
+                <InitialValue variable = "freestream_u"> <Real value="8.0"/> </InitialValue>
+            </InitialValues>
+        </Simulator>
+
+        <Simulator name="rotation" source="../../data_output/DataOutput.fmu">
+            <InitialValues>
+                <InitialValue variable = "file_path"> <String value="setup_files/rotation_data.json"/> </InitialValue>
+            </InitialValues>
+        </Simulator>
+
+    </Simulators>
+
+    <Connections>
+        <VariableConnection>
+            <Variable simulator="rotation" name="output"/>
+            <Variable simulator="wing" name="relative_angle"/>
+        </VariableConnection>
+        
+    </Connections>
+
+</OspSystemStructure>

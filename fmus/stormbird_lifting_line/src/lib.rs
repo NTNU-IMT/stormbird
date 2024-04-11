@@ -14,6 +14,7 @@ pub struct StormbirdLiftingLine {
     #[parameter]
     pub setup_file_path: String,
     pub angles_in_degrees: bool,
+    pub use_relative_angle: bool,
     #[input]
     pub translation_x: f64,
     pub translation_y: f64,
@@ -25,7 +26,6 @@ pub struct StormbirdLiftingLine {
     pub freestream_v: f64,
     pub freestream_w: f64,
     pub relative_angle: f64,
-    pub use_relative_angle: bool,
     #[output]
     pub force_x: f64,
     pub force_y: f64,
@@ -46,6 +46,8 @@ impl FmuFunctions for StormbirdLiftingLine {
 
     fn do_step(&mut self, current_time: f64, time_step: f64) {
         let input_state = self.input_state();
+
+        dbg!(&self.relative_angle);
 
         if self.use_relative_angle {
             self.apply_relative_angle(input_state.freestream_velocity);

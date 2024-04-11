@@ -48,8 +48,9 @@ pub struct LineForceModel {
     pub translation: Vec3,
     /// Rotation from local to global coordinates
     pub rotation: Vec3,
-    /// Vector used to store local angles for each wing. This can be used to rotate the wing during 
-    /// a dynamic simulation
+    /// Vector used to store local angles for each wing. This can be used to rotate the wing along 
+    /// the span axis during a dynamic simulation. The typcial example is chaging the angle of 
+    /// attack on a wing sail due to changing apparent wind conditions.
     pub local_wing_angles: Vec<f64>,
     /// Density used in force calculations
     pub density: f64,
@@ -58,7 +59,7 @@ pub struct LineForceModel {
 }
 
 impl LineForceModel {
-    pub fn default_density() -> f64 { 1.0 } //TODO: the default density should be 1.225. Only set to one for testing purposes
+    pub fn default_density() -> f64 { 1.225 }
 
     /// Creates a new empty line force model. Wings can be added using the [LineForceModel::add_wing] function.
     pub fn new(density: f64) -> LineForceModel {
@@ -150,6 +151,7 @@ impl LineForceModel {
         self.wing_rotation_axis(wing_index)
     }
 
+    /// Returns both angle and axis of rotation for the wing at the input index.
     pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, Vec3) {
         let axis = self.wing_rotation_axis(wing_index);
         let angle = self.local_wing_angles[wing_index];
@@ -189,8 +191,7 @@ impl LineForceModel {
             |(global_index, chord_vector)| {
                 let (angle, axis) = self.wing_rotation_data_from_global(global_index);
 
-                chord_vector.rotate_around_axis(angle, axis)
-                    .rotate(self.rotation)
+                chord_vector.rotate_around_axis(angle, axis).rotate(self.rotation)
             }
         ).collect()
     }
