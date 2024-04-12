@@ -39,7 +39,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    cosim_path = Path.home() / Path("Software/open_simulation_platform/cosim-v0.7.1-win64/bin/cosim.exe")
+    #cosim_path = Path.home() / Path("Software/open_simulation_platform/cosim-v0.7.1-win64/bin/cosim.exe")
+
+    cosim_path = Path("C:\Program Files\Open Simulation Platform\cosim-v0.7.1-win64/bin/cosim.exe")
     
     output_path = Path('output')
 
