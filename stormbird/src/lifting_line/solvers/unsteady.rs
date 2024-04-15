@@ -49,9 +49,7 @@ pub fn solve_one_time_step(
     let ctrl_points = line_force_model.ctrl_points();
 
     // Velocity components that are fixed for the entire time step    
-    let u_inf_ctrl_point: Vec<Vec3> = velocity_input.felt_velocity_at_points(
-        &line_force_model.ctrl_points_local()
-    );
+    let u_inf_ctrl_point: Vec<Vec3> = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
 
     let u_i_free_wake: Vec<Vec3>    = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 

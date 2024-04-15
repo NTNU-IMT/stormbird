@@ -52,7 +52,7 @@ impl ActuatorLineBuilder {
         }
     }
 
-    /// Contstructs a actuator line model from the builder data.
+    /// Constructs a actuator line model from the builder data.
     pub fn build(&self) -> ActuatorLine {
         let force_model_sampling = self.force_model.build();
         let force_model_projection = self.force_model.build_with_nr_sections(self.force_model.nr_sections * self.project_upscale_factor);
@@ -72,7 +72,7 @@ impl ActuatorLineBuilder {
 }
 
 #[derive(Debug, Clone)]
-/// Structure for prepresenting an actuator line model. 
+/// Structure for representing an actuator line model. 
 pub struct ActuatorLine {
     /// The line force model used to compute forces on each line segment as a function of the local
     /// velocity.

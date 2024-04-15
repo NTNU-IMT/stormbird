@@ -66,7 +66,7 @@ impl Default for SteadySolverSettings {
 /// 1) - coarse models seems to require fewer iterations than fine mdoels
 /// 2) - coarse models seem to be more stable than fine models
 /// 
-/// The idea is inspired from multigrid solvers in CFD
+/// The idea is inspired from multi grid solvers in CFD
 pub fn solve_steady_multiresolution(
     line_force_model_builder: &LineForceModelBuilder, 
     velocity_input: &VelocityInput, 
@@ -214,9 +214,7 @@ fn calculate_velocity(
     viscous_wakes: Option<&ViscousWakes>, 
     circulation_strength: &[f64]
 ) -> Vec<Vec3> {
-    let ctrl_point_velocities: Vec<Vec3> = velocity_input.felt_velocity_at_points(
-        &line_force_model.ctrl_points_local()
-    );
+    let ctrl_point_velocities: Vec<Vec3> = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
 
     let induced_velocities: Vec<Vec3> = wake.induced_velocities_at_control_points(circulation_strength);
 

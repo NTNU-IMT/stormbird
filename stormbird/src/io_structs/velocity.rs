@@ -6,6 +6,8 @@
 //! the motion of the wings.
 
 use crate::vec3::Vec3;
+use crate::math_utils::finite_difference;
+use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Copy, Default)]
 /// Structure to store and acess the freestream velocity and the motion velocity of the wing.
@@ -24,10 +26,13 @@ impl VelocityInput {
         self.freestream
     }
 
-    /// Calculates the felt velocity at the given points. The motion velocity is assumed to be 
-    /// negative, meaning that the internal values represent the velocity of the wing.
-    pub fn felt_velocity_at_points(&self, points: &[Vec3]) -> Vec<Vec3> {
-        points.iter().map(|point| {
+    /// Calculates the felt velocity at the control points of the line force model. 
+    /// The motion velocity is assumed to be negative, meaning that the internal values represent 
+    /// the velocity of the wing.
+    pub fn felt_velocity_at_ctrl_points(&self, line_force_model: &LineForceModel) -> Vec<Vec3> {
+        let ctrl_points = line_force_model.ctrl_points();
+
+        ctrl_points.iter().map(|point| {
             self.freestream - self.translation - self.rotation.cross(*point)
         }).collect()
     }
@@ -63,17 +68,20 @@ impl Default for VelocityCalculator {
 
 impl VelocityCalculator {
     pub fn get_velocity_input(&mut self, input_state: InputState, time_step: f64) -> VelocityInput {
-        let rotation_velocity = (
-            3.0 * input_state.rotation - 
-            4.0 * self.state_history[1].rotation + 
-            self.state_history[0].rotation
-        ) / (2.0 * time_step);
+        let rotation_data: [Vec3; 3] = [
+            self.state_history[0].rotation,
+            self.state_history[1].rotation,
+            input_state.rotation,
+        ];
 
-        let translation_velocity = (
-            3.0 * input_state.translation - 
-            4.0 * self.state_history[1].translation + 
-            self.state_history[0].translation
-        ) / (2.0 * time_step);
+        let translation_data: [Vec3; 3] = [
+            self.state_history[0].translation,
+            self.state_history[1].translation,
+            input_state.translation,
+        ];
+
+        let rotation_velocity = finite_difference::first_derivative_second_order_backward(&rotation_data, time_step);
+        let translation_velocity = finite_difference::first_derivative_second_order_backward(&translation_data, time_step);
 
         self.state_history[0] = self.state_history[1];
         self.state_history[1] = input_state;

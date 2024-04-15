@@ -521,7 +521,7 @@ impl LineForceModel {
     }
     
 
-    /// General fucntion for calculating wing-averaged values
+    /// General function for calculating wing-averaged values
     pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T> 
     where T: 
         std::ops::Div<f64, Output = T> + 
