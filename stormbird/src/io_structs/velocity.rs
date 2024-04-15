@@ -25,7 +25,7 @@ impl VelocityInput {
     }
 
     /// Calculates the felt velocity at the given points. The motion velocity is assumed to be 
-    /// negative, menaing that the internal values represent the velocity of the wing.
+    /// negative, meaning that the internal values represent the velocity of the wing.
     pub fn felt_velocity_at_points(&self, points: &[Vec3]) -> Vec<Vec3> {
         points.iter().map(|point| {
             self.freestream - self.translation - self.rotation.cross(*point)
@@ -43,4 +43,45 @@ pub struct InputState {
     pub translation: Vec3,
     /// Rotation of the wing(s), measured in rad
     pub rotation: Vec3,
+}
+
+#[derive(Debug, Clone, Copy)]
+/// A structure responsible for calculating the velocity based on the input state of the wings, 
+/// using finite difference and the history of the input states.
+pub struct VelocityCalculator {
+    /// The history of the input states
+    pub state_history: [InputState; 2],
+}
+
+impl Default for VelocityCalculator {
+    fn default() -> Self {
+        Self {
+            state_history: [InputState::default(); 2],
+        }
+    }
+}
+
+impl VelocityCalculator {
+    pub fn get_velocity_input(&mut self, input_state: InputState, time_step: f64) -> VelocityInput {
+        let rotation_velocity = (
+            3.0 * input_state.rotation - 
+            4.0 * self.state_history[1].rotation + 
+            self.state_history[0].rotation
+        ) / (2.0 * time_step);
+
+        let translation_velocity = (
+            3.0 * input_state.translation - 
+            4.0 * self.state_history[1].translation + 
+            self.state_history[0].translation
+        ) / (2.0 * time_step);
+
+        self.state_history[0] = self.state_history[1];
+        self.state_history[1] = input_state;
+
+        VelocityInput {
+            freestream: input_state.freestream_velocity,
+            translation: translation_velocity,
+            rotation: rotation_velocity,
+        }
+    }
 }

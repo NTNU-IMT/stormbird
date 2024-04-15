@@ -18,7 +18,7 @@ use crate::vec3::Vec3;
 
 use crate::line_force_model::LineForceModel;
 use crate::lifting_line::singularity_elements::prelude::*;
-use crate::io_structs::input::VelocityInput;
+use crate::io_structs::velocity::VelocityInput;
 
 use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilder};
 
@@ -63,7 +63,7 @@ pub enum WakeLength {
 
 impl Default for WakeLength {
     fn default() -> Self {
-        Self::NrPanels(100)
+        Self::NrPanels(200)
     }
 }
 

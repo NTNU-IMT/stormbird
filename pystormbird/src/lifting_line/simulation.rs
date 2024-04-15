@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
-use stormbird::io_structs::input::InputState;
+use stormbird::io_structs::velocity::InputState;
 
 use crate::vec3::Vec3;
 use crate::result_structs::SimulationResult;

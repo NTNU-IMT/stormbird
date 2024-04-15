@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality for  representnig wings as "line objects", without any assumptions about the 
+//! Functionality for  representing wings as "line objects", without any assumptions about the 
 //! physical model. 
 //! 
 //! Stores the geometry and sectional models only. To be used with either lifting line simulations 
@@ -49,7 +49,7 @@ pub struct LineForceModel {
     /// Rotation from local to global coordinates
     pub rotation: Vec3,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along 
-    /// the span axis during a dynamic simulation. The typcial example is chaging the angle of 
+    /// the span axis during a dynamic simulation. The typical example is changing the angle of 
     /// attack on a wing sail due to changing apparent wind conditions.
     pub local_wing_angles: Vec<f64>,
     /// Density used in force calculations

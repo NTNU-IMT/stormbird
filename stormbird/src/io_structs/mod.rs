@@ -4,13 +4,13 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 //! Collection of structs used for input and output in simulations. The structs are kept independent
-//! from the specific methods in the lirbary (lifting- and actuator line), as they are used in 
+//! from the specific methods in the library (lifting- and actuator line), as they are used in 
 //! multiple places.
 
-pub mod input;
+pub mod velocity;
 pub mod result;
 
 pub mod prelude {
-    pub use super::input::*;
+    pub use super::velocity::*;
     pub use super::result::*;
 }
