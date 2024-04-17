@@ -2,11 +2,9 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality for  representing wings as "line objects", without any assumptions about the 
-//! physical model. 
-//! 
-//! Stores the geometry and sectional models only. To be used with either lifting line simulations 
-//! (see [crate::lifting_line]) or in actuator line simulations (see [crate::actuator_line])
+//! Functionality for representing wings as "line objects", without any assumptions about how 
+//! lift-induced velocities are estimated. In other words, this part is common for all methods 
+//! available in the library, and therefore the foundation of all simulations. 
 
 pub mod solver_utils;
 pub mod span_line;
@@ -286,7 +284,6 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        // TODO: change the match statement to the outside of the for loop
         let angle_of_attack = self.angle_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
@@ -314,8 +311,6 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        // TODO: change the match statement to the outside of the for loop
-
         let angle_of_attack = self.angle_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(

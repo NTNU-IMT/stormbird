@@ -2,11 +2,12 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality to represent the velocity in simulations due to both the freestream velocity and 
-//! the motion of the wings.
+//! Functionality to represent and calculate the velocity in a simulations due to both the 
+//! freestream velocity and the motion of the wings.
 
 use crate::vec3::Vec3;
 use crate::math_utils::finite_difference;
+
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -21,11 +22,6 @@ pub struct VelocityInput {
 }
 
 impl VelocityInput {
-    /// Returns the freestream velocity.
-    pub fn freestream(&self) -> Vec3 {
-        self.freestream
-    }
-
     /// Calculates the felt velocity at the control points of the line force model. 
     /// The motion velocity is assumed to be negative, meaning that the internal values represent 
     /// the velocity of the wing.

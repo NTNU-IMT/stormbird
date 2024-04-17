@@ -144,8 +144,6 @@ impl UnsteadyWakeBuilder {
         line_force_model: &LineForceModel, 
         velocity_input: &VelocityInput, 
     ) -> UnsteadyWake {                
-        let freestream_velocity = velocity_input.freestream();
-
         let span_points   = line_force_model.span_points();
         let chord_vectors = line_force_model.chord_vectors();
 
@@ -164,12 +162,12 @@ impl UnsteadyWakeBuilder {
         let nr_wake_panels_per_line_element = match self.wake_length {
             WakeLength::NrPanels(nr_panels) => nr_panels,
             WakeLength::TargetLengthFactor(_) => {
-                if freestream_velocity.length() == 0.0 {
+                if velocity_input.freestream.length() == 0.0 {
                     panic!("Freestream velocity is zero. Cannot calculate wake length.");
                 }
 
                 self.wake_length.nr_wake_panels_from_target_length_factor(
-                    mean_chord_length, freestream_velocity.length(), time_step
+                    mean_chord_length, velocity_input.freestream.length(), time_step
                 ).unwrap()
             }
         };
@@ -186,10 +184,10 @@ impl UnsteadyWakeBuilder {
             FirstPanelBehavior::VelocityFixed(ratio) => ratio,
         };
 
-        let wake_building_velocity = if freestream_velocity.length() == 0.0 {
+        let wake_building_velocity = if velocity_input.freestream.length() == 0.0 {
             Vec3::new(1e-6, 1e-6, 1e-6)
         } else {
-            freestream_velocity
+            velocity_input.freestream
         };
 
         for i_stream in 0..nr_wake_points_per_line_element {
@@ -241,7 +239,7 @@ impl UnsteadyWakeBuilder {
 
         let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); nr_panels];
 
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(freestream_velocity);
+        let induced_velocity_corrections = self.induced_velocity_corrections.build(velocity_input.freestream);
 
         let mut wake = UnsteadyWake {
             wake_points,
@@ -335,7 +333,11 @@ pub struct UnsteadyWake {
     wing_indices: Vec<Range<usize>>,
     /// Counter to keep track of the number of time steps that have been completed
     number_of_time_steps_completed: usize,
-    /// Corrections for the induced velocity
+    /// Corrections for the induced velocity, such as max magnitude and correction factor.
+    /// 
+    /// By default, this is not used. However, it can be used on cases where the simulation is known
+    /// to create unstable and too large induced velocities. The original use case is for rotor 
+    /// sails.
     induced_velocity_corrections: VelocityCorrections
 }
 
