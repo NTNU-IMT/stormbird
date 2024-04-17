@@ -49,6 +49,5 @@
         }
     },
     "write_wake_data_to_file": true,
-    "wake_files_folder_path": "wake_files",
-    "initial_velocity": {"x": -10.0, "y": -4.0, "z": 0.0}
+    "wake_files_folder_path": "output/wake_files"
 }

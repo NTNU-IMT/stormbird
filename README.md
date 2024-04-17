@@ -1,46 +1,40 @@
 # Stormbird
-Stormbird is a library for simulating lifting surfaces, i.e. wings, under the assumption that they can be represented as 
-*line-models*. Although this makes it usable for a variety of different cases, it is also mostly developed to offer 
-efficient modelling of modern wind propulsion devices. That is, the following types of lifting surfaces are of 
-particular interest:
+Stormbird is a library for simulating lifting surfaces, i.e. wings, under the assumption that they 
+can be represented as *line-models*. Although this makes it usable for a variety of different cases, 
+it is also mostly developed to offer efficient modeling of modern wind propulsion devices. That is, 
+the following types of lifting surfaces are of particular interest:
 
 1) Wing sails
 2) Rotor sails
 3) Suction sails
 4) Kites
 
-These use cases are special in that they require modeling of the following physical effects:
- - Strong viscous effects on the lift, for instance due to large angles of attack.
- - Various lift generation mechanisms (classical foils, with and without flaps, rotating cylinders, foils with boundary 
-layer suction). 
- - Interaction between multiple lifting surfaces.
- - Interaction between lifting surfaces and other structures, such as a ship superstructure.
- - Unsteady effects (kites, analysis of ships operating in waves, maneuvering simulations).
+These use cases require modeling of strong viscous effects on the lift (e.g., due to large angles of 
+attack), various lift generation mechanisms (classical foils, with and without flaps, rotating 
+cylinders, foils with boundary layer suction), interaction between multiple lifting surfaces 
+(when there are multiple sails), interaction between lifting surfaces and other structures (the 
+superstructure and other deck structures) and unsteady effects (kites flying dynamically, analysis 
+of ships operating in waves, maneuvering simulations).
 
-At the same time, it is also often necessary with efficient computations. The user will usually be interested in testing 
-many different weather conditions, ship speeds, sail configurations, and operational variables. The goal is, therefore, 
-to find the right balance between accuracy and speed for the intended use case. To achieve this, the library 
-supports the following methods, that offer different levels of complexity and computational speed:
+At the same time, it is also often necessary with efficient computations. The user will usually be 
+interested in testing many different weather conditions, ship speeds, sail configurations, and 
+operational variables. The goal is, therefore, to find the right balance between accuracy and speed 
+for the intended use case. To achieve this, the library supports the following methods, that offer 
+different levels of complexity and computational speed:
 
  1) Discrete static lifting line, for steady- or quasi-steady cases
  2) Discrete dynamic lifting line, for unsteady or steady cases with large wake deformations
- 3) Actuator line, for steady and unsteady cases where interaction with other structures is of interest
-
-The lifting line model assumes that the vorticity from the wings can be represented with potential theory while the 
-actuator line is dependent on a CFD solver to model the lift-induced velocities. The CFD solver itself is not included 
-in Stormbird, but there are interfaces to open-source solvers.
-
-The lifting line is fast, but can only include other wings in the simulation. The actuator line model can be combined 
-with any geometry or other models available in the CFD solver, but will typically be slower (dependent on the resolution 
-in the CFD simulation).
+ 3) Actuator line, for steady and unsteady cases where interaction with other structures is of 
+ interest
 
 See the `stormbird` docs or the `book` for more details on the methods
 
 ## Folder structure
 - `stormbird` contains the core library, written in [Rust](https://www.rust-lang.org/).
-- `book` contains a [mdBook](https://github.com/rust-lang/mdBook) that aims to explain the methods implemented in Stormbird more 
-thoroughly than what is done in the code docs, together with references to papers with more 
-information. **Waring**: This is currently very much a work in progress.
+- `book` contains a [mdBook](https://github.com/rust-lang/mdBook) that aims to explain the methods 
+implemented in Stormbird more thoroughly than what is done in the code docs, together with 
+references to papers with more information. **Waring**: This is currently very much a work in 
+progress.
 - `pystormbird` contains a Python interface to the core library. This can either be used to run 
 lifting line simulations directly, for instance using a scripting approach, or to test individual 
 parts of the library, for instance when plotting is useful. The interface is generated using the 

@@ -2,13 +2,13 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Structures used to return results from simulations. Stored in their own module as they are 
-//! used for both lifting line and actuator line simulations
+//! Results from simulations.
 
 use crate::vec3::Vec3;
 use serde::{Serialize, Deserialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// Structures used to return results from simulations. 
 pub struct SimulationResult {
     pub ctrl_points: Vec<Vec3>,
     pub circulation_strength: Vec<f64>,

@@ -1,6 +1,6 @@
 // Copyright (C) 2024, NTNU 
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
-// License: GPL v3.0 (see seperate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 pub use fmu_from_struct::prelude::*;
 
@@ -14,6 +14,7 @@ pub struct StormbirdLiftingLine {
     #[parameter]
     pub setup_file_path: String,
     pub angles_in_degrees: bool,
+    pub use_relative_angle: bool,
     #[input]
     pub translation_x: f64,
     pub translation_y: f64,
@@ -25,7 +26,6 @@ pub struct StormbirdLiftingLine {
     pub freestream_v: f64,
     pub freestream_w: f64,
     pub relative_angle: f64,
-    pub use_relative_angle: bool,
     #[output]
     pub force_x: f64,
     pub force_y: f64,

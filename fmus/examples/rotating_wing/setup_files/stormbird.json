@@ -1,0 +1,28 @@
+{
+    "line_force_model": {
+        "wing_builders": [
+            {
+                "section_points": [
+                    {"x": 0.0, "y": 0.0, "z": -10.0},
+                    {"x": 0.0, "y": 0.0, "z": 10.0}
+                ],
+                "chord_vectors": [
+                    {"x": 2.0, "y": 0.0, "z": 0.0},
+                    {"x": 2.0, "y": 0.0, "z": 0.0}
+                ],
+                "section_model": {
+                    "Foil": {
+                        "cl_zero_angle": 0.0,
+                        "mean_stall_angle": 4.0
+                    }
+                }
+            }
+        ],
+        "nr_sections": 20
+    },
+    "simulation_mode": {
+        "Dynamic": {}
+    },
+    "write_wake_data_to_file": true,
+    "wake_files_folder_path": "wake_files"
+}

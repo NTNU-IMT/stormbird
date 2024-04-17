@@ -38,7 +38,7 @@ pub struct UnsteadySettings {
 /// Enum that determines what type of simulation to run. 
 /// 
 /// Both quasi-steady and dynamic simulations are supported. The settings for each simulation type 
-/// is stored as a member varaiable of each variant.
+/// is stored as a member variable of each variant.
 pub enum SimulationMode {
     QuasiSteady(SteadySettings),
     Dynamic(UnsteadySettings),
@@ -104,8 +104,7 @@ impl SimulationBuilder {
         Simulation {
             line_force_model,
             simulation_mode: self.simulation_mode.clone(),
-            previous_translations: [Vec3::default(), Vec3::default()],
-            previous_rotations: [Vec3::default(), Vec3::default()],
+            velocity_calculator: VelocityCalculator::default(),
             previous_circulation_strength: vec![0.0; nr_of_lines],
             unsteady_wake: None,
             write_wake_data_to_file: self.write_wake_data_to_file,
@@ -119,8 +118,7 @@ impl SimulationBuilder {
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     simulation_mode: SimulationMode,
-    previous_translations: [Vec3; 2],
-    previous_rotations: [Vec3; 2],
+    velocity_calculator: VelocityCalculator,
     previous_circulation_strength: Vec<f64>,
     unsteady_wake: Option<UnsteadyWake>,
     write_wake_data_to_file: bool,
@@ -144,20 +142,7 @@ impl Simulation {
         self.line_force_model.rotation    = input_state.rotation;
         self.line_force_model.translation = input_state.translation;
 
-        // Estimate velocity based on second order backwards finite difference
-        let rotation_velocity    = (
-            3.0 * input_state.rotation  - 4.0 * self.previous_rotations[0] + self.previous_rotations[1]
-        ) / (2.0 * time_step);
-
-        let translation_velocity = (
-            3.0 * input_state.translation - 4.0 * self.previous_translations[0] + self.previous_translations[1]
-        ) / (2.0 * time_step);
-
-        let velocity_input = VelocityInput {
-            freestream: input_state.freestream_velocity,
-            translation: translation_velocity,
-            rotation: rotation_velocity,
-        };
+        let velocity_input = self.velocity_calculator.get_velocity_input(input_state, time_step);
 
         let result = match &self.simulation_mode {
             SimulationMode::QuasiSteady(settings) => {
@@ -211,12 +196,6 @@ impl Simulation {
         };
 
         self.previous_circulation_strength = result.circulation_strength.clone();
-        
-        self.previous_translations[1] = self.previous_translations[0];
-        self.previous_rotations[1]    = self.previous_rotations[0];
-
-        self.previous_translations[0] = input_state.translation;
-        self.previous_rotations[0]    = input_state.rotation;
 
         result
     }

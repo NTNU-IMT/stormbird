@@ -7,16 +7,9 @@ import os
 
 from pathlib import Path
 
-import argparse
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Plot results.')
-    parser.add_argument('--with-stormbird', action='store_true', help='Run with stormbird.')
-
-    args = parser.parse_args()
-
-    output_path_w_sb = Path('../output_with_stormbird')
-    output_path_n_sb = Path('../output_no_stormbird')
+    output_path_w_sb = Path('../output/output_with_stormbird')
+    output_path_n_sb = Path('../output/output_no_stormbird')
 
     output_path_list = [output_path_w_sb]
 
@@ -35,9 +28,11 @@ if __name__ == '__main__':
         time = sails_df['Time'].to_numpy()
 
         surge_force = sails_df['force_x'].to_numpy()
-        sway_force = sails_df['force_y'].to_numpy()
+        sway_force  = sails_df['force_y'].to_numpy()
 
-        plt.plot(time, surge_force)
-        plt.plot(time, sway_force)
+        plt.plot(time, surge_force, label='Surge force')
+        plt.plot(time, sway_force, label='Sway force')
+
+    plt.legend()
 
     plt.show()

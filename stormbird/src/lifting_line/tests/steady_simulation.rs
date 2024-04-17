@@ -49,7 +49,7 @@ fn moment_test() {
 
     // The force should be in the negative y direction as the force direction is parallel to the
     // cross product of the velocity and the span line multiplied by the strength. The strength is 
-    // negative with a positive lift coeffient, by definition. The velocity vector is in the 
+    // negative with a positive lift coefficient, by definition. The velocity vector is in the 
     // positive x direction and the span line is in the negative z direction
     assert!(force.y < 0.0, "Sign of the force in the y direction is wrong: {}", force.y);
 

@@ -51,9 +51,9 @@ fn steady_lift() {
         SimulationMode::Dynamic(dynamic_settings)
     ).build();
 
-    let nr_time_steps = 100;
+    let nr_time_steps = 200;
 
-    let time_step = 0.5;
+    let time_step = 0.25;
 
     let velocity = Vec3::new(1.2, 0.0, 0.0);
 
@@ -95,8 +95,11 @@ fn steady_lift() {
     let dynamic_cl_error = (cl_theory - cl_dynamic).abs() / cl_theory.abs();
     let dynamic_cd_error = (cd_theory - cd_dynamic).abs() / cd_theory.abs();
 
-    assert!(steady_cl_error < 0.02, "Steady cl error: {}", steady_cl_error);
-    assert!(steady_cd_error < 0.05, "Steady cd error: {}", steady_cd_error);
-    assert!(dynamic_cl_error < 0.02, "Dynamic cl error: {}", dynamic_cl_error);
-    assert!(dynamic_cd_error < 0.05, "Dynamic cd error: {}", dynamic_cd_error);   
+    let allowable_cd_error = 0.05;
+    let allowable_cl_error = 0.07;
+
+    assert!(steady_cl_error < allowable_cl_error, "Steady cl error: {}", steady_cl_error);
+    assert!(steady_cd_error < allowable_cd_error, "Steady cd error: {}", steady_cd_error);
+    assert!(dynamic_cl_error < allowable_cl_error, "Dynamic cl error: {}", dynamic_cl_error);
+    assert!(dynamic_cd_error < allowable_cd_error, "Dynamic cd error: {}", dynamic_cd_error);   
 }

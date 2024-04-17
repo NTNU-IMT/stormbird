@@ -194,7 +194,7 @@ fn rotational_velocity() {
 
         let ctrl_points = line_force_model.ctrl_points();
         
-        let ctrl_point_velocity_est = velocity_input.felt_velocity_at_points(&ctrl_points);
+        let ctrl_point_velocity_est = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
 
         for i in 0..ctrl_points.len() {
             let velocity_local = velocity.cross(ctrl_points[i]);

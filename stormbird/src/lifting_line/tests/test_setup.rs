@@ -20,7 +20,7 @@ impl Default for RectangularWing {
             aspect_ratio: 5.0,
             cl_zero_angle: 0.5,
             angle_of_attack: 0.0,
-            nr_strips: 20,
+            nr_strips: 10,
             negative_span_orientation: false
         }
     }

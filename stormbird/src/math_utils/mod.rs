@@ -11,3 +11,4 @@ pub mod integration;
 pub mod smoothing;
 pub mod statistics;
 pub mod array_generation;
+pub mod finite_difference;

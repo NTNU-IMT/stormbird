@@ -5,8 +5,7 @@
 //! Functionality for calculating lift-induced velocities from full dynamic wake.
 
 use std::fs::File;
-use std::io::{Write, Error};
-use std::io::BufWriter;
+use std::io::{Write, BufWriter, Error};
 
 use serde::{Serialize, Deserialize};
 
@@ -19,7 +18,7 @@ use crate::vec3::Vec3;
 
 use crate::line_force_model::LineForceModel;
 use crate::lifting_line::singularity_elements::prelude::*;
-use crate::io_structs::input::VelocityInput;
+use crate::io_structs::velocity::VelocityInput;
 
 use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilder};
 
@@ -48,11 +47,42 @@ impl Default for FirstPanelBehavior {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Enum to choose how to set the length of the wake. 
+/// 
+/// # Variants
+/// * `NrPanels` - The wake length is determined by the number of panels in the wake. This makes it
+/// independent of the freestream velocity and the mean chord length.
+/// * `TargetLengthFactor` - The wake length is determined by the freestream velocity and the mean
+/// chord length, multiplied by the given factor. This variant can only be used safely when the 
+/// freestream velocity is properly defined when initializing the wake. This is not always the case, 
+/// and the `NrPanels` variant is therefore the default.
+pub enum WakeLength {
+    NrPanels(usize),
+    TargetLengthFactor(f64),
+}
+
+impl Default for WakeLength {
+    fn default() -> Self {
+        Self::NrPanels(200)
+    }
+}
+
+impl WakeLength {
+    fn nr_wake_panels_from_target_length_factor(&self, chord_length: f64, velocity: f64, time_step: f64) -> Result<usize, String> {
+        match self {
+            Self::NrPanels(_) => Err("This function is only intended for the TargetLengthFactor variant".to_string()),
+            Self::TargetLengthFactor(factor) => Ok((factor * chord_length / (velocity * time_step)).ceil() as usize)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Variables used to build an unsteady wake. 
 pub struct UnsteadyWakeBuilder {
-    #[serde(default="UnsteadyWakeBuilder::default_wake_length_factor")]
-    /// Length of the wake relative to the free stream velocity and the mean chord length
-    pub wake_length_factor: f64,
+    #[serde(default)]
+    /// Data used to determine the length of the wake. 
+    pub wake_length: WakeLength,
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
     pub viscous_core_length: ViscousCoreLength,
@@ -84,6 +114,7 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default)]
     /// Optional viscous core to be used when calculating induced velocities off body.
     pub viscous_core_length_off_body: Option<ViscousCoreLength>,
+    #[serde(default)]
     /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is 
     /// useful if the effect of self-induced velocities on lift and drag is calculated in another 
     /// way, for example with CFD, and the only reason for running lifting-line simulations is to 
@@ -95,7 +126,6 @@ pub struct UnsteadyWakeBuilder {
 }
 
 impl UnsteadyWakeBuilder {
-    fn default_wake_length_factor() -> f64 {50.0}
     fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
 
     /// Short hand for loading default settings for a rotor sail
@@ -114,8 +144,6 @@ impl UnsteadyWakeBuilder {
         line_force_model: &LineForceModel, 
         velocity_input: &VelocityInput, 
     ) -> UnsteadyWake {                
-        let freestream_velocity = velocity_input.freestream();
-
         let span_points   = line_force_model.span_points();
         let chord_vectors = line_force_model.chord_vectors();
 
@@ -131,9 +159,18 @@ impl UnsteadyWakeBuilder {
             .map(|chord| chord.length())
             .sum::<f64>() / chord_vectors.len() as f64;
         
-        let nr_wake_panels_per_line_element = self.nr_wake_panels_per_line_element(
-            mean_chord_length, freestream_velocity.length(), time_step
-        );
+        let nr_wake_panels_per_line_element = match self.wake_length {
+            WakeLength::NrPanels(nr_panels) => nr_panels,
+            WakeLength::TargetLengthFactor(_) => {
+                if velocity_input.freestream.length() == 0.0 {
+                    panic!("Freestream velocity is zero. Cannot calculate wake length.");
+                }
+
+                self.wake_length.nr_wake_panels_from_target_length_factor(
+                    mean_chord_length, velocity_input.freestream.length(), time_step
+                ).unwrap()
+            }
+        };
 
         let nr_wake_points_per_line_element = nr_wake_panels_per_line_element + 1;
 
@@ -147,6 +184,12 @@ impl UnsteadyWakeBuilder {
             FirstPanelBehavior::VelocityFixed(ratio) => ratio,
         };
 
+        let wake_building_velocity = if velocity_input.freestream.length() == 0.0 {
+            Vec3::new(1e-6, 1e-6, 1e-6)
+        } else {
+            velocity_input.freestream
+        };
+
         for i_stream in 0..nr_wake_points_per_line_element {
             for i_span in 0..span_points.len() {
                 let start_point = span_points[i_span];
@@ -157,7 +200,7 @@ impl UnsteadyWakeBuilder {
                     wake_points.push(
                         start_point + 
                         first_panel_ratio * span_points_chord_vectors[i_span] +
-                        ((i_stream-1) as f64) * time_step * freestream_velocity
+                        ((i_stream-1) as f64) * time_step * wake_building_velocity
                     );
                 }
             }
@@ -196,7 +239,7 @@ impl UnsteadyWakeBuilder {
 
         let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); nr_panels];
 
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(freestream_velocity);
+        let induced_velocity_corrections = self.induced_velocity_corrections.build(velocity_input.freestream);
 
         let mut wake = UnsteadyWake {
             wake_points,
@@ -214,10 +257,6 @@ impl UnsteadyWakeBuilder {
         wake
     }
 
-    fn nr_wake_panels_per_line_element(&self, chord_length: f64, velocity: f64, time_step: f64) -> usize {
-        (self.wake_length_factor * chord_length / (velocity * time_step)).ceil() as usize
-    }
-
     fn strength_damping_factor(&self, nr_wake_panels_per_line_element: usize) -> f64 {
         let estimated_value = 1.0 - self.strength_damping_last_panel_ratio.powf(
             1.0 / (nr_wake_panels_per_line_element - 1) as f64
@@ -230,7 +269,7 @@ impl UnsteadyWakeBuilder {
 impl Default for UnsteadyWakeBuilder {
     fn default() -> Self {
         Self {
-            wake_length_factor: Self::default_wake_length_factor(),
+            wake_length: Default::default(),
             viscous_core_length: Default::default(),
             first_panel_behavior: Default::default(),
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
@@ -294,7 +333,11 @@ pub struct UnsteadyWake {
     wing_indices: Vec<Range<usize>>,
     /// Counter to keep track of the number of time steps that have been completed
     number_of_time_steps_completed: usize,
-    /// Corrections for the induced velocity
+    /// Corrections for the induced velocity, such as max magnitude and correction factor.
+    /// 
+    /// By default, this is not used. However, it can be used on cases where the simulation is known
+    /// to create unstable and too large induced velocities. The original use case is for rotor 
+    /// sails.
     induced_velocity_corrections: VelocityCorrections
 }
 

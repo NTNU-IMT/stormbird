@@ -2,11 +2,9 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality for  representnig wings as "line objects", without any assumptions about the 
-//! physical model. 
-//! 
-//! Stores the geometry and sectional models only. To be used with either lifting line simulations 
-//! (see [crate::lifting_line]) or in actuator line simulations (see [crate::actuator_line])
+//! Functionality for representing wings as "line objects", without any assumptions about how 
+//! lift-induced velocities are estimated. In other words, this part is common for all methods 
+//! available in the library, and therefore the foundation of all simulations. 
 
 pub mod solver_utils;
 pub mod span_line;
@@ -48,8 +46,9 @@ pub struct LineForceModel {
     pub translation: Vec3,
     /// Rotation from local to global coordinates
     pub rotation: Vec3,
-    /// Vector used to store local angles for each wing. This can be used to rotate the wing during 
-    /// a dynamic simulation
+    /// Vector used to store local angles for each wing. This can be used to rotate the wing along 
+    /// the span axis during a dynamic simulation. The typical example is changing the angle of 
+    /// attack on a wing sail due to changing apparent wind conditions.
     pub local_wing_angles: Vec<f64>,
     /// Density used in force calculations
     pub density: f64,
@@ -58,7 +57,7 @@ pub struct LineForceModel {
 }
 
 impl LineForceModel {
-    pub fn default_density() -> f64 { 1.0 } //TODO: the default density should be 1.225. Only set to one for testing purposes
+    pub fn default_density() -> f64 { 1.225 }
 
     /// Creates a new empty line force model. Wings can be added using the [LineForceModel::add_wing] function.
     pub fn new(density: f64) -> LineForceModel {
@@ -150,6 +149,7 @@ impl LineForceModel {
         self.wing_rotation_axis(wing_index)
     }
 
+    /// Returns both angle and axis of rotation for the wing at the input index.
     pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, Vec3) {
         let axis = self.wing_rotation_axis(wing_index);
         let angle = self.local_wing_angles[wing_index];
@@ -189,8 +189,7 @@ impl LineForceModel {
             |(global_index, chord_vector)| {
                 let (angle, axis) = self.wing_rotation_data_from_global(global_index);
 
-                chord_vector.rotate_around_axis(angle, axis)
-                    .rotate(self.rotation)
+                chord_vector.rotate_around_axis(angle, axis).rotate(self.rotation)
             }
         ).collect()
     }
@@ -285,7 +284,6 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        // TODO: change the match statement to the outside of the for loop
         let angle_of_attack = self.angle_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
@@ -313,8 +311,6 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        // TODO: change the match statement to the outside of the for loop
-
         let angle_of_attack = self.angle_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
@@ -384,7 +380,11 @@ impl LineForceModel {
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let mut section_force = strength[index] * velocity[index].cross(span_lines[index].relative_vector());
+                let mut section_force = if velocity[index].length() == 0.0 {
+                    Vec3::default()
+                } else {
+                    strength[index] * velocity[index].cross(span_lines[index].relative_vector())
+                };
                 
                 if let Some(cd) = &viscous_cd {
                     let drag_direction = velocity[index].normalize();
@@ -516,7 +516,7 @@ impl LineForceModel {
     }
     
 
-    /// General fucntion for calculating wing-averaged values
+    /// General function for calculating wing-averaged values
     pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T> 
     where T: 
         std::ops::Div<f64, Output = T> + 

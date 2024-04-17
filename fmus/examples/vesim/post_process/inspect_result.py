@@ -21,9 +21,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.with_stormbird:
-        output_path = Path('../output_with_stormbird')
+        output_path = Path('../output/output_with_stormbird')
     else:
-        output_path = Path('../output_no_stormbird')
+        output_path = Path('../output/output_no_stormbird')
     
     all_output_files = os.listdir(output_path)
 

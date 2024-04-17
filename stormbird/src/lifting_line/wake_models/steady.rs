@@ -16,7 +16,7 @@ use ndarray::prelude::*;
 use crate::vec3::Vec3;
 use crate::line_force_model::LineForceModel;
 use crate::lifting_line::singularity_elements::prelude::*;
-use crate::io_structs::input::VelocityInput;
+use crate::io_structs::velocity::VelocityInput;
 
 use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilder};
 
@@ -56,9 +56,7 @@ impl SteadyWakeBuilder {
 
         let wake_length = self.wake_length_factor * mean_chord_length;
 
-        let freestream_velocity = velocity_input.freestream();
-
-        let wake_line_vector = freestream_velocity.normalize() * wake_length;
+        let wake_line_vector = velocity_input.freestream.normalize() * wake_length;
         
         let span_lines = line_force_model.span_lines();
 
@@ -89,7 +87,7 @@ impl SteadyWakeBuilder {
             }
         }
 
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(freestream_velocity);
+        let induced_velocity_corrections = self.induced_velocity_corrections.build(velocity_input.freestream);
 
         SteadyWake {
             velocity_factors,

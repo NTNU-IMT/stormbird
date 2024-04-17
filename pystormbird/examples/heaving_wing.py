@@ -1,7 +1,13 @@
+'''
+Script that simulates a heaving wing with both dynamic and quasi-static lifting line models. The 
+result are compared against each other and against the theoretical (simplified) Theodorsen function.
+'''
+
 import json
 from pathlib import Path
 
 import numpy as np
+import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 
 from pystormbird.lifting_line import Simulation
@@ -9,16 +15,48 @@ from pystormbird import Vec3
 
 import argparse
 
+def get_motion_functions(*, amplitude: float, radial_frequency: float):
+    def position(t: float):
+        return amplitude * np.sin(radial_frequency * t)
+
+    def velocity(t: float):
+        return amplitude * radial_frequency * np.cos(radial_frequency * t)
+
+    return position, velocity
+
+def theodorsen_lift_reduction_data(reduced_frequency: float) -> float:
+    ''' 
+    Reduction of the lift due to dynamic effects according to Theodorsen's function, as presented
+    in: "Bøckmann, E., 2015, "Wave Propulsion of Ships", page 28, Figure 3.3
+    '''
+
+    x_data = np.array([
+        0.0000000000000000, 0.10160218835482548, 0.21101992966002325, 0.3243454474404064, 0.45720984759671746, 0.6213364595545132,
+        0.8401719421649079, 1.0668229777256741, 1.3325517780382963, 1.6060961313012891, 2.0007815552950357
+    ])
+
+    y_data = np.array([
+        0.9999999999999999, 0.8254545454545454, 0.7185454545454544, 0.6552727272727272, 0.6094545454545454, 0.5745454545454544, 
+        0.5516363636363635, 0.5363636363636362, 0.5254545454545453, 0.5199999999999998, 0.5134545454545453
+    ])
+
+    spl = interpolate.splrep(x_data, y_data)
+
+    return interpolate.splev(reduced_frequency, spl)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation of a heaving wing")
-    parser.add_argument("-rf", "--reduced-frequency", type=float, help="Reduced frequency")
+    parser.add_argument("-rf", "--reduced-frequency", type=float, default = 0.3, help="Reduced frequency")
+    parser.add_argument("--amplitude-factor", type=float, default = 0.1, help="Amplitude relative to chord length of heaving motion")
 
     home = Path.home()
 
     wake_files_folder_path  = home / Path("wake_files")
 
     if not wake_files_folder_path.exists():
-        raise FileNotFoundError(f"Folder {wake_files_folder_path} does not exist")
+        raise FileNotFoundError(
+            f"Folder {wake_files_folder_path} does not exist. Create it to allow storage of wake files."
+        )
 
     args = parser.parse_args()
 
@@ -26,16 +64,29 @@ if __name__ == "__main__":
 
     velocity = 8.0
     chord_length = 1.0
-    span = 16.0
-    nr_sections = 20
+    span = 32.0
+    nr_sections = 64
+    density = 1.225
 
-    amplitude = 0.1 * chord_length
+    aspect_ratio = span / chord_length
+
+    amplitude = args.amplitude_factor * chord_length
 
     radial_frequency = reduced_frequency * velocity / (0.5 * chord_length)
     frequency = radial_frequency / (2.0 * np.pi)
     period = 1.0 / frequency
 
-    force_factor = 0.5 * chord_length * span * velocity**2
+    position_func, velocity_func = get_motion_functions(
+        amplitude = amplitude, radial_frequency = radial_frequency
+    )
+
+    max_vertical_velocity = amplitude * radial_frequency
+
+    max_angle_of_attack = np.arctan(max_vertical_velocity / velocity)
+
+    max_cl_theory = 2.0 * np.pi * max_angle_of_attack / (1 + 2/aspect_ratio)
+
+    force_factor = 0.5 * chord_length * span * density * velocity**2
 
     wings = [
         {
@@ -60,17 +111,21 @@ if __name__ == "__main__":
 
     sim_settings_list = [
         {
-            "Dynamic": {}
+            "Dynamic": {
+                "wake": {
+                    "ratio_of_wake_affected_by_induced_velocities": 0.0
+                }
+            }
         },
         {
             "QuasiSteady": {}
         }
     ]
 
-    label_list = ["Dynamic", "QuasiSteady"]
+    label_list = ["Dynamic", "Quasi-steady"]
 
     dt = period / 64
-    final_time = 10.0 * period
+    final_time = 5.0 * period
 
     w_plot = 14
     fig = plt.figure(figsize=(w_plot, w_plot / 3.0))
@@ -78,6 +133,8 @@ if __name__ == "__main__":
     max_cl = []
 
     for simulation_settings, label in zip(sim_settings_list, label_list):
+        print("Running ", label, "simulations:")
+
         setup = {
             "line_force_model": line_force_model,
             "simulation_mode": simulation_settings,
@@ -98,13 +155,11 @@ if __name__ == "__main__":
         while t < final_time:
             print("Running sim at time = ", t)
 
-            translation = Vec3(0.0, amplitude * np.sin(radial_frequency * t), 0.0)
-
             result = simulation.do_step(
                 time = t, 
                 time_step = dt, 
                 freestream_velocity = Vec3(velocity, 0.0, 0.0),
-                translation = translation
+                translation = Vec3(0.0, position_func(t), 0.0)
             )
 
             forces = result.integrated_forces_sum()
@@ -119,10 +174,22 @@ if __name__ == "__main__":
 
         max_cl.append(np.max(lift))
 
+        print()
+
+    theodorsen_reduction = theodorsen_lift_reduction_data(reduced_frequency)
+    three_dim_reduction = 1 / (1 + 2/aspect_ratio)
+
+    total_reduction = theodorsen_reduction * three_dim_reduction
+
+    cl_theodorsen = -2 * np.pi * total_reduction * velocity_func(np.array(time)) / velocity
+
+    plt.plot(time, cl_theodorsen, label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color="grey")
+
+    print("Theodorsen ratio", theodorsen_reduction)
     print("CL ratio", max_cl[0] / max_cl[1])
 
-    plt.xlim(1.0 * period, 6 * period)
-    plt.ylim(-0.5, 0.5)
+    plt.xlim(1.0 * period, 5 * period)
+    plt.ylim(-1.1 * max_cl_theory, 1.1 * max_cl_theory)
     plt.xlabel("Time")
     plt.ylabel("Lift coefficient")
     plt.legend()

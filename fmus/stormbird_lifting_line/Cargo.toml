@@ -7,6 +7,6 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-fmu_from_struct = { version = "0.1.0" }
+fmu_from_struct = { version = "0.1.1" }
 
 stormbird = { path = "../../stormbird"}
