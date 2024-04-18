@@ -8,7 +8,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
-use stormbird::io_structs::velocity::InputState;
+use stormbird::line_force_model::velocity_input::InputState;
+use stormbird::line_force_model::velocity_input::freestream::Freestream;
 
 use crate::vec3::Vec3;
 use crate::result_structs::SimulationResult;
@@ -45,7 +46,7 @@ impl Simulation {
     ) -> SimulationResult {
 
         let input_state = InputState {
-            freestream_velocity: freestream_velocity.data,
+            freestream: Freestream::Constant(freestream_velocity.data),
             translation: translation.data,
             rotation: rotation.data,
         };

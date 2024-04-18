@@ -38,7 +38,8 @@ impl Default for UnsteadySolverSettings {
 pub fn solve_one_time_step(
     time_step: f64,
     line_force_model: &LineForceModel,
-    velocity_input: &VelocityInput,
+    freestream: &Freestream,
+    motion: &Motion,
     wake: &mut UnsteadyWake,
     solver_settings: &UnsteadySolverSettings,
     previous_circulation_strength: &[f64]
@@ -49,13 +50,17 @@ pub fn solve_one_time_step(
     let ctrl_points = line_force_model.ctrl_points();
 
     // Velocity components that are fixed for the entire time step    
-    let u_inf_ctrl_point: Vec<Vec3> = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
+    let u_inf_ctrl_point: Vec<Vec3> = freestream.velocity_at_locations(&ctrl_points);
 
     let u_i_free_wake: Vec<Vec3>    = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 
-    let fixed_velocities: Vec<Vec3> = u_inf_ctrl_point.iter()
-        .zip(u_i_free_wake.iter())
-        .map(|(a, b)| *a + *b).collect();
+    let mut fixed_velocities: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
+
+    for i in 0..ctrl_points.len() {
+        fixed_velocities.push(
+            u_inf_ctrl_point[i] - motion.velocity[i] + u_i_free_wake[i]
+        );
+    }
 
     // Iterate to solver for the strength at the first panel
     let mut circulation_strength = previous_circulation_strength.to_vec();
@@ -90,7 +95,7 @@ pub fn solve_one_time_step(
     let integrated_forces  = line_force_model.integrated_forces(&circulation_strength, &velocity);
     let integrated_moments = line_force_model.integrated_moments(&circulation_strength, &velocity);
 
-    wake.update_after_completed_time_step(&circulation_strength, time_step, line_force_model, velocity_input);
+    wake.update_after_completed_time_step(&circulation_strength, time_step, line_force_model, freestream);
 
     SimulationResult {
         ctrl_points: ctrl_points.clone(),

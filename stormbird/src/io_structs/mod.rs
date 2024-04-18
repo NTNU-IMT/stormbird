@@ -7,10 +7,8 @@
 //! from the specific methods in the library (lifting- and actuator line), as they are used in 
 //! multiple places.
 
-pub mod velocity;
 pub mod result;
 
 pub mod prelude {
-    pub use super::velocity::*;
     pub use super::result::*;
 }

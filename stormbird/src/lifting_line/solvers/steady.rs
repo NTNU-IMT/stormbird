@@ -62,14 +62,15 @@ impl Default for SteadySolverSettings {
 /// a max value for the resolution is reached. The solution from the previous coarse model is used 
 /// as initial conditions for a new fine model. 
 /// 
-/// The reason this solver is implemented is based on two oberservations:
-/// 1) - coarse models seems to require fewer iterations than fine mdoels
+/// The reason this solver is implemented is based on two observations:
+/// 1) - coarse models seems to require fewer iterations than fine models
 /// 2) - coarse models seem to be more stable than fine models
 /// 
 /// The idea is inspired from multi grid solvers in CFD
 pub fn solve_steady_multiresolution(
     line_force_model_builder: &LineForceModelBuilder, 
-    velocity_input: &VelocityInput, 
+    freestream: &Freestream,
+    motion: &Motion,
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder
 ) -> SimulationResult {
@@ -112,7 +113,7 @@ pub fn solve_steady_multiresolution(
         };
 
         results.push(
-            solve_steady(&force_models[i], velocity_input, solver_settings, wake_builder, &initial_solution)
+            solve_steady(&force_models[i], freestream, motion, solver_settings, wake_builder, &initial_solution)
         );
     }
 
@@ -121,7 +122,8 @@ pub fn solve_steady_multiresolution(
 
 pub fn solve_steady(
     line_force_model: &LineForceModel, 
-    velocity_input: &VelocityInput, 
+    freestream: &Freestream,
+    motion: &Motion, 
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder,
     initial_solution: &[f64],
@@ -130,7 +132,7 @@ pub fn solve_steady(
 
     let wake = wake_builder.build(
         line_force_model, 
-        velocity_input, 
+        freestream, 
     );
     
     let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
@@ -148,7 +150,8 @@ pub fn solve_steady(
     for iteration in 0..solver_settings.max_iterations {
         let velocity = calculate_velocity(
             line_force_model,
-            &velocity_input,
+            freestream,
+            motion,
             &wake, 
             viscous_wakes.as_ref(), 
             &circulation_strength
@@ -183,7 +186,8 @@ pub fn solve_steady(
 
     let velocity = calculate_velocity(
         line_force_model,
-        &velocity_input,
+        freestream,
+        motion,
         &wake, 
         viscous_wakes.as_ref(), 
         &circulation_strength
@@ -209,12 +213,19 @@ pub fn solve_steady(
 /// Collected in a function as the same procedure is used multiple times in the solver.
 fn calculate_velocity(
     line_force_model: &LineForceModel,
-    force_input: &ForceInput,
+    freestream: &Freestream,
+    motion: &Motion,
     wake: &SteadyWake, 
     viscous_wakes: Option<&ViscousWakes>, 
     circulation_strength: &[f64]
 ) -> Vec<Vec3> {
-    let ctrl_point_velocities: Vec<Vec3> = force_input.velocity.clone();
+    let mut ctrl_point_velocities: Vec<Vec3> = freestream.velocity_at_locations(
+        &line_force_model.ctrl_points()
+    );
+
+    for i in 0..line_force_model.nr_span_lines() {
+        ctrl_point_velocities[i] -= motion.velocity[i];
+    }
 
     let induced_velocities: Vec<Vec3> = wake.induced_velocities_at_control_points(circulation_strength);
 

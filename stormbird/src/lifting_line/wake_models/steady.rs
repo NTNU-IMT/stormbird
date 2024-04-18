@@ -15,8 +15,9 @@ use ndarray::prelude::*;
 
 use crate::vec3::Vec3;
 use crate::line_force_model::LineForceModel;
+use crate::line_force_model::velocity_input::freestream::Freestream;
+
 use crate::lifting_line::singularity_elements::prelude::*;
-use crate::io_structs::velocity::VelocityInput;
 
 use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilder};
 
@@ -43,20 +44,28 @@ impl SteadyWakeBuilder {
     /// # Arguments
     /// * `line_force_model` - an instance of a line force model to that is used to determine the
     /// geometry of the bound vortices fo the wake.
-    /// * `velocity_input` - an instance of a velocity input struct that is used to determine the
+    /// * `freestream` - an instance of a freestream velocity model that is used to determine the
     /// wake direction.
     pub fn build(
         &self, 
         line_force_model: &LineForceModel, 
-        velocity_input: &VelocityInput, 
+        freestream: &Freestream, 
     ) -> SteadyWake {
         let mean_chord_length: f64 = line_force_model.chord_vectors().iter().map(
             |chord| chord.length()
         ).sum::<f64>() / line_force_model.nr_span_lines() as f64;
 
+        let ctrl_points = line_force_model.ctrl_points();
+
+        let freestream_velocity = freestream.velocity_at_locations(
+            &ctrl_points
+        );
+
+        let average_freestream_velocity: Vec3 = freestream_velocity.iter().sum::<Vec3>() / freestream_velocity.len() as f64;
+
         let wake_length = self.wake_length_factor * mean_chord_length;
 
-        let wake_line_vector = velocity_input.freestream.normalize() * wake_length;
+        let wake_line_vector = average_freestream_velocity * wake_length;
         
         let span_lines = line_force_model.span_lines();
 
@@ -74,7 +83,7 @@ impl SteadyWakeBuilder {
 
         // For each control point ...
         for i_row in 0..nr_span_lines {
-            let ctrl_point = span_lines[i_row].ctrl_point();
+            let ctrl_point = ctrl_points[i_row];
 
             // Calculate the induced velocity from each horseshoe vortex
             for i_col in 0..nr_span_lines {
@@ -87,7 +96,7 @@ impl SteadyWakeBuilder {
             }
         }
 
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(velocity_input.freestream);
+        let induced_velocity_corrections = self.induced_velocity_corrections.build(average_freestream_velocity);
 
         SteadyWake {
             velocity_factors,
