@@ -5,8 +5,3 @@
 pub use super::LineForceModel;
 pub use super::builder::LineForceModelBuilder;
 pub use super::span_line::SpanLine;
-pub use super::velocity_input::{
-    freestream::Freestream,
-    motion::Motion,
-    InputState,
-};

@@ -32,10 +32,6 @@ pub mod prelude {
         LineForceModelBuilder,
         WingBuilder,
     };
-    pub use crate::line_force_model::velocity_input::{
-        freestream::Freestream,
-        motion::Motion,
-    };
 
     pub use crate::section_models::{
         SectionModel,

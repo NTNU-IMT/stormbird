@@ -17,7 +17,7 @@ use std::ops::Range;
 use crate::vec3::Vec3;
 
 use crate::line_force_model::LineForceModel;
-use crate::line_force_model::velocity_input::freestream::Freestream;
+use crate::io_structs::freestream::Freestream;
 
 use crate::lifting_line::singularity_elements::prelude::*;
 

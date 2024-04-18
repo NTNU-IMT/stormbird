@@ -6,6 +6,8 @@ pub use fmu_from_struct::prelude::*;
 
 use stormbird::lifting_line::prelude::*;
 use stormbird::lifting_line::simulation::{Simulation, SimulationBuilder};
+use stormbird::line_force_model::velocity_input::InputState;
+use stormbird::line_force_model::velocity_input::freestream::Freestream;
 
 
 #[derive(Debug, Default, Clone, Fmu)]
@@ -48,7 +50,15 @@ impl FmuFunctions for StormbirdLiftingLine {
         let input_state = self.input_state();
 
         if self.use_relative_angle {
-            self.apply_relative_angle(input_state.freestream_velocity);
+            let ctrl_points = self.stormbird_model.as_ref().unwrap().line_force_model.ctrl_points();
+
+            let freestream_velocity = input_state.freestream.velocity_at_locations(
+                &ctrl_points
+            );
+
+            let average_freestream_velocity = freestream_velocity.iter().sum::<Vec3>() / freestream_velocity.len() as f64;
+
+            self.apply_relative_angle(average_freestream_velocity);
         }
         
         if let Some(model) = &mut self.stormbird_model {
@@ -90,14 +100,16 @@ impl StormbirdLiftingLine {
             )
         };
 
-        let freestream_velocity = Vec3::new(
-            self.freestream_u, 
-            self.freestream_v, 
-            self.freestream_w
+        let freestream = Freestream::Constant(
+            Vec3::new(
+                self.freestream_u, 
+                self.freestream_v, 
+                self.freestream_w
+            )
         );
 
         InputState {
-            freestream_velocity,
+            freestream,
             translation,
             rotation,
         }

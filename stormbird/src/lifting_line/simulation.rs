@@ -10,8 +10,8 @@
 use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::prelude::*;
-use crate::line_force_model::velocity_input::motion::MotionCalculator;
-use crate::line_force_model::velocity_input::InputState;
+use crate::io_structs::motion::MotionCalculator;
+use crate::io_structs::input_state::InputState;
 
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

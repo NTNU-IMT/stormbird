@@ -13,6 +13,8 @@ use crate::lifting_line::simulation::{
     SteadySettings,
 };
 
+use crate::io_structs::motion::MotionCalculator;
+
 use super::test_setup::RectangularWing;
 
 #[test]
@@ -61,7 +63,7 @@ fn right_sign_of_the_force_when_translating() {
         let translation = Vec3::new(0.0, translation_y, 0.0);
 
         let input_state = InputState {
-            freestream_velocity,
+            freestream: Freestream::Constant(freestream_velocity),
             translation,
             rotation,
         };
@@ -129,7 +131,7 @@ fn right_sign_of_the_moment_when_rotating() {
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
         let input_state = InputState {
-            freestream_velocity,
+            freestream: Freestream::Constant(freestream_velocity),
             translation,
             rotation,
         };
@@ -162,7 +164,7 @@ fn rotational_velocity() {
     let period = 2.0;
     let frequency = 2.0 * PI / period;
 
-    let line_force_model = RectangularWing {
+    let mut line_force_model = RectangularWing {
         aspect_ratio,
         cl_zero_angle,
         angle_of_attack,
@@ -172,8 +174,7 @@ fn rotational_velocity() {
 
     let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
 
-    let mut previous_rotation = Vec3::default();
-    let mut two_previous_rotation = Vec3::default();
+    let mut motion_calculator = MotionCalculator::new(&line_force_model);
 
     for i_t in 1..20 {
         let time = (i_t as f64) * time_step;
@@ -184,17 +185,19 @@ fn rotational_velocity() {
         let rotation = Vec3::new(rotation_x, 0.0, 0.0);
         let velocity = Vec3::new(rotation_vel_x, 0.0, 0.0);
 
-        let rotation_velocity = (3.0 * rotation - 4.0 * previous_rotation + two_previous_rotation) / (2.0 * time_step);
-        
-        let velocity_input = VelocityInput {
-            freestream: freestream_velocity,
-            translation: Vec3::default(),
-            rotation: rotation_velocity,
-        };
+        line_force_model.rotation = rotation;
 
-        let ctrl_points = line_force_model.ctrl_points();
+        let motion = motion_calculator.get_motion(&line_force_model, time_step);
+
+        let freestream = Freestream::Constant(freestream_velocity);
         
-        let ctrl_point_velocity_est = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
+        let ctrl_points = line_force_model.ctrl_points();
+
+        let mut ctrl_point_velocity_est = freestream.velocity_at_locations(&ctrl_points);
+
+        for i in 0..line_force_model.nr_span_lines() {
+            ctrl_point_velocity_est[i] -= motion.velocity[i];
+        }
 
         for i in 0..ctrl_points.len() {
             let velocity_local = velocity.cross(ctrl_points[i]);
@@ -209,8 +212,5 @@ fn rotational_velocity() {
                 assert!(error < 0.06, "Error in rotational velocity estimation at ctrl point {} = {}", i, error);
             }
         }
-
-        two_previous_rotation = previous_rotation;
-        previous_rotation = rotation;
     }
 }

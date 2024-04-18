@@ -60,7 +60,7 @@ fn steady_lift() {
     let force_factor = steady_sim.line_force_model.total_force_factor(velocity.length());
 
     let input_state = InputState {
-        freestream_velocity: velocity,
+        freestream: Freestream::Constant(velocity),
         translation: Vec3::default(),
         rotation: Vec3::default(),
     };

@@ -27,14 +27,15 @@ fn moment_test() {
     let solver_settings = SteadySolverSettings::default();
     let wake_builder  = SteadyWakeBuilder::default();
 
-    let velocity_input = VelocityInput{
-        freestream: Vec3::new(1.2, 0.0, 0.0),
-        ..Default::default()
-    };
+    let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
+
+    let freestream = Freestream::Constant(freestream_velocity);
+    let motion = Motion::new_zero(line_force_model.nr_span_lines());
 
     let result = steady_solvers::solve_steady(
         &line_force_model,
-        &velocity_input,
+        &freestream,
+        &motion,
         &solver_settings,
         &wake_builder,
         vec![0.0; line_force_model.nr_span_lines()].as_slice()
@@ -43,7 +44,7 @@ fn moment_test() {
     let force = result.integrated_forces_sum();
     let moment = result.integrated_moments_sum();
 
-    let cl = force.y / line_force_model.total_force_factor(velocity_input.freestream.length());
+    let cl = force.y / line_force_model.total_force_factor(freestream_velocity.length());
 
     dbg!(cl);
 

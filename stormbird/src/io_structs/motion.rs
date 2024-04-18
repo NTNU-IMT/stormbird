@@ -23,6 +23,16 @@ pub struct Motion {
     pub chord_rotation_velocity: Vec<Vec3>,
 }
 
+impl Motion {
+    pub fn new_zero(nr_span_lines: usize) -> Self {
+        Self {
+            velocity: vec![Vec3::default(); nr_span_lines],
+            acceleration: vec![Vec3::default(); nr_span_lines],
+            chord_rotation_velocity: vec![Vec3::default(); nr_span_lines],
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// Functionality to calculate the motion of the control points of a line force model based on 
 /// finite difference.

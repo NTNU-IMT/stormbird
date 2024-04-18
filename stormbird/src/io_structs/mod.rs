@@ -8,7 +8,13 @@
 //! multiple places.
 
 pub mod result;
+pub mod freestream;
+pub mod motion;
+pub mod input_state;
 
 pub mod prelude {
     pub use super::result::*;
+    pub use super::freestream::*;
+    pub use super::motion::*;
+    pub use super::input_state::*;
 }

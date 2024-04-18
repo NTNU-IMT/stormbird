@@ -11,7 +11,6 @@ pub mod span_line;
 pub mod builder;
 pub mod prescribed_circulations;
 pub mod prelude;
-pub mod velocity_input;
 
 use std::ops::Range;
 
