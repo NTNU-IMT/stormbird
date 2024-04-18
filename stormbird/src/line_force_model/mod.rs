@@ -11,6 +11,7 @@ pub mod span_line;
 pub mod builder;
 pub mod prescribed_circulations;
 pub mod prelude;
+pub mod force_input;
 
 use std::ops::Range;
 
@@ -20,6 +21,8 @@ use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
 use prescribed_circulations::PrescribedCirculation;
+
+use force_input::ForceInput;
 
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
@@ -38,7 +41,7 @@ pub struct LineForceModel {
     pub span_lines_local:     Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
     pub chord_vectors_local:  Vec<Vec3>,
-    /// Two dimensional models for lift and drag coefficients for each section
+    /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
     pub wing_indices:   Vec<Range<usize>>,
