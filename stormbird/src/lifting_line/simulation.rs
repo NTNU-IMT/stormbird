@@ -118,8 +118,8 @@ impl SimulationBuilder {
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     simulation_mode: SimulationMode,
-    velocity_calculator: VelocityCalculator,
     previous_circulation_strength: Vec<f64>,
+    force_input_calculator: Option<ForceInputCalculator>,
     unsteady_wake: Option<UnsteadyWake>,
     write_wake_data_to_file: bool,
     wake_files_folder_path: String,
@@ -132,7 +132,6 @@ impl Simulation {
         Ok(builder.build())
     }
 
-    
     pub fn do_step(
         &mut self, 
         time: f64,
@@ -142,13 +141,24 @@ impl Simulation {
         self.line_force_model.rotation    = input_state.rotation;
         self.line_force_model.translation = input_state.translation;
 
-        let velocity_input = self.velocity_calculator.get_velocity_input(input_state, time_step);
+        // If the force input calculator has not been initialized, initialize it.
+        if self.force_input_calculator.is_none() {
+            self.force_input_calculator = Some(ForceInputCalculator::new(&self.line_force_model));
+        }
+
+        let mut force_input_calculator = self.force_input_calculator.as_mut().unwrap();
+
+        let force_input = force_input_calculator.get_force_input(
+            &self.line_force_model, 
+            &input_state.freestream_velocity, 
+            time_step
+        );
 
         let result = match &self.simulation_mode {
             SimulationMode::QuasiSteady(settings) => {
                 steady_solvers::solve_steady(
                     &self.line_force_model, 
-                    &velocity_input, 
+                    &force_input, 
                     &settings.solver,
                     &settings.wake, 
                     &self.previous_circulation_strength
@@ -160,7 +170,7 @@ impl Simulation {
                         settings.wake.build(
                             time_step,
                             &self.line_force_model,
-                            &velocity_input
+                            &force_input
                         )
                     );
                 }
@@ -170,7 +180,7 @@ impl Simulation {
                 let result = unsteady_solvers::solve_one_time_step(
                     time_step,
                     &self.line_force_model,
-                    &velocity_input,
+                    &force_input,
                     &mut wake,
                     &settings.solver,
                     &self.previous_circulation_strength

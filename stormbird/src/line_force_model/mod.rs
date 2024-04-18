@@ -22,8 +22,6 @@ use crate::section_models::SectionModel;
 use span_line::*;
 use prescribed_circulations::PrescribedCirculation;
 
-use force_input::ForceInput;
-
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
     pub span_lines_local: Vec<SpanLine>,

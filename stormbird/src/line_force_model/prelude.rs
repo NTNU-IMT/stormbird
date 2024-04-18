@@ -5,3 +5,7 @@
 pub use super::LineForceModel;
 pub use super::builder::LineForceModelBuilder;
 pub use super::span_line::SpanLine;
+pub use super::force_input::{
+    ForceInput,
+    ForceInputCalculator,
+};

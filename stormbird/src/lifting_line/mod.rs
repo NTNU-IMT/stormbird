@@ -32,6 +32,11 @@ pub mod prelude {
         LineForceModelBuilder,
         WingBuilder,
     };
+    pub use crate::line_force_model::force_input::{
+        ForceInput,
+        ForceInputCalculator,
+    };
+
     pub use crate::section_models::{
         SectionModel,
         foil::Foil,

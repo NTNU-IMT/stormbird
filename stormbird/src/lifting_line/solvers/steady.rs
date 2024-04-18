@@ -209,12 +209,12 @@ pub fn solve_steady(
 /// Collected in a function as the same procedure is used multiple times in the solver.
 fn calculate_velocity(
     line_force_model: &LineForceModel,
-    velocity_input: &VelocityInput,
+    force_input: &ForceInput,
     wake: &SteadyWake, 
     viscous_wakes: Option<&ViscousWakes>, 
     circulation_strength: &[f64]
 ) -> Vec<Vec3> {
-    let ctrl_point_velocities: Vec<Vec3> = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
+    let ctrl_point_velocities: Vec<Vec3> = force_input.velocity.clone();
 
     let induced_velocities: Vec<Vec3> = wake.induced_velocities_at_control_points(circulation_strength);
 
