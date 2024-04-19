@@ -239,7 +239,7 @@ impl ActuatorLine {
 
         let result = self.results.last().unwrap();
 
-        let sectional_forces_to_project = self.force_model_projection.sectional_forces_no_viscous_drag(&result.circulation_strength, &result.velocity);
+        let sectional_forces_to_project = self.force_model_projection.sectional_circulatory_forces(&result.circulation_strength, &result.velocity);
         
         for i in 0..self.force_model_projection.nr_span_lines() {
             let span_line  = &span_lines_projection[i];

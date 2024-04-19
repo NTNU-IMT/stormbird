@@ -11,6 +11,7 @@ pub mod result;
 pub mod freestream;
 pub mod motion;
 pub mod input_state;
+pub mod forces_and_moments;
 
 pub mod prelude {
     pub use super::result::*;

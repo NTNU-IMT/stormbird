@@ -358,45 +358,47 @@ impl LineForceModel {
     
     /// Calculates the forces on each line element.
     pub fn sectional_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        self.sectional_forces_internal(strength, velocity, true)
+        let circulatory_forces = self.sectional_circulatory_forces(strength, velocity);
+        let drag_forces = self.sectional_drag_forces(velocity);
+
+        (0..self.nr_span_lines()).map(
+            |index| {
+                circulatory_forces[index] + drag_forces[index]
+            }
+        ).collect()
     }
 
-
-    /// Calculates the forces on each line element, without viscous drag. That is, only lift and 
-    /// lift-induced drag.
-    pub fn sectional_forces_no_viscous_drag(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        self.sectional_forces_internal(strength, velocity, false)
-    }
-
-    /// Calculates the forces on each line element.
-    fn sectional_forces_internal(&self, strength: &[f64], velocity: &[Vec3], include_viscous_drag: bool) -> Vec<Vec3> {
-        let viscous_cd: Option<Vec<f64>> = if include_viscous_drag {
-            Some(self.viscous_drag_coefficients(velocity))
-        } else {
-            None
-        };
-
+    /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
+    pub fn sectional_circulatory_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
         let span_lines = self.span_lines();
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let mut section_force = if velocity[index].length() == 0.0 {
+                if velocity[index].length() == 0.0 {
                     Vec3::default()
                 } else {
                     strength[index] * velocity[index].cross(span_lines[index].relative_vector())
-                };
-                
-                if let Some(cd) = &viscous_cd {
-                    let drag_direction = velocity[index].normalize();
-    
-                    let drag_area = self.chord_vectors_local[index].length() * span_lines[index].length();
-
-                    let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
-    
-                    section_force += drag_direction *  cd[index] * force_factor;
                 }
-              
-                section_force
+            }
+        ).collect()
+    }
+
+    /// Calculates the forces on each line element due to the sectional drag model. This is most 
+    /// often the visocus drag, but it can also include other physical effects if that is included
+    /// in the sectional drag model.
+    pub fn sectional_drag_forces(&self, velocity: &[Vec3]) -> Vec<Vec3> {
+        let span_lines = self.span_lines();
+        let cd = self.viscous_drag_coefficients(velocity);
+
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let drag_direction = velocity[index].normalize();
+
+                let drag_area = self.chord_vectors_local[index].length() * span_lines[index].length();
+
+                let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
+
+                drag_direction * cd[index] * force_factor
             }
         ).collect()
     }

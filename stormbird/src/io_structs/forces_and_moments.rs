@@ -25,7 +25,7 @@ pub struct IntegratedValues {
 pub struct SectionalForces {
     /// Forces due to the circluation on a line element. Computed from the lift part of the 
     /// sectional model.
-    pub circulatory: Vec<Vec3>
+    pub circulatory: Vec<Vec3>,
     /// Forces due to the two dimensional drag on a line element. 
     /// 
     /// **Note**: this is often the visocus drag, but not always. In can also include three 
@@ -51,11 +51,40 @@ impl SectionalForces {
         }
     }
 
-    pub integrated_forces(&self, line_force_model: &LineForceModel) -> IntegratedValues {
-        todo!()
+    /// Calculates the moment contribution from each line element.
+    /// 
+    /// The moments are calculated as the cross product of the control point and the sectional force.
+    pub fn sectional_moments(line_force_model: &LineForceModel, sectional_forces: &[Vec3]) -> Vec<Vec3> {
+        let span_lines = line_force_model.span_lines();
+
+        (0..line_force_model.nr_span_lines()).map(
+            |index| {
+                span_lines[index].ctrl_point().cross(sectional_forces[index])
+            }
+        ).collect()
     }
 
-    pub integrated_moments(&self, line_force_model: &LineForceModel) -> IntegratedValues {
+    pub fn integrated_forces(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
+        let mut integrated_values: Vec<IntegratedValues> = Vec::new();
+
+        for wing_indices in &line_force_model.wing_indices {
+            let mut wing_result = IntegratedValues::default();
+
+            for i in wing_indices.start..wing_indices.end {
+                wing_result.circulatory += self.circulatory[i];
+                wing_result.sectional_drag += self.sectional_drag[i];
+                wing_result.added_mass += self.added_mass[i];
+                wing_result.gyroscopic += self.gyroscopic[i];
+                wing_result.total += self.total[i];
+            }
+
+            integrated_values.push(wing_result);
+        }
+
+        integrated_values
+    }
+
+    pub fn integrated_moments(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
         todo!()
     }
 }
