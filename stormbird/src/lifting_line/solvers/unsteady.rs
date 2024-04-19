@@ -92,8 +92,9 @@ pub fn solve_one_time_step(
 
     // Do post processing
     let sectional_forces   = line_force_model.sectional_forces(&circulation_strength, &velocity);
-    let integrated_forces  = line_force_model.integrated_forces(&circulation_strength, &velocity);
-    let integrated_moments = line_force_model.integrated_moments(&circulation_strength, &velocity);
+
+    let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
+    let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
 
     wake.update_after_completed_time_step(&circulation_strength, time_step, line_force_model, freestream);
 

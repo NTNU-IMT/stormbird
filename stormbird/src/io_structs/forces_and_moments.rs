@@ -23,13 +23,13 @@ pub struct IntegratedValues {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to store sectional forces from simulations.
 pub struct SectionalForces {
-    /// Forces due to the circluation on a line element. Computed from the lift part of the 
+    /// Forces due to the circulation on a line element. Computed from the lift part of the 
     /// sectional model.
     pub circulatory: Vec<Vec3>,
     /// Forces due to the two dimensional drag on a line element. 
     /// 
-    /// **Note**: this is often the visocus drag, but not always. In can also include three 
-    /// dimensional effects on the drag, if the model is executed with a simplfied approach, for 
+    /// **Note**: this is often the viscous drag, but not always. In can also include three 
+    /// dimensional effects on the drag, if the model is executed with a simplified approach, for 
     /// instance when neglecting the *self-induced* velocities.
     pub sectional_drag: Vec<Vec3>,
     /// Added mass forces on the line element.
@@ -64,7 +64,7 @@ impl SectionalForces {
         ).collect()
     }
 
-    pub fn integrated_forces(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
+    pub fn integrate_forces(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
         let mut integrated_values: Vec<IntegratedValues> = Vec::new();
 
         for wing_indices in &line_force_model.wing_indices {
@@ -84,7 +84,29 @@ impl SectionalForces {
         integrated_values
     }
 
-    pub fn integrated_moments(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
-        todo!()
+    pub fn integrate_moments(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
+        let sectional_circulatory_moments = Self::sectional_moments(line_force_model, &self.circulatory);
+        let sectional_drag_moments = Self::sectional_moments(line_force_model, &self.sectional_drag);
+        let sectional_added_mass_moments = Self::sectional_moments(line_force_model, &self.added_mass);
+        let sectional_gyroscopic_moments = Self::sectional_moments(line_force_model, &self.gyroscopic);
+        let sectional_total_moments = Self::sectional_moments(line_force_model, &self.total);
+
+        let mut integrated_values: Vec<IntegratedValues> = Vec::new();
+
+        for wing_indices in &line_force_model.wing_indices {
+            let mut wing_result = IntegratedValues::default();
+
+            for i in wing_indices.start..wing_indices.end {
+                wing_result.circulatory += sectional_circulatory_moments[i];
+                wing_result.sectional_drag += sectional_drag_moments[i];
+                wing_result.added_mass += sectional_added_mass_moments[i];
+                wing_result.gyroscopic += sectional_gyroscopic_moments[i];
+                wing_result.total += sectional_total_moments[i];
+            }
+
+            integrated_values.push(wing_result);
+        }
+        
+        integrated_values
     }
 }

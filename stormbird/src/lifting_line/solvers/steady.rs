@@ -195,8 +195,8 @@ pub fn solve_steady(
 
     let sectional_forces = line_force_model.sectional_forces(&circulation_strength, &velocity);
 
-    let integrated_forces = line_force_model.integrated_forces(&circulation_strength, &velocity);
-    let integrated_moments = line_force_model.integrated_moments(&circulation_strength, &velocity);
+    let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
+    let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
 
     SimulationResult {
         ctrl_points,

@@ -154,7 +154,8 @@ impl ActuatorLine {
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
     pub fn calculate_result(&mut self, velocity_ctrl_points_sampling: &[Vec3]) -> SimulationResult {
-        let mut result = SimulationResult::new();
+        let mut result = SimulationResult::default();
+
         let span_lines_projection = self.force_model_projection.span_lines();
 
         result.ctrl_points = span_lines_projection.iter().map(|line| {
@@ -199,8 +200,8 @@ impl ActuatorLine {
 
         result.sectional_forces  = self.force_model_projection.sectional_forces(&result.circulation_strength, &result.velocity);
 
-        result.integrated_forces  = self.force_model_projection.integrated_forces(&result.circulation_strength, &result.velocity);
-        result.integrated_moments = self.force_model_projection.integrated_moments(&result.circulation_strength, &result.velocity);
+        result.integrated_forces = result.sectional_forces.integrate_forces(&self.force_model_projection);
+        result.integrated_moments = result.sectional_forces.integrate_moments(&self.force_model_projection);
 
         result
     }

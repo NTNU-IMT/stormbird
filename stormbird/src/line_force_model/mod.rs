@@ -16,6 +16,7 @@ use std::ops::Range;
 
 use crate::math_utils::statistics::mean;
 
+use crate::io_structs::forces_and_moments::SectionalForces;
 use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
@@ -349,7 +350,7 @@ impl LineForceModel {
     }
 
 
-    /// Calculates the average viscouse drag coefficient for each wing.
+    /// Calculates the average viscous drag coefficient for each wing.
     pub fn average_viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
         let cd = self.viscous_drag_coefficients(velocity);
 
@@ -357,15 +358,18 @@ impl LineForceModel {
     }
     
     /// Calculates the forces on each line element.
-    pub fn sectional_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        let circulatory_forces = self.sectional_circulatory_forces(strength, velocity);
-        let drag_forces = self.sectional_drag_forces(velocity);
+    pub fn sectional_forces(&self, strength: &[f64], velocity: &[Vec3]) -> SectionalForces {
+        let mut sectional_forces = SectionalForces {
+            circulatory: self.sectional_circulatory_forces(strength, velocity),
+            sectional_drag: self.sectional_drag_forces(velocity),
+            added_mass: vec![Vec3::default(); self.nr_span_lines()],
+            gyroscopic: vec![Vec3::default(); self.nr_span_lines()],
+            total: vec![Vec3::default(); self.nr_span_lines()],
+        };
 
-        (0..self.nr_span_lines()).map(
-            |index| {
-                circulatory_forces[index] + drag_forces[index]
-            }
-        ).collect()
+        sectional_forces.compute_total();
+
+        sectional_forces
     }
 
     /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
@@ -399,21 +403,6 @@ impl LineForceModel {
                 let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
 
                 drag_direction * cd[index] * force_factor
-            }
-        ).collect()
-    }
-
-
-    /// Calculates the moment contribution from each line element.
-    /// 
-    /// The moments are calculated as the cross product of the control point and the sectional force.
-    pub fn sectional_moments(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        let span_lines = self.span_lines();
-        let sectional_forces = self.sectional_forces(strength, velocity);
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                span_lines[index].ctrl_point().cross(sectional_forces[index])
             }
         ).collect()
     }
@@ -459,45 +448,6 @@ impl LineForceModel {
 
         relative_span_distance
     }
-
-    /// Integrates sectional forces over each wing in the model.
-    pub fn integrated_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3>  {
-        let mut result: Vec<Vec3> = Vec::new();
-
-        let sectional_forces = self.sectional_forces(strength, velocity);
-
-        for wing_indices in &self.wing_indices {
-            let mut wing_result = Vec3::default();
-
-            for sectional_force in sectional_forces.iter().take(wing_indices.end).skip(wing_indices.start) {
-                wing_result  += *sectional_force;
-            }
-
-            result.push(wing_result);
-        }
-        
-        result
-    }
-
-    /// Integrates sectional moments over each wing in the model.
-    pub fn integrated_moments(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3>  {
-        let mut result: Vec<Vec3> = Vec::new();
-
-        let sectional_moments = self.sectional_moments(strength, velocity);
-
-        for wing_indices in &self.wing_indices {
-            let mut wing_result = Vec3::default();
-
-            for sectional_moment in sectional_moments.iter().take(wing_indices.end).skip(wing_indices.start) {
-                wing_result  += *sectional_moment;
-            }
-
-            result.push(wing_result);
-        }
-        
-        result
-    }
-
 
     /// Integrates the chord length along the span of all wings in the model to return the total
     /// projected area of the wing.

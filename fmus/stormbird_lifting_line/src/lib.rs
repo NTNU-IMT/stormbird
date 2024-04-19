@@ -6,8 +6,8 @@ pub use fmu_from_struct::prelude::*;
 
 use stormbird::lifting_line::prelude::*;
 use stormbird::lifting_line::simulation::{Simulation, SimulationBuilder};
-use stormbird::line_force_model::velocity_input::InputState;
-use stormbird::line_force_model::velocity_input::freestream::Freestream;
+use stormbird::io_structs::input_state::InputState;
+use stormbird::io_structs::freestream::Freestream;
 
 
 #[derive(Debug, Default, Clone, Fmu)]
