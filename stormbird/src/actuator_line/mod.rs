@@ -165,9 +165,9 @@ impl ActuatorLine {
         // TODO: This must be uddated to handle moving wings!
         let force_input = SectionalForcesInput {
             circulation_strength,
-            felt_velocity: velocity_ctrl_points.to_vec(),
+            velocity: velocity_ctrl_points.to_vec(),
             acceleration: vec![Vec3::default(); self.line_force_model.nr_span_lines()],
-            chord_rotation_velocity: vec![0.0; self.line_force_model.nr_span_lines()],
+            angle_of_attack_derivative: vec![0.0; self.line_force_model.nr_span_lines()],
         };
 
         let sectional_forces = self.line_force_model.sectional_forces(&force_input);
@@ -201,14 +201,14 @@ impl ActuatorLine {
         let result = self.results.last().unwrap();
 
         let sectional_forces_to_project = self.line_force_model.sectional_circulatory_forces(
-            &result.force_input.circulation_strength, &result.force_input.felt_velocity
+            &result.force_input.circulation_strength, &result.force_input.velocity
         );
         
         let mut body_force = Vec3::default();
 
         for i in 0..self.line_force_model.nr_span_lines() {
             let effective_chord_vector = if self.settings.velocity_aligned_projection {
-                result.force_input.felt_velocity[i].normalize() * chord_vectors[i].length()
+                result.force_input.velocity[i].normalize() * chord_vectors[i].length()
             } else {
                 chord_vectors[i]
             };
@@ -233,7 +233,7 @@ impl ActuatorLine {
 
         for i in 0..self.line_force_model.nr_span_lines() {
             let effective_chord_vector = if self.settings.velocity_aligned_projection {
-                result.force_input.felt_velocity[i].normalize() * chord_vectors[i].length()
+                result.force_input.velocity[i].normalize() * chord_vectors[i].length()
             } else {
                 chord_vectors[i]
             };

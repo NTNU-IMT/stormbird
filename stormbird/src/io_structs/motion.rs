@@ -20,7 +20,7 @@ pub struct Motion {
     pub acceleration: Vec<Vec3>,
     /// How fast the chord vector is rotating. Mainly used to calculate additional lift due to this
     /// rotation
-    pub chord_rotation_velocity: Vec<f64>,
+    pub angle_of_attack_derivative: Vec<f64>,
 }
 
 impl Motion {
@@ -28,7 +28,7 @@ impl Motion {
         Self {
             velocity: vec![Vec3::default(); nr_span_lines],
             acceleration: vec![Vec3::default(); nr_span_lines],
-            chord_rotation_velocity: vec![0.0; nr_span_lines],
+            angle_of_attack_derivative: vec![0.0; nr_span_lines],
         }
     }
 }
@@ -40,17 +40,17 @@ pub struct MotionCalculator {
     /// Previous positions of the control points
     ctrl_points_history: [Vec<Vec3>; 2],
     /// Previous values for the chord vector
-    chord_vector_history: [Vec<Vec3>; 2],
+    angle_of_attack_history: [Vec<f64>; 2],
 }
 
 impl MotionCalculator {
     pub fn new(line_force_model: &LineForceModel) -> Self {
         let ctrl_points = line_force_model.ctrl_points();
-        let chord_vectors = line_force_model.chord_vectors();
+        let angle_of_attack = vec![0.0; line_force_model.nr_span_lines()];
         
         Self {
-            ctrl_points_history: [ctrl_points.clone(), ctrl_points.clone()],
-            chord_vector_history: [chord_vectors.clone(), chord_vectors.clone()],
+            ctrl_points_history: [ctrl_points.clone(), ctrl_points],
+            angle_of_attack_history: [angle_of_attack.clone(), angle_of_attack],
         }
     }
 
@@ -70,7 +70,7 @@ impl MotionCalculator {
         }
 
         let current_ctrl_points = line_force_model.ctrl_points();
-        let current_chord_vectors = line_force_model.chord_vectors();
+        let current_angle_of_attack = vec![0.0; line_force_model.nr_span_lines()];
 
         let mut velocity: Vec<Vec3> = Vec::with_capacity(line_force_model.nr_span_lines());
         let mut acceleration: Vec<Vec3> = Vec::with_capacity(line_force_model.nr_span_lines());
@@ -95,20 +95,20 @@ impl MotionCalculator {
             );
         }
 
-        let chord_rotation_velocity = vec![0.0; line_force_model.nr_span_lines()];
+        let angle_of_attack_derivative = vec![0.0; line_force_model.nr_span_lines()];
 
         for i in 0..line_force_model.nr_span_lines() {
             self.ctrl_points_history[0][i] = self.ctrl_points_history[1][i];
             self.ctrl_points_history[1][i] = current_ctrl_points[i];
 
-            self.chord_vector_history[0][i] = self.chord_vector_history[1][i];
-            self.chord_vector_history[1][i] = current_chord_vectors[i];
+            self.angle_of_attack_history[0][i] = self.angle_of_attack_history[1][i];
+            self.angle_of_attack_history[1][i] = current_angle_of_attack[i];
         }
 
         Motion {
             velocity,
             acceleration,
-            chord_rotation_velocity,
+            angle_of_attack_derivative,
         }
     }
 }

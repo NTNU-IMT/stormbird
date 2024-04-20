@@ -197,10 +197,10 @@ pub fn solve_steady(
     );
 
     let force_input = SectionalForcesInput {
-        circulation_strength: circulation_strength,
-        felt_velocity: velocity,
+        circulation_strength,
+        velocity,
         acceleration: motion.acceleration.clone(),
-        chord_rotation_velocity: motion.chord_rotation_velocity.clone(),
+        angle_of_attack_derivative: motion.angle_of_attack_derivative.clone(),
     };
 
     let sectional_forces = line_force_model.sectional_forces(&force_input);

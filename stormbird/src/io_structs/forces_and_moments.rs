@@ -23,14 +23,16 @@ pub struct IntegratedValues {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Input data to calculate sectional forces.
 pub struct SectionalForcesInput {
-    /// Circulation strength
+    /// Circulation strength of each line element
     pub circulation_strength: Vec<f64>,
-    /// Felt velocity at each control point
-    pub felt_velocity: Vec<Vec3>,
-    /// Acceleration at each control point
+    /// The *felt* velocity at each control point, meaning the velocity of the fluid from the 
+    /// perspective of the wings, **not** the velocity of the wings themselves.  
+    pub velocity: Vec<Vec3>,
+    /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
+    /// the perspective of the wings, **not** the acceleration of the wings themselves.
     pub acceleration: Vec<Vec3>,
-    /// Chord rotation velocity at each control point
-    pub chord_rotation_velocity: Vec<f64>,
+    /// The change in angle of attack at each control point as a function of time. 
+    pub angle_of_attack_derivative: Vec<f64>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

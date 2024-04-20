@@ -360,10 +360,10 @@ impl LineForceModel {
     /// Calculates the forces on each line element.
     pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
         let mut sectional_forces = SectionalForces {
-            circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.felt_velocity),
-            sectional_drag: self.sectional_drag_forces(&input.felt_velocity),
+            circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.velocity),
+            sectional_drag: self.sectional_drag_forces(&input.velocity),
             added_mass: self.sectional_added_mass_force(&input.acceleration),
-            gyroscopic: self.sectional_gyroscopic_force(&input.felt_velocity),
+            gyroscopic: self.sectional_gyroscopic_force(&input.velocity),
             total: vec![Vec3::default(); self.nr_span_lines()],
         };
 

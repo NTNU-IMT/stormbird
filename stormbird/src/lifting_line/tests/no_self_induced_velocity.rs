@@ -119,7 +119,7 @@ fn no_self_induced_velocity() {
     let cd = result.integrated_forces_sum().x / force_factor;
     let cl = result.integrated_forces_sum().y / force_factor;
 
-    dbg!(&result.velocity);
+    dbg!(&result.force_input.velocity);
 
     dbg!(cd, cl);
 
