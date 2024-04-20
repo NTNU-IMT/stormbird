@@ -73,6 +73,7 @@ impl MotionCalculator {
         let current_chord_vectors = line_force_model.chord_vectors();
 
         let mut velocity: Vec<Vec3> = Vec::with_capacity(line_force_model.nr_span_lines());
+        let mut acceleration: Vec<Vec3> = Vec::with_capacity(line_force_model.nr_span_lines());
         
         for i in 0..line_force_model.nr_span_lines() {
             let position_history = [
@@ -86,9 +87,14 @@ impl MotionCalculator {
                     &position_history, time_step
                 )
             );
+
+            acceleration.push(
+                finite_difference::second_derivative_backward(
+                    &position_history, time_step
+                )
+            );
         }
 
-        let acceleration = vec![Vec3::default(); line_force_model.nr_span_lines()];
         let chord_rotation_velocity = vec![Vec3::default(); line_force_model.nr_span_lines()];
 
         for i in 0..line_force_model.nr_span_lines() {
