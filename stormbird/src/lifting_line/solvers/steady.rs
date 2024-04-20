@@ -108,7 +108,10 @@ pub fn solve_steady_multiresolution(
             vec![0.0; force_models[i].nr_span_lines()]
         } else {
             force_models[i-1].map_strength_gaussian(
-                &results[i-1].circulation_strength, &force_models[i], (end_correction, end_correction), 0.5
+                &results[i-1].force_input.circulation_strength, 
+                &force_models[i], 
+                (end_correction, end_correction), 
+                0.5
             )
         };
 
@@ -207,8 +210,7 @@ pub fn solve_steady(
 
     SimulationResult {
         ctrl_points,
-        circulation_strength: force_input.circulation_strength, 
-        velocity: force_input.felt_velocity,
+        force_input,
         sectional_forces,
         integrated_forces,
         integrated_moments,

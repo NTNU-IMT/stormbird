@@ -7,15 +7,17 @@
 use crate::vec3::Vec3;
 use serde::{Serialize, Deserialize};
 
-use super::forces_and_moments::IntegratedValues;
-use super::forces_and_moments::SectionalForces;
+use super::forces_and_moments::{
+    IntegratedValues,
+    SectionalForces,
+    SectionalForcesInput
+};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
     pub ctrl_points: Vec<Vec3>,
-    pub circulation_strength: Vec<f64>,
-    pub velocity: Vec<Vec3>,
+    pub force_input: SectionalForcesInput,
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
     pub integrated_moments: Vec<IntegratedValues>,

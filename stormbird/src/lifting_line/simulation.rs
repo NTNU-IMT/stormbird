@@ -208,7 +208,7 @@ impl Simulation {
             }
         };
 
-        self.previous_circulation_strength = result.circulation_strength.clone();
+        self.previous_circulation_strength = result.force_input.circulation_strength.clone();
 
         result
     }

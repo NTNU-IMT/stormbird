@@ -20,7 +20,7 @@ pub struct IntegratedValues {
     pub total: Vec3,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Input data to calculate sectional forces.
 pub struct SectionalForcesInput {
     /// Circulation strength

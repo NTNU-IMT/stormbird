@@ -107,8 +107,7 @@ pub fn solve_one_time_step(
 
     SimulationResult {
         ctrl_points,
-        circulation_strength: force_input.circulation_strength, 
-        velocity: force_input.felt_velocity,
+        force_input,
         sectional_forces,
         integrated_forces,
         integrated_moments,
