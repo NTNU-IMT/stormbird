@@ -10,19 +10,22 @@
 pub mod common_functions;
 /// Section model of a foil profile
 pub mod foil;
+/// Section model of a foil profile where the parameters can vary depending on an internal state
+pub mod varying_foil;
 /// Section model of a rotating cylinder, for instance to be used when modelling rotor sails.
 pub mod rotating_cylinder;
 
 use serde::{Serialize, Deserialize};
 
 use foil::Foil;
+use varying_foil::VaryingFoil;
 use rotating_cylinder::RotatingCylinder;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Sectional model for a wing, that can be of multple variants
 pub enum SectionModel {
     Foil(Foil),
-    VaryingFoil(Vec<Foil>),
+    VaryingFoil(VaryingFoil),
     RotatingCylinder(RotatingCylinder),
 }
 

@@ -13,6 +13,9 @@ use std::f64::consts::PI;
 pub struct Foil {
     #[serde(default)]
     pub cl_zero_angle: f64,
+    #[serde(default="Foil::default_cl_initial_slope")]
+    pub cl_initial_slope: f64,
+
     #[serde(default)]
     pub cd_zero_angle: f64,
 
@@ -37,8 +40,6 @@ pub struct Foil {
     pub stall_range: f64,
 }
 
-
-
 fn get_stall_angle(angle_of_attack: f64) -> f64 {
     let mut effective = angle_of_attack.abs();
 
@@ -53,14 +54,13 @@ fn get_stall_angle(angle_of_attack: f64) -> f64 {
 
 impl Foil {
     pub fn default_one()                  -> f64 {1.0}
+    pub fn default_cl_initial_slope()     -> f64 {2.0 * PI}
     pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
     pub fn default_cd_power_after_stall() -> f64 {1.6}
     
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
         let stall_angle = get_stall_angle(angle_of_attack);
-
-        let cl_a1 = 2.0 * PI;
 
         let angle_high_power = if self.cl_high_order_power > 0.0 {
             angle_of_attack.powf(self.cl_high_order_power)
@@ -70,9 +70,8 @@ impl Foil {
 
         let cl_pre_stall  = 
             self.cl_zero_angle + 
-            cl_a1 * angle_of_attack +
+            self.cl_initial_slope * angle_of_attack +
             self.cl_high_order_factor * angle_high_power;
-
 
         let cl_post_stall = self.cl_max_after_stall * (2.0 * stall_angle).sin();
 
@@ -103,6 +102,7 @@ impl Default for Foil {
     fn default() -> Self {
         Self {
             cl_zero_angle:          0.0,
+            cl_initial_slope:       Self::default_cl_initial_slope(),
             cd_zero_angle:          0.0,
             cl_high_order_factor:   0.0,
             cl_high_order_power:    0.0,

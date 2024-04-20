@@ -289,14 +289,13 @@ impl LineForceModel {
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let local_index = self.local_index_from_global(index);
                 let wing_index  = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(foil) => 
                         foil.lift_coefficient(angle_of_attack[index]),
-                    SectionModel::VaryingFoil(foils) => 
-                        foils[local_index].lift_coefficient(angle_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) => 
+                        foil.lift_coefficient(angle_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) => 
                         cylinder.lift_coefficient(
                             self.chord_vectors_local[index].length(), velocity[index].length()
@@ -316,14 +315,13 @@ impl LineForceModel {
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let local_index = self.local_index_from_global(index);
                 let wing_index  = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(foil) => 
                         foil.drag_coefficient(angle_of_attack[index]),
-                    SectionModel::VaryingFoil(foils) => 
-                        foils[local_index].drag_coefficient(angle_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) => 
+                        foil.drag_coefficient(angle_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) => 
                         cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
                 }
