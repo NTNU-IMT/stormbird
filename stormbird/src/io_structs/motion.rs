@@ -20,7 +20,7 @@ pub struct Motion {
     pub acceleration: Vec<Vec3>,
     /// How fast the chord vector is rotating. Mainly used to calculate additional lift due to this
     /// rotation
-    pub chord_rotation_velocity: Vec<Vec3>,
+    pub chord_rotation_velocity: Vec<f64>,
 }
 
 impl Motion {
@@ -28,7 +28,7 @@ impl Motion {
         Self {
             velocity: vec![Vec3::default(); nr_span_lines],
             acceleration: vec![Vec3::default(); nr_span_lines],
-            chord_rotation_velocity: vec![Vec3::default(); nr_span_lines],
+            chord_rotation_velocity: vec![0.0; nr_span_lines],
         }
     }
 }
@@ -95,7 +95,7 @@ impl MotionCalculator {
             );
         }
 
-        let chord_rotation_velocity = vec![Vec3::default(); line_force_model.nr_span_lines()];
+        let chord_rotation_velocity = vec![0.0; line_force_model.nr_span_lines()];
 
         for i in 0..line_force_model.nr_span_lines() {
             self.ctrl_points_history[0][i] = self.ctrl_points_history[1][i];

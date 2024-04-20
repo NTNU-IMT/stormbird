@@ -193,15 +193,22 @@ pub fn solve_steady(
         &circulation_strength
     );
 
-    let sectional_forces = line_force_model.sectional_forces(&circulation_strength, &velocity);
+    let force_input = SectionalForcesInput {
+        circulation_strength: circulation_strength,
+        felt_velocity: velocity,
+        acceleration: motion.acceleration.clone(),
+        chord_rotation_velocity: motion.chord_rotation_velocity.clone(),
+    };
+
+    let sectional_forces = line_force_model.sectional_forces(&force_input);
 
     let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
     let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
 
     SimulationResult {
         ctrl_points,
-        circulation_strength, 
-        velocity,
+        circulation_strength: force_input.circulation_strength, 
+        velocity: force_input.felt_velocity,
         sectional_forces,
         integrated_forces,
         integrated_moments,

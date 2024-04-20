@@ -20,6 +20,19 @@ pub struct IntegratedValues {
     pub total: Vec3,
 }
 
+#[derive(Default, Debug, Clone)]
+/// Input data to calculate sectional forces.
+pub struct SectionalForcesInput {
+    /// Circulation strength
+    pub circulation_strength: Vec<f64>,
+    /// Felt velocity at each control point
+    pub felt_velocity: Vec<Vec3>,
+    /// Acceleration at each control point
+    pub acceleration: Vec<Vec3>,
+    /// Chord rotation velocity at each control point
+    pub chord_rotation_velocity: Vec<f64>,
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to store sectional forces from simulations.
 pub struct SectionalForces {

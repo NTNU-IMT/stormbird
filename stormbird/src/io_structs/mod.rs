@@ -18,4 +18,5 @@ pub mod prelude {
     pub use super::freestream::*;
     pub use super::motion::*;
     pub use super::input_state::*;
+    pub use super::forces_and_moments::*;
 }

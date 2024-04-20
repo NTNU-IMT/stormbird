@@ -18,7 +18,7 @@ use crate::math_utils::smoothing::gaussian_kernel;
 use crate::vec3::Vec3;
 use crate::line_force_model::LineForceModel;
 use crate::line_force_model::builder::LineForceModelBuilder;
-use crate::io_structs::result::SimulationResult;
+use crate::io_structs::prelude::*;
 
 use projection::Projection;
 use velocity_sampling::{VelocitySampling, VelocitySamplingBuilder};
@@ -198,7 +198,15 @@ impl ActuatorLine {
             result.circulation_strength = new_calculated_strength;
         }
 
-        result.sectional_forces  = self.force_model_projection.sectional_forces(&result.circulation_strength, &result.velocity);
+        // TODO: This must be uddated to handle moving wings!
+        let force_input = SectionalForcesInput {
+            circulation_strength: result.circulation_strength.clone(),
+            felt_velocity: result.velocity.clone(),
+            acceleration: vec![Vec3::default(); self.force_model_projection.nr_span_lines()],
+            chord_rotation_velocity: vec![0.0; self.force_model_projection.nr_span_lines()],
+        };
+
+        result.sectional_forces  = self.force_model_projection.sectional_forces(&force_input);
 
         result.integrated_forces = result.sectional_forces.integrate_forces(&self.force_model_projection);
         result.integrated_moments = result.sectional_forces.integrate_moments(&self.force_model_projection);

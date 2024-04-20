@@ -16,7 +16,7 @@ use std::ops::Range;
 
 use crate::math_utils::statistics::mean;
 
-use crate::io_structs::forces_and_moments::SectionalForces;
+use crate::io_structs::prelude::*;
 use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
@@ -358,12 +358,12 @@ impl LineForceModel {
     }
     
     /// Calculates the forces on each line element.
-    pub fn sectional_forces(&self, strength: &[f64], velocity: &[Vec3]) -> SectionalForces {
+    pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
         let mut sectional_forces = SectionalForces {
-            circulatory: self.sectional_circulatory_forces(strength, velocity),
-            sectional_drag: self.sectional_drag_forces(velocity),
-            added_mass: vec![Vec3::default(); self.nr_span_lines()],
-            gyroscopic: vec![Vec3::default(); self.nr_span_lines()],
+            circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.felt_velocity),
+            sectional_drag: self.sectional_drag_forces(&input.felt_velocity),
+            added_mass: self.sectional_added_mass_force(&input.acceleration),
+            gyroscopic: self.sectional_gyroscopic_force(&input.felt_velocity),
             total: vec![Vec3::default(); self.nr_span_lines()],
         };
 
@@ -405,6 +405,14 @@ impl LineForceModel {
                 drag_direction * cd[index] * force_factor
             }
         ).collect()
+    }
+
+    pub fn sectional_added_mass_force(&self, acceleration: &[Vec3]) -> Vec<Vec3> {
+        vec![Vec3::default(); self.nr_span_lines()]
+    }
+
+    pub fn sectional_gyroscopic_force(&self, velocity: &[Vec3]) -> Vec<Vec3> {
+        vec![Vec3::default(); self.nr_span_lines()]
     }
 
     /// Calculates the relative distance from the center off each wing for each control point.

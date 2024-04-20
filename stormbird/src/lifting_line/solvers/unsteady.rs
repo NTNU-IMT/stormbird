@@ -91,17 +91,24 @@ pub fn solve_one_time_step(
         .map(|(a, b)| *a + *b).collect();
 
     // Do post processing
-    let sectional_forces   = line_force_model.sectional_forces(&circulation_strength, &velocity);
+    let force_input = SectionalForcesInput {
+        circulation_strength,
+        felt_velocity: velocity,
+        acceleration: motion.acceleration.clone(),
+        chord_rotation_velocity: motion.chord_rotation_velocity.clone(),
+    };
+
+    let sectional_forces   = line_force_model.sectional_forces(&force_input);
 
     let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
     let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
 
-    wake.update_after_completed_time_step(&circulation_strength, time_step, line_force_model, freestream);
+    wake.update_after_completed_time_step(&force_input.circulation_strength, time_step, line_force_model, freestream);
 
     SimulationResult {
-        ctrl_points: ctrl_points.clone(),
-        circulation_strength,
-        velocity,
+        ctrl_points,
+        circulation_strength: force_input.circulation_strength, 
+        velocity: force_input.felt_velocity,
         sectional_forces,
         integrated_forces,
         integrated_moments,
