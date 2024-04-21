@@ -78,6 +78,7 @@ fn no_self_induced_velocity() {
                         0.0, 20.0_f64.to_radians(), 25.0_f64.to_radians(), 
                         35.0_f64.to_radians(), 45.0_f64.to_radians(), 60.0_f64.to_radians()
                     ],
+                    ..Default::default()
                 }
             ),
         };

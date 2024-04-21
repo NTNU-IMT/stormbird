@@ -7,39 +7,61 @@ use crate::math_utils::interpolation::linear_interpolation;
 use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// A foil profile where the parameters can vary depending on an internal state. 
+/// 
+/// The two typical use cases are to model foil sections that include a flap angle, or suction 
+/// sails, where the foil section properties are dependent on the suction rate.
 pub struct VaryingFoil {
-    pub variable_value: f64,
-    pub variable_data: Vec<f64>,
+    pub internal_state_data: Vec<f64>,
     pub foils_data: Vec<Foil>,
+    #[serde(default)]
+    pub current_internal_state: f64,
+    #[serde(default)]
+    pub current_foil: Option<Foil>,
 }
 
 impl VaryingFoil {
     pub fn get_foil(&self) -> Foil {
         let cl_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
         let cl_initial_slope_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
-        let cd_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_zero_angle).collect();
         let cl_high_order_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_high_order_factor).collect();
         let cl_high_order_power_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_high_order_power).collect();
-        let cd_second_order_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
         let cl_max_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
+
+        let cd_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_zero_angle).collect();
+        let cd_second_order_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
         let cd_max_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_max_after_stall).collect();
         let cd_power_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_power_after_stall).collect();
+
         let mean_stall_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.mean_stall_angle).collect();
         let stall_range_data: Vec<f64> = self.foils_data.iter().map(|x| x.stall_range).collect();
 
+        let cl_changing_aoa_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_changing_aoa_factor).collect();
+        let added_mass_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
+
+        let x = self.current_internal_state;
+        let x_data = &self.internal_state_data;
+
         Foil {
-            cl_zero_angle: linear_interpolation(self.variable_value, &self.variable_data, &cl_zero_angle_data),
-            cl_initial_slope: linear_interpolation(self.variable_value, &self.variable_data, &cl_initial_slope_data),
-            cd_zero_angle: linear_interpolation(self.variable_value, &self.variable_data, &cd_zero_angle_data),
-            cl_high_order_factor: linear_interpolation(self.variable_value, &self.variable_data, &cl_high_order_factor_data),
-            cl_high_order_power: linear_interpolation(self.variable_value, &self.variable_data, &cl_high_order_power_data),
-            cd_second_order_factor: linear_interpolation(self.variable_value, &self.variable_data, &cd_second_order_factor_data),
-            cl_max_after_stall: linear_interpolation(self.variable_value, &self.variable_data, &cl_max_after_stall_data),
-            cd_max_after_stall: linear_interpolation(self.variable_value, &self.variable_data, &cd_max_after_stall_data),
-            cd_power_after_stall: linear_interpolation(self.variable_value, &self.variable_data, &cd_power_after_stall_data),
-            mean_stall_angle: linear_interpolation(self.variable_value, &self.variable_data, &mean_stall_angle_data),
-            stall_range: linear_interpolation(self.variable_value, &self.variable_data, &stall_range_data),
+            cl_zero_angle:          linear_interpolation(x, x_data, &cl_zero_angle_data),
+            cl_initial_slope:       linear_interpolation(x, x_data, &cl_initial_slope_data),
+            cl_high_order_factor:   linear_interpolation(x, x_data, &cl_high_order_factor_data),
+            cl_high_order_power:    linear_interpolation(x, x_data, &cl_high_order_power_data),
+            cl_max_after_stall:     linear_interpolation(x, x_data, &cl_max_after_stall_data),
+            cd_zero_angle:          linear_interpolation(x, x_data, &cd_zero_angle_data),
+            cd_second_order_factor: linear_interpolation(x, x_data, &cd_second_order_factor_data),
+            cd_max_after_stall:     linear_interpolation(x, x_data, &cd_max_after_stall_data),
+            cd_power_after_stall:   linear_interpolation(x, x_data, &cd_power_after_stall_data),
+            mean_stall_angle:       linear_interpolation(x, x_data, &mean_stall_angle_data),
+            stall_range:            linear_interpolation(x, x_data, &stall_range_data),
+            cl_changing_aoa_factor: linear_interpolation(x, x_data, &cl_changing_aoa_factor_data),
+            added_mass_factor:      linear_interpolation(x, x_data, &added_mass_factor_data),
         }
+    }
+
+    pub fn set_internal_state(&mut self, internal_state: f64) {
+        self.current_internal_state = internal_state;
+        self.current_foil = Some(self.get_foil());
     }
 
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
@@ -48,5 +70,9 @@ impl VaryingFoil {
 
     pub fn drag_coefficient(&self, angle_of_attack: f64) -> f64 {
         self.get_foil().drag_coefficient(angle_of_attack)
+    }
+
+    pub fn added_mass_coefficient(&self, heave_acceleration: f64) -> f64 {
+        self.get_foil().added_mass_coefficient(heave_acceleration)
     }
 }

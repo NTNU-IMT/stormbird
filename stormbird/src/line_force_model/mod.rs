@@ -405,10 +405,62 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Calculates the added mass force on each line element due to the flow acceleration at each 
+    /// control point. 
+    /// 
+    /// **Note**: At the moment, this function only calculates the added mass due to the point 
+    /// acceleration. However, according to, for instance, Theodorsen, the added mass should also 
+    /// depend on the angular velocity and angular acceleration of the wing. Although these effects
+    /// are expected to be small, it should be included in the future. This would, however, require
+    /// more information about the motion of the wing to be included as arguments.
+    /// 
+    /// # Argument
+    /// * `acceleration` - the acceleration of the flow at each control point. That is, if the only
+    /// velocity is due to the motion of the wings, the acceleration will be opposite to the motion
+    /// of the wings.
     pub fn sectional_added_mass_force(&self, acceleration: &[Vec3]) -> Vec<Vec3> {
-        vec![Vec3::default(); self.nr_span_lines()]
+        let span_lines = self.span_lines();
+        let chord_vectors = self.chord_vectors();
+        
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index  = self.wing_index_from_global(index);
+
+                let strip_area = chord_vectors[index].length() * span_lines[index].length();
+
+                let mut relevant_acceleration = acceleration[index];
+
+                relevant_acceleration -= relevant_acceleration.project(span_lines[index].direction());
+
+                match self.section_models[wing_index] {
+                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => {
+                        relevant_acceleration -= relevant_acceleration.project(chord_vectors[index]);
+                    },
+                    _ => {}
+                }
+
+                let added_mass_coefficient = match &self.section_models[wing_index] {
+                    SectionModel::Foil(foil) => {
+                        foil.added_mass_coefficient(relevant_acceleration.length())
+                    },
+                    SectionModel::VaryingFoil(foil) => {
+                        foil.added_mass_coefficient(relevant_acceleration.length())
+                    },
+                    SectionModel::RotatingCylinder(cylinder) => {
+                        cylinder.added_mass_coefficient(relevant_acceleration.length())
+                    }
+                };
+
+                added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
+            }
+        ).collect()
     }
 
+    /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
+    /// 
+    /// Uses a simplfied approach where the rotational speed of the rotor is assumed to be 
+    /// significantly larger than the rotational velocity of the sail, for instance due to roll or
+    /// pitch motion of the boat.
     pub fn sectional_gyroscopic_force(&self, velocity: &[Vec3]) -> Vec<Vec3> {
         vec![Vec3::default(); self.nr_span_lines()]
     }
