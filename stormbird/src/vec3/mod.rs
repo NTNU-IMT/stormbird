@@ -121,7 +121,9 @@ impl Vec3 {
     }
 
     #[inline]
-    /// Returns the signed angle between two vectors, with the sign determined by the axis
+    /// Returns the signed angle between two vectors, with the sign determined by the axis.
+    /// 
+    /// The sign is determined by the right-hand rule where the rotation is from self to rhs.
     pub fn signed_angle_between(self, rhs: Self, axis: Self) -> f64 {
         let triple_product = self.dot(rhs.cross(axis));
 
@@ -156,5 +158,35 @@ impl Default for Vec3 {
             y: 0.0,
             z: 0.0
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// Tests the sign of the angle between two vectors. The angle is supposed to follow the 
+    /// right-hand rule
+    fn test_signed_angle() {
+        let vector_1 = Vec3::new(1.2, 0.0, 0.0);
+
+        let vector_2 = Vec3::new(1.2, -0.2, 0.0);
+
+        let axis = Vec3::unit_z();
+
+        let angle_from_1_to_2 = vector_1.signed_angle_between(vector_2, axis);
+        let angle_from_2_to_1 = vector_2.signed_angle_between(vector_1, axis);
+        let angle_from_1_to_2_neg_axis = vector_1.signed_angle_between(vector_2, -axis);
+
+        dbg!(
+            angle_from_1_to_2, 
+            angle_from_2_to_1, 
+            angle_from_1_to_2_neg_axis
+        );
+
+        assert!(angle_from_1_to_2 < 0.0);
+        assert!(angle_from_2_to_1 > 0.0);
+        assert!(angle_from_1_to_2_neg_axis > 0.0);
     }
 }

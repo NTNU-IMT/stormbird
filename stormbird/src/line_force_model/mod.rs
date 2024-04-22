@@ -240,6 +240,9 @@ impl LineForceModel {
     }
 
     /// Return the angle of attack at each control point.
+    /// 
+    /// The angle is defined as the rotation from the chord vector to the velocity vector, using the 
+    /// span line as the axis of rotation, with right handed positive rotation.
     ///
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
@@ -248,8 +251,8 @@ impl LineForceModel {
         let span_lines    = self.span_lines();
         
         (0..velocity.len()).map(|index| {
-            -velocity[index].signed_angle_between(
-                chord_vectors[index], 
+            chord_vectors[index].signed_angle_between(
+                velocity[index], 
                 span_lines[index].direction()
             )
         }).collect()
