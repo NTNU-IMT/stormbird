@@ -23,12 +23,12 @@ impl SimulationResult {
 
     #[getter]
     pub fn circulation_strength(&self) -> Vec<f64> {
-        self.data.circulation_strength.clone()
+        self.data.force_input.circulation_strength.clone()
     }
 
     #[getter]
     pub fn velocity(&self) -> Vec<Vec3> {
-        self.data.velocity.iter().map(|v| Vec3::from(v.clone())).collect()
+        self.data.force_input.velocity.iter().map(|v| Vec3::from(v.clone())).collect()
     }
 
     #[getter]

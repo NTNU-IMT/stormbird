@@ -68,9 +68,10 @@ impl Default for SteadySolverSettings {
 /// 
 /// The idea is inspired from multi grid solvers in CFD
 pub fn solve_steady_multiresolution(
+    time_step: f64,
     line_force_model_builder: &LineForceModelBuilder, 
     freestream: &Freestream,
-    motion: &Motion,
+    derivatives: Option<&Derivatives>,
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder
 ) -> SimulationResult {
@@ -116,7 +117,7 @@ pub fn solve_steady_multiresolution(
         };
 
         results.push(
-            solve_steady(&force_models[i], freestream, motion, solver_settings, wake_builder, &initial_solution)
+            solve_steady(time_step, &force_models[i], freestream, derivatives, solver_settings, wake_builder, &initial_solution)
         );
     }
 
@@ -124,9 +125,10 @@ pub fn solve_steady_multiresolution(
 }
 
 pub fn solve_steady(
+    time_step: f64,
     line_force_model: &LineForceModel, 
     freestream: &Freestream,
-    motion: &Motion, 
+    derivatives: Option<&Derivatives>,
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder,
     initial_solution: &[f64],
@@ -152,9 +154,10 @@ pub fn solve_steady(
 
     for iteration in 0..solver_settings.max_iterations {
         let velocity = calculate_velocity(
+            time_step,
             line_force_model,
             freestream,
-            motion,
+            derivatives,
             &wake, 
             viscous_wakes.as_ref(), 
             &circulation_strength
@@ -188,19 +191,34 @@ pub fn solve_steady(
     }
 
     let velocity = calculate_velocity(
+        time_step,
         line_force_model,
         freestream,
-        motion,
+        derivatives,
         &wake, 
         viscous_wakes.as_ref(), 
         &circulation_strength
     );
 
+    let angles_of_attack = line_force_model.angles_of_attack(&velocity);
+
+    let mut acceleration: Vec<Vec3> = vec![Vec3::default(); nr_ctrl_points];
+    let mut angles_of_attack_derivative: Vec<f64> = vec![0.0; nr_ctrl_points];
+    let mut rotation_velocity = Vec3::default();
+
+    if let Some(derivatives) = derivatives {
+        acceleration = derivatives.flow.acceleration(&velocity, time_step);
+        angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(&angles_of_attack, time_step);
+        rotation_velocity = derivatives.motion.rotation_velocity(line_force_model, time_step);
+    }
+
     let force_input = SectionalForcesInput {
         circulation_strength,
         velocity,
-        acceleration: motion.acceleration.clone(),
-        angle_of_attack_derivative: motion.angle_of_attack_derivative.clone(),
+        angles_of_attack,
+        acceleration,
+        angles_of_attack_derivative,
+        rotation_velocity,
     };
 
     let sectional_forces = line_force_model.sectional_forces(&force_input);
@@ -221,9 +239,10 @@ pub fn solve_steady(
 /// 
 /// Collected in a function as the same procedure is used multiple times in the solver.
 fn calculate_velocity(
+    time_step: f64,
     line_force_model: &LineForceModel,
     freestream: &Freestream,
-    motion: &Motion,
+    derivatives: Option<&Derivatives>,
     wake: &SteadyWake, 
     viscous_wakes: Option<&ViscousWakes>, 
     circulation_strength: &[f64]
@@ -232,8 +251,14 @@ fn calculate_velocity(
         &line_force_model.ctrl_points()
     );
 
+    let motion_velocity = if let Some(derivatives) = derivatives {
+        derivatives.motion.ctrl_point_velocity(line_force_model, time_step)
+    } else {
+        vec![Vec3::default(); line_force_model.nr_span_lines()]
+    };
+
     for i in 0..line_force_model.nr_span_lines() {
-        ctrl_point_velocities[i] -= motion.velocity[i];
+        ctrl_point_velocities[i] -= motion_velocity[i];
     }
 
     let induced_velocities: Vec<Vec3> = wake.induced_velocities_at_control_points(circulation_strength);

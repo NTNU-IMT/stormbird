@@ -40,7 +40,8 @@ impl RotatingCylinder {
                 spin_ratio_data,
                 cl_data,
                 cd_data,
-                wake_angle_data
+                wake_angle_data,
+                ..Default::default()
             }
         }
     }

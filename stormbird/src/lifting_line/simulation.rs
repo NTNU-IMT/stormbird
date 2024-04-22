@@ -10,7 +10,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::prelude::*;
-use crate::io_structs::motion::MotionCalculator;
+use crate::io_structs::derivatives::Derivatives;
 use crate::io_structs::input_state::InputState;
 
 
@@ -106,7 +106,7 @@ impl SimulationBuilder {
         Simulation {
             line_force_model,
             simulation_mode: self.simulation_mode.clone(),
-            motion_calculator: None,
+            derivatives: None,
             previous_circulation_strength: vec![0.0; nr_of_lines],
             unsteady_wake: None,
             write_wake_data_to_file: self.write_wake_data_to_file,
@@ -121,7 +121,7 @@ pub struct Simulation {
     pub line_force_model: LineForceModel,
     simulation_mode: SimulationMode,
     previous_circulation_strength: Vec<f64>,
-    motion_calculator: Option<MotionCalculator>,
+    derivatives: Option<Derivatives>,
     unsteady_wake: Option<UnsteadyWake>,
     write_wake_data_to_file: bool,
     wake_files_folder_path: String,
@@ -144,23 +144,31 @@ impl Simulation {
         self.line_force_model.translation = input_state.translation;
 
         // If the force input calculator has not been initialized, initialize it.
-        if self.motion_calculator.is_none() {
-            self.motion_calculator = Some(MotionCalculator::new(&self.line_force_model));
+        if self.derivatives.is_none() {
+            let initial_velocity = input_state.freestream.velocity_at_locations(
+                &self.line_force_model.ctrl_points()
+            );
+
+            let initial_angles = self.line_force_model.angles_of_attack(&initial_velocity);
+
+            self.derivatives = Some(
+                Derivatives::new(
+                    &self.line_force_model,
+                    &initial_velocity,
+                    &initial_angles
+                )
+            );
         }
 
-        let motion_calculator = self.motion_calculator.as_mut().unwrap();
-
-        let motion = motion_calculator.get_motion(
-            &self.line_force_model,
-            time_step
-        );
+        let derivatives = self.derivatives.as_mut().unwrap();
 
         let result = match &self.simulation_mode {
             SimulationMode::QuasiSteady(settings) => {
                 steady_solvers::solve_steady(
+                    time_step,
                     &self.line_force_model, 
                     &input_state.freestream,
-                    &motion,
+                    Some(&derivatives),
                     &settings.solver,
                     &settings.wake, 
                     &self.previous_circulation_strength
@@ -183,7 +191,7 @@ impl Simulation {
                     time_step,
                     &self.line_force_model,
                     &input_state.freestream,
-                    &motion,
+                    &derivatives,
                     &mut wake,
                     &settings.solver,
                     &self.previous_circulation_strength
@@ -209,6 +217,12 @@ impl Simulation {
         };
 
         self.previous_circulation_strength = result.force_input.circulation_strength.clone();
+
+        derivatives.update(
+            &self.line_force_model,
+            &result.force_input.velocity,
+            &result.force_input.angles_of_attack
+        );
 
         result
     }

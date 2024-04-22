@@ -6,6 +6,8 @@
 //! lift-induced velocities are estimated. In other words, this part is common for all methods 
 //! available in the library, and therefore the foundation of all simulations. 
 
+use std::f64::consts::PI;
+
 pub mod solver_utils;
 pub mod span_line;
 pub mod builder;
@@ -246,7 +248,7 @@ impl LineForceModel {
     ///
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
-    pub fn angle_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
+    pub fn angles_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
         let chord_vectors = self.chord_vectors();
         let span_lines    = self.span_lines();
         
@@ -288,7 +290,7 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angle_of_attack = self.angle_of_attack(velocity);
+        let angles_of_attack = self.angles_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
             |index| {
@@ -296,9 +298,9 @@ impl LineForceModel {
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(foil) => 
-                        foil.lift_coefficient(angle_of_attack[index]),
+                        foil.lift_coefficient(angles_of_attack[index]),
                     SectionModel::VaryingFoil(foil) => 
-                        foil.lift_coefficient(angle_of_attack[index]),
+                        foil.lift_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) => 
                         cylinder.lift_coefficient(
                             self.chord_vectors_local[index].length(), velocity[index].length()
@@ -314,7 +316,7 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angle_of_attack = self.angle_of_attack(velocity);
+        let angles_of_attack = self.angles_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
             |index| {
@@ -322,9 +324,9 @@ impl LineForceModel {
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(foil) => 
-                        foil.drag_coefficient(angle_of_attack[index]),
+                        foil.drag_coefficient(angles_of_attack[index]),
                     SectionModel::VaryingFoil(foil) => 
-                        foil.drag_coefficient(angle_of_attack[index]),
+                        foil.drag_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) => 
                         cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
                 }
@@ -364,7 +366,7 @@ impl LineForceModel {
             circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.velocity),
             sectional_drag: self.sectional_drag_forces(&input.velocity),
             added_mass: self.sectional_added_mass_force(&input.acceleration),
-            gyroscopic: self.sectional_gyroscopic_force(&input.velocity),
+            gyroscopic: self.sectional_gyroscopic_force(input.rotation_velocity),
             total: vec![Vec3::default(); self.nr_span_lines()],
         };
 
@@ -389,7 +391,7 @@ impl LineForceModel {
     }
 
     /// Calculates the forces on each line element due to the sectional drag model. This is most 
-    /// often the visocus drag, but it can also include other physical effects if that is included
+    /// often the viscous drag, but it can also include other physical effects if that is included
     /// in the sectional drag model.
     pub fn sectional_drag_forces(&self, velocity: &[Vec3]) -> Vec<Vec3> {
         let span_lines = self.span_lines();
@@ -461,11 +463,30 @@ impl LineForceModel {
 
     /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
     /// 
-    /// Uses a simplfied approach where the rotational speed of the rotor is assumed to be 
+    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be 
     /// significantly larger than the rotational velocity of the sail, for instance due to roll or
     /// pitch motion of the boat.
-    pub fn sectional_gyroscopic_force(&self, velocity: &[Vec3]) -> Vec<Vec3> {
-        vec![Vec3::default(); self.nr_span_lines()]
+    pub fn sectional_gyroscopic_force(&self, rotation_velocity: Vec3) -> Vec<Vec3> {
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index = self.wing_index_from_global(index);
+                let span_lines = self.span_lines();
+
+                match &self.section_models[wing_index] {
+                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => Vec3::default(),
+                    SectionModel::RotatingCylinder(cylinder) => {
+                        let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
+
+                        let radial_velocity = 2.0 * PI * cylinder.revolutions_per_second;
+
+                        let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
+
+                        angular_momentum.cross(rotation_velocity)
+                    }
+                }
+
+            }
+        ).collect()
     }
 
     /// Calculates the relative distance from the center off each wing for each control point.

@@ -39,7 +39,7 @@ pub fn solve_one_time_step(
     time_step: f64,
     line_force_model: &LineForceModel,
     freestream: &Freestream,
-    motion: &Motion,
+    derivatives: &Derivatives,
     wake: &mut UnsteadyWake,
     solver_settings: &UnsteadySolverSettings,
     previous_circulation_strength: &[f64]
@@ -51,6 +51,7 @@ pub fn solve_one_time_step(
 
     // Velocity components that are fixed for the entire time step    
     let u_inf_ctrl_point: Vec<Vec3> = freestream.velocity_at_locations(&ctrl_points);
+    let u_motion_ctrl_point: Vec<Vec3> = derivatives.motion.ctrl_point_velocity(&line_force_model, time_step);
 
     let u_i_free_wake: Vec<Vec3>    = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 
@@ -58,7 +59,7 @@ pub fn solve_one_time_step(
 
     for i in 0..ctrl_points.len() {
         fixed_velocities.push(
-            u_inf_ctrl_point[i] - motion.velocity[i] + u_i_free_wake[i]
+            u_inf_ctrl_point[i] - u_motion_ctrl_point[i] + u_i_free_wake[i]
         );
     }
 
@@ -90,12 +91,22 @@ pub fn solve_one_time_step(
         .zip(update_to_velocity.iter())
         .map(|(a, b)| *a + *b).collect();
 
+    
+    let angles_of_attack = line_force_model.angles_of_attack(&velocity);
+
+    let acceleration = derivatives.flow.acceleration(&velocity, time_step);
+    let angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(&angles_of_attack, time_step);
+
+    let rotation_velocity = derivatives.motion.rotation_velocity(&line_force_model, time_step);
+
     // Do post processing
     let force_input = SectionalForcesInput {
         circulation_strength,
         velocity,
-        acceleration: motion.acceleration.clone(),
-        angle_of_attack_derivative: motion.angle_of_attack_derivative.clone(),
+        angles_of_attack,
+        acceleration,
+        angles_of_attack_derivative,
+        rotation_velocity
     };
 
     let sectional_forces   = line_force_model.sectional_forces(&force_input);

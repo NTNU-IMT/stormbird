@@ -162,12 +162,16 @@ impl ActuatorLine {
             new_estimated_circulation_strength
         };
 
-        // TODO: This must be uddated to handle moving wings!
+        let angles_of_attack = self.line_force_model.angles_of_attack(&velocity_ctrl_points);
+
+        // TODO: This must be undated to handle moving wings!
         let force_input = SectionalForcesInput {
             circulation_strength,
             velocity: velocity_ctrl_points.to_vec(),
+            angles_of_attack,
             acceleration: vec![Vec3::default(); self.line_force_model.nr_span_lines()],
-            angle_of_attack_derivative: vec![0.0; self.line_force_model.nr_span_lines()],
+            angles_of_attack_derivative: vec![0.0; self.line_force_model.nr_span_lines()],
+            rotation_velocity: Vec3::default(),
         };
 
         let sectional_forces = self.line_force_model.sectional_forces(&force_input);

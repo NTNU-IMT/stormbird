@@ -13,7 +13,7 @@ use crate::lifting_line::simulation::{
     SteadySettings,
 };
 
-use crate::io_structs::motion::MotionCalculator;
+use crate::io_structs::derivatives::MotionDerivatives;
 
 use super::test_setup::RectangularWing;
 
@@ -174,7 +174,7 @@ fn rotational_velocity() {
 
     let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
 
-    let mut motion_calculator = MotionCalculator::new(&line_force_model);
+    let mut motion_calculator = MotionDerivatives::new(&line_force_model);
 
     for i_t in 1..20 {
         let time = (i_t as f64) * time_step;
@@ -187,7 +187,7 @@ fn rotational_velocity() {
 
         line_force_model.rotation = rotation;
 
-        let motion = motion_calculator.get_motion(&line_force_model, time_step);
+        let motion_velocity = motion_calculator.ctrl_point_velocity(&line_force_model, time_step);
 
         let freestream = Freestream::Constant(freestream_velocity);
         
@@ -196,7 +196,7 @@ fn rotational_velocity() {
         let mut ctrl_point_velocity_est = freestream.velocity_at_locations(&ctrl_points);
 
         for i in 0..line_force_model.nr_span_lines() {
-            ctrl_point_velocity_est[i] -= motion.velocity[i];
+            ctrl_point_velocity_est[i] -= motion_velocity[i];
         }
 
         for i in 0..ctrl_points.len() {
@@ -212,5 +212,7 @@ fn rotational_velocity() {
                 assert!(error < 0.06, "Error in rotational velocity estimation at ctrl point {} = {}", i, error);
             }
         }
+
+        motion_calculator.update(&line_force_model);
     }
 }

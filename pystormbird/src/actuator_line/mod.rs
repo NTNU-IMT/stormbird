@@ -34,10 +34,6 @@ impl ActuatorLine {
         }
     }
 
-    pub fn upscaled_strength(&self, sampling_strength: Vec<f64>) -> Vec<f64> {
-        self.data.upscaled_strength(&sampling_strength)
-    }
-
     pub fn __str__(&self) -> String {
         format!("{:?}", self.data)
     }

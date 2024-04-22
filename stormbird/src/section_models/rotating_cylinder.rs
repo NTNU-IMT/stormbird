@@ -30,6 +30,8 @@ pub struct RotatingCylinder {
     #[serde(default)]
     /// Added mass factor for the cylinder
     pub added_mass_factor: f64,
+    /// Two-dimensional moment of inertia
+    pub moment_of_inertia_2d: f64,
 }
 
 impl Default for RotatingCylinder {
@@ -41,6 +43,7 @@ impl Default for RotatingCylinder {
             cd_data: Self::default_cd_data(),
             wake_angle_data: Self::default_wake_angle_data(),
             added_mass_factor: 0.0,
+            moment_of_inertia_2d: 0.0,
         }
     }
 }

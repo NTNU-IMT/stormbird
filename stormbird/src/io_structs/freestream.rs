@@ -11,13 +11,25 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Structure to model an atmospheric boundary layer according to a power law
 pub struct PowerModelABL {
-    pub reference_velocity: Vec3,
+    /// A constant velocity component, independent of position. Primarily meant to represent the 
+    /// velocity due to forward motion of a vessel.
+    pub constant_velocity: Vec3,
+    /// The reference wind velocity at the reference height. This value is used to as input when 
+    /// compting how the wind velocity varies with height.
+    pub reference_wind_velocity: Vec3,
     #[serde(default="PowerModelABL::default_reference_height")]
+    /// Reference height for the input reference wind velocity.
     pub reference_height: f64,
     #[serde(default="PowerModelABL::default_power_factor")]
+    /// Power factor for the power law. 
     pub power_factor: f64,
     #[serde(default="PowerModelABL::default_up_direction")]
+    /// The up direction in the simulation. This is used to compute the height of a location.
     pub up_direction: Vec3,
+    #[serde(default)]
+    /// Reference value for the water plane height, used in cases where the origin of the coordinate
+    /// system does not match the water plane location.
+    pub water_plane_height: f64,
 }
 
 impl PowerModelABL {
@@ -26,11 +38,11 @@ impl PowerModelABL {
     fn default_up_direction() -> Vec3 {Vec3::new(0.0, 0.0, 1.0)}
 
     pub fn velocity_at_location(&self, location: &Vec3) -> Vec3 {
-        let height = location.dot(self.up_direction);
+        let height = location.dot(self.up_direction) - self.water_plane_height;
 
         let factor = (height / self.reference_height).powf(self.power_factor);
         
-        self.reference_velocity * factor
+        self.constant_velocity + self.reference_wind_velocity * factor
     }
 }
 

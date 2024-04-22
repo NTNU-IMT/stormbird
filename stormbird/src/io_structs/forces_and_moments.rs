@@ -28,11 +28,15 @@ pub struct SectionalForcesInput {
     /// The *felt* velocity at each control point, meaning the velocity of the fluid from the 
     /// perspective of the wings, **not** the velocity of the wings themselves.  
     pub velocity: Vec<Vec3>,
+    /// The estimated angle of attack at each control point.
+    pub angles_of_attack: Vec<f64>,
     /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
     /// the perspective of the wings, **not** the acceleration of the wings themselves.
     pub acceleration: Vec<Vec3>,
     /// The change in angle of attack at each control point as a function of time. 
-    pub angle_of_attack_derivative: Vec<f64>,
+    pub angles_of_attack_derivative: Vec<f64>,
+    /// The rotational velocity of the entire system. Primarily relevant for gyroscopic effects.
+    pub rotation_velocity: Vec3,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

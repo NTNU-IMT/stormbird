@@ -105,10 +105,10 @@ fn get_stall_angle(angle_of_attack: f64) -> f64 {
 
 impl Foil {
     fn default_one()                  -> f64 {1.0}
-    fn default_cl_initial_slope()     -> f64 {2.0 * PI}
-    fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
-    fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
-    fn default_cd_power_after_stall() -> f64 {1.6}
+    pub fn default_cl_initial_slope()     -> f64 {2.0 * PI}
+    pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
+    pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
+    pub fn default_cd_power_after_stall() -> f64 {1.6}
     
     /// Calculates the lift coefficient for a given angle of attack.
     /// 

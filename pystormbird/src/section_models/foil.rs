@@ -20,12 +20,13 @@ impl Foil {
     #[new]
     #[pyo3(
         signature = (
-            cl_zero_angle          = 0.0, 
-            cd_zero_angle          = 0.0, 
+            *,
+            cl_zero_angle          = 0.0,
             cl_high_order_factor   = 0.0, 
-            cl_high_order_power    = 0.0, 
-            cd_second_order_factor = 0.0, 
+            cl_high_order_power    = 0.0,
             cl_max_after_stall     = 1.0, 
+            cd_zero_angle          = 0.0, 
+            cd_second_order_factor = 0.0, 
             cd_max_after_stall     = 1.0, 
             cd_power_after_stall   = FoilRust::default_cd_power_after_stall(), 
             mean_stall_angle       = FoilRust::default_mean_stall_angle(), 
@@ -34,11 +35,11 @@ impl Foil {
     )]
     pub fn new(
         cl_zero_angle: f64,
-        cd_zero_angle: f64,
         cl_high_order_factor: f64,
         cl_high_order_power: f64,
-        cd_second_order_factor: f64,
         cl_max_after_stall: f64,
+        cd_zero_angle: f64,
+        cd_second_order_factor: f64,
         cd_max_after_stall: f64,
         cd_power_after_stall: f64,
         mean_stall_angle: f64,
@@ -47,15 +48,16 @@ impl Foil {
         Self {
             data: FoilRust {
                 cl_zero_angle,
-                cd_zero_angle,
                 cl_high_order_factor,
                 cl_high_order_power,
-                cd_second_order_factor,
                 cl_max_after_stall,
+                cd_zero_angle,
+                cd_second_order_factor,
                 cd_max_after_stall,
                 cd_power_after_stall,
                 mean_stall_angle,
-                stall_range
+                stall_range,
+                ..Default::default()
             }
         }
     }
