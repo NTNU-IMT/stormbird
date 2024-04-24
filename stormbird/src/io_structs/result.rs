@@ -43,4 +43,13 @@ impl SimulationResult {
         
         sum
     }
+
+    pub fn write_to_file(&self, file_path: &str) -> std::io::Result<()> {
+        let file = std::fs::File::create(file_path)?;
+        let writer = std::io::BufWriter::new(file);
+
+        serde_json::to_writer(writer, self)?;
+
+        Ok(())
+    }
 }

@@ -37,6 +37,7 @@ pub struct MotionDerivatives {
     ctrl_points_history: [Vec<Vec3>; 2],
     /// Previous values for the chord vector
     rotation_history: [Vec3; 2],
+    update_count: usize,
 }
 
 impl MotionDerivatives {
@@ -46,6 +47,7 @@ impl MotionDerivatives {
         Self {
             ctrl_points_history: [ctrl_points.clone(), ctrl_points],
             rotation_history: [line_force_model.rotation, line_force_model.rotation],
+            update_count: 0,
         }
     }
 
@@ -54,6 +56,10 @@ impl MotionDerivatives {
             panic!(
                 "The number of span lines in the line force model does not match the number of span lines in the force input calculator"
             );
+        }
+
+        if self.update_count < 2 {
+            return vec![Vec3::default(); line_force_model.nr_span_lines()];
         }
 
         let current_ctrl_points = line_force_model.ctrl_points();
@@ -98,7 +104,9 @@ impl MotionDerivatives {
         }
 
         self.rotation_history[0] = self.rotation_history[1];
-        self.rotation_history[1] = line_force_model.rotation;   
+        self.rotation_history[1] = line_force_model.rotation;
+
+        self.update_count += 1;
     }
 }
 
@@ -107,6 +115,7 @@ impl MotionDerivatives {
 pub struct FlowDerivatives {
     pub velocity_history: [Vec<Vec3>; 2],
     pub angles_of_attack_history: [Vec<f64>; 2],
+    update_count: usize,
 }
 
 impl FlowDerivatives {
@@ -119,10 +128,15 @@ impl FlowDerivatives {
         Self {
             velocity_history: [initial_velocity.to_vec(), initial_velocity.to_vec()],
             angles_of_attack_history: [initial_angles.to_vec(), initial_angles.to_vec()],
+            update_count: 0,
         }
     }
 
     pub fn acceleration(&self, current_velocity: &[Vec3], time_step: f64) -> Vec<Vec3> {
+        if self.update_count < 2 {
+            return vec![Vec3::default(); current_velocity.len()];
+        }
+
         let mut acceleration = Vec::with_capacity(current_velocity.len());
 
         for i in 0..current_velocity.len() {
@@ -144,6 +158,10 @@ impl FlowDerivatives {
     }
 
     pub fn angles_of_attack_derivative(&self, current_angles_of_attack: &[f64], time_step: f64) -> Vec<f64> {
+        if self.update_count < 2 {
+            return vec![0.0; current_angles_of_attack.len()];
+        }
+        
         let mut angles_of_attack_derivative = Vec::with_capacity(current_angles_of_attack.len());
 
         for i in 0..current_angles_of_attack.len() {
@@ -170,5 +188,7 @@ impl FlowDerivatives {
 
         self.angles_of_attack_history[0] = self.angles_of_attack_history[1].clone();
         self.angles_of_attack_history[1] = current_angles_of_attack.to_vec();
+
+        self.update_count += 1;
     }
 }

@@ -12,10 +12,10 @@ use serde::{Serialize, Deserialize};
 /// Structure to model an atmospheric boundary layer according to a power law
 pub struct PowerModelABL {
     /// A constant velocity component, independent of position. Primarily meant to represent the 
-    /// velocity due to forward motion of a vessel.
+    /// velocity due to the forward motion of a vessel.
     pub constant_velocity: Vec3,
     /// The reference wind velocity at the reference height. This value is used to as input when 
-    /// compting how the wind velocity varies with height.
+    /// computing how the wind velocity varies with height.
     pub reference_wind_velocity: Vec3,
     #[serde(default="PowerModelABL::default_reference_height")]
     /// Reference height for the input reference wind velocity.
@@ -40,9 +40,18 @@ impl PowerModelABL {
     pub fn velocity_at_location(&self, location: &Vec3) -> Vec3 {
         let height = location.dot(self.up_direction) - self.water_plane_height;
 
-        let factor = (height / self.reference_height).powf(self.power_factor);
+        if height < 0.0 {
+            dbg!(location, self.up_direction);
+            panic!("The calculated height in the freestream input is negative. This is likely due to the up direction not being correctly set.")
+        }
+
+        let increase_factor = if self.power_factor > 0.0 {
+            (height / self.reference_height).powf(self.power_factor)
+        } else {
+            1.0
+        };
         
-        self.constant_velocity + self.reference_wind_velocity * factor
+        self.constant_velocity + self.reference_wind_velocity * increase_factor
     }
 }
 
