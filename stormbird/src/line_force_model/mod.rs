@@ -38,7 +38,7 @@ pub struct SingleWing {
 pub struct LineForceModel {
     /// Vector of line segments that defines the span geometry of the wings. Each have its own start 
     /// and end point, to allow for uncoupled analysis
-    pub span_lines_local:     Vec<SpanLine>,
+    pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
     pub chord_vectors_local:  Vec<Vec3>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model

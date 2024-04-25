@@ -2,9 +2,6 @@
 
 [Introduction](./introduction.md)
 
-# Theory
 - [Line model](./theory/line_model/line_model_intro.md)
-    - [Sectional models](./theory/line_model/section_models.md)
-
-# Tutorials
-- [Single Wing](./tu)
+- [Sectional models](./theory/sectional_models/sectional_models_intro.md)
+- [Tutorials](./tutorials.md)
