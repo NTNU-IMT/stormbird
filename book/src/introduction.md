@@ -2,20 +2,27 @@
 
 Welcome to the Stormbird book!
 
-Stormbird is a library for simulating lifting surfaces, i.e. wings, under the assumption that they can be represented as *line-models*. Although this makes it usable for a variety of different cases, it is also mostly developed to offer efficient modeling of modern wind propulsion devices. That is, the following types of lifting surfaces are of particular interest:
+Stormbird is a library for simulating lifting surfaces, i.e. wings, under the assumption that they can be represented as *line-models*, which is a simplified modeling approach. Although this can be usable for a variety of different cases, it is also mostly developed to offer efficient modeling of modern wind propulsion devices. That is, the following types of lifting surfaces are of particular interest:
 
 1) Wing sails
 2) Rotor sails
 3) Suction sails
 4) Kites
 
-These use cases require modeling of strong viscous effects on the lift (e.g., due to large angles of attack), various lift generation mechanisms (classical foils, with and without flaps, rotating cylinders, foils with boundary layer suction), interaction between multiple lifting surfaces (thereare often multiple sails), interaction between lifting surfaces and other structures (the superstructure and other deck structures) and unsteady effects (kites flying dynamically, analysis of ships operating in waves, maneuvering simulations).
+To achieve practical modeling capabilities for these use cases, the following physical effects are assumed to be particularly important:
+- **Various lift generation mechanisms**: modern sails consists *sections* that range from classical foils, with and without flaps, rotating cylinders and foils with boundary layer suction.
+- **Strong viscous effects:** For all lift generating mechanisms above, there will be high lift coefficients with strong viscous effects on both the lift and drag forces. For instance, wing sails tend to be operated close to stall and the lift on a rotating cylinder is strongly affected by partial flow separation.
+- **Interaction effects between lifting surfaces:** Many wind powered ships have several sails placed in close proximity. Interaction effects between multiple sails can therefore be important. 
+- **Interaction effects with other structures:** Independent of the number of sails, there can in some cases be interaction effects between the sails and other structures on deck, for instance the bridge.
+- **Unsteady effects:** Ship applications often require modeling of unsteady effects for instance to model seakeeping behavior or maneuvering. The sail forces are assumed to be important for such cases, which also introduces dynamic effects on the sails themselves. In addition, kites are often flown dynamically to increase the power extracted from the wind.
 
-At the same time, it is also often necessary with efficient computations. The user will usually be interested in testing many different weather conditions, ship speeds, sail configurations, and operational variables. The goal is, therefore, to find the right balance between accuracy and speed for the intended use case. To achieve this, the library supports the following methods, that offer different levels of complexity and computational speed:
+At the same time, it is also often necessary with efficient computations. The user will usually be interested in testing many different weather conditions, ship speeds, sail configurations, and operational variables. 
 
- 1) Discrete static lifting line, for steady- or quasi-steady cases
- 2) Discrete dynamic lifting line, for unsteady or steady cases with large wake deformations
- 3) Actuator line, for steady and unsteady cases where interaction with other structures is of interest
+The goal is, therefore, to find the right balance between accuracy and speed for the intended use case. To achieve this, the library supports the following methods, that offer different levels of complexity and computational speed:
+
+ 1) **Discrete static lifting line**, for steady- or quasi-steady cases
+ 2) **Discrete dynamic lifting line**, for unsteady or steady cases with large wake deformations
+ 3) **Actuator line**, for steady and unsteady cases where interaction with other structures is of interest
 
 The library is developed as part of the research project KSP WIND by the Department of Marine Technology at the [Norwegian University of Science and Technology](https://www.ntnu.edu/). The main developer is Jarle Vinje Kramer.
 
