@@ -30,11 +30,9 @@ The library is developed as part of the research project KSP WIND by the Departm
 You should read this if you are interested in using Stormbird to run lifting line or actuator line simulations, or if you just want more information on the theory behind each method. The book is written primarily for *users*, and are therefore not focused on the underlying source code. However, developers should off course read this as well, to understand the intended use case.
 
 ## How to Use This Book
-The books is organized in two main parts.
+The books is intended to give an introduction to the theory and the models available as well as overall concepts in the implementation. The goal is  to give a birds eye view of the library and the functionality. There will also be references to other literature for more details when that is appropriate. 
 
-The first part gives an introduction to the theory and the models available as well as overall concepts in the implementation. This is intended to give a birds eye view of the library and the functionality. There will also be references to other literature for more details when that is appropriate. 
-
-The second part gives more detailed examples and tutorials on how the library can be used in a practical sense. This sections will focus on concrete use cases and be as specific as possible.
+To truly learn how to use it, though, it is recommended to look at actual input files and code examples. This should be distributed along with the book. See the [tutorial chapter](./tutorials.md) for more on this 
 
 ## Overview of Different Flavors
 Stormbird itself is a [Rust](https://www.rust-lang.org/) library. Rust is a nice programming language that offers a unique combination of high computational speed, and a modern user friendly developer experience. However, there are also two other ways to use the functionality without knowing how to program in Rust, listed below:
