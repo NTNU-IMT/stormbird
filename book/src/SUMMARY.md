@@ -2,6 +2,7 @@
 
 [Introduction](./introduction.md)
 
+- [Input/output format](./io_info.md)
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
     - [Results from simulations](./line_model/results.md)
