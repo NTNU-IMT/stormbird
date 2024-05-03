@@ -1,6 +1,6 @@
 '''
 Script that simulates a heaving wing with both dynamic and quasi-static lifting line models. The 
-result are compared against each other and against the theoretical (simplified) Theodorsen function.
+result are compared against each other and against a theoretical (simplified) model.
 '''
 
 import json
@@ -16,6 +16,9 @@ from pystormbird import Vec3
 import argparse
 
 def get_motion_functions(*, amplitude: float, radial_frequency: float):
+    '''
+    Create closures for the motion as a function of time, based on the amplitude and radial frequency.
+    '''
     def position(t: float):
         return amplitude * np.sin(radial_frequency * t)
 
@@ -48,22 +51,25 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation of a heaving wing")
     parser.add_argument("-rf", "--reduced-frequency", type=float, default = 0.3, help="Reduced frequency")
     parser.add_argument("--amplitude-factor", type=float, default = 0.1, help="Amplitude relative to chord length of heaving motion")
-
-    home = Path.home()
-
-    wake_files_folder_path  = home / Path("wake_files")
-
-    if not wake_files_folder_path.exists():
-        raise FileNotFoundError(
-            f"Folder {wake_files_folder_path} does not exist. Create it to allow storage of wake files."
-        )
+    parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
     args = parser.parse_args()
+    
+    if args.write_wake_files:
+    
+        wake_files_folder_path  = Path("wake_files_output")
+
+        if not wake_files_folder_path.exists():
+            raise FileNotFoundError(
+                f"Folder {wake_files_folder_path} does not exist. Create it to allow storage of wake files."
+            )
+    else:
+        wake_files_folder_path = ''
 
     reduced_frequency = args.reduced_frequency
 
     velocity = 8.0
-    chord_length = 1.0
+    chord_length = 1.0 # Deliberately chosen to be small, as the dynamic effects are easier to compare against theory when the 3D effects are small
     span = 32.0
     nr_sections = 64
     density = 1.225
@@ -138,7 +144,7 @@ if __name__ == "__main__":
         setup = {
             "line_force_model": line_force_model,
             "simulation_mode": simulation_settings,
-            "write_wake_data_to_file": True,
+            "write_wake_data_to_file": args.write_wake_files,
             "wake_files_folder_path": str(wake_files_folder_path)
         }
 

@@ -60,5 +60,5 @@ An example of an input string to Stormbird can be seen below. More explanations 
 ## Python interface
 Although it would be possible (and not that difficult) to create other types of interfaces to the library, for instance by making settings available directly as `Python` classes, it would also increase the maintenance in terms of keeping the interface up to date with any changes to the underlying Rust-library. This manual task is avoided by using Serde which is practical from a developer perspective, especially while the library is evolving. 
 
-This means that even the Python interface to Stormbird relies heavily on `JSON` strings. Luckily, `Python` has excellent support for `JSON` strings in the standard library.
+This means that even the Python interface to Stormbird relies heavily on `JSON` strings. Luckily, `Python` has excellent support for `JSON` strings in the standard library. For now, see the examples for more on this.
 

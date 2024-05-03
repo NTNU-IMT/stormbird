@@ -21,6 +21,12 @@ pub struct VaryingFoil {
 }
 
 impl VaryingFoil {
+    pub fn new_from_string(input_str: &str) -> Self {
+        let data: VaryingFoil = serde_json::from_str(input_str).unwrap();
+        
+        data
+    }
+
     pub fn get_foil(&self) -> Foil {
         let cl_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
         let cl_initial_slope_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();

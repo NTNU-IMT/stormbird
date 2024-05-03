@@ -22,7 +22,7 @@ use varying_foil::VaryingFoil;
 use rotating_cylinder::RotatingCylinder;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// Sectional model for a wing, that can be of multple variants
+/// Sectional model for a wing, that can be of multiple variants
 pub enum SectionModel {
     Foil(Foil),
     VaryingFoil(VaryingFoil),

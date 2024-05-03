@@ -1,15 +1,11 @@
 # Tutorials
 
-This section goes through the tutorials made for the library. At the moment, only the lifting line functionality is covered for a limited set of use cases. However, the plan is to extent this section in the future to cover more use cases and also the actuator line functionality. 
+This section gives an overview of the tutorials made for the library. At the moment, only the lifting line functionality is covered for a limited set of use cases. However, the plan is to extent this section in the future to cover more use cases and also the actuator line functionality. 
 
-This text is only meant as an introduction and a high-level overview. To get the full picture, it is necessary to also look at the detailed code and input files for each tutorial. These files should be distributed along with this book. At the time of writing this (April 2024), the code repository is not yet open. However, this book, along with code documentation and tutorial files is distributed using a Teams-site for project partner in KSP WIND. On that site, there should be a folder named `tutorials` with sub-folders corresponding to each tutorial mentioned later in this chapter.
+This text is only meant as an introduction and a high-level overview. To get the full picture, it is necessary to also look at the detailed code and input files for each tutorial. These files should be distributed along with this book. At the time of writing this (April 2024), the code repository is not yet open. However, this book, along with code documentation and tutorial files is distributed using a Teams-site for project partner in KSP WIND. On that site, there should be a folder named `examples` with sub-folders for each example
 
-## General structure of the tutorials
+## FMU vs Python
 The current tutorials focuses on how to run simulations using the `Python` interface to Stormbird. However, running `FMU`simulations are very similar in nature, and the setup is more or less identical. The main difference is connected to how `FMU`s work relative to `Python` code. 
-
-Each tutorial is separated into **three core parts**: 1) how to generate the setup for Stormbird, 2) how to execute a setup using `Python`and 3) examples on how to post-process and plot the results.
-
-Each tutorial should also have its own `README` document, explaining how to execute the code.
 
 ### Setup and post-processing
 As mention in **[link to section about io to come]**, Stormbird generally uses `JSON` strings to both serialize output and deserialize input. These `JSON` strings are the same no matter which version of Stormbird is used. 
@@ -21,12 +17,3 @@ Although these strings can easily be generated manually, for instance in a file,
 As `Python` is used for both the setup and execution of tutorials, it is also used for post-processing. The Stormbird results are parsed into `Python` dictionaries from `JSON` strings, which can further be used for plotting or other post-processing tasks. 
 
 However, both the setup and the post-processing is generally independent of the `pystormbird` implementation, which means both steps could easily be changed to other programming languages if wanted. This could for instance be an option if the `FMU` version of Stormbird is used and some other scripting language is preferred. `Python` is just used as a convenient example.
-
-## List of available tutorials
-Below is an overview of the tutorials that should be available in the `tutorials` folder distributed with this book, along with a short explanation
-
-### Single oscillating wing
-This tutorial demonstrates how to set up both dynamic and quasi-static simulations of an oscillating wing. It shows both how to setup a very simple model of a wing sail and how to apply dynamic motion as a function of time. 
-
-### Several multi-element wing sails
-This tutorial shows how to set up simulations of 

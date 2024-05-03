@@ -119,7 +119,7 @@ impl WingBuilder {
 
         let section_model = match &self.section_model {
             SectionModel::Foil(foil) => SectionModel::Foil(foil.clone()),
-            SectionModel::VaryingFoil(_foils) => panic!("Varying foil model are not yet supported!"),
+            SectionModel::VaryingFoil(foils) => SectionModel::VaryingFoil(foils.clone()),
             SectionModel::RotatingCylinder(cylinder) => SectionModel::RotatingCylinder(cylinder.clone()),
         };
 

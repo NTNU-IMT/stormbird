@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 
 pub mod foil;
 pub mod rotating_cylinder;
+pub mod varying_foil;
 
 use stormbird::section_models::SectionModel as SectionModelRust;
 
@@ -19,6 +20,7 @@ pub struct SectionModel{
 pub fn section_models(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SectionModel>()?;
     m.add_class::<foil::Foil>()?;
+    m.add_class::<varying_foil::VaryingFoil>()?;
     m.add_class::<rotating_cylinder::RotatingCylinder>()?;
     Ok(())
 }
