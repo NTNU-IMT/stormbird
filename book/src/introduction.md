@@ -26,6 +26,14 @@ The goal is, therefore, to find the right balance between accuracy and speed for
 
 The library is developed as part of the research project KSP WIND by the Department of Marine Technology at the [Norwegian University of Science and Technology](https://www.ntnu.edu/). The main developer is Jarle Vinje Kramer.
 
+## Developing principle
+
+Stormbird is a library that is primarily made for people with some programming experience. In addition, the goal is also to keep things as simple as possible and avoid [feature creep](https://en.wikipedia.org/wiki/Feature_creep). The idea is that a simple library is easier to maintain and less likely to contain bugs. Last but not least, **computational speed is important** and should not be sacrificed. As such, a guiding principle in the development is [data orientation](https://en.wikipedia.org/wiki/Data-oriented_design). That can mean different things, but in this context it means the following: 
+
+- **Simple data structures:** It is better to use many arrays of simple data structures than a few arrays of complex data structures. 
+- **Complexity can often be moved:** In some cases, complexity in the internal software design can be avoided by allowing for more complexity in the setup and post-processing of results. A slightly more complex setup phase is therefore accepted in Stormbird if it simplifies the internal structure. 
+- **Don't implement hypothetical use cases:** Stormbird only implements features that are necessary for the use case - meaning simulation of wind power devices. There are many ways to extend Stormbird to also handle other use cases better, but this is not prioritized, at least not at the moment. The goal is to attempt to be **done** at some point. Hypothetical future use cases are a future problem we do not consider today
+
 ## Who the Book is for
 You should read this if you are interested in using Stormbird to run lifting line or actuator line simulations, or if you just want more information on the theory behind each method. The book is written primarily for *users*, and are therefore not focused on the underlying source code. However, developers should off course read this as well, to understand the intended use case.
 
