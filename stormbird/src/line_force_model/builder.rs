@@ -15,6 +15,8 @@ use crate::section_models::SectionModel;
 #[serde(deny_unknown_fields)]
 pub struct LineForceModelBuilder {
     pub wing_builders: Vec<WingBuilder>,
+    /// Nr sections to discretize the wing into. That is, each wing in the wing builder vector will
+    /// end up having a number of sections equal to this variable.
     pub nr_sections: usize,
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,

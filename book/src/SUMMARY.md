@@ -2,9 +2,12 @@
 
 [Introduction](./introduction.md)
 
+- [Publications using Stormbird](./publications_overview.md)
 - [Input/output format](./io_info.md)
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
+    - [Move and modify a line model](./line_model/move_line_models.md)
+    - [Force calculations](./line_model/force_calculations.md)
     - [Results from simulations](./line_model/results.md)
 - [Sectional models](./sectional_models/sectional_models_intro.md)
     - [Foil model](./sectional_models/foil_model.md)
@@ -13,6 +16,6 @@
 - [Lifting line simulations](./lifting_line/lifting_line_intro.md)
     - [Simulation overview](./lifting_line/simulation_overview.md)
     - [Solver settings](./lifting_line/solver_settings.md)
-    - [Wake settings](./lifting_line/wake_settings.md)
+    - [Wake builders](./lifting_line/wake_builders.md)
     - [Velocity input](./lifting_line/velocity_input.md)
 - [Tutorials](./tutorials.md)

@@ -1,5 +1,7 @@
 # Input/output format
 
+This section contain an overview of input to and output from Stormbird can be handled.
+
 ## Overall principle
 Stormbird, as any library, consist of many data structures. Some represents the settings for a simulations, such as wake and solver parameters, while others represent input to or result from a simulation. To create and run a simulation it is generally necessary to pass information to the library about the data structures that you whish to create. 
 
