@@ -8,3 +8,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 fmu_from_struct = { version = "0.1.1" }
+
+stormbird = { path = "../../stormbird"}

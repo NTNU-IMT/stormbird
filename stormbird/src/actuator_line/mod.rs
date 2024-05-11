@@ -18,7 +18,7 @@ use crate::math_utils::smoothing::gaussian_kernel;
 use crate::vec3::Vec3;
 use crate::line_force_model::LineForceModel;
 use crate::line_force_model::builder::LineForceModelBuilder;
-use crate::io_structs::result::SimulationResult;
+use crate::io_structs::prelude::*;
 
 use projection::Projection;
 use velocity_sampling::{VelocitySampling, VelocitySamplingBuilder};
@@ -28,43 +28,35 @@ use settings::ActuatorLineSettings;
 #[serde(deny_unknown_fields)]
 /// Builder for the actuator line model.
 pub struct ActuatorLineBuilder {
-    pub force_model: LineForceModelBuilder,
+    pub line_force_model_builder: LineForceModelBuilder,
     #[serde(default)]
     pub projection: Projection,
     #[serde(default)]
     pub velocity_sampling: VelocitySamplingBuilder,
     #[serde(default)]
     pub settings: ActuatorLineSettings,
-    #[serde(default="ActuatorLineBuilder::default_project_upscale_factor")]
-    pub project_upscale_factor: usize,
 }
 
 impl ActuatorLineBuilder {
-    pub fn default_project_upscale_factor() -> usize { 1 }
-
-    pub fn new(force_model: LineForceModelBuilder) -> Self {
+    pub fn new(line_force_model_builder: LineForceModelBuilder) -> Self {
         Self {
-            force_model,
+            line_force_model_builder,
             projection: Projection::default(),
             velocity_sampling: VelocitySamplingBuilder::default(),
             settings: ActuatorLineSettings::default(),
-            project_upscale_factor: Self::default_project_upscale_factor(),
         }
     }
 
     /// Constructs a actuator line model from the builder data.
     pub fn build(&self) -> ActuatorLine {
-        let force_model_sampling = self.force_model.build();
-        let force_model_projection = self.force_model.build_with_nr_sections(self.force_model.nr_sections * self.project_upscale_factor);
-        let projection = self.projection.clone();
+        let line_force_model = self.line_force_model_builder.build();
 
-        let velocity_sampling = self.velocity_sampling.build(force_model_sampling.nr_span_lines());
+        let nr_span_lines = line_force_model.nr_span_lines();
 
         ActuatorLine{
-            force_model_sampling,
-            force_model_projection,
-            projection,
-            velocity_sampling,
+            line_force_model,
+            projection: self.projection.clone(),
+            velocity_sampling: self.velocity_sampling.build(nr_span_lines),
             results: Vec::new(),
             settings: self.settings.clone(),
         }
@@ -76,8 +68,7 @@ impl ActuatorLineBuilder {
 pub struct ActuatorLine {
     /// The line force model used to compute forces on each line segment as a function of the local
     /// velocity.
-    pub force_model_sampling: LineForceModel,
-    pub force_model_projection: LineForceModel,
+    pub line_force_model: LineForceModel,
     /// Enum, with an internal structure, that determines how forces are projected in a CFD 
     /// simulation
     pub projection: Projection,
@@ -110,24 +101,21 @@ impl ActuatorLine {
     }
 
     pub fn add_cell_information(&mut self, center: Vec3, velocity: Vec3, volume: f64) {
-        let sampling_span_lines = self.force_model_sampling.span_lines();
-        let sampling_chord_vectors = self.force_model_sampling.chord_vectors();
+        let span_lines = self.line_force_model.span_lines();
+        let chord_vectors = self.line_force_model.chord_vectors();
 
-        for i in 0..self.force_model_sampling.nr_span_lines() {
-            let span_line    = &sampling_span_lines[i];
-            let chord_vector = sampling_chord_vectors[i];
-
+        for i in 0..self.line_force_model.nr_span_lines() {
             let projection_value_org = self.projection.projection_value_at_point(
-                center, chord_vector, span_line
+                center, chord_vectors[i], &span_lines[i]
             );
 
             if projection_value_org > 0.0 {
-                let line_coordinates = span_line.line_coordinates(center, chord_vector);
+                let line_coordinates = span_lines[i].line_coordinates(center, chord_vectors[i]);
 
                 let span_projection = gaussian_kernel(
                     line_coordinates.span, 
                     0.0, 
-                    self.velocity_sampling.span_gaussian_width_factor * span_line.length()
+                    self.velocity_sampling.span_gaussian_width_factor * span_lines[i].length()
                 );
 
                 let projection_value = projection_value_org * span_projection;
@@ -138,88 +126,66 @@ impl ActuatorLine {
     }
 
     pub fn calculate_and_add_result(&mut self) {        
-        let mut ctrl_points_velocity_sampling = self.velocity_sampling.freestream_velocity();
+        let mut velocity_ctrl_points = self.velocity_sampling.freestream_velocity();
          
         if self.settings.remove_span_velocity {
-            ctrl_points_velocity_sampling = self.force_model_sampling.remove_span_velocity(
-                &ctrl_points_velocity_sampling
+            velocity_ctrl_points = self.line_force_model.remove_span_velocity(
+                &velocity_ctrl_points
             );
         }
 
-        let result = self.calculate_result(&ctrl_points_velocity_sampling);
+        let result = self.calculate_result(&velocity_ctrl_points);
 
         self.results.push(result);
     }
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn calculate_result(&mut self, velocity_ctrl_points_sampling: &[Vec3]) -> SimulationResult {
-        let mut result = SimulationResult::new();
-        let span_lines_projection = self.force_model_projection.span_lines();
+    pub fn calculate_result(&mut self, velocity_ctrl_points: &[Vec3]) -> SimulationResult {
+        let ctrl_points = self.line_force_model.ctrl_points();
 
-        result.ctrl_points = span_lines_projection.iter().map(|line| {
-            line.ctrl_point()
-        }).collect();
+        let new_estimated_circulation_strength = self.line_force_model.circulation_strength(
+            &velocity_ctrl_points
+        );
 
-        let mapping = 
-            self.force_model_sampling.nr_span_lines() != 
-            self.force_model_projection.nr_span_lines();
-
-        result.velocity = if mapping {
-            self.upscaled_velocity(velocity_ctrl_points_sampling)
-        } else {
-            velocity_ctrl_points_sampling.to_vec()
-        };
-
-        let sampling_strength = self.force_model_sampling.circulation_strength(&velocity_ctrl_points_sampling);
-        
-        let new_calculated_strength = if mapping {
-            self.upscaled_strength(&sampling_strength)
-        } else {
-            sampling_strength
-        };
-
-        if self.settings.strength_damping > 0.0 {
+        let circulation_strength = if self.settings.strength_damping > 0.0 {
             let previous_strength = if self.results.len() > 0 {
-                self.results.last().unwrap().circulation_strength.clone()
+                self.results.last().unwrap().force_input.circulation_strength.clone()
             } else {
-                vec![0.0; self.force_model_projection.nr_span_lines()]
+                vec![0.0; self.line_force_model.nr_span_lines()]
             };
 
-            for i in 0..new_calculated_strength.len() {
-                let change = new_calculated_strength[i] - previous_strength[i];
-                
-                result.circulation_strength.push(
-                    previous_strength[i] + (1.0 - self.settings.strength_damping) * change
-                );
-            }
+            new_estimated_circulation_strength.iter().zip(previous_strength.iter()).map(|(new, old)| {
+                old + (1.0 - self.settings.strength_damping) * (new - old)
+            }).collect()
         } else {
-            result.circulation_strength = new_calculated_strength;
+            new_estimated_circulation_strength
+        };
+
+        let angles_of_attack = self.line_force_model.angles_of_attack(&velocity_ctrl_points);
+
+        // TODO: This must be undated to handle moving wings!
+        let force_input = SectionalForcesInput {
+            circulation_strength,
+            velocity: velocity_ctrl_points.to_vec(),
+            angles_of_attack,
+            acceleration: vec![Vec3::default(); self.line_force_model.nr_span_lines()],
+            angles_of_attack_derivative: vec![0.0; self.line_force_model.nr_span_lines()],
+            rotation_velocity: Vec3::default(),
+        };
+
+        let sectional_forces = self.line_force_model.sectional_forces(&force_input);
+
+        let integrated_forces = sectional_forces.integrate_forces(&self.line_force_model);
+        let integrated_moments = sectional_forces.integrate_moments(&self.line_force_model);
+
+        SimulationResult {
+            ctrl_points,
+            force_input,
+            sectional_forces,
+            integrated_forces,
+            integrated_moments,
         }
-
-        result.sectional_forces  = self.force_model_projection.sectional_forces(&result.circulation_strength, &result.velocity);
-
-        result.integrated_forces  = self.force_model_projection.integrated_forces(&result.circulation_strength, &result.velocity);
-        result.integrated_moments = self.force_model_projection.integrated_moments(&result.circulation_strength, &result.velocity);
-
-        result
-    }
-
-    pub fn upscaled_velocity(&self, sampling_velocity: &[Vec3]) -> Vec<Vec3> {
-        self.force_model_sampling.map_velocity_gaussian(
-            sampling_velocity, 
-            &self.force_model_projection,
-            self.settings.gaussian_mapping_length_factor
-        )
-    }
-
-    pub fn upscaled_strength(&self, sampling_strength: &[f64]) -> Vec<f64> {
-        self.force_model_sampling.map_strength_gaussian(
-            sampling_strength, 
-            &self.force_model_projection, 
-            self.settings.gaussian_mapping_end_correction, 
-            self.settings.gaussian_mapping_length_factor
-        )
     }
 
     /// Writes the resulting values from the line force model to a file. 
@@ -233,29 +199,29 @@ impl ActuatorLine {
 
     /// Computes a distributed body force at a given point in space.
     pub fn distributed_body_force_at_point(&self, point: Vec3) -> Vec3 {
-        let span_lines_projection = self.force_model_projection.span_lines();
-        let chord_vectors_projection = self.force_model_projection.chord_vectors();
-        let mut body_force = Vec3::default();
-
+        let span_lines = self.line_force_model.span_lines();
+        let chord_vectors = self.line_force_model.chord_vectors();
+        
         let result = self.results.last().unwrap();
 
-        let sectional_forces_to_project = self.force_model_projection.sectional_forces_no_viscous_drag(&result.circulation_strength, &result.velocity);
+        let sectional_forces_to_project = self.line_force_model.sectional_circulatory_forces(
+            &result.force_input.circulation_strength, &result.force_input.velocity
+        );
         
-        for i in 0..self.force_model_projection.nr_span_lines() {
-            let span_line  = &span_lines_projection[i];
-            let chord_vector = chord_vectors_projection[i];
+        let mut body_force = Vec3::default();
 
-            let sectional_force = sectional_forces_to_project[i];
-
+        for i in 0..self.line_force_model.nr_span_lines() {
             let effective_chord_vector = if self.settings.velocity_aligned_projection {
-                result.velocity[i].normalize() * chord_vector.length()
+                result.force_input.velocity[i].normalize() * chord_vectors[i].length()
             } else {
-                chord_vector
+                chord_vectors[i]
             };
 
-            let projection = self.projection.projection_value_at_point(point, effective_chord_vector, &span_line);
+            let projection = self.projection.projection_value_at_point(
+                point, effective_chord_vector, &span_lines[i]
+            );
 
-            body_force += sectional_force * projection;
+            body_force += sectional_forces_to_project[i] * projection;
         }
 
         body_force
@@ -264,22 +230,21 @@ impl ActuatorLine {
     pub fn distributed_body_force_weight_at_point(&self, point: Vec3) -> f64 {
         let mut body_force_weight = 0.0;
 
-        let span_lines_projection = self.force_model_projection.span_lines();
-        let chord_vectors_projection = self.force_model_projection.chord_vectors();
+        let span_lines = self.line_force_model.span_lines();
+        let chord_vectors = self.line_force_model.chord_vectors();
 
         let result = self.results.last().unwrap();
 
-        for i in 0..self.force_model_projection.nr_span_lines() {
-            let span_line  = &span_lines_projection[i];
-            let chord_vector = chord_vectors_projection[i];
-
+        for i in 0..self.line_force_model.nr_span_lines() {
             let effective_chord_vector = if self.settings.velocity_aligned_projection {
-                result.velocity[i].normalize() * chord_vector.length()
+                result.force_input.velocity[i].normalize() * chord_vectors[i].length()
             } else {
-                chord_vector
+                chord_vectors[i]
             };
 
-            body_force_weight += self.projection.projection_value_at_point(point, effective_chord_vector, &span_line);
+            body_force_weight += self.projection.projection_value_at_point(
+                point, effective_chord_vector, &span_lines[i]
+            );
         }
 
         body_force_weight

@@ -7,34 +7,49 @@
 use crate::vec3::Vec3;
 use serde::{Serialize, Deserialize};
 
+use super::forces_and_moments::{
+    IntegratedValues,
+    SectionalForces,
+    SectionalForcesInput
+};
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
     pub ctrl_points: Vec<Vec3>,
-    pub circulation_strength: Vec<f64>,
-    pub velocity: Vec<Vec3>,
-    pub sectional_forces: Vec<Vec3>,
-    pub integrated_forces: Vec<Vec3>,
-    pub integrated_moments: Vec<Vec3>,
+    pub force_input: SectionalForcesInput,
+    pub sectional_forces: SectionalForces,
+    pub integrated_forces: Vec<IntegratedValues>,
+    pub integrated_moments: Vec<IntegratedValues>,
 }
 
 impl SimulationResult {
-    pub fn new() -> Self {
-        Self {
-            ctrl_points: Vec::new(),
-            circulation_strength: Vec::new(),
-            velocity: Vec::new(),
-            sectional_forces: Vec::new(),
-            integrated_forces: Vec::new(),
-            integrated_moments: Vec::new(),
-        }
-    }
-    
     pub fn integrated_forces_sum(&self) -> Vec3 {
-        self.integrated_forces.iter().sum()
+        let mut sum = Vec3::default();
+
+        for i in 0..self.integrated_forces.len() {
+            sum += self.integrated_forces[i].total;
+        }
+        
+        sum
     }
 
     pub fn integrated_moments_sum(&self) -> Vec3 {
-        self.integrated_moments.iter().sum()
+        let mut sum = Vec3::default();
+
+        for i in 0..self.integrated_moments.len() {
+            sum += self.integrated_moments[i].total;
+        }
+        
+        sum
+    }
+
+    pub fn write_to_file(&self, file_path: &str) -> std::io::Result<()> {
+        let file = std::fs::File::create(file_path)?;
+        let writer = std::io::BufWriter::new(file);
+
+        serde_json::to_writer(writer, self)?;
+
+        Ok(())
     }
 }

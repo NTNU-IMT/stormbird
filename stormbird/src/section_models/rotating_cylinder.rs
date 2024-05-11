@@ -27,6 +27,11 @@ pub struct RotatingCylinder {
     #[serde(default = "RotatingCylinder::default_wake_angle_data")]
     /// The angle of the wake behind the cylinder, as a function of spin ratio.
     pub wake_angle_data: Vec<f64>,
+    #[serde(default)]
+    /// Added mass factor for the cylinder
+    pub added_mass_factor: f64,
+    /// Two-dimensional moment of inertia
+    pub moment_of_inertia_2d: f64,
 }
 
 impl Default for RotatingCylinder {
@@ -37,6 +42,8 @@ impl Default for RotatingCylinder {
             cl_data: Self::default_cl_data(),
             cd_data: Self::default_cd_data(),
             wake_angle_data: Self::default_wake_angle_data(),
+            added_mass_factor: 0.0,
+            moment_of_inertia_2d: 0.0,
         }
     }
 }
@@ -107,6 +114,10 @@ impl RotatingCylinder {
         let angle_magnitude = interpolation::linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &self.wake_angle_data);
 
         -angle_magnitude * spin_ratio.signum()
+    }
+
+    pub fn added_mass_coefficient(&self, acceleration_magnitude: f64) -> f64 {
+        self.added_mass_factor * acceleration_magnitude
     }
 
     /// Helper function to calculate revolutions per second from a target spin ratio, diameter and

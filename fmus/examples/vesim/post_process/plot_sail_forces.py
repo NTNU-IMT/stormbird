@@ -33,6 +33,8 @@ if __name__ == '__main__':
         plt.plot(time, surge_force, label='Surge force')
         plt.plot(time, sway_force, label='Sway force')
 
+    plt.ylim(surge_force[-1] * 1.2, sway_force[-1]*1.2)
+
     plt.legend()
 
     plt.show()

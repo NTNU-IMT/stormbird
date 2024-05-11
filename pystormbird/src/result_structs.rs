@@ -23,27 +23,27 @@ impl SimulationResult {
 
     #[getter]
     pub fn circulation_strength(&self) -> Vec<f64> {
-        self.data.circulation_strength.clone()
+        self.data.force_input.circulation_strength.clone()
     }
 
     #[getter]
     pub fn velocity(&self) -> Vec<Vec3> {
-        self.data.velocity.iter().map(|v| Vec3::from(v.clone())).collect()
+        self.data.force_input.velocity.iter().map(|v| Vec3::from(v.clone())).collect()
     }
 
     #[getter]
     pub fn sectional_forces(&self) -> Vec<Vec3> {
-        self.data.sectional_forces.iter().map(|v| Vec3::from(v.clone())).collect()
+        self.data.sectional_forces.total.iter().map(|v| Vec3::from(v.clone())).collect()
     }
 
     #[getter]
     pub fn integrated_forces(&self) -> Vec<Vec3> {
-        self.data.integrated_forces.iter().map(|v| Vec3::from(v.clone())).collect()
+        self.data.integrated_forces.iter().map(|v| Vec3::from(v.total.clone())).collect()
     }
 
     #[getter]
     pub fn integrated_moments(&self) -> Vec<Vec3> {
-        self.data.integrated_moments.iter().map(|v| Vec3::from(v.clone())).collect()
+        self.data.integrated_moments.iter().map(|v| Vec3::from(v.total.clone())).collect()
     }
 
     fn __str__(&self) -> String {

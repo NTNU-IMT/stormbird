@@ -62,8 +62,12 @@ if __name__ == '__main__':
         initial_variables = {
             'setup_file_path': stormbird_setup_path,
             'angles_in_degrees': True,
-            'relative_angle': 0.0,
-            "use_relative_angle": True
+            'relative_angle': 10.0,
+            "use_relative_angle": True,
+            "use_abl_model": True,
+            "write_stormbird_results": True,
+            "stormbird_results_path": "output/stormbird_results.json",
+            "max_wing_rotation_velocity": 10.0
         }
     )
 
@@ -80,26 +84,62 @@ if __name__ == '__main__':
     add_connection(
         connections, 
         simulators = [ship_name, 'velocity_input'], 
-        variables  = ['wind_velocity_relative_to_ship', 'apparent_wind_velocity']
+        variables  = ['global_wind_vel', 'global_wind_velocity']
     )
 
     add_connection(
         connections, 
         simulators = [ship_name, 'velocity_input'], 
-        variables  = ['wind_direction_relative_to_ship', 'apparent_wind_direction']
+        variables  = ['global_wind_dir', 'global_wind_direction']
+    )
+
+    add_connection(
+        connections, 
+        simulators = [ship_name, 'velocity_input'], 
+        variables  = ['course', 'ship_course']
+    )
+
+    add_connection(
+        connections, 
+        simulators = [ship_name, 'velocity_input'], 
+        variables  = ['drift_angle', 'drift_angle']
+    )
+
+    add_connection(
+        connections, 
+        simulators = [ship_name, 'velocity_input'], 
+        variables  = ['cgShipMotion.linearVelocity.surge', 'surge_velocity']
+    )
+
+    add_connection(
+        connections, 
+        simulators = [ship_name, 'velocity_input'], 
+        variables  = ['cgShipMotion.linearVelocity.sway', 'sway_velocity']
     )
 
     # From velocity input to sails
     add_connection(
         connections, 
         simulators = ['velocity_input', 'sails'], 
-        variables  = ['effective_u', 'freestream_u']
+        variables  = ['constant_velocity_x', 'constant_velocity_x']
     )
 
     add_connection(
         connections, 
         simulators = ['velocity_input', 'sails'], 
-        variables  = ['effective_v', 'freestream_v']
+        variables  = ['constant_velocity_y', 'constant_velocity_y']
+    )
+
+    add_connection(
+        connections, 
+        simulators = ['velocity_input', 'sails'], 
+        variables  = ['reference_wind_velocity_x', 'reference_wind_velocity_x']
+    )
+
+    add_connection(
+        connections, 
+        simulators = ['velocity_input', 'sails'], 
+        variables  = ['reference_wind_velocity_y', 'reference_wind_velocity_y']
     )
 
     # From ship to sails

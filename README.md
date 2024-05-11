@@ -31,10 +31,6 @@ See the `stormbird` docs or the `book` for more details on the methods
 
 ## Folder structure
 - `stormbird` contains the core library, written in [Rust](https://www.rust-lang.org/).
-- `book` contains a [mdBook](https://github.com/rust-lang/mdBook) that aims to explain the methods 
-implemented in Stormbird more thoroughly than what is done in the code docs, together with 
-references to papers with more information. **Waring**: This is currently very much a work in 
-progress.
 - `pystormbird` contains a Python interface to the core library. This can either be used to run 
 lifting line simulations directly, for instance using a scripting approach, or to test individual 
 parts of the library, for instance when plotting is useful. The interface is generated using the 
@@ -45,10 +41,16 @@ the future. In addition, there is a general C++ interface to the actuator line f
 OpenFOAM, and many other CFD solvers, are written in C++.
 - `fmus` contains a [functional mockup interfaces](https://fmi-standard.org/) for 
 running lifting line simulations using the library, as well as other useful FMUs for setting up 
-numerical experiments. The interface is generated using the [fmu_from_struct](https://github.com/jarlekramer/fmu_from_struct)
+numerical experiments. The interface is generated using the 
+[fmu_from_struct](https://github.com/jarlekramer/fmu_from_struct)
 derive macro. This can, for instance, be used to run simulations with
-[Open Simulation Platform](https://opensimulationplatform.com/), or load the model in other software that
-supports the FMI-standard
+[Open Simulation Platform](https://opensimulationplatform.com/), or load the model in other software 
+that supports the FMI-standard
+- `book` contains a [mdBook](https://github.com/rust-lang/mdBook) that aims to explain the methods 
+implemented in Stormbird more thoroughly than what is done in the code docs, together with 
+references to papers with more information. **Waring**: This is currently very much a work in 
+progress.
+- `tutorials` contains files relevant for the tutorials described the book above.
 
 ## Instructions for how to use the library
 Each of the folders contains its own `README` file with install instructions.
@@ -56,15 +58,17 @@ Each of the folders contains its own `README` file with install instructions.
 For an explanation of how to set up models for different cases, see the `book` (work in progress)
 
 ## How to contribute
-1) **Contact Jarle Vinje Kramer**, for instance at jarle.a.kramer@ntnu.no, for a discussion about what and how. 
-2) Make a **separate branch** where you can implement your modification without affecting the main branch. 
+1) **Contact Jarle Vinje Kramer**, for instance at jarle.a.kramer@ntnu.no, for a discussion about 
+what and how. 
+2) Make a **separate branch** where you can implement your modification without affecting the main 
+branch. 
 3) If you add new functionality or fix a newly discovered bug, strongly consider **implementing a 
 test** for this. 
-4) When you think you are done, make sure to run test builds and the actual tests written for the library. 
-**They should all pass!**
+4) When you think you are done, make sure to run test builds and the actual tests written for the 
+library. **They should all pass!**
 5) When you are done, make a pull-request. Wait for the pull-request to be **reviewed and approved**.
-6) When the pull-request is approved, it should be merged into the main branch using a **squash commit**, 
-with a **descriptive commit message**.
+6) When the pull-request is approved, it should be merged into the main branch using a **squash 
+commit**, with a **descriptive commit message**.
 
 ### Developing principles
 Although there are no absolute rules, if anything, the code loosely follows
@@ -95,10 +99,9 @@ very complex, it is possible to add a separate library for this task...
 ### Code Style
 - The code should follow the official [Rust style guide](https://doc.rust-lang.org/nightly/style-guide/)
 - Use descriptive names for both functions and variables.
-- **Doc strings are good!** Use them! However, explainer comments inside a method or function are generally
-a sign of bad code. Can you re-structure or re-name the code such that the explainer comment is not 
-needed?
-
+- **Doc strings are good!** Use them! However, explainer comments inside a method or function are 
+generally a sign of bad code. Can you re-structure or re-name the code such that the explainer 
+comment is not needed?
 
 ## Developing status
 All parts of this repository are work in progress. Breaking changes is therefore expected on all 

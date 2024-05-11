@@ -78,6 +78,7 @@ fn no_self_induced_velocity() {
                         0.0, 20.0_f64.to_radians(), 25.0_f64.to_radians(), 
                         35.0_f64.to_radians(), 45.0_f64.to_radians(), 60.0_f64.to_radians()
                     ],
+                    ..Default::default()
                 }
             ),
         };
@@ -103,7 +104,7 @@ fn no_self_induced_velocity() {
     let force_factor = sim.line_force_model.total_force_factor(velocity.length());
 
     let input_state = InputState {
-        freestream_velocity: velocity,
+        freestream: Freestream::Constant(velocity),
         translation: Vec3::default(),
         rotation: Vec3::default(),
     };
@@ -119,7 +120,7 @@ fn no_self_induced_velocity() {
     let cd = result.integrated_forces_sum().x / force_factor;
     let cl = result.integrated_forces_sum().y / force_factor;
 
-    dbg!(&result.velocity);
+    dbg!(&result.force_input.velocity);
 
     dbg!(cd, cl);
 

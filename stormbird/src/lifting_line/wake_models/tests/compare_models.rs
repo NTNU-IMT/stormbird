@@ -5,8 +5,8 @@
 use super::*;
 
 use crate::vec3::Vec3;
-use crate::io_structs::prelude::*;
 use crate::lifting_line::tests::test_setup::RectangularWing;
+use crate::io_structs::freestream::Freestream;
 
 #[test]
 fn compare_wake_models() {
@@ -15,18 +15,15 @@ fn compare_wake_models() {
         ..Default::default()
     }.build().build();
 
-    let velocity_input = VelocityInput{
-        freestream: Vec3::new(1.2, 0.0, 0.0),
-        ..Default::default()
-    };
+    let freestream = Freestream::Constant(Vec3::new(1.2, 0.0, 0.0));
 
     let time_step = 0.5; 
 
     let mut dynamic_wake = UnsteadyWakeBuilder::default()
-        .build(time_step, &line_force_model, &velocity_input);
+        .build(time_step, &line_force_model, &freestream);
 
     let steady_wake = SteadyWakeBuilder::default()
-        .build(&line_force_model, &velocity_input);
+        .build(&line_force_model, &freestream);
 
     let circulation_strength_value = 1.31;
 

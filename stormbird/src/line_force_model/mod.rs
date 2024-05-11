@@ -6,6 +6,8 @@
 //! lift-induced velocities are estimated. In other words, this part is common for all methods 
 //! available in the library, and therefore the foundation of all simulations. 
 
+use std::f64::consts::PI;
+
 pub mod solver_utils;
 pub mod span_line;
 pub mod builder;
@@ -16,6 +18,7 @@ use std::ops::Range;
 
 use crate::math_utils::statistics::mean;
 
+use crate::io_structs::prelude::*;
 use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
@@ -35,10 +38,10 @@ pub struct SingleWing {
 pub struct LineForceModel {
     /// Vector of line segments that defines the span geometry of the wings. Each have its own start 
     /// and end point, to allow for uncoupled analysis
-    pub span_lines_local:     Vec<SpanLine>,
+    pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
     pub chord_vectors_local:  Vec<Vec3>,
-    /// Two dimensional models for lift and drag coefficients for each section
+    /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
     pub wing_indices:   Vec<Range<usize>>,
@@ -239,16 +242,19 @@ impl LineForceModel {
     }
 
     /// Return the angle of attack at each control point.
+    /// 
+    /// The angle is defined as the rotation from the chord vector to the velocity vector, using the 
+    /// span line as the axis of rotation, with right handed positive rotation.
     ///
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
-    pub fn angle_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
+    pub fn angles_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
         let chord_vectors = self.chord_vectors();
         let span_lines    = self.span_lines();
         
         (0..velocity.len()).map(|index| {
-            -velocity[index].signed_angle_between(
-                chord_vectors[index], 
+            chord_vectors[index].signed_angle_between(
+                velocity[index], 
                 span_lines[index].direction()
             )
         }).collect()
@@ -284,18 +290,17 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angle_of_attack = self.angle_of_attack(velocity);
+        let angles_of_attack = self.angles_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let local_index = self.local_index_from_global(index);
                 let wing_index  = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(foil) => 
-                        foil.lift_coefficient(angle_of_attack[index]),
-                    SectionModel::VaryingFoil(foils) => 
-                        foils[local_index].lift_coefficient(angle_of_attack[index]),
+                        foil.lift_coefficient(angles_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) => 
+                        foil.lift_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) => 
                         cylinder.lift_coefficient(
                             self.chord_vectors_local[index].length(), velocity[index].length()
@@ -311,18 +316,17 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angle_of_attack = self.angle_of_attack(velocity);
+        let angles_of_attack = self.angles_of_attack(velocity);
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let local_index = self.local_index_from_global(index);
                 let wing_index  = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(foil) => 
-                        foil.drag_coefficient(angle_of_attack[index]),
-                    SectionModel::VaryingFoil(foils) => 
-                        foils[local_index].drag_coefficient(angle_of_attack[index]),
+                        foil.drag_coefficient(angles_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) => 
+                        foil.drag_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) => 
                         cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
                 }
@@ -349,7 +353,7 @@ impl LineForceModel {
     }
 
 
-    /// Calculates the average viscouse drag coefficient for each wing.
+    /// Calculates the average viscous drag coefficient for each wing.
     pub fn average_viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
         let cd = self.viscous_drag_coefficients(velocity);
 
@@ -357,61 +361,130 @@ impl LineForceModel {
     }
     
     /// Calculates the forces on each line element.
-    pub fn sectional_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        self.sectional_forces_internal(strength, velocity, true)
-    }
-
-
-    /// Calculates the forces on each line element, without viscous drag. That is, only lift and 
-    /// lift-induced drag.
-    pub fn sectional_forces_no_viscous_drag(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        self.sectional_forces_internal(strength, velocity, false)
-    }
-
-    /// Calculates the forces on each line element.
-    fn sectional_forces_internal(&self, strength: &[f64], velocity: &[Vec3], include_viscous_drag: bool) -> Vec<Vec3> {
-        let viscous_cd: Option<Vec<f64>> = if include_viscous_drag {
-            Some(self.viscous_drag_coefficients(velocity))
-        } else {
-            None
+    pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
+        let mut sectional_forces = SectionalForces {
+            circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.velocity),
+            sectional_drag: self.sectional_drag_forces(&input.velocity),
+            added_mass: self.sectional_added_mass_force(&input.acceleration),
+            gyroscopic: self.sectional_gyroscopic_force(input.rotation_velocity),
+            total: vec![Vec3::default(); self.nr_span_lines()],
         };
 
+        sectional_forces.compute_total();
+
+        sectional_forces
+    }
+
+    /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
+    pub fn sectional_circulatory_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
         let span_lines = self.span_lines();
 
         (0..self.nr_span_lines()).map(
             |index| {
-                let mut section_force = if velocity[index].length() == 0.0 {
+                if velocity[index].length() == 0.0 {
                     Vec3::default()
                 } else {
                     strength[index] * velocity[index].cross(span_lines[index].relative_vector())
-                };
-                
-                if let Some(cd) = &viscous_cd {
-                    let drag_direction = velocity[index].normalize();
-    
-                    let drag_area = self.chord_vectors_local[index].length() * span_lines[index].length();
-
-                    let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
-    
-                    section_force += drag_direction *  cd[index] * force_factor;
                 }
-              
-                section_force
             }
         ).collect()
     }
 
-
-    /// Calculates the moment contribution from each line element.
-    /// 
-    /// The moments are calculated as the cross product of the control point and the sectional force.
-    pub fn sectional_moments(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
+    /// Calculates the forces on each line element due to the sectional drag model. This is most 
+    /// often the viscous drag, but it can also include other physical effects if that is included
+    /// in the sectional drag model.
+    pub fn sectional_drag_forces(&self, velocity: &[Vec3]) -> Vec<Vec3> {
         let span_lines = self.span_lines();
-        let sectional_forces = self.sectional_forces(strength, velocity);
+        let cd = self.viscous_drag_coefficients(velocity);
 
         (0..self.nr_span_lines()).map(
             |index| {
-                span_lines[index].ctrl_point().cross(sectional_forces[index])
+                let drag_direction = velocity[index].normalize();
+
+                let drag_area = self.chord_vectors_local[index].length() * span_lines[index].length();
+
+                let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
+
+                drag_direction * cd[index] * force_factor
+            }
+        ).collect()
+    }
+
+    /// Calculates the added mass force on each line element due to the flow acceleration at each 
+    /// control point. 
+    /// 
+    /// **Note**: At the moment, this function only calculates the added mass due to the point 
+    /// acceleration. However, according to, for instance, Theodorsen, the added mass should also 
+    /// depend on the angular velocity and angular acceleration of the wing. Although these effects
+    /// are expected to be small, it should be included in the future. This would, however, require
+    /// more information about the motion of the wing to be included as arguments.
+    /// 
+    /// # Argument
+    /// * `acceleration` - the acceleration of the flow at each control point. That is, if the only
+    /// velocity is due to the motion of the wings, the acceleration will be opposite to the motion
+    /// of the wings.
+    pub fn sectional_added_mass_force(&self, acceleration: &[Vec3]) -> Vec<Vec3> {
+        let span_lines = self.span_lines();
+        let chord_vectors = self.chord_vectors();
+        
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index  = self.wing_index_from_global(index);
+
+                let strip_area = chord_vectors[index].length() * span_lines[index].length();
+
+                let mut relevant_acceleration = acceleration[index];
+
+                relevant_acceleration -= relevant_acceleration.project(span_lines[index].direction());
+
+                match self.section_models[wing_index] {
+                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => {
+                        relevant_acceleration -= relevant_acceleration.project(chord_vectors[index]);
+                    },
+                    _ => {}
+                }
+
+                let added_mass_coefficient = match &self.section_models[wing_index] {
+                    SectionModel::Foil(foil) => {
+                        foil.added_mass_coefficient(relevant_acceleration.length())
+                    },
+                    SectionModel::VaryingFoil(foil) => {
+                        foil.added_mass_coefficient(relevant_acceleration.length())
+                    },
+                    SectionModel::RotatingCylinder(cylinder) => {
+                        cylinder.added_mass_coefficient(relevant_acceleration.length())
+                    }
+                };
+
+                added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
+            }
+        ).collect()
+    }
+
+    /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
+    /// 
+    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be 
+    /// significantly larger than the rotational velocity of the sail, for instance due to roll or
+    /// pitch motion of the boat.
+    pub fn sectional_gyroscopic_force(&self, rotation_velocity: Vec3) -> Vec<Vec3> {
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index = self.wing_index_from_global(index);
+                let span_lines = self.span_lines();
+
+                match &self.section_models[wing_index] {
+                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => Vec3::default(),
+                    SectionModel::RotatingCylinder(cylinder) => {
+                        let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
+
+                        let radial_velocity = 2.0 * PI * cylinder.revolutions_per_second;
+
+                        let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
+
+                        angular_momentum.cross(rotation_velocity)
+                    }
+                }
+
             }
         ).collect()
     }
@@ -457,45 +530,6 @@ impl LineForceModel {
 
         relative_span_distance
     }
-
-    /// Integrates sectional forces over each wing in the model.
-    pub fn integrated_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3>  {
-        let mut result: Vec<Vec3> = Vec::new();
-
-        let sectional_forces = self.sectional_forces(strength, velocity);
-
-        for wing_indices in &self.wing_indices {
-            let mut wing_result = Vec3::default();
-
-            for sectional_force in sectional_forces.iter().take(wing_indices.end).skip(wing_indices.start) {
-                wing_result  += *sectional_force;
-            }
-
-            result.push(wing_result);
-        }
-        
-        result
-    }
-
-    /// Integrates sectional moments over each wing in the model.
-    pub fn integrated_moments(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3>  {
-        let mut result: Vec<Vec3> = Vec::new();
-
-        let sectional_moments = self.sectional_moments(strength, velocity);
-
-        for wing_indices in &self.wing_indices {
-            let mut wing_result = Vec3::default();
-
-            for sectional_moment in sectional_moments.iter().take(wing_indices.end).skip(wing_indices.start) {
-                wing_result  += *sectional_moment;
-            }
-
-            result.push(wing_result);
-        }
-        
-        result
-    }
-
 
     /// Integrates the chord length along the span of all wings in the model to return the total
     /// projected area of the wing.

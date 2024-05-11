@@ -15,6 +15,8 @@ use crate::section_models::SectionModel;
 #[serde(deny_unknown_fields)]
 pub struct LineForceModelBuilder {
     pub wing_builders: Vec<WingBuilder>,
+    /// Nr sections to discretize the wing into. That is, each wing in the wing builder vector will
+    /// end up having a number of sections equal to this variable.
     pub nr_sections: usize,
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,
@@ -119,7 +121,7 @@ impl WingBuilder {
 
         let section_model = match &self.section_model {
             SectionModel::Foil(foil) => SectionModel::Foil(foil.clone()),
-            SectionModel::VaryingFoil(_foils) => panic!("Varying foil model are not yet supported!"),
+            SectionModel::VaryingFoil(foils) => SectionModel::VaryingFoil(foils.clone()),
             SectionModel::RotatingCylinder(cylinder) => SectionModel::RotatingCylinder(cylinder.clone()),
         };
 

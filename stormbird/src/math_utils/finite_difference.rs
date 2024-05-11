@@ -38,3 +38,75 @@ where T:
 {
     (data[2] * 3.0 - data[1] * 4.0 + data[0]) / (2.0 * step_size)
 }
+
+/// Calculates the double derivative based on the data using a backwards finite difference scheme.
+/// 
+/// Souce: https://en.wikipedia.org/wiki/Finite_difference
+/// 
+/// # Arguments
+/// * `data` - The data to calculate the derivative on. The last element in the array is the newest
+/// data point, while the first is the oldest data point. Each point is assumed to be equally spaced
+/// based on the step size
+pub fn second_derivative_backward<T>(data: &[T; 3], step_size: f64) -> T 
+where T: 
+    std::ops::Mul<f64, Output = T> + 
+    std::ops::Add<T, Output = T> + 
+    std::ops::Sub<T, Output = T> + 
+    std::ops::Div<f64, Output = T> +
+    Copy
+{
+    (data[2] - data[1] * 2.0 + data[0]) / step_size.powi(2)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn function(x: f64) -> f64 {
+        3.2 * x.powi(3) + 2.0 * x + 1.0
+    }
+
+    fn derivative(x: f64) -> f64 {
+        3.0 * 3.2 * x.powi(2) + 2.0
+    }
+
+    fn second_derivative(x: f64) -> f64 {
+        3.0 * 2.0 * 3.2 * x
+    }
+
+    #[test]
+    fn test_derivatives() {
+        let step_size = 0.0012;
+        let x0 = 0.85;
+
+        let previous_x_values: [f64; 3] = [x0, x0 + step_size, x0 + 2.0 * step_size];
+        let new_x_value = x0 + 3.0 * step_size;
+        
+        let data: [f64; 3] = [
+            function(previous_x_values[0]),
+            function(previous_x_values[1]),
+            function(previous_x_values[2]),
+        ];
+
+        let derivative_truth = derivative(new_x_value);
+        let second_derivative_truth = second_derivative(new_x_value);
+
+        let derivative_first_order = first_derivative_first_order(&[data[1], data[2]], step_size);
+        let derivative_second_order = first_derivative_second_order_backward(&data, step_size);
+        let second_derivative = second_derivative_backward(&data, step_size);
+
+        dbg!(derivative_truth, derivative_first_order, derivative_second_order);
+        dbg!(second_derivative_truth, second_derivative);
+
+        let derivative_error_first_order = (derivative_truth - derivative_first_order).abs() / derivative_truth.abs();
+        let derivative_error_second_order = (derivative_truth - derivative_second_order).abs() / derivative_truth.abs();
+        let second_derivative_error = (second_derivative_truth - second_derivative).abs() / second_derivative_truth.abs();
+        
+        dbg!(derivative_error_first_order, derivative_error_second_order, second_derivative_error);
+
+        let allowed_error = 0.005;
+        assert!(derivative_error_first_order < allowed_error);
+        assert!(derivative_error_second_order < allowed_error);
+        assert!(second_derivative_error < allowed_error);
+    }
+}

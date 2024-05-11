@@ -38,7 +38,8 @@ impl Default for UnsteadySolverSettings {
 pub fn solve_one_time_step(
     time_step: f64,
     line_force_model: &LineForceModel,
-    velocity_input: &VelocityInput,
+    freestream: &Freestream,
+    derivatives: &Derivatives,
     wake: &mut UnsteadyWake,
     solver_settings: &UnsteadySolverSettings,
     previous_circulation_strength: &[f64]
@@ -49,13 +50,18 @@ pub fn solve_one_time_step(
     let ctrl_points = line_force_model.ctrl_points();
 
     // Velocity components that are fixed for the entire time step    
-    let u_inf_ctrl_point: Vec<Vec3> = velocity_input.felt_velocity_at_ctrl_points(&line_force_model);
+    let u_inf_ctrl_point: Vec<Vec3> = freestream.velocity_at_locations(&ctrl_points);
+    let u_motion_ctrl_point: Vec<Vec3> = derivatives.motion.ctrl_point_velocity(&line_force_model, time_step);
 
     let u_i_free_wake: Vec<Vec3>    = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 
-    let fixed_velocities: Vec<Vec3> = u_inf_ctrl_point.iter()
-        .zip(u_i_free_wake.iter())
-        .map(|(a, b)| *a + *b).collect();
+    let mut fixed_velocities: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
+
+    for i in 0..ctrl_points.len() {
+        fixed_velocities.push(
+            u_inf_ctrl_point[i] - u_motion_ctrl_point[i] + u_i_free_wake[i]
+        );
+    }
 
     // Iterate to solver for the strength at the first panel
     let mut circulation_strength = previous_circulation_strength.to_vec();
@@ -85,17 +91,34 @@ pub fn solve_one_time_step(
         .zip(update_to_velocity.iter())
         .map(|(a, b)| *a + *b).collect();
 
+    
+    let angles_of_attack = line_force_model.angles_of_attack(&velocity);
+
+    let acceleration = derivatives.flow.acceleration(&velocity, time_step);
+    let angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(&angles_of_attack, time_step);
+
+    let rotation_velocity = derivatives.motion.rotation_velocity(&line_force_model, time_step);
+
     // Do post processing
-    let sectional_forces   = line_force_model.sectional_forces(&circulation_strength, &velocity);
-    let integrated_forces  = line_force_model.integrated_forces(&circulation_strength, &velocity);
-    let integrated_moments = line_force_model.integrated_moments(&circulation_strength, &velocity);
-
-    wake.update_after_completed_time_step(&circulation_strength, time_step, line_force_model, velocity_input);
-
-    SimulationResult {
-        ctrl_points: ctrl_points.clone(),
+    let force_input = SectionalForcesInput {
         circulation_strength,
         velocity,
+        angles_of_attack,
+        acceleration,
+        angles_of_attack_derivative,
+        rotation_velocity
+    };
+
+    let sectional_forces   = line_force_model.sectional_forces(&force_input);
+
+    let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
+    let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
+
+    wake.update_after_completed_time_step(&force_input.circulation_strength, time_step, line_force_model, freestream);
+
+    SimulationResult {
+        ctrl_points,
+        force_input,
         sectional_forces,
         integrated_forces,
         integrated_moments,
