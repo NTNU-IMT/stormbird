@@ -12,6 +12,7 @@ pub mod wake_models;
 pub mod solvers;
 pub mod singularity_elements;
 pub mod simulation;
+pub mod velocity_input;
 
 /// Typical imports when using the lifting line functionality
 pub mod prelude {
