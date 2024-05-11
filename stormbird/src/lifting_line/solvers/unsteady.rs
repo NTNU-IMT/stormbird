@@ -38,7 +38,8 @@ impl Default for UnsteadySolverSettings {
 pub fn solve_one_time_step(
     time_step: f64,
     line_force_model: &LineForceModel,
-    freestream: &Freestream,
+    ctrl_points_freestream: &[Vec3],
+    wake_points_freestream: &[Vec3],
     derivatives: &Derivatives,
     wake: &mut UnsteadyWake,
     solver_settings: &UnsteadySolverSettings,
@@ -49,17 +50,16 @@ pub fn solve_one_time_step(
     
     let ctrl_points = line_force_model.ctrl_points();
 
-    // Velocity components that are fixed for the entire time step    
-    let u_inf_ctrl_point: Vec<Vec3> = freestream.velocity_at_locations(&ctrl_points);
+    // Velocity components that are fixed for the entire time step
     let u_motion_ctrl_point: Vec<Vec3> = derivatives.motion.ctrl_point_velocity(&line_force_model, time_step);
 
-    let u_i_free_wake: Vec<Vec3>    = wake.induced_velocities_from_free_wake(&ctrl_points, false);
+    let u_i_free_wake: Vec<Vec3> = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 
     let mut fixed_velocities: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
 
     for i in 0..ctrl_points.len() {
         fixed_velocities.push(
-            u_inf_ctrl_point[i] - u_motion_ctrl_point[i] + u_i_free_wake[i]
+            ctrl_points_freestream[i] - u_motion_ctrl_point[i] + u_i_free_wake[i]
         );
     }
 
@@ -114,7 +114,13 @@ pub fn solve_one_time_step(
     let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
     let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
 
-    wake.update_after_completed_time_step(&force_input.circulation_strength, time_step, line_force_model, freestream);
+    wake.update_after_completed_time_step(
+        &force_input.circulation_strength, 
+        time_step, 
+        line_force_model, 
+        ctrl_points_freestream, 
+        wake_points_freestream
+    );
 
     SimulationResult {
         ctrl_points,

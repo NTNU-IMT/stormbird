@@ -56,7 +56,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.write_wake_files:
-    
         wake_files_folder_path  = Path("wake_files_output")
 
         if not wake_files_folder_path.exists():
@@ -150,7 +149,11 @@ if __name__ == "__main__":
 
         setup_string = json.dumps(setup)
 
-        simulation = Simulation.new_from_string(setup_string)
+        simulation = Simulation(
+            setup_string = setup_string,
+            initial_time_step = dt,
+            wake_initial_velocity = Vec3(velocity, 0.0, 0.0), 
+        )
 
         time = []
         lift = []
@@ -158,14 +161,27 @@ if __name__ == "__main__":
 
         t = 0.0
 
+        '''
+        Query the simulation struct for points where the freestream velocity is defined. This is 
+        only done once in this case as the velocity is not dependent on the position of the wing.
+        Also, because there is noe spatial variation in the velocity, the freestream velocity is
+        the same for all points.
+        '''
+        freestream_velocity_points = simulation.get_freestream_velocity_points()
+
+        freestream_velocity = []
+        for point in freestream_velocity_points:
+            freestream_velocity.append(Vec3(velocity, 0.0, 0.0))
+
         while t < final_time:
             print("Running sim at time = ", t)
+
+            simulation.set_translation(Vec3(0.0, position_func(t), 0.0))
 
             result = simulation.do_step(
                 time = t, 
                 time_step = dt, 
-                freestream_velocity = Vec3(velocity, 0.0, 0.0),
-                translation = Vec3(0.0, position_func(t), 0.0)
+                freestream_velocity = freestream_velocity,
             )
 
             forces = result.integrated_forces_sum()

@@ -11,7 +11,6 @@ use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::prelude::*;
 use crate::io_structs::derivatives::Derivatives;
-use crate::io_structs::input_state::InputState;
 
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -99,16 +98,29 @@ impl SimulationBuilder {
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.
-    pub fn build(&self) -> Simulation {
+    pub fn build(&self, initial_time_step: f64, wake_initial_velocity: Vec3) -> Simulation {
         let line_force_model = self.line_force_model.build();
         let nr_of_lines = line_force_model.nr_span_lines();
+
+        let unsteady_wake = match &self.simulation_mode {
+            SimulationMode::Dynamic(settings) => {
+                Some(
+                    settings.wake.build(
+                        initial_time_step,
+                        &line_force_model,
+                        wake_initial_velocity,
+                    )
+                )
+            },
+            _ => None
+        };
 
         Simulation {
             line_force_model,
             simulation_mode: self.simulation_mode.clone(),
             derivatives: None,
             previous_circulation_strength: vec![0.0; nr_of_lines],
-            unsteady_wake: None,
+            unsteady_wake,
             write_wake_data_to_file: self.write_wake_data_to_file,
             wake_files_folder_path: self.wake_files_folder_path.clone()
         }
@@ -128,33 +140,63 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new_from_string(string: &str) -> Result<Self, String> {
-        let builder = SimulationBuilder::new_from_string(string)?;
+    pub fn new_from_string(setup_string: &str, initial_time_step: f64, wake_initial_velocity: Vec3) -> Result<Self, String> {
+        let builder = SimulationBuilder::new_from_string(setup_string)?;
 
-        Ok(builder.build())
+        Ok(builder.build(initial_time_step, wake_initial_velocity))
+    }
+
+    /// Returns the points where the freestream velocity must be specified in order to execute a 
+    /// `do_step` call. 
+    /// 
+    /// Which points that are returned depends on the simulation mode. In case of a quasi-steady 
+    /// simulation, the points are only the control points of the line force model. In case of a 
+    /// dynamic simulation, the points are the control points of the line force model and the 
+    /// points in the wake.
+    pub fn get_freestream_velocity_points(&self) -> Vec<Vec3> {
+        match &self.simulation_mode {
+            SimulationMode::QuasiSteady(_) => {
+                self.line_force_model.ctrl_points()
+            },
+            SimulationMode::Dynamic(_) => {
+                let mut points = self.line_force_model.ctrl_points();
+
+                let wake_points = &self.unsteady_wake.as_ref().unwrap().wake_points;
+
+                for i in 0..wake_points.len() {
+                    points.push(wake_points[i]);
+                }
+
+                points
+            }
+        }
     }
 
     pub fn do_step(
         &mut self, 
         time: f64,
         time_step: f64,
-        input_state: InputState
+        freestream_velocity: &[Vec3],
     ) -> SimulationResult {
-        self.line_force_model.rotation    = input_state.rotation;
-        self.line_force_model.translation = input_state.translation;
+        let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
+
+        let wake_points_freestream: Option<Vec<Vec3>> = match &self.simulation_mode {
+            SimulationMode::QuasiSteady(_) => {
+                None
+            },
+            SimulationMode::Dynamic(_) => {
+                Some(freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec())
+            }
+        };
 
         // If the force input calculator has not been initialized, initialize it.
         if self.derivatives.is_none() {
-            let initial_velocity = input_state.freestream.velocity_at_locations(
-                &self.line_force_model.ctrl_points()
-            );
-
-            let initial_angles = self.line_force_model.angles_of_attack(&initial_velocity);
+            let initial_angles = self.line_force_model.angles_of_attack(&ctrl_points_freestream);
 
             self.derivatives = Some(
                 Derivatives::new(
                     &self.line_force_model,
-                    &initial_velocity,
+                    &ctrl_points_freestream,
                     &initial_angles
                 )
             );
@@ -167,7 +209,7 @@ impl Simulation {
                 steady_solvers::solve_steady(
                     time_step,
                     &self.line_force_model, 
-                    &input_state.freestream,
+                    &ctrl_points_freestream,
                     Some(&derivatives),
                     &settings.solver,
                     &settings.wake, 
@@ -175,22 +217,15 @@ impl Simulation {
                 )
             },
             SimulationMode::Dynamic(settings) => {
-                if self.unsteady_wake.is_none() {
-                    self.unsteady_wake = Some(
-                        settings.wake.build(
-                            time_step,
-                            &self.line_force_model,
-                            &input_state.freestream
-                        )
-                    );
-                }
-
-                let mut wake = self.unsteady_wake.as_mut().unwrap();
+                let mut wake = self.unsteady_wake.as_mut().expect(
+                    "The dynamic wake must be initialized before calling do_step."
+                );
 
                 let result = unsteady_solvers::solve_one_time_step(
                     time_step,
                     &self.line_force_model,
-                    &input_state.freestream,
+                    &ctrl_points_freestream,
+                    &wake_points_freestream.unwrap(),
                     &derivatives,
                     &mut wake,
                     &settings.solver,

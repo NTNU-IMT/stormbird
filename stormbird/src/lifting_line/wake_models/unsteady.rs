@@ -17,7 +17,6 @@ use std::ops::Range;
 use crate::vec3::Vec3;
 
 use crate::line_force_model::LineForceModel;
-use crate::io_structs::freestream::Freestream;
 
 use crate::lifting_line::singularity_elements::prelude::*;
 
@@ -152,15 +151,10 @@ impl UnsteadyWakeBuilder {
         &self,
         time_step: f64, 
         line_force_model: &LineForceModel, 
-        freestream: &Freestream, 
+        initial_velocity: Vec3, 
     ) -> UnsteadyWake {                
         let span_points   = line_force_model.span_points();
-        let ctrl_points   = line_force_model.ctrl_points();
         let chord_vectors = line_force_model.chord_vectors();
-
-        let freestream_velocity: Vec<Vec3> = freestream.velocity_at_locations(&ctrl_points);
-
-        let average_freestream_velocity: Vec3 = freestream_velocity.iter().sum::<Vec3>() / freestream_velocity.len() as f64;
 
         let span_points_chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
             &chord_vectors, true
@@ -176,12 +170,12 @@ impl UnsteadyWakeBuilder {
         let nr_wake_panels_per_line_element = match self.wake_length {
             WakeLength::NrPanels(nr_panels) => nr_panels,
             WakeLength::TargetLengthFactor(_) => {
-                if average_freestream_velocity.length() == 0.0 {
+                if initial_velocity.length() == 0.0 {
                     panic!("Freestream velocity is zero. Cannot calculate wake length.");
                 }
 
                 self.wake_length.nr_wake_panels_from_target_length_factor(
-                    mean_chord_length, average_freestream_velocity.length(), time_step
+                    mean_chord_length, initial_velocity.length(), time_step
                 ).unwrap()
             }
         };
@@ -198,10 +192,10 @@ impl UnsteadyWakeBuilder {
             FirstPanelBehavior::VelocityFixed(ratio) => ratio,
         };
 
-        let wake_building_velocity = if average_freestream_velocity.length() == 0.0 {
+        let wake_building_velocity = if initial_velocity.length() == 0.0 {
             Vec3::new(1e-6, 1e-6, 1e-6)
         } else {
-            average_freestream_velocity
+            initial_velocity
         };
 
         for i_stream in 0..nr_wake_points_per_line_element {
@@ -253,7 +247,7 @@ impl UnsteadyWakeBuilder {
 
         let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); nr_panels];
 
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(average_freestream_velocity);
+        let induced_velocity_corrections = self.induced_velocity_corrections.build(initial_velocity);
 
         let mut wake = UnsteadyWake {
             wake_points,
@@ -333,7 +327,7 @@ pub struct UnsteadyWakeSettings {
 /// the simulation.
 pub struct UnsteadyWake {
     /// The points making up the vortex wake
-    wake_points: Vec<Vec3>,
+    pub wake_points: Vec<Vec3>,
     /// The strengths of the vortex lines
     pub strengths: Vec<f64>,
     /// Panel geometry data used to determine what method to use for calculating the induced 
@@ -427,9 +421,15 @@ impl UnsteadyWake {
         new_circulation_strength: &[f64], 
         time_step: f64, 
         line_force_model: &LineForceModel,
-        freestream: &Freestream
+        ctrl_points_freestream: &[Vec3],
+        wake_points_freestream: &[Vec3]
     ) {
-        self.update_wake_points_after_completed_time_step(time_step, line_force_model, freestream);
+        self.update_wake_points_after_completed_time_step(
+            time_step, 
+            line_force_model, 
+            ctrl_points_freestream, 
+            wake_points_freestream
+        );
         self.update_panel_geometry_from_wake_points();
         self.update_strength_after_completed_time_step(new_circulation_strength);
 
@@ -544,7 +544,7 @@ impl UnsteadyWake {
     }
 
     /// Moves the first wake points after the wing geometry itself.
-    fn move_first_free_wake_points(&mut self, line_force_model: &LineForceModel, freestream: &Freestream) {                
+    fn move_first_free_wake_points(&mut self, line_force_model: &LineForceModel, ctrl_points_freestream: &[Vec3]) {                
         let span_lines = line_force_model.span_lines();
         
         let chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
@@ -560,13 +560,12 @@ impl UnsteadyWake {
             FirstPanelBehavior::VelocityFixed(chord_ratio) => {
                 let ctrl_points = line_force_model.ctrl_points();
 
-                let u_inf: Vec<Vec3> = freestream.velocity_at_locations(&ctrl_points);
                 let u_i: Vec<Vec3>   = self.induced_velocities(&ctrl_points, true);
 
                 let mut ctrl_points_velocity: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
 
                 for i in 0..ctrl_points.len() {
-                    ctrl_points_velocity.push(u_inf[i] + u_i[i]);
+                    ctrl_points_velocity.push(ctrl_points_freestream[i] + u_i[i]);
                 }
 
                 ctrl_points_velocity = line_force_model.remove_span_velocity(&ctrl_points_velocity);
@@ -612,10 +611,11 @@ impl UnsteadyWake {
         &mut self, 
         time_step: f64,
         line_force_model: &LineForceModel,
-        freestream: &Freestream
+        ctrl_points_freestream: &[Vec3],
+        wake_points_freestream: &[Vec3]
     ) {
-        self.move_first_free_wake_points(line_force_model, freestream);
-        self.stream_free_wake_points(time_step, freestream); 
+        self.move_first_free_wake_points(line_force_model, ctrl_points_freestream);
+        self.stream_free_wake_points(time_step, wake_points_freestream); 
     }
 
     /// Returns the velocity at all the wake points.
@@ -626,8 +626,8 @@ impl UnsteadyWake {
     ///
     /// # Argument
     /// * `freestream` - A model for the freestream velocity in the simulation
-    pub fn velocity_at_wake_points(&self, freestream: &Freestream) -> Vec<Vec3> {
-        let mut velocity: Vec<Vec3> = freestream.velocity_at_locations(&self.wake_points);
+    pub fn velocity_at_wake_points(&self, wake_points_freestream: &[Vec3]) -> Vec<Vec3> {
+        let mut velocity: Vec<Vec3> = wake_points_freestream.to_vec();
 
         let end_index: usize = if let Some(end_index) = self.settings.end_index_induced_velocities_on_wake {
             self.wake_point_index(end_index, 0).min(self.wake_points.len())
@@ -647,10 +647,10 @@ impl UnsteadyWake {
     }
 
     /// Stream all free wake points based on the Euler method.
-    fn stream_free_wake_points(&mut self, time_step: f64, freestream: &Freestream) {
+    fn stream_free_wake_points(&mut self, time_step: f64, wake_points_freestream: &[Vec3]) {
         let old_wake_points = self.wake_points.clone();
 
-        let velocity = self.velocity_at_wake_points(freestream);
+        let velocity = self.velocity_at_wake_points(wake_points_freestream);
 
         // Don't move the first panel. This is done in another function
         let start_index = 2 * self.settings.nr_wake_points_along_span;

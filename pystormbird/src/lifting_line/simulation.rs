@@ -5,11 +5,9 @@
 //! Interface to a dynamic simulation using a lifting line model.
 
 use pyo3::prelude::*;
-use pyo3::types::PyType;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
-use stormbird::io_structs::input_state::InputState;
-use stormbird::io_structs::freestream::Freestream;
+use stormbird::vec3::Vec3 as Vec3Rust;
 
 use crate::vec3::Vec3;
 use crate::result_structs::SimulationResult;
@@ -21,11 +19,43 @@ pub struct Simulation {
 
 #[pymethods]
 impl Simulation {
-    #[classmethod]
-    pub fn new_from_string(_cls: &PyType, string: String) -> Self {
+    #[new]
+    #[pyo3(
+        signature=(
+            *,
+            setup_string, 
+            initial_time_step,
+            wake_initial_velocity
+        )
+    )]
+    pub fn new(
+        setup_string: String, 
+        initial_time_step: f64, 
+        wake_initial_velocity: Vec3
+    ) -> Self {
         Self {
-            data: SimulationRust::new_from_string(&string).unwrap()
+            data: SimulationRust::new_from_string(
+                &setup_string, 
+                initial_time_step, 
+                wake_initial_velocity.data
+            ).unwrap()
         }
+    }
+
+    pub fn set_translation(&mut self, translation: Vec3) {
+        self.data.line_force_model.translation = translation.data;
+    }
+
+    pub fn set_rotation(&mut self, rotation: Vec3) {
+        self.data.line_force_model.rotation = rotation.data;
+    }
+
+    pub fn get_freestream_velocity_points(&self) -> Vec<Vec3> {
+        let rust_vec = self.data.get_freestream_velocity_points();
+
+        rust_vec.iter().map(
+            |v| Vec3::new(v.x, v.y, v.z)
+        ).collect()
     }
 
     #[pyo3(signature=(
@@ -33,29 +63,23 @@ impl Simulation {
         time, 
         time_step,
         freestream_velocity,
-        translation = Vec3::new(0.0, 0.0, 0.0),
-        rotation = Vec3::new(0.0, 0.0, 0.0),
     ))]
     pub fn do_step(
         &mut self, 
         time: f64, 
         time_step: f64,
-        freestream_velocity: Vec3,
-        translation: Vec3,
-        rotation: Vec3,
+        freestream_velocity: Vec<Vec3>,
     ) -> SimulationResult {
 
-        let input_state = InputState {
-            freestream: Freestream::Constant(freestream_velocity.data),
-            translation: translation.data,
-            rotation: rotation.data,
-        };
+        let rust_freestream_velocity: Vec<Vec3Rust> = freestream_velocity.iter().map(
+            |v| v.data
+        ).collect();
 
         SimulationResult {
             data: self.data.do_step(
                 time, 
                 time_step,
-                input_state
+                &rust_freestream_velocity
             )
         }
     }

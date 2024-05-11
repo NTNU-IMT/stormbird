@@ -15,7 +15,6 @@ use ndarray::prelude::*;
 
 use crate::vec3::Vec3;
 use crate::line_force_model::LineForceModel;
-use crate::io_structs::freestream::Freestream;
 
 use crate::lifting_line::singularity_elements::prelude::*;
 
@@ -49,7 +48,7 @@ impl SteadyWakeBuilder {
     pub fn build(
         &self, 
         line_force_model: &LineForceModel, 
-        freestream: &Freestream, 
+        ctrl_points_freestream: &[Vec3], 
     ) -> SteadyWake {
         let mean_chord_length: f64 = line_force_model.chord_vectors().iter().map(
             |chord| chord.length()
@@ -57,11 +56,7 @@ impl SteadyWakeBuilder {
 
         let ctrl_points = line_force_model.ctrl_points();
 
-        let freestream_velocity = freestream.velocity_at_locations(
-            &ctrl_points
-        );
-
-        let average_freestream_velocity: Vec3 = freestream_velocity.iter().sum::<Vec3>() / freestream_velocity.len() as f64;
+        let average_freestream_velocity: Vec3 = ctrl_points_freestream.iter().sum::<Vec3>() / ctrl_points_freestream.len() as f64;
 
         let wake_length = self.wake_length_factor * mean_chord_length;
 

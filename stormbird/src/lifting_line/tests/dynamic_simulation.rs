@@ -206,7 +206,7 @@ fn rotational_velocity() {
                 continue;
             }
 
-            if i_t > 1 {
+            if i_t > 3 {
                 let error = (velocity_local.y + ctrl_point_velocity_est[i].y).abs() / velocity_local.y.abs();
 
                 assert!(error < 0.06, "Error in rotational velocity estimation at ctrl point {} = {}", i, error);

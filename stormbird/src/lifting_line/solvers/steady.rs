@@ -9,8 +9,6 @@ use crate::math_utils::statistics;
 use crate::vec3::Vec3;
 use crate::line_force_model::prelude::*;
 
-use crate::empirical_models::viscous_wakes::ViscousWakes;
-
 use crate::lifting_line::wake_models::steady::{
     SteadyWake,
     SteadyWakeBuilder
@@ -30,8 +28,6 @@ pub struct SteadySolverSettings {
     #[serde(default="SteadySolverSettings::default_damping_factor")]
     pub damping_factor: f64,
     #[serde(default)]
-    pub include_viscous_wake: bool,
-    #[serde(default)]
     pub smoothing_length_ratio: Option<f64>,
     #[serde(default)]
     pub convergence_test: ConvergenceTest,
@@ -49,7 +45,6 @@ impl Default for SteadySolverSettings {
         SteadySolverSettings {
             max_iterations: Self::default_max_iterations(),
             damping_factor: Self::default_damping_factor(),
-            include_viscous_wake: Default::default(),
             smoothing_length_ratio: Default::default(),
             convergence_test: Default::default(),
             print_log: Default::default(),
@@ -70,7 +65,7 @@ impl Default for SteadySolverSettings {
 pub fn solve_steady_multiresolution(
     time_step: f64,
     line_force_model_builder: &LineForceModelBuilder, 
-    freestream: &Freestream,
+    ctrl_points_freestream: &[Vec3],
     derivatives: Option<&Derivatives>,
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder
@@ -117,7 +112,7 @@ pub fn solve_steady_multiresolution(
         };
 
         results.push(
-            solve_steady(time_step, &force_models[i], freestream, derivatives, solver_settings, wake_builder, &initial_solution)
+            solve_steady(time_step, &force_models[i], ctrl_points_freestream, derivatives, solver_settings, wake_builder, &initial_solution)
         );
     }
 
@@ -127,7 +122,7 @@ pub fn solve_steady_multiresolution(
 pub fn solve_steady(
     time_step: f64,
     line_force_model: &LineForceModel, 
-    freestream: &Freestream,
+    ctrl_points_freestream: &[Vec3],
     derivatives: Option<&Derivatives>,
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder,
@@ -137,16 +132,10 @@ pub fn solve_steady(
 
     let wake = wake_builder.build(
         line_force_model, 
-        freestream, 
+        ctrl_points_freestream, 
     );
     
     let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
-
-    let viscous_wakes: Option<ViscousWakes> = if solver_settings.include_viscous_wake {
-        Some(ViscousWakes::from_line_force_model(line_force_model))
-    } else {
-        None
-    };
 
     let mut convergence_test = solver_settings.convergence_test.build();
 
@@ -156,10 +145,9 @@ pub fn solve_steady(
         let velocity = calculate_velocity(
             time_step,
             line_force_model,
-            freestream,
+            ctrl_points_freestream,
             derivatives,
             &wake, 
-            viscous_wakes.as_ref(), 
             &circulation_strength
         );
         
@@ -193,10 +181,9 @@ pub fn solve_steady(
     let velocity = calculate_velocity(
         time_step,
         line_force_model,
-        freestream,
+        ctrl_points_freestream,
         derivatives,
         &wake, 
-        viscous_wakes.as_ref(), 
         &circulation_strength
     );
 
@@ -241,15 +228,12 @@ pub fn solve_steady(
 fn calculate_velocity(
     time_step: f64,
     line_force_model: &LineForceModel,
-    freestream: &Freestream,
+    ctrl_points_freestream: &[Vec3],
     derivatives: Option<&Derivatives>,
     wake: &SteadyWake, 
-    viscous_wakes: Option<&ViscousWakes>, 
     circulation_strength: &[f64]
 ) -> Vec<Vec3> {
-    let mut ctrl_point_velocities: Vec<Vec3> = freestream.velocity_at_locations(
-        &line_force_model.ctrl_points()
-    );
+    let mut ctrl_point_velocities: Vec<Vec3> = ctrl_points_freestream.to_vec();
 
     let motion_velocity = if let Some(derivatives) = derivatives {
         derivatives.motion.ctrl_point_velocity(line_force_model, time_step)
@@ -263,14 +247,8 @@ fn calculate_velocity(
 
     let induced_velocities: Vec<Vec3> = wake.induced_velocities_at_control_points(circulation_strength);
 
-    let mut velocity: Vec<Vec3> = ctrl_point_velocities.iter()
+    ctrl_point_velocities.iter()
         .zip(induced_velocities.iter())
         .map(| (u_ctrl, u_i)| {*u_ctrl + *u_i})
-        .collect();
-
-    if let Some(viscous_wakes) = viscous_wakes.as_ref() {
-        velocity = viscous_wakes.corrected_velocity(line_force_model, &velocity);
-    }
-
-    velocity
+        .collect()
 }
