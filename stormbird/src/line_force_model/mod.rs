@@ -17,6 +17,7 @@ pub mod prelude;
 use std::ops::Range;
 
 use crate::math_utils::statistics::mean;
+use crate::math_utils::finite_difference;
 
 use crate::io_structs::prelude::*;
 use crate::vec3::Vec3;
@@ -273,6 +274,42 @@ impl LineForceModel {
         }
     }
 
+    /// Calculates the second derivative of the circulation strength on each line element. This can 
+    /// be used to calculate artificial viscosity damping when estimating the circulation strength
+    pub fn circulation_strength_second_derivative(&self, circulation_strength: &[f64]) -> Vec<f64> {
+        let span_distance = self.span_distance_in_local_coordinates();
+
+        let mut first_derivative = Vec::with_capacity(circulation_strength.len());
+
+        for wing_index in 0..self.wing_indices.len() {
+            let local_span_distance = &span_distance[self.wing_indices[wing_index].clone()];
+            let local_circulation_strength = &circulation_strength[self.wing_indices[wing_index].clone()];
+
+            let local_circulation_derivative = finite_difference::derivative_spatial_arrays(
+                local_span_distance, 
+                local_circulation_strength
+            );
+
+            first_derivative.extend(local_circulation_derivative);
+        }
+
+        let mut second_derivative = Vec::with_capacity(circulation_strength.len());
+
+        for wing_index in 0..self.wing_indices.len() {
+            let local_span_distance = &span_distance[self.wing_indices[wing_index].clone()];
+            let local_circulation_derivative = &first_derivative[self.wing_indices[wing_index].clone()];
+
+            let local_circulation_derivative = finite_difference::derivative_spatial_arrays(
+                local_span_distance, 
+                local_circulation_derivative
+            );
+
+            second_derivative.extend(local_circulation_derivative);
+        }
+
+        second_derivative
+    }
+
     /// Returns the circulation strength on each line based on the lifting line equation.
     ///
     /// # Argument
@@ -487,6 +524,44 @@ impl LineForceModel {
 
             }
         ).collect()
+    }
+
+    pub fn span_distance_in_local_coordinates(&self) -> Vec<f64> {
+        let mut span_distance: Vec<f64> = Vec::new();
+
+        for wing_index in 0..self.wing_indices.len() {
+            let start_point = self.span_lines_local[
+                self.wing_indices[wing_index].start
+            ].start_point;
+            
+            let mut previous_point = start_point;
+            let mut previous_distance = 0.0;
+
+            let mut current_wing_span_distance: Vec<f64> = Vec::new();
+
+            for i in self.wing_indices[wing_index].clone() {
+                let line = &self.span_lines_local[i];
+
+                let increase_in_distance = line.ctrl_point().distance(previous_point);
+                previous_point = line.ctrl_point();
+
+                current_wing_span_distance.push(previous_distance + increase_in_distance);
+                
+                previous_distance += increase_in_distance;
+            }
+
+            let end_point = self.span_lines_local[
+                self.wing_indices[wing_index].clone().last().unwrap()
+            ].end_point;
+
+            let total_distance = current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
+
+            for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
+                span_distance.push(current_wing_span_distance[i] - 0.5 * total_distance);
+            }
+        }
+
+        span_distance
     }
 
     /// Calculates the relative distance from the center off each wing for each control point.

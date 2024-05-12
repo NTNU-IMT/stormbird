@@ -28,7 +28,7 @@ pub struct SteadySolverSettings {
     #[serde(default="SteadySolverSettings::default_damping_factor")]
     pub damping_factor: f64,
     #[serde(default)]
-    pub smoothing_length_ratio: Option<f64>,
+    pub circulation_viscosity: f64,
     #[serde(default)]
     pub convergence_test: ConvergenceTest,
     #[serde(default)]
@@ -45,7 +45,7 @@ impl Default for SteadySolverSettings {
         SteadySolverSettings {
             max_iterations: Self::default_max_iterations(),
             damping_factor: Self::default_damping_factor(),
-            smoothing_length_ratio: Default::default(),
+            circulation_viscosity: Default::default(),
             convergence_test: Default::default(),
             print_log: Default::default(),
         }
@@ -150,6 +150,16 @@ pub fn solve_steady(
             &wake, 
             &circulation_strength
         );
+
+        if solver_settings.circulation_viscosity != 0.0 {
+            let circulation_strength_second_derivative = line_force_model.circulation_strength_second_derivative(
+                &circulation_strength
+            );
+
+            for i in 0..nr_ctrl_points {
+                circulation_strength[i] += solver_settings.circulation_viscosity * circulation_strength_second_derivative[i];
+            }
+        }
         
         let new_estimated_strength = line_force_model.circulation_strength(&velocity);
 

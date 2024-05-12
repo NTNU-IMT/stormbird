@@ -38,10 +38,15 @@ fn steady_lift() {
         ..Default::default()
     }.build();
 
-    let steady_settings  = SteadySettings::default();
-    let dynamic_settings = UnsteadySettings::default();
+    let steady_settings  = SteadySettings{
+        solver: SteadySolverSettings {
+            circulation_viscosity: 0.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
-    
+    let dynamic_settings = UnsteadySettings::default();
 
     let nr_time_steps = 200;
 
