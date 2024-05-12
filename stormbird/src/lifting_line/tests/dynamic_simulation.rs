@@ -34,24 +34,25 @@ fn right_sign_of_the_force_when_translating() {
         ..Default::default()
     }.build();
 
-    let mut sim = SimulationBuilder::new (
-        wing_builder,
-        SimulationMode::QuasiSteady(SteadySettings::default()),
-    ).build();
-
     let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
 
     let vel_magnitude = (freestream_velocity).length();
-    
-    let force_factor = 0.5 * aspect_ratio * vel_magnitude.powi(2) * sim.line_force_model.density;
 
     let time_step = 0.1;
     let period = 2.0;
     let frequency = 2.0 * PI / period;
 
-    let rotation = Vec3::default();
-
     let amplitude = 0.23;
+
+    let mut sim = SimulationBuilder::new (
+        wing_builder,
+        SimulationMode::QuasiSteady(SteadySettings::default()),
+    ).build(time_step, freestream_velocity);
+
+    let freestream_velocity_points = sim.get_freestream_velocity_points();
+    let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
+
+    let force_factor = 0.5 * aspect_ratio * vel_magnitude.powi(2) * sim.line_force_model.density;
 
     for i in 1..20 {
         
@@ -62,13 +63,9 @@ fn right_sign_of_the_force_when_translating() {
 
         let translation = Vec3::new(0.0, translation_y, 0.0);
 
-        let input_state = InputState {
-            freestream: Freestream::Constant(freestream_velocity),
-            translation,
-            rotation,
-        };
+        sim.line_force_model.translation = translation;
 
-        let result = sim.do_step(time, time_step, input_state);
+        let result = sim.do_step(time, time_step, &input_freestream_velocity);
     
         let cl = result.integrated_forces_sum().y / force_factor;
     
@@ -100,24 +97,26 @@ fn right_sign_of_the_moment_when_rotating() {
         ..Default::default()
     }.build();
 
-    let mut sim = SimulationBuilder::new (
-        wing_builder,
-        SimulationMode::QuasiSteady(
-            SteadySettings::default()
-        ),
-    ).build();
-
+    
     let freestream_velocity = Vec3::new(10.2, 0.0, 0.0);
 
     let period = 2.0;
     let nr_time_steps_per_period = 20;
     let time_step = period / nr_time_steps_per_period as f64;
 
+    let mut sim = SimulationBuilder::new (
+        wing_builder,
+        SimulationMode::QuasiSteady(
+            SteadySettings::default()
+        ),
+    ).build(time_step, freestream_velocity);
+
     let frequency = 2.0 * PI / period;
 
-    let translation = Vec3::default();
-
     let amplitude = 5.0_f64.to_radians();
+
+    let freestream_velocity_points = sim.get_freestream_velocity_points();
+    let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
 
     for i in 1..nr_time_steps_per_period {
         let time = (i as f64) * time_step;
@@ -130,13 +129,9 @@ fn right_sign_of_the_moment_when_rotating() {
 
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
-        let input_state = InputState {
-            freestream: Freestream::Constant(freestream_velocity),
-            translation,
-            rotation,
-        };
+        sim.line_force_model.rotation = rotation;
 
-        let result = sim.do_step(time, time_step, input_state);
+        let result = sim.do_step(time, time_step, &input_freestream_velocity);
         
         
         let moment_in_x = result.integrated_moments_sum().x;
@@ -188,12 +183,10 @@ fn rotational_velocity() {
         line_force_model.rotation = rotation;
 
         let motion_velocity = motion_calculator.ctrl_point_velocity(&line_force_model, time_step);
-
-        let freestream = Freestream::Constant(freestream_velocity);
         
         let ctrl_points = line_force_model.ctrl_points();
 
-        let mut ctrl_point_velocity_est = freestream.velocity_at_locations(&ctrl_points);
+        let mut ctrl_point_velocity_est = vec![freestream_velocity; ctrl_points.len()];
 
         for i in 0..line_force_model.nr_span_lines() {
             ctrl_point_velocity_est[i] -= motion_velocity[i];

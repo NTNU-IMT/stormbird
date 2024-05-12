@@ -29,12 +29,12 @@ fn moment_test() {
 
     let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
 
-    let freestream = Freestream::Constant(freestream_velocity);
+    let input_freestream_velocity = vec![freestream_velocity; line_force_model.nr_span_lines()];
 
     let result = steady_solvers::solve_steady(
         1.0, 
         &line_force_model,
-        &freestream,
+        &input_freestream_velocity,
         None,
         &solver_settings,
         &wake_builder,

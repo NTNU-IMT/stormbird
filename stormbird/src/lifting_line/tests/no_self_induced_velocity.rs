@@ -90,31 +90,28 @@ fn no_self_induced_velocity() {
         wake: UnsteadyWakeBuilder::new_rotor_sail(diameter),
         ..Default::default()
     };
-
-    let mut sim = SimulationBuilder::new(
-        line_force_model_builder,
-        SimulationMode::Dynamic(settings)
-    ).build();
-
+    
     let nr_time_steps = 100;
     let time_step = 0.5;
 
     let velocity = Vec3::new(velocity_mag, 0.0, 0.0);
 
+    let mut sim = SimulationBuilder::new(
+        line_force_model_builder,
+        SimulationMode::Dynamic(settings)
+    ).build(time_step, velocity);
+
     let force_factor = sim.line_force_model.total_force_factor(velocity.length());
 
-    let input_state = InputState {
-        freestream: Freestream::Constant(velocity),
-        translation: Vec3::default(),
-        rotation: Vec3::default(),
-    };
+    let freestream_velocity_points = sim.get_freestream_velocity_points();
+    let input_freestream_velocity = vec![velocity; freestream_velocity_points.len()];
 
     let mut result = SimulationResult::default();
 
     for i in 0..nr_time_steps {
         let time = (i as f64) * time_step;
         
-        result = sim.do_step(time, time_step, input_state);
+        result = sim.do_step(time, time_step, &input_freestream_velocity);
     }
 
     let cd = result.integrated_forces_sum().x / force_factor;
