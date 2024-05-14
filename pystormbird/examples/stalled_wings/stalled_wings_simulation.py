@@ -32,7 +32,7 @@ if __name__ == "__main__":
     chord_length = 9.8
     span = 37.0
 
-    nr_sections = 16
+    nr_sections = 32
     density = 1.225
 
     start_height = 10.0

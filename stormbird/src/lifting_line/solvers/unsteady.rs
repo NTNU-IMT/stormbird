@@ -6,10 +6,14 @@
 
 use serde::{Serialize, Deserialize};
 
+use super::SolverResult;
+
 use crate::vec3::Vec3;
 use crate::line_force_model::prelude::*;
 use crate::io_structs::prelude::*;
 use crate::lifting_line::wake_models::prelude::*;
+
+use super::calculate_felt_ctrl_points_freestream;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -44,34 +48,38 @@ pub fn solve_one_time_step(
     wake: &mut UnsteadyWake,
     solver_settings: &UnsteadySolverSettings,
     previous_circulation_strength: &[f64]
-) -> SimulationResult
+) -> SolverResult
 {   
     wake.synchronize_wing_geometry(&line_force_model);
     
     let ctrl_points = line_force_model.ctrl_points();
 
-    // Velocity components that are fixed for the entire time step
-    let u_motion_ctrl_point: Vec<Vec3> = derivatives.motion.ctrl_point_velocity(&line_force_model, time_step);
+    let felt_ctrl_points_freestream = calculate_felt_ctrl_points_freestream(
+        ctrl_points_freestream, 
+        time_step, 
+        Some(derivatives), 
+        line_force_model
+    );
 
     let u_i_free_wake: Vec<Vec3> = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 
-    let mut fixed_velocities: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
-
-    for i in 0..ctrl_points.len() {
-        fixed_velocities.push(
-            ctrl_points_freestream[i] - u_motion_ctrl_point[i] + u_i_free_wake[i]
-        );
-    }
+    let fixed_velocities: Vec<Vec3> = (0..ctrl_points.len()).map(|i| 
+        {
+            felt_ctrl_points_freestream[i] + u_i_free_wake[i]
+        }
+    ).collect();
 
     // Iterate to solver for the strength at the first panel
     let mut circulation_strength = previous_circulation_strength.to_vec();
 
+    let mut velocity = vec![Vec3::default(); ctrl_points.len()];
+
     for _ in 0..solver_settings.max_iterations_per_time_step {
         let update_to_velocity = wake.induced_velocities_from_first_panels(&ctrl_points, false);
-        
-        let velocity: Vec<Vec3> = fixed_velocities.iter()
-            .zip(update_to_velocity.iter())
-            .map(|(a, b)| *a + *b).collect();
+
+        for i in 0..ctrl_points.len() {
+            velocity[i] = fixed_velocities[i] + update_to_velocity[i];
+        }
 
         let new_circulation_strength = line_force_model.circulation_strength(&velocity);
 
@@ -84,49 +92,16 @@ pub fn solve_one_time_step(
         wake.update_wing_strength(&circulation_strength);
     }
 
-    // Calculate the final velocity based on the final circulation strength
-    let update_to_velocity = wake.induced_velocities_from_first_panels(&ctrl_points, false);
-        
-    let velocity: Vec<Vec3> = fixed_velocities.iter()
-        .zip(update_to_velocity.iter())
-        .map(|(a, b)| *a + *b).collect();
-
-    
-    let angles_of_attack = line_force_model.angles_of_attack(&velocity);
-
-    let acceleration = derivatives.flow.acceleration(&velocity, time_step);
-    let angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(&angles_of_attack, time_step);
-
-    let rotation_velocity = derivatives.motion.rotation_velocity(&line_force_model, time_step);
-
-    // Do post processing
-    let force_input = SectionalForcesInput {
-        circulation_strength,
-        velocity,
-        angles_of_attack,
-        acceleration,
-        angles_of_attack_derivative,
-        rotation_velocity
-    };
-
-    let sectional_forces   = line_force_model.sectional_forces(&force_input);
-
-    let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
-    let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
-
     wake.update_after_completed_time_step(
-        &force_input.circulation_strength, 
+        &circulation_strength, 
         time_step, 
         line_force_model, 
         ctrl_points_freestream, 
         wake_points_freestream
     );
-
-    SimulationResult {
-        ctrl_points,
-        force_input,
-        sectional_forces,
-        integrated_forces,
-        integrated_moments,
+    
+    SolverResult {
+        circulation_strength,
+        ctrl_point_velocity: velocity
     }
 }

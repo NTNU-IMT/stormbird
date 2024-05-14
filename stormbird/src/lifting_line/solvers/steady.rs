@@ -10,15 +10,15 @@ use crate::vec3::Vec3;
 use crate::line_force_model::prelude::*;
 
 use crate::lifting_line::wake_models::steady::{
-    SteadyWake,
     SteadyWakeBuilder
 };
 
 use crate::io_structs::prelude::*;
 
-use crate::section_models::SectionModel;
-
 use crate::line_force_model::solver_utils::ConvergenceTest;
+
+use super::SolverResult;
+use super::calculate_felt_ctrl_points_freestream;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,73 +52,6 @@ impl Default for SteadySolverSettings {
     }
 }
 
-/// Uses a line force model builder to construct multiple line force models with varying resolution. 
-/// The algorithm starts by solving a coarse model and then gradually increases the resolution until 
-/// a max value for the resolution is reached. The solution from the previous coarse model is used 
-/// as initial conditions for a new fine model. 
-/// 
-/// The reason this solver is implemented is based on two observations:
-/// 1) - coarse models seems to require fewer iterations than fine models
-/// 2) - coarse models seem to be more stable than fine models
-/// 
-/// The idea is inspired from multi grid solvers in CFD
-pub fn solve_steady_multiresolution(
-    time_step: f64,
-    line_force_model_builder: &LineForceModelBuilder, 
-    ctrl_points_freestream: &[Vec3],
-    derivatives: Option<&Derivatives>,
-    solver_settings: &SteadySolverSettings,
-    wake_builder: &SteadyWakeBuilder
-) -> SimulationResult {
-    let end_correction = match line_force_model_builder.wing_builders[0].section_model {
-        SectionModel::RotatingCylinder(_) => false,
-        _ => true
-    };
-
-    let mut nr_sections: Vec<usize> = Vec::new();
-    let mut current_nr_sections = line_force_model_builder.nr_sections;
-
-    while current_nr_sections > 1 {
-        nr_sections.push(current_nr_sections);
-
-        if current_nr_sections % 2 == 0 {
-            current_nr_sections /= 2;
-        } else {
-            current_nr_sections = (current_nr_sections + 1) / 2;
-        }
-    }
-
-    nr_sections.reverse();
-
-    let mut force_models: Vec<LineForceModel> = Vec::new();
-    let mut results: Vec<SimulationResult> = Vec::new();
-
-    for nr in nr_sections {
-        force_models.push(
-            line_force_model_builder.build_with_nr_sections(nr)
-        );
-    }
-
-    for i in 0..force_models.len() {
-        let initial_solution: Vec<f64> = if i==0 {
-            vec![0.0; force_models[i].nr_span_lines()]
-        } else {
-            force_models[i-1].map_strength_gaussian(
-                &results[i-1].force_input.circulation_strength, 
-                &force_models[i], 
-                (end_correction, end_correction), 
-                0.5
-            )
-        };
-
-        results.push(
-            solve_steady(time_step, &force_models[i], ctrl_points_freestream, derivatives, solver_settings, wake_builder, &initial_solution)
-        );
-    }
-
-    results.last().unwrap().clone()
-}
-
 pub fn solve_steady(
     time_step: f64,
     line_force_model: &LineForceModel, 
@@ -127,7 +60,7 @@ pub fn solve_steady(
     solver_settings: &SteadySolverSettings,
     wake_builder: &SteadyWakeBuilder,
     initial_solution: &[f64],
-) -> SimulationResult {
+) -> SolverResult {
     let nr_ctrl_points = line_force_model.nr_span_lines();    
 
     let wake = wake_builder.build(
@@ -136,32 +69,35 @@ pub fn solve_steady(
     );
     
     let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
+    let mut velocity = vec![Vec3::default(); nr_ctrl_points];
 
     let mut convergence_test = solver_settings.convergence_test.build();
 
-    let ctrl_points = line_force_model.ctrl_points();
+    let felt_ctrl_points_freestream = calculate_felt_ctrl_points_freestream(
+        ctrl_points_freestream,
+        time_step,
+        derivatives,
+        line_force_model,
+    );
 
     for iteration in 0..solver_settings.max_iterations {
-        let velocity = calculate_velocity(
-            time_step,
-            line_force_model,
-            ctrl_points_freestream,
-            derivatives,
-            &wake, 
-            &circulation_strength
-        );
+        let induced_velocities = wake.induced_velocities_at_control_points(&circulation_strength);
+
+        for i in 0..nr_ctrl_points {
+            velocity[i] = felt_ctrl_points_freestream[i] + induced_velocities[i];
+        }
+        
+        let mut new_estimated_strength = line_force_model.circulation_strength(&velocity);
 
         if solver_settings.circulation_viscosity != 0.0 {
             let circulation_strength_second_derivative = line_force_model.circulation_strength_second_derivative(
-                &circulation_strength
+                &new_estimated_strength
             );
 
             for i in 0..nr_ctrl_points {
-                circulation_strength[i] += solver_settings.circulation_viscosity * circulation_strength_second_derivative[i];
+                new_estimated_strength[i] += solver_settings.circulation_viscosity * circulation_strength_second_derivative[i];
             }
         }
-        
-        let new_estimated_strength = line_force_model.circulation_strength(&velocity);
 
         let strength_difference: Vec<f64> = new_estimated_strength
             .iter()
@@ -188,77 +124,8 @@ pub fn solve_steady(
 
     }
 
-    let velocity = calculate_velocity(
-        time_step,
-        line_force_model,
-        ctrl_points_freestream,
-        derivatives,
-        &wake, 
-        &circulation_strength
-    );
-
-    let angles_of_attack = line_force_model.angles_of_attack(&velocity);
-
-    let mut acceleration: Vec<Vec3> = vec![Vec3::default(); nr_ctrl_points];
-    let mut angles_of_attack_derivative: Vec<f64> = vec![0.0; nr_ctrl_points];
-    let mut rotation_velocity = Vec3::default();
-
-    if let Some(derivatives) = derivatives {
-        acceleration = derivatives.flow.acceleration(&velocity, time_step);
-        angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(&angles_of_attack, time_step);
-        rotation_velocity = derivatives.motion.rotation_velocity(line_force_model, time_step);
-    }
-
-    let force_input = SectionalForcesInput {
+    SolverResult {
         circulation_strength,
-        velocity,
-        angles_of_attack,
-        acceleration,
-        angles_of_attack_derivative,
-        rotation_velocity,
-    };
-
-    let sectional_forces = line_force_model.sectional_forces(&force_input);
-
-    let integrated_forces = sectional_forces.integrate_forces(&line_force_model);
-    let integrated_moments = sectional_forces.integrate_moments(&line_force_model);
-
-    SimulationResult {
-        ctrl_points,
-        force_input,
-        sectional_forces,
-        integrated_forces,
-        integrated_moments,
+        ctrl_point_velocity: velocity,
     }
-}
-
-/// Function that calculates the velocity at the control points of the wing.
-/// 
-/// Collected in a function as the same procedure is used multiple times in the solver.
-fn calculate_velocity(
-    time_step: f64,
-    line_force_model: &LineForceModel,
-    ctrl_points_freestream: &[Vec3],
-    derivatives: Option<&Derivatives>,
-    wake: &SteadyWake, 
-    circulation_strength: &[f64]
-) -> Vec<Vec3> {
-    let mut ctrl_point_velocities: Vec<Vec3> = ctrl_points_freestream.to_vec();
-
-    let motion_velocity = if let Some(derivatives) = derivatives {
-        derivatives.motion.ctrl_point_velocity(line_force_model, time_step)
-    } else {
-        vec![Vec3::default(); line_force_model.nr_span_lines()]
-    };
-
-    for i in 0..line_force_model.nr_span_lines() {
-        ctrl_point_velocities[i] -= motion_velocity[i];
-    }
-
-    let induced_velocities: Vec<Vec3> = wake.induced_velocities_at_control_points(circulation_strength);
-
-    ctrl_point_velocities.iter()
-        .zip(induced_velocities.iter())
-        .map(| (u_ctrl, u_i)| {*u_ctrl + *u_i})
-        .collect()
 }

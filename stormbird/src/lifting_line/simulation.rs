@@ -231,7 +231,7 @@ impl Simulation {
 
         let derivatives = self.derivatives.as_mut().unwrap();
 
-        let result = match &self.simulation_mode {
+        let solver_result = match &self.simulation_mode {
             SimulationMode::QuasiSteady(settings) => {
                 match &mut self.wake_model {
                     WakeModel::Unsteady(_) => {
@@ -291,6 +291,33 @@ impl Simulation {
                     }
                 }
             }
+        };
+
+        let angles_of_attack = self.line_force_model.angles_of_attack(&solver_result.ctrl_point_velocity);
+        let acceleration = derivatives.flow.acceleration(&solver_result.ctrl_point_velocity, time_step);
+        let angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(&angles_of_attack, time_step);
+        let rotation_velocity = derivatives.motion.rotation_velocity(&self.line_force_model, time_step);
+
+        let force_input = SectionalForcesInput {
+            circulation_strength: solver_result.circulation_strength.clone(),
+            velocity: solver_result.ctrl_point_velocity.clone(),
+            angles_of_attack,
+            acceleration,
+            angles_of_attack_derivative,
+            rotation_velocity
+        };
+
+        let ctrl_points = self.line_force_model.ctrl_points();
+        let sectional_forces   = self.line_force_model.sectional_forces(&force_input);
+        let integrated_forces = sectional_forces.integrate_forces(&self.line_force_model);
+        let integrated_moments = sectional_forces.integrate_moments(&self.line_force_model);
+
+        let result = SimulationResult {
+            ctrl_points,
+            force_input,
+            sectional_forces,
+            integrated_forces,
+            integrated_moments,
         };
 
         self.previous_circulation_strength = result.force_input.circulation_strength.clone();
