@@ -45,6 +45,12 @@ pub enum SimulationMode {
     Dynamic(UnsteadySettings),
 }
 
+#[derive(Debug, Clone)]
+pub enum WakeModel {
+    Steady(SteadyWake),
+    Unsteady(UnsteadyWake)
+}
+
 impl Default for SimulationMode {
     fn default() -> Self {
         SimulationMode::QuasiSteady(SteadySettings::default())
@@ -102,9 +108,9 @@ impl SimulationBuilder {
         let line_force_model = self.line_force_model.build();
         let nr_of_lines = line_force_model.nr_span_lines();
 
-        let unsteady_wake = match &self.simulation_mode {
+        let wake_model = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
-                Some(
+                WakeModel::Unsteady(
                     settings.wake.build(
                         initial_time_step,
                         &line_force_model,
@@ -112,7 +118,16 @@ impl SimulationBuilder {
                     )
                 )
             },
-            _ => None
+            SimulationMode::QuasiSteady(settings) => {
+                let ctrl_points_freestream = vec![wake_initial_velocity; nr_of_lines];
+
+                WakeModel::Steady(
+                    settings.wake.build(
+                        &line_force_model,
+                        &ctrl_points_freestream
+                    )
+                )
+            }
         };
 
         Simulation {
@@ -120,7 +135,7 @@ impl SimulationBuilder {
             simulation_mode: self.simulation_mode.clone(),
             derivatives: None,
             previous_circulation_strength: vec![0.0; nr_of_lines],
-            unsteady_wake,
+            wake_model,
             write_wake_data_to_file: self.write_wake_data_to_file,
             wake_files_folder_path: self.wake_files_folder_path.clone()
         }
@@ -134,7 +149,7 @@ pub struct Simulation {
     simulation_mode: SimulationMode,
     previous_circulation_strength: Vec<f64>,
     derivatives: Option<Derivatives>,
-    unsteady_wake: Option<UnsteadyWake>,
+    wake_model: WakeModel,
     write_wake_data_to_file: bool,
     wake_files_folder_path: String,
 }
@@ -161,10 +176,15 @@ impl Simulation {
             SimulationMode::Dynamic(_) => {
                 let mut points = self.line_force_model.ctrl_points();
 
-                let wake_points = &self.unsteady_wake.as_ref().unwrap().wake_points;
+                if let WakeModel::Unsteady(wake) = &self.wake_model {
 
-                for i in 0..wake_points.len() {
-                    points.push(wake_points[i]);
+                    let wake_points = &wake.wake_points;
+
+                    for i in 0..wake_points.len() {
+                        points.push(wake_points[i]);
+                    }
+                } else {
+                    panic!("The wake model is not of the unsteady type.");
                 }
 
                 points
@@ -172,6 +192,13 @@ impl Simulation {
         }
     }
 
+    /// Steps the simulation forward in time by one time step. 
+    /// 
+    /// # Arguments
+    /// - `time`: The current time of the simulation.
+    /// - `time_step`: The time step to use for the simulation.
+    /// - `freestream_velocity`: The freestream velocity at the points returned by 
+    /// `get_freestream_velocity_points`
     pub fn do_step(
         &mut self, 
         time: f64,
@@ -206,48 +233,63 @@ impl Simulation {
 
         let result = match &self.simulation_mode {
             SimulationMode::QuasiSteady(settings) => {
-                steady_solvers::solve_steady(
-                    time_step,
-                    &self.line_force_model, 
-                    &ctrl_points_freestream,
-                    Some(&derivatives),
-                    &settings.solver,
-                    &settings.wake, 
-                    &self.previous_circulation_strength
-                )
-            },
-            SimulationMode::Dynamic(settings) => {
-                let mut wake = self.unsteady_wake.as_mut().expect(
-                    "The dynamic wake must be initialized before calling do_step."
-                );
+                match &mut self.wake_model {
+                    WakeModel::Unsteady(_) => {
+                        panic!("The wake model is not of the steady type.");
+                    },
+                    WakeModel::Steady(wake) => {
+                        *wake = settings.wake.build(
+                            &self.line_force_model,
+                            &ctrl_points_freestream
+                        );
 
-                let result = unsteady_solvers::solve_one_time_step(
-                    time_step,
-                    &self.line_force_model,
-                    &ctrl_points_freestream,
-                    &wake_points_freestream.unwrap(),
-                    &derivatives,
-                    &mut wake,
-                    &settings.solver,
-                    &self.previous_circulation_strength
-                );
-
-                let time_step_index = (time / time_step) as usize;
-
-                if self.write_wake_data_to_file {
-                    let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
-
-                    let write_result = wake.write_wake_to_vtk_file(&wake_file_path);
-
-                    match write_result {
-                        Ok(_) => {},
-                        Err(e) => {
-                            println!("Error writing wake data to file: {}", e);
-                        }
+                        steady_solvers::solve_steady(
+                            time_step,
+                            &self.line_force_model, 
+                            &ctrl_points_freestream,
+                            Some(&derivatives),
+                            &settings.solver,
+                            &settings.wake, 
+                            &self.previous_circulation_strength
+                        )
                     }
                 }
-
-                result
+            },
+            SimulationMode::Dynamic(settings) => {
+                match &mut self.wake_model {
+                    WakeModel::Steady(_) => {
+                        panic!("The wake model is not of the unsteady type.");
+                    },
+                    WakeModel::Unsteady(wake) => {
+                        let result = unsteady_solvers::solve_one_time_step(
+                            time_step,
+                            &self.line_force_model,
+                            &ctrl_points_freestream,
+                            &wake_points_freestream.unwrap(),
+                            &derivatives,
+                            wake,
+                            &settings.solver,
+                            &self.previous_circulation_strength
+                        );
+    
+                        let time_step_index = (time / time_step) as usize;
+    
+                        if self.write_wake_data_to_file {
+                            let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
+    
+                            let write_result = wake.write_wake_to_vtk_file(&wake_file_path);
+    
+                            match write_result {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    println!("Error writing wake data to file: {}", e);
+                                }
+                            }
+                        }
+    
+                        result
+                    }
+                }
             }
         };
 
@@ -260,5 +302,16 @@ impl Simulation {
         );
 
         result
+    }
+
+    pub fn induced_velocities(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
+        match &self.wake_model {
+            WakeModel::Steady(wake) => {
+                wake.induced_velocities(&self.previous_circulation_strength, points)
+            },
+            WakeModel::Unsteady(wake) => {
+                wake.induced_velocities(points, off_body)
+            }
+        }
     }
 }

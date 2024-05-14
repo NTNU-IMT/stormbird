@@ -49,4 +49,9 @@ impl Vec3 {
             data: self.data.rotate(rotation.data)
         }
     }
+
+    #[getter]
+    pub fn length(&self) -> f64 {
+        self.data.length()
+    }
 }

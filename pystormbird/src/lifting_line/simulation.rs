@@ -83,4 +83,20 @@ impl Simulation {
             )
         }
     }
+
+    #[pyo3(signature=(
+        points,
+        off_body = true
+    ))]
+    pub fn induced_velocities(&self, points: Vec<Vec3>, off_body: bool) -> Vec<Vec3> {
+        let rust_points: Vec<Vec3Rust> = points.iter().map(
+            |v| v.data
+        ).collect();
+
+        let rust_induced_velocities = self.data.induced_velocities(&rust_points, off_body);
+
+        rust_induced_velocities.iter().map(
+            |v| Vec3::new(v.x, v.y, v.z)
+        ).collect()
+    }
 }

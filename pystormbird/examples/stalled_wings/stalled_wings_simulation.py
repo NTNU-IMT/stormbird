@@ -14,31 +14,20 @@ from pystormbird.lifting_line import Simulation
 from pystormbird import Vec3
 import json
 
-from foil_model import get_foil_dict
-from atmospheric_boundary_layer import AtmosphericBoundaryLayer
-
 import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation of a multiple two-element wings")
-    parser.add_argument("--flap-angle",      type=float, default = 5.0,  help="Flap angle in degrees")
-    parser.add_argument("--angle-of-attack", type=float, default = 0.0,  help="Angle of attack in degrees")
-    parser.add_argument("--wind-velocity",   type=float, default = 8.0,  help="Wind velocity in m/s")
-    parser.add_argument("--wind-direction",  type=float, default = 45.0, help="Wind direction in degrees")
-
-    parser.add_argument("--velocity-plane-height", type=float, default = 15.0, help="Height of the velocity plane")
-
+    parser.add_argument("--wind-velocity",    type=float, default = 8.2,  help="Flap angle in degrees")
+    parser.add_argument("--angle-of-attack",  type=float, default = 75.0,  help="Angle of attack in degrees")
+    parser.add_argument("--circulation-viscosity", type=float, default = 0.0,  help="Circulation viscosity")
+    parser.add_argument("--damping-factor",  type=float, default = 0.01,  help="Damping factor")
     parser.add_argument("--dynamic",          action="store_true", help="Use dynamic model")
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
-    parser.add_argument("--plot-velocity-plane", action="store_true", help="Plot velocity plane")
 
     args = parser.parse_args()
 
-    wind_model = AtmosphericBoundaryLayer(
-        ship_velocity           = 0.0,
-        reference_wind_velocity = args.wind_velocity,
-        wind_direction          = np.radians(args.wind_direction)
-    )
+    wind_velocity_vector = Vec3(args.wind_velocity, 0.0, 0.0)
 
     chord_length = 9.8
     span = 37.0
@@ -48,16 +37,10 @@ if __name__ == "__main__":
 
     start_height = 10.0
 
-    x_positions = np.array([-50.0, 50.0])
-    y_positions = np.array([-10, 10.0])
+    x_positions = np.array([0.0])
+    y_positions = np.array([0.0])
 
-    foil_dict = get_foil_dict(flap_angle=np.radians(args.flap_angle))
-
-    wings = []
-
-    chord_angle = np.radians(
-        args.wind_direction - args.angle_of_attack
-    )
+    chord_angle = np.radians(args.angle_of_attack)
 
     chord_vector = Vec3(
         chord_length * np.cos(chord_angle),
@@ -65,6 +48,7 @@ if __name__ == "__main__":
         0.0
     )
 
+    wings = []
     for i in range(len(x_positions)):
         wings.append(
             {
@@ -77,12 +61,10 @@ if __name__ == "__main__":
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
                 ],
                 "section_model": {
-                    "VaryingFoil": foil_dict
+                    "Foil": {}
                 }
             }
         )
-
-    
 
     line_force_model = {
         "wing_builders": wings,
@@ -104,6 +86,9 @@ if __name__ == "__main__":
                     "viscous_core_length_off_body": {
                         "Absolute": 0.25 * chord_length
                     }
+                },
+                "solver": {
+                    "circulation_viscosity": args.circulation_viscosity
                 }
             }
         }
@@ -117,7 +102,12 @@ if __name__ == "__main__":
 
     else:
         sim_settings = {
-            "QuasiSteady": {}
+            "QuasiSteady": {
+                "solver": {
+                    "damping_factor": args.damping_factor,
+                    "circulation_viscosity": args.circulation_viscosity
+                }
+            }
         }
 
         setup = {
@@ -137,9 +127,7 @@ if __name__ == "__main__":
     simulation = Simulation(
         setup_string = setup_string,
         initial_time_step = dt,
-        wake_initial_velocity = wind_model.get_velocity(
-            Vec3(0.0, 0.0, start_height + span/2)
-        )
+        wake_initial_velocity = wind_velocity_vector
     )
 
     '''
@@ -152,7 +140,7 @@ if __name__ == "__main__":
     freestream_velocity = []
     for point in freestream_velocity_points:
         freestream_velocity.append(
-            wind_model.get_velocity(point)
+            wind_velocity_vector
         )
 
     force_factor = 0.5 * chord_length * span * density * args.wind_velocity**2 * len(wings)
@@ -174,47 +162,17 @@ if __name__ == "__main__":
     print("Thrust factor:     ", -forces.x / force_factor)
     print("Side force factor: ", forces.y / force_factor)
 
-    '''
-    Optional plotting of the velocity at a given height.
+    ctrl_points = result.ctrl_points
 
-    This is mostly shown to illustrate how induced velocities can be extracted at custom points from
-    the simulation.
-    '''
+    z_coords = []
+    for point in ctrl_points:
+        z_coords.append(point.z)
 
-    if args.plot_velocity_plane:
-        n_plot = 200
-        x = np.linspace(-60, 60, n_plot)
-        y = np.linspace(-30, 30, n_plot)
+    for i in range(len(wings)):
+        plt.plot(
+            z_coords[i * nr_sections: (i + 1) * nr_sections], 
+            result.circulation_strength[i * nr_sections: (i + 1) * nr_sections]
+        )
 
-        xx, yy = np.meshgrid(x, y)
-
-        velocity_plane_points = []
-
-        for i in range(len(xx)):
-            for j in range(len(yy)):
-                velocity_plane_points.append(
-                    Vec3(xx[i][j], yy[i][j], args.velocity_plane_height)
-                )
-
-        induced_velocity_at_plane = simulation.induced_velocities(velocity_plane_points)
-
-        induced_velocity_magnitude = np.zeros((len(xx), len(yy)))
-
-        index = 0
-
-        for i in range(len(xx)):
-            for j in range(len(yy)):
-                induced_velocity_magnitude[i][j] = induced_velocity_at_plane[index].length
-                    
-                index += 1
-
-        levels = np.linspace(0, 0.1 * args.wind_velocity, 100)
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
-        plt.contourf(xx, yy, induced_velocity_magnitude, levels=levels, cmap="viridis")
-        plt.colorbar()
-
-        plt.scatter(x_positions, y_positions, color="white")
-        plt.show()
+    plt.show()
     
