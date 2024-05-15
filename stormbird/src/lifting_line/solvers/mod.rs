@@ -64,8 +64,16 @@ pub fn solve_time_step(
             );
 
             for i in 0..ctrl_points.len() {
-                new_estimated_strength[i] += solver_settings.circulation_viscosity * circulation_strength_second_derivative[i];
+                let viscosity_term = solver_settings.circulation_viscosity * circulation_strength_second_derivative[i];
+                
+                new_estimated_strength[i] += viscosity_term;
             }
+        }
+
+        if let Some(smoothing_length) = solver_settings.gaussian_smoothing_length {
+            new_estimated_strength = line_force_model.gaussian_smoothed_strength(
+                &new_estimated_strength, smoothing_length
+            );
         }
 
         let strength_difference: Vec<f64> = (0..ctrl_points.len()).map(|i| {

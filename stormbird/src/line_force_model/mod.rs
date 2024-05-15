@@ -490,6 +490,19 @@ impl LineForceModel {
         total_area
     }
 
+    /// returns the span length of each wing in the model
+    pub fn wing_span_lengths(&self) -> Vec<f64> {
+        let mut span_length = vec![0.0; self.nr_wings()];
+
+        for i in 0..self.nr_span_lines() {
+            let wing_index = self.wing_index_from_global(i);
+
+            span_length[wing_index] += self.span_lines_local[i].length();
+        }
+
+        span_length
+    }
+
     /// Shorthand for quickly calculating the typical force factor used when presenting 
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)
     pub fn total_force_factor(&self, freestream_velocity: f64) -> f64 {

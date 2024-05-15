@@ -21,7 +21,9 @@ if __name__ == "__main__":
     parser.add_argument("--wind-velocity",    type=float, default = 8.2,  help="Flap angle in degrees")
     parser.add_argument("--angle-of-attack",  type=float, default = 75.0,  help="Angle of attack in degrees")
     parser.add_argument("--circulation-viscosity", type=float, default = 0.0,  help="Circulation viscosity")
+    parser.add_argument("--gaussian-smoothing-length", type=float, default = 0.0,  help="Gaussian smoothing length")
     parser.add_argument("--damping-factor",  type=float, default = 0.01,  help="Damping factor")
+    parser.add_argument("--nr-sections",  type=int, default = 32,  help="Nr sections per wing")
     parser.add_argument("--dynamic",          action="store_true", help="Use dynamic model")
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
@@ -32,7 +34,6 @@ if __name__ == "__main__":
     chord_length = 9.8
     span = 37.0
 
-    nr_sections = 32
     density = 1.225
 
     start_height = 10.0
@@ -68,9 +69,17 @@ if __name__ == "__main__":
 
     line_force_model = {
         "wing_builders": wings,
-        "nr_sections": nr_sections,
+        "nr_sections": args.nr_sections,
         "density": density
     }
+
+    solver_settings = {
+        "damping_factor": args.damping_factor,
+        "circulation_viscosity": args.circulation_viscosity,
+    }
+
+    if args.gaussian_smoothing_length > 0.0:
+        solver_settings["gaussian_smoothing_length"] = args.gaussian_smoothing_length
 
     if args.dynamic:
         '''
@@ -87,9 +96,7 @@ if __name__ == "__main__":
                         "Absolute": 0.25 * chord_length
                     }
                 },
-                "solver": {
-                    "circulation_viscosity": args.circulation_viscosity
-                }
+                "solver": solver_settings
             }
         }
 
@@ -103,10 +110,7 @@ if __name__ == "__main__":
     else:
         sim_settings = {
             "QuasiSteady": {
-                "solver": {
-                    "damping_factor": args.damping_factor,
-                    "circulation_viscosity": args.circulation_viscosity
-                }
+                "solver": solver_settings
             }
         }
 
@@ -170,8 +174,8 @@ if __name__ == "__main__":
 
     for i in range(len(wings)):
         plt.plot(
-            z_coords[i * nr_sections: (i + 1) * nr_sections], 
-            result.circulation_strength[i * nr_sections: (i + 1) * nr_sections]
+            z_coords[i * args.nr_sections: (i + 1) * args.nr_sections], 
+            result.circulation_strength[i * args.nr_sections: (i + 1) * args.nr_sections]
         )
 
     plt.show()

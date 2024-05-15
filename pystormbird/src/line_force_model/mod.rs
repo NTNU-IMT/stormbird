@@ -23,11 +23,6 @@ impl LineForceModel {
     pub fn ctrl_points(&self) -> Vec<Vec3> {
         self.data.ctrl_points().iter().map(|v| Vec3::from(v.clone())).collect()
     }
-
-    #[pyo3(signature = (self_strength, target_model, end_correction = (false, false), gaussian_length_factor = 0.5))]
-    pub fn map_strength_gaussian(&self, self_strength: Vec<f64>, target_model: &LineForceModel, end_correction: (bool, bool), gaussian_length_factor: f64) -> Vec<f64> {
-        self.data.map_strength_gaussian(&self_strength, &target_model.data, end_correction, gaussian_length_factor)
-    }
 }
 
 #[pymodule]
