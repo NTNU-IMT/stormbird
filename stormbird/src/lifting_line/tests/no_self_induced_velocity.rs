@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation::{ 
+use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
     SimulationMode,
     UnsteadySettings,

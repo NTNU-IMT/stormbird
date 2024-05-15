@@ -22,11 +22,6 @@ impl Derivatives {
             flow: FlowDerivatives::new(initial_velocity, initial_angles),
         }
     }
-
-    pub fn update(&mut self, line_force_model: &LineForceModel, current_velocity: &[Vec3], current_angles: &[f64]) {
-        self.motion.update(line_force_model);
-        self.flow.update(current_velocity, current_angles);
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -95,16 +90,14 @@ impl MotionDerivatives {
         )
     }
 
-    pub fn update(&mut self, line_force_model: &LineForceModel) {
-        let current_ctrl_points = line_force_model.ctrl_points();
-
-        for i in 0..line_force_model.nr_span_lines() {
+    pub fn update(&mut self, current_ctrl_points: &[Vec3], current_rotation: Vec3) {
+        for i in 0..current_ctrl_points.len() {
             self.ctrl_points_history[0][i] = self.ctrl_points_history[1][i];
             self.ctrl_points_history[1][i] = current_ctrl_points[i];
         }
 
         self.rotation_history[0] = self.rotation_history[1];
-        self.rotation_history[1] = line_force_model.rotation;
+        self.rotation_history[1] = current_rotation;
 
         self.update_count += 1;
     }

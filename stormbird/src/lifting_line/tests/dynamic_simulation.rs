@@ -7,7 +7,7 @@
 use std::f64::consts::PI;
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation::{ 
+use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
     SimulationMode,
     SteadySettings,
@@ -205,7 +205,7 @@ fn rotational_velocity() {
                 assert!(error < 0.06, "Error in rotational velocity estimation at ctrl point {} = {}", i, error);
             }
         }
-
-        motion_calculator.update(&line_force_model);
+    
+        motion_calculator.update(&ctrl_points, line_force_model.rotation);
     }
 }

@@ -11,8 +11,8 @@
 pub mod wake_models;
 pub mod solvers;
 pub mod singularity_elements;
+pub mod simulation_builder;
 pub mod simulation;
-pub mod velocity_input;
 
 /// Typical imports when using the lifting line functionality
 pub mod prelude {
@@ -23,9 +23,8 @@ pub mod prelude {
 
     pub use super::singularity_elements::prelude::*;
 
-    pub use super::solvers::steady as steady_solvers;
-    pub use super::solvers::unsteady as unsteady_solvers;
-    pub use super::solvers::solver_settings::*;
+    pub use super::solvers::solve_time_step;
+    pub use super::solvers::settings::*;
     
     pub use crate::line_force_model::span_line::SpanLine;
     pub use crate::line_force_model::LineForceModel;
@@ -39,7 +38,6 @@ pub mod prelude {
         foil::Foil,
         rotating_cylinder::RotatingCylinder,
     };
-    pub use crate::empirical_models::viscous_wakes::ViscousWakes;
 }
 
 #[cfg(test)]

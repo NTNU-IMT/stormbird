@@ -9,7 +9,7 @@
 //! 2) Modify the results when the prediction from the simplified models are too inaccurate.
 
 /// Models of viscous wakes due to flow separation.
-pub mod viscous_wakes;
+// pub mod viscous_wakes;
 
 /// Correction factors that can be applied to a calculated circulation distribution.
 pub mod tip_loss_factors;

@@ -7,12 +7,12 @@
 use std::f64::consts::PI;
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation::{ 
+use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationMode,
     SteadySettings,
     UnsteadySettings,
-}; 
+};
 
 use super::test_setup::RectangularWing;
 use super::elliptic_wing_theory::EllipticWingTheory;

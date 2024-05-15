@@ -13,6 +13,13 @@ use super::forces_and_moments::{
     SectionalForcesInput
 };
 
+#[derive(Debug, Clone)]
+/// Results from a lifting line solver, which will be further used to generate SimulationResults
+pub struct SolverResult {
+    pub circulation_strength: Vec<f64>,
+    pub ctrl_point_velocity: Vec<Vec3>,
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {

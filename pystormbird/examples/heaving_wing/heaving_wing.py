@@ -114,16 +114,24 @@ if __name__ == "__main__":
         "nr_sections": nr_sections,
     }
 
+    solver_settings = {
+        "max_iterations_per_time_step": 300,
+        "print_log": True
+    }
+
     sim_settings_list = [
         {
             "Dynamic": {
+                "solver": solver_settings,
                 "wake": {
                     "ratio_of_wake_affected_by_induced_velocities": 0.0
                 }
             }
         },
         {
-            "QuasiSteady": {}
+            "QuasiSteady": {
+                "solver": solver_settings,
+            }
         }
     ]
 

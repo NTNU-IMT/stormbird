@@ -5,7 +5,7 @@
 //! Tests for the static simulation capabilities of the lifting line module
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation::{
+use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationMode,
     SteadySettings
