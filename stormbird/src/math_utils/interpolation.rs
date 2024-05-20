@@ -19,6 +19,8 @@ where T:
     std::ops::Sub<T, Output = T> + 
     Copy
 {
+    assert_eq!(x_data.len(), y_data.len(), "x_data and y_data must have the same length");
+    
     match x_data.len() {
         0 => panic!("x_data is empty"),
         1 => y_data[0],
