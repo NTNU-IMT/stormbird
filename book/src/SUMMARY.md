@@ -18,4 +18,5 @@
     - [Solver settings](./lifting_line/solver_settings.md)
     - [Wake builders](./lifting_line/wake_builders.md)
     - [Velocity input](./lifting_line/velocity_input.md)
-- [Tutorials](./tutorials.md)
+- [Tutorials](./tutorials/tutorials.md)
+    - [Rotor sail](./tutorials/rotor_sail.md)

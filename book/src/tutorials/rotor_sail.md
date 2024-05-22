@@ -1,0 +1,24 @@
+# Rotor sail
+
+Rotor sails are special in several ways, relative to other lifting surfaces, which pose challenges from a simplified modelling perspective. 
+
+The First challenge is that they tend to operate with extremely high lift coefficients. As a consequence, the lift-induced velocities in the proximity of a rotor sail is much stronger than for a conventional wing, such as a wing sail. This can sometimes cause numerical instabilities, for instance when integrating the shape of a dynamic wake. In addition, the shape of the wake tend to affect the lift-induced velocities more than for a conventional wing, which has consequences for quasi-static modelling.
+
+The second challenge is that both the lift and drag is usually affected by strong viscous effects. A stationary circular cylinder will have massive amounts of flow separation in its wake, which causes high drag forces. The amount of flow separation will decrease if the cylinder starts to rotate, but even at practical spin ratios, there can be strong viscous effects on the wake. This is different from wing sails, where viscous effects only play a major role when the sails are operated close to or above stall. This can both create instabilities and require more empirical modelling than a conventional wing.
+
+Third, a rotor sail will often use geometrical structures intended to disrupt the lift-induced flow from the rotors, which are not directly captured by a lifting line model. This can for instance be end disks or specially designed foundations. It is important to accurately capture the effect of these structures, and modelling them will require some amount of empirical correction.
+
+This section intends to give guidelines on how to deal with these challenges when modelling a rotor sail in Stormbird.
+
+## What is the point?
+In later sections, there will be given instructions on how to apply *stabilizing tricks* in the simulation setup, and how to use empirical corrections to capture physical effects not directly modelled by the lifting line model. When reading this, you might wonder, what is the point of running lifting line simulations of a rotor sail, if so many corrections are needed? Would it not be easier to just use a pure empirical model for early stage analysis, and then do CFD simulations at later stages?
+
+It is true that a lifting line model *alone* is less physical accurate for rotor sails than for other sail types, and the best practice for rotor sail simulations is essentially to use a combination of lifting line simulations and external data from either experiments or CFD simulations. That is, if the goal is to model a single rotor, standing on a simple flat surface, a lifting line simulation might not be the right tool. Since the model must be tuned using high-fidelity data it might be easier to just use the tuning data directly, for instance with a simple interpolation method. However, this is a **simplified case**.  
+
+A lifting line simulation of a rotor sail is seen as useful when modelling of more advanced situations is required. In many ways, the point is primarily to be able to use and correct the high-fidelity data in **situations not directly tested in CFD or experiments**. This can be exemplified in two ways:
+
+## Best practices
+
+## Model setup
+
+## Empirical data sources
