@@ -547,7 +547,11 @@ impl LineForceModel {
 
     /// Maps the values at the control points to the values at the span points using linear 
     /// interpolation.
-    pub fn span_point_values_from_ctrl_point_values<T>(&self, ctrl_point_values: &[T], extrapolate_ends: bool) -> Vec<T> 
+    pub fn span_point_values_from_ctrl_point_values<T>(
+        &self, 
+        ctrl_point_values: &[T], 
+        extrapolate_ends: bool
+    ) -> Vec<T> 
     where T: 
         std::ops::Add<T, Output = T> + 
         std::ops::Sub<T, Output = T> +

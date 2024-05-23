@@ -127,7 +127,7 @@ impl Foil {
 
         let cl_post_stall = self.cl_max_after_stall * (2.0 * stall_angle).sin();
 
-        self.combine_pre_and_post_stall(angle_of_attack.abs(), cl_pre_stall, cl_post_stall)
+        self.combine_pre_and_post_stall(angle_of_attack, cl_pre_stall, cl_post_stall)
     }
 
     /// Calculates the drag coefficient for a given angle of attack.
@@ -140,7 +140,7 @@ impl Foil {
         let cd_pre_stall  = self.cd_zero_angle + self.cd_second_order_factor * angle_of_attack.powi(2);
         let cd_post_stall = self.cd_max_after_stall * stall_angle.sin().abs().powf(self.cd_power_after_stall);
 
-        self.combine_pre_and_post_stall(angle_of_attack.abs(), cd_pre_stall, cd_post_stall)
+        self.combine_pre_and_post_stall(angle_of_attack, cd_pre_stall, cd_post_stall)
     }
 
     /// Calculates the added mass force in the direction of the heave motion of the foil.
@@ -152,12 +152,17 @@ impl Foil {
         self.added_mass_factor * heave_acceleration
     }
 
-    fn combine_pre_and_post_stall(&self, angle_of_attack: f64, pre_stall: f64, post_stall: f64) -> f64 {
-        let amount_of_stall = common_functions::sigmoid_function(
-            angle_of_attack, 
+    /// Calculates the amount of stall for a given angle of attack.
+    pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
+        common_functions::sigmoid_function(
+            angle_of_attack.abs(), 
             self.mean_stall_angle, 
             self.stall_range
-        );
+        )
+    }
+
+    fn combine_pre_and_post_stall(&self, angle_of_attack: f64, pre_stall: f64, post_stall: f64) -> f64 {
+        let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
         pre_stall * (1.0 - amount_of_stall) + amount_of_stall * post_stall
     }

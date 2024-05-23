@@ -74,10 +74,10 @@ fn no_self_induced_velocity() {
                     spin_ratio_data: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
                     cd_data: vec![0.554, 0.674, 1.497, 2.877, 3.556, 3.816],
                     cl_data: vec![0.0, 1.889, 4.638, 6.794, 7.680, 7.950],
-                    wake_angle_data: vec![
+                    wake_angle_data: Some(vec![
                         0.0, 20.0_f64.to_radians(), 25.0_f64.to_radians(), 
                         35.0_f64.to_radians(), 45.0_f64.to_radians(), 60.0_f64.to_radians()
-                    ],
+                    ]),
                     ..Default::default()
                 }
             ),
@@ -86,8 +86,14 @@ fn no_self_induced_velocity() {
         line_force_model_builder.add_wing(wing_builder);
     }
 
+    let wake = UnsteadyWakeBuilder {
+        neglect_self_induced_velocities: true,
+        viscous_core_length_off_body: Some(ViscousCoreLength::Absolute(0.5 * diameter)),
+        ..Default::default()
+    };
+
     let settings = UnsteadySettings{
-        wake: UnsteadyWakeBuilder::new_rotor_sail(diameter),
+        wake,
         ..Default::default()
     };
     

@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--wind-velocity",    type=float, default = 8.2,  help="Flap angle in degrees")
     parser.add_argument("--angle-of-attack",  type=float, default = 75.0,  help="Angle of attack in degrees")
     parser.add_argument("--circulation-viscosity", type=float, default = 0.0,  help="Circulation viscosity")
-    parser.add_argument("--gaussian-smoothing-length", type=float, default = 0.0,  help="Gaussian smoothing length")
+    parser.add_argument("--gaussian-smoothing-length", type=float, default = 0.05,  help="Gaussian smoothing length")
     parser.add_argument("--damping-factor",  type=float, default = 0.01,  help="Damping factor")
     parser.add_argument("--nr-sections",  type=int, default = 32,  help="Nr sections per wing")
     parser.add_argument("--dynamic",          action="store_true", help="Use dynamic model")

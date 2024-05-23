@@ -24,29 +24,6 @@ use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilde
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Enum to choose how to treat the first panel in the wake. 
-/// # Variants
-/// * `ChordFixed` - The first panel has the same orientation as the chord vector at the given span
-/// line
-/// * `VelocityFixed` - The first panel has the same orientation as the velocity at the given span
-/// ctrl point
-///
-/// # Data
-/// The `f64` value connected to each variant specifies how far downstream the first panel should be,
-/// relative to the chord length of the span line.
-pub enum FirstPanelBehavior {
-    ChordFixed(f64),
-    VelocityFixed(f64)
-}
-
-impl Default for FirstPanelBehavior {
-    fn default() -> Self {
-        Self::ChordFixed(0.75)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 /// Enum to choose how to set the length of the wake. 
 /// 
 /// # Variants
@@ -95,9 +72,9 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
     pub viscous_core_length: ViscousCoreLength,
-    #[serde(default)]
+    #[serde(default="UnsteadyWakeBuilder::default_first_panel_relative_length")]
     /// How the first panel in the wake is treated
-    pub first_panel_behavior: FirstPanelBehavior,
+    pub first_panel_relative_length: f64,
     #[serde(default="UnsteadyWakeBuilder::default_strength_damping_last_panel_ratio")]
     /// Determines the damping factor for the wake strength. Specifies how much damping there should
     /// be on the last panel. The actual damping factor also depends on the number of wake panels.
@@ -136,16 +113,7 @@ pub struct UnsteadyWakeBuilder {
 
 impl UnsteadyWakeBuilder {
     fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
-
-    /// Short hand for loading default settings for a rotor sail
-    pub fn new_rotor_sail(diameter: f64) -> Self {
-        Self {
-            first_panel_behavior: FirstPanelBehavior::VelocityFixed(1.0),
-            neglect_self_induced_velocities: true,
-            viscous_core_length_off_body: Some(ViscousCoreLength::Absolute(0.5 * diameter)),
-            ..Default::default()
-        }
-    }
+    fn default_first_panel_relative_length() -> f64 {0.75}
 
     pub fn build(
         &self,
@@ -186,12 +154,6 @@ impl UnsteadyWakeBuilder {
             nr_wake_points_per_line_element * nr_wake_points_along_span
         );
 
-        // Initialize wake points
-        let first_panel_ratio = match self.first_panel_behavior {
-            FirstPanelBehavior::ChordFixed(ratio) => ratio,
-            FirstPanelBehavior::VelocityFixed(ratio) => ratio,
-        };
-
         let wake_building_velocity = if initial_velocity.length() == 0.0 {
             Vec3::new(1e-6, 1e-6, 1e-6)
         } else {
@@ -207,7 +169,7 @@ impl UnsteadyWakeBuilder {
                 } else {
                     wake_points.push(
                         start_point + 
-                        first_panel_ratio * span_points_chord_vectors[i_span] +
+                        self.first_panel_relative_length * span_points_chord_vectors[i_span] +
                         ((i_stream-1) as f64) * time_step * wake_building_velocity
                     );
                 }
@@ -223,7 +185,7 @@ impl UnsteadyWakeBuilder {
         let strength_damping_factor =self.strength_damping_factor(nr_wake_panels_per_line_element);
 
         let settings = UnsteadyWakeSettings {
-            first_panel_behavior: self.first_panel_behavior.clone(),
+            first_panel_relative_length: self.first_panel_relative_length,
             strength_damping_factor,
             nr_wake_points_along_span,
             nr_wake_panels_along_span,
@@ -279,7 +241,7 @@ impl Default for UnsteadyWakeBuilder {
         Self {
             wake_length: Default::default(),
             viscous_core_length: Default::default(),
-            first_panel_behavior: Default::default(),
+            first_panel_relative_length: Self::default_first_panel_relative_length(),
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: None,
@@ -295,7 +257,7 @@ impl Default for UnsteadyWakeBuilder {
 #[derive(Debug, Clone)]
 /// Settings for the unsteady wake
 pub struct UnsteadyWakeSettings {
-    pub first_panel_behavior: FirstPanelBehavior,
+    pub first_panel_relative_length: f64,
     pub strength_damping_factor: f64,
     pub nr_wake_points_along_span: usize,
     pub nr_wake_panels_along_span: usize,
@@ -544,62 +506,87 @@ impl UnsteadyWake {
     }
 
     /// Moves the first wake points after the wing geometry itself.
-    fn move_first_free_wake_points(&mut self, line_force_model: &LineForceModel, ctrl_points_freestream: &[Vec3]) {                
-        let span_lines = line_force_model.span_lines();
-        
-        let chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
-            &line_force_model.chord_vectors(), true
+    /// 
+    /// How the points are moved depends on both the sectional force model for each wing and - in 
+    /// some cases - the angle of attack on each line force model.
+    fn move_first_free_wake_points(
+        &mut self, 
+        line_force_model: &LineForceModel, 
+        ctrl_points_freestream: &[Vec3]
+    ) {                
+        assert!(
+            line_force_model.nr_span_lines() == self.settings.nr_wake_panels_along_span, 
+            "Number of span lines in line force model does not match number of wake points in wake model"
         );
         
-        match self.settings.first_panel_behavior {
-            FirstPanelBehavior::ChordFixed(chord_ratio) => {
-                for i in 0..self.settings.nr_wake_points_along_span {
-                    self.wake_points[i + self.settings.nr_wake_points_along_span] = self.wake_points[i] + chord_ratio * chord_vectors[i];
-                }
-            },
-            FirstPanelBehavior::VelocityFixed(chord_ratio) => {
-                let ctrl_points = line_force_model.ctrl_points();
+        // Extract relevant information from the line force model
+        let span_lines = line_force_model.span_lines();
+        let chord_vectors = line_force_model.chord_vectors();
+        let ctrl_points = line_force_model.ctrl_points();
 
-                let u_i: Vec<Vec3>   = self.induced_velocities(&ctrl_points, true);
+        // Compute the induced velocities at the control points
+        let u_i: Vec<Vec3> = self.induced_velocities(&ctrl_points, true);
 
-                let mut ctrl_points_velocity: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
+        let mut ctrl_points_velocity: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
 
-                for i in 0..ctrl_points.len() {
-                    ctrl_points_velocity.push(ctrl_points_freestream[i] + u_i[i]);
-                }
+        for i in 0..ctrl_points.len() {
+            ctrl_points_velocity.push(ctrl_points_freestream[i] + u_i[i]);
+        }
 
-                ctrl_points_velocity = line_force_model.remove_span_velocity(&ctrl_points_velocity);
+        ctrl_points_velocity = line_force_model.remove_span_velocity(&ctrl_points_velocity);
 
-                let wake_angles = line_force_model.wake_angles(&ctrl_points_velocity);
+        let angles_of_attack = line_force_model.angles_of_attack(&ctrl_points_velocity);
 
-                let mut ctrl_point_directions: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
+        let wake_angles     = line_force_model.wake_angles(&ctrl_points_velocity);
 
-                for i in 0..line_force_model.nr_span_lines() {
-                    let axis = span_lines[i].relative_vector().normalize();
+        // Compute a change vector based on ctrl point data
+        let mut ctrl_points_change_vector: Vec<Vec3> = Vec::with_capacity(
+            self.settings.nr_wake_panels_along_span
+        );
 
-                    ctrl_point_directions.push(
-                        ctrl_points_velocity[i].normalize().rotate_around_axis(wake_angles[i], axis)
-                    );
-                }
+        for i in 0..self.settings.nr_wake_panels_along_span {
+            let wing_index = line_force_model.wing_index_from_global(i);
 
-                let span_points_directions = line_force_model.span_point_values_from_ctrl_point_values(
-                    &ctrl_point_directions,
-                    true
-                );
+            let amount_of_flow_separation = line_force_model
+                .section_models[wing_index]
+                .amount_of_flow_separation(angles_of_attack[i]);
+            
+            // Little flow separation means that the ctrl point should move in the direction of the
+            // chord vector. Large flow separation means that the ctrl point should move in the
+            // direction of the velocity vector, but with an optional rotation around the axis of
+            // the span line.
+            let wake_direction = if amount_of_flow_separation.abs() < 0.5 {
+                chord_vectors[i].normalize()
+            } else {
+                let axis = span_lines[i].relative_vector().normalize();
 
-                let old_start_index = self.settings.nr_wake_points_along_span;
-                let old_end_index   = 2 * self.settings.nr_wake_points_along_span;
-                let old_wake_points = self.wake_points[old_start_index..old_end_index].to_vec();
+                ctrl_points_velocity[i]
+                    .normalize()
+                    .rotate_around_axis(wake_angles[i], axis)
+            };
 
-                for i in 0..self.settings.nr_wake_points_along_span {
-                    let change_vector = chord_ratio * chord_vectors[i].length() * span_points_directions[i];
-                    let estimated_new_wake_point = self.wake_points[i] + change_vector;
-                        
-                    self.wake_points[i + self.settings.nr_wake_points_along_span] = 
-                        old_wake_points[i] * self.settings.shape_damping_factor + 
-                        estimated_new_wake_point * (1.0 - self.settings.shape_damping_factor);
-                }
-            }
+            ctrl_points_change_vector.push(
+                self.settings.first_panel_relative_length * chord_vectors[i].length() * wake_direction
+            );
+        }
+
+        // Transfer ctrl point data to span lines
+        let span_points_change_vector = line_force_model.span_point_values_from_ctrl_point_values(
+            &ctrl_points_change_vector, true
+        );
+
+        // Update the wake points
+        let old_start_index = self.settings.nr_wake_points_along_span;
+        let old_end_index   = 2 * self.settings.nr_wake_points_along_span;
+
+        let old_wake_points = self.wake_points[old_start_index..old_end_index].to_vec();
+
+        for i in 0..self.settings.nr_wake_points_along_span {
+            let estimated_new_wake_point = self.wake_points[i] + span_points_change_vector[i];
+            
+            self.wake_points[i + self.settings.nr_wake_points_along_span] = 
+                old_wake_points[i] * self.settings.shape_damping_factor + 
+                estimated_new_wake_point * (1.0 - self.settings.shape_damping_factor);
         }
     }
 

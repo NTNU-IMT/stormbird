@@ -18,15 +18,12 @@ import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation of a multiple two-element wings")
-    
-    parser.add_argument("--wind-velocity",             type=float, default = 8.2,  help="Flap angle in degrees")
-    parser.add_argument("--start-height",              type=float, default = 10.0, help="Start height")
-    parser.add_argument("--spin-ratio",                type=float, default = 2.0,  help="Spin ratio")
-    parser.add_argument("--circulation-viscosity",     type=float, default = 0.0,  help="Circulation viscosity")
-    parser.add_argument("--gaussian-smoothing-length", type=float, default = 0.0,  help="Gaussian smoothing length")
-    parser.add_argument("--damping-factor",            type=float, default = 0.01, help="Damping factor")
-    parser.add_argument("--max-induced-velocity-ratio", type=float, default = 1.0,  help="Max induced velocity ratio")
-    parser.add_argument("--nr-sections",               type=int, default = 32,  help="Nr sections per wing")
+    parser.add_argument("--wind-velocity",    type=float, default = 8.2,  help="Flap angle in degrees")
+    parser.add_argument("--rotational-velocity", type=float, default = 10.0,  help="Rotational velocity in deg/s")
+    parser.add_argument("--circulation-viscosity", type=float, default = 0.0,  help="Circulation viscosity")
+    parser.add_argument("--gaussian-smoothing-length", type=float, default = 0.1,  help="Gaussian smoothing length")
+    parser.add_argument("--damping-factor",  type=float, default = 0.01,  help="Damping factor")
+    parser.add_argument("--nr-sections",  type=int, default = 32,  help="Nr sections per wing")
 
     parser.add_argument("--dynamic",          action="store_true", help="Use dynamic model")
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
@@ -35,43 +32,38 @@ if __name__ == "__main__":
 
     wind_velocity_vector = Vec3(args.wind_velocity, 0.0, 0.0)
 
-    diameter = 5.0
-    span = 35.0
+    chord_length = 9.8
+    span = 37.0
 
     density = 1.225
+
+    start_height = 10.0
 
     x_positions = np.array([0.0])
     y_positions = np.array([0.0])
 
-    chord_vector = Vec3(diameter, 0.0, 0.0)
+    chord_vector = Vec3(chord_length, 0.0, 0.0)
 
-    circumference = np.pi * diameter
-    tangential_velocity = args.wind_velocity * args.spin_ratio
-            
-    revolutions_per_second = -tangential_velocity / circumference
-
-    rotors = []
+    wings = []
     for i in range(len(x_positions)):
-        rotors.append(
+        wings.append(
             {
                 "section_points": [
-                    {"x": x_positions[i], "y": y_positions[i], "z": args.start_height},
-                    {"x": x_positions[i], "y": y_positions[i], "z": args.start_height + span}
+                    {"x": x_positions[i], "y": y_positions[i], "z": start_height},
+                    {"x": x_positions[i], "y": y_positions[i], "z": start_height + span}
                 ],
                 "chord_vectors": [
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
                 ],
                 "section_model": {
-                    "RotatingCylinder": {
-                        "revolutions_per_second": revolutions_per_second
-                    }
+                    "Foil": {}
                 }
             }
         )
 
     line_force_model = {
-        "wing_builders": rotors,
+        "wing_builders": wings,
         "nr_sections": args.nr_sections,
         "density": density
     }
@@ -84,27 +76,14 @@ if __name__ == "__main__":
     if args.gaussian_smoothing_length > 0.0:
         solver_settings["gaussian_smoothing_length"] = args.gaussian_smoothing_length
 
-    wake_settings = {
-        "symmetry_condition": "Z",
-        "induced_velocity_corrections": {
-            "max_magnitude_ratio": args.max_induced_velocity_ratio
-        }
-    }
-
     if args.dynamic:
-        solver_settings['max_iterations_per_time_step'] = 3
-
-        wake_settings["first_panel_relative_length"] = 0.5
-
-        wake_settings["viscous_core_length_off_body"] = {
-            "Absolute": 0.5 * diameter
-        }
-
-        wake_settings["ratio_of_wake_affected_by_induced_velocities"] = 0.1
-
         sim_settings = {
             "Dynamic": {
-                "wake": wake_settings,
+                "wake": {
+                    "viscous_core_length_off_body": {
+                        "Absolute": 0.25 * chord_length
+                    }
+                },
                 "solver": solver_settings
             }
         }
@@ -119,7 +98,6 @@ if __name__ == "__main__":
     else:
         sim_settings = {
             "QuasiSteady": {
-                "wake": wake_settings,
                 "solver": solver_settings
             }
         }
@@ -131,12 +109,8 @@ if __name__ == "__main__":
 
     setup_string = json.dumps(setup)
 
-    if args.dynamic:
-        end_time = 80 * diameter / args.wind_velocity
-        dt = end_time / 256
-    else:
-        end_time = 1.0
-        dt = 1.0
+    end_time = 360 / args.rotational_velocity
+    dt = end_time / 256
 
     simulation = Simulation(
         setup_string = setup_string,
@@ -157,37 +131,41 @@ if __name__ == "__main__":
             wind_velocity_vector
         )
 
-    force_factor = 0.5 * diameter * span * density * args.wind_velocity**2 * len(rotors)
+    force_factor = 0.5 * chord_length * span * density * args.wind_velocity**2 * len(wings)
     
     current_time = 0.0
+    current_angle_deg = 0.0
+
+    angles = []
+    lift = []
+    drag = []
 
     while current_time < end_time:
+        current_angle_deg += args.rotational_velocity * dt
+
         print("Time: ", current_time)
+        print("Current angle: ", current_angle_deg)
+        print()
+
+        simulation.set_local_wing_angles([np.radians(current_angle_deg)] * len(wings))
+
         result = simulation.do_step(
             time = current_time, 
             time_step = dt, 
             freestream_velocity = freestream_velocity
         )
 
+        forces = result.integrated_forces_sum()
+
+        angles.append(current_angle_deg)
+        
+        drag.append(forces.x / force_factor)
+        lift.append(-forces.y / force_factor)
+
         current_time += dt
 
-    forces = result.integrated_forces_sum()
 
-    print("Drag:", forces.x / force_factor)
-    print("Lift: ", forces.y / force_factor)
-
-    ctrl_points = result.ctrl_points
-
-    z_coords = []
-    for point in ctrl_points:
-        z_coords.append(point.z)
-
-    for i in range(len(rotors)):
-        indices = slice(i * args.nr_sections, (i + 1) * args.nr_sections)
-        
-        plt.plot(z_coords[indices], -np.array(result.circulation_strength[indices]))
-
-    plt.ylim(0.0, None)
-
+    plt.plot(angles, drag, label="Drag")
+    plt.plot(angles, lift, label="Lift")
     plt.show()
     

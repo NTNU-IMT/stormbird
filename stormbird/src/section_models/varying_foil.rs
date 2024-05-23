@@ -81,4 +81,8 @@ impl VaryingFoil {
     pub fn added_mass_coefficient(&self, heave_acceleration: f64) -> f64 {
         self.get_foil().added_mass_coefficient(heave_acceleration)
     }
+
+    pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
+        self.get_foil().amount_of_stall(angle_of_attack)
+    }
 }

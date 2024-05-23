@@ -50,6 +50,15 @@ impl Simulation {
         self.data.line_force_model.rotation = rotation.data;
     }
 
+    pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {
+        assert!(
+            local_wing_angles.len() == self.data.line_force_model.local_wing_angles.len(),
+            "The number of wing angles must match the number of wings in the simulation."
+        );
+
+        self.data.line_force_model.local_wing_angles = local_wing_angles;
+    }
+
     pub fn get_freestream_velocity_points(&self) -> Vec<Vec3> {
         let rust_vec = self.data.get_freestream_velocity_points();
 
