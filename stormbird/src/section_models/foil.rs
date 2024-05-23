@@ -115,7 +115,7 @@ impl Foil {
         let stall_angle = get_stall_angle(angle_of_attack);
 
         let angle_high_power = if self.cl_high_order_power > 0.0 {
-            angle_of_attack.powf(self.cl_high_order_power)
+            angle_of_attack.abs().powf(self.cl_high_order_power) * angle_of_attack.signum()
         } else {
             0.0
         };

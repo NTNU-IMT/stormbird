@@ -1,5 +1,7 @@
 # Rotor sail
 
+**WARNING**: This text is very much under construction. 
+
 ## Challenges
 Rotor sails are special in several ways - relative to other lifting surfaces - which pose challenges from a simplified modelling perspective. 
 
@@ -19,16 +21,22 @@ It is true that a lifting line model **alone** is **less physical accurate for r
 A lifting line simulation of a rotor sail is a potential candidate for capturing the physics in more advanced situations. In many ways, the method can be a practical way to use and correct the high-fidelity data in **situations not directly tested in CFD or experiments**. This can be exemplified in three ways:
 
 ### Point 1 - sail-to-sail interaction effects
-As will be highlighted further under best practices, a lifting line simulation of a rotor sail is created by tuning some model parameters to high fidelity data of a single sail. When tuning the model, two things happen.
+To come
 
 ### Point 2 - spatially varying velocity fields
+To come
 
 ### Point 3 - motions
+To come
 
 ### When not to use lifting line simulations for rotor sails
+To come
 
 ## Best practices
+To come
 
 ## Model setup
+To come
 
 ## Empirical data sources
+To come

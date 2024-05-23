@@ -1,26 +1,28 @@
 # Foil model
 
-The single element foil model is a *parametric model* of a foil section. That is, it is defined using a (relatively) few parameters that are later used in a simple mathematical model to compute lift and drag for arbitrary angles of attack.
+The `Foil` structure is a *parametric model* of a single element foil section. That is, it is defined using (relatively) few parameters that are later used in a simple mathematical model to compute lift and drag for arbitrary angles of attack.
 
 ## Why a parametric model?
 Other implementations of lifting line and actuator line methods often use data based models for computing the lift and drag coefficients. That is, the user must supply data on how the lift and drag varies as a function of the angle attack, and then the solver can use this data together with interpolation or table look-up to compute force coefficients for arbitrary angles. 
 
-A data based approach is often fine, and does have some benefits. For instance, it is the only way to make a truly general model where the user have full control over the behavior of the sectional model. For this reason, there might be implementations of pure data based models in Stormbird in the future. However, the choice of using a parametric model for now where based on two core reason. 
+A data based approach is often fine, and does have some benefits. For instance, it is the only way to make a truly general model where the user have full control over the behavior of the sectional model. For this reason, there might be implementations of pure data based models in Stormbird in the future. However, the choice of using a parametric model for now where based on two reasons. 
 
 First, it becomes easier to use a parametric model as a building block for more complex foil models, where the behavior depends on some internal state, such as flap angle or suction rate. This is because the model parameters can be allowed to depend on the internal state through interpolation. See the [varying foil sub chapter](./varying_foil_model.md) for more on this.
 
-Second, a parametric model ensures smoothness, which is beneficial when using the model together with gradient based optimization algorithms. For instance, such a method might be used to optimize the angle of attack for wing sails at a given wind direction. The smoothness is in particular practical when the expected optimal point is close to the stall angle.
+Second, a parametric model ensures smoothness, which is beneficial when using the model together with gradient based optimization algorithms. For instance, such a method might be used to optimize the angle of attack for wing sails at a given wind direction. The smoothness is in particular practical when the expected optimal point is close to the stall angle - which ot often is.
 
-The downside of a parametric model is believed to be small, as long as the model can represent typical foil section behavior without too many simplifications.
+The downside of a parametric model is believed to be small, as long as the model can represent typical foil section behavior without too many simplifications. The design of the `Foil` model is intended to achieve this as best as possible[^update_to_model_note].
+
+[^update_to_model_note]: The design of the `Foil` model is open for changes, and may be updated when a need is discovered. The goal is to find the right balance between simplicity and flexibility.
 
 ## Model overview
-The model is divided in two core sub-models, labeled *pre-stall* and *post-stall*.
+The model is divided in two core sub-models, labeled *pre-stall* and *post-stall*, respectively representing the behavior before and after the foil has stalled due to too high angle of attack.
 
-For angles of attack below stall, it is assumed that both lift and drag can be represented accurately as simple polynomials. The lift is mostly linear, but can also have an optional high-order term where both the factor and power of the term is adjustable. The drag is assumed to be represented as a second order polynomial.
+For angles of attack below stall, it is assumed that both lift and drag can be represented accurately with simple polynomials. The lift is linear by default, but can also have an optional high-order term where both the factor and power of the term is adjustable. The high order term is meant to capture slowly developing separations, which might occur at low Reynolds numbers. The drag is assumed to be represented as a second order polynomial. For a wing sail operating below stall, the drag will mostly be dominated by lift-induced drag forces. The viscous drag can therefore be kept simple, as the importance to the total force is relatively low.
 
-For angles of attack above stall, both the lift and drag are assumed to be harmonic functions which primarily is adjusted by setting the *max value* after stall. This is a rough model, which is assumed to be appropriate as the pre-stall behavior is usually more important for a wind power device.
+For angles of attack above stall, both the lift and drag are assumed to be harmonic functions which primarily is adjusted by setting the *max value* after stall. This is a rough model which might not be perfect for all angles of attack, but is assumed to be close enough. Wing sails will most often operate below stall.
 
-The transit between the two models is done using a sigmoid function, where both the transition point and the width of the transition can be adjusted.
+The transit between the two models is done using a [sigmoid function](https://en.wikipedia.org/wiki/Sigmoid_function), where both the transition point and the width of the transition can be adjusted.
 
 In addition, there factors in the model to account for added mass and lift due to the time derivative of the angle of attack. Both these effects are assumed to be linear for simplicity.
 
@@ -64,6 +66,18 @@ An explanation of the parameters are given below:
 
 ## Example
 
-An example of the output of a foil model is shown below, along with definition of the parameters used.
+An example of the output of a foil model is shown below. The parameters values are given as follows:
+
+```rust
+let foil = Foil {
+    cl_zero_angle = 0.5,
+    cl_max_after_stall = 0.9,
+    cd_max_after_stall = 1.2,
+    mean_stall_angle = 20.0_f64.to_radians(),
+    stall_range = 10.0_f64.to_radians(),
+    ..Default::default()
+}
+
+```
 
 ![Foil model example](figures/foil_model_example.png)
