@@ -1,12 +1,19 @@
 # Foil model
 
-Parametric model of a foil profile that can compute lift and drag coefficients.
+The single element foil model is a parametric model of a foil section. That is, it is defined using a limited set of parameters that are later used in a simple mathematical model to compute lift and drag for arbitrary angles of attack.
 
-The reason for using a parametric model, rather than a data based table look-up, is two fold:
-1) It becomes easier to use this model as a building block for more complex foil models, where the behavior depends on some internal state, such as flap angle or suction rate, because the parameters can be allowed to depend on the internal state through interpolation.
-2) A parametric model ensures smoothness, which is important when using the model in some form optimization, for instance to maximize thrust for a given wind direction. The smoothness is in particular practical when the expected optimal point is close to the stall angle 
+## Why a parametric model?
+Other implementations of lifting line and actuator lines often use data based models for computing the lift and drag. That is, the user must supply data on how the lift and drag varies as a function of the angle attack, and then the solver can use this data together with interpolation or table look-up to compute force coefficients for arbitrary angles. 
 
+A data based approach is often fine, and does have some benefits. There might be implementations of pure data based models in Stormbird in the future. However, the choice of using parametric model where based on two core reason. 
+
+First, it becomes easier to use a parametric model as a building block for more complex foil models, where the behavior depends on some internal state, such as flap angle or suction rate, because the model parameters can be allowed to depend on the internal state through interpolation. See the [varying foil sub chapter](./varying_foil_model.md) for more on this.
+
+Second, a parametric model ensures smoothness, which is beneficial when using the model together with gradient based optimization algorithms. For instance, such a method might be used to maximize thrust for a given wind direction. The smoothness is in particular practical when the expected optimal point is close to the stall angle. 
+
+## Model overview
 The model is divided in two core sub-models
+
 1) For angles of attack below stall, it is assumed that both lift and drag can be represented accurately as simple polynomials. The lift is mostly linear, but can also have an optional high-order term where both the factor and power of the term is adjustable. The drag is assumed to be represented as a second order polynomial.
 2) For angles of attack above stall, both the lift and drag are assumed to be harmonic functions which primarily is adjusted by setting the *max value* after stall. This is a rough model, which is assumed to be appropriate as the pre-stall behavior is usually more important for a wind power device.
 
