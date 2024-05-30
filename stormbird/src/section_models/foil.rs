@@ -7,6 +7,13 @@ use super::common_functions;
 
 use std::f64::consts::PI;
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub enum StallModel {
+    #[default]
+    Harmonic,
+    ConstantLift,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Parametric model of a foil profile that can compute lift and drag coefficients.
@@ -86,6 +93,9 @@ pub struct Foil {
     #[serde(default)]
     /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
     pub added_mass_factor: f64,
+    #[serde(default)]
+    /// Type of stall model to use. The default is harmonic.
+    pub stall_model: StallModel,
 }
 
 fn get_stall_angle(angle_of_attack: f64) -> f64 {
@@ -112,22 +122,38 @@ impl Foil {
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
-        let stall_angle = get_stall_angle(angle_of_attack);
+        let cl_pre_stall  = self.lift_coefficient_pre_stall(angle_of_attack);
 
+        match self.stall_model {
+            StallModel::Harmonic => {
+                let stall_angle = get_stall_angle(angle_of_attack);
+
+                let cl_post_stall = self.lift_coefficient_post_stall(stall_angle);
+
+                self.combine_pre_and_post_stall(angle_of_attack, cl_pre_stall, cl_post_stall)
+            },
+            StallModel::ConstantLift => {
+                let cl_post_stall = self.lift_coefficient_pre_stall(self.mean_stall_angle);
+
+                cl_pre_stall.abs().min(cl_post_stall.abs())*cl_pre_stall.signum()
+            }
+        }
+    }
+
+    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: f64) -> f64 {
         let angle_high_power = if self.cl_high_order_power > 0.0 {
             angle_of_attack.abs().powf(self.cl_high_order_power) * angle_of_attack.signum()
         } else {
             0.0
         };
+        
+        self.cl_zero_angle + 
+        self.cl_initial_slope * angle_of_attack +
+        self.cl_high_order_factor * angle_high_power
+    }
 
-        let cl_pre_stall  = 
-            self.cl_zero_angle + 
-            self.cl_initial_slope * angle_of_attack +
-            self.cl_high_order_factor * angle_high_power;
-
-        let cl_post_stall = self.cl_max_after_stall * (2.0 * stall_angle).sin();
-
-        self.combine_pre_and_post_stall(angle_of_attack, cl_pre_stall, cl_post_stall)
+    pub fn lift_coefficient_post_stall(&self, angle_of_attack: f64) -> f64 {
+        self.cl_max_after_stall * (2.0 * angle_of_attack).sin()
     }
 
     /// Calculates the drag coefficient for a given angle of attack.
@@ -184,6 +210,7 @@ impl Default for Foil {
             stall_range:            Self::default_stall_range(),
             cl_changing_aoa_factor: 0.0,
             added_mass_factor:      0.0,
+            stall_model:            StallModel::Harmonic,
         }
     }
 }

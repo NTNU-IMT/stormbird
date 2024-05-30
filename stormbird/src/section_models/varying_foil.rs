@@ -48,6 +48,8 @@ impl VaryingFoil {
         let x = self.current_internal_state;
         let x_data = &self.internal_state_data;
 
+        let stall_model = self.foils_data[0].stall_model.clone();
+
         Foil {
             cl_zero_angle:          linear_interpolation(x, x_data, &cl_zero_angle_data),
             cl_initial_slope:       linear_interpolation(x, x_data, &cl_initial_slope_data),
@@ -62,6 +64,7 @@ impl VaryingFoil {
             stall_range:            linear_interpolation(x, x_data, &stall_range_data),
             cl_changing_aoa_factor: linear_interpolation(x, x_data, &cl_changing_aoa_factor_data),
             added_mass_factor:      linear_interpolation(x, x_data, &added_mass_factor_data),
+            stall_model:            stall_model,
         }
     }
 

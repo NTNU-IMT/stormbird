@@ -46,6 +46,11 @@ impl SimulationResult {
         self.data.integrated_moments.iter().map(|v| Vec3::from(v.total.clone())).collect()
     }
 
+    #[getter]
+    pub fn effective_angles_of_attack(&self) -> Vec<f64> {
+        self.data.force_input.angles_of_attack.clone()
+    }
+
     fn __str__(&self) -> String {
         format!("{:?}", self.data)
     }
