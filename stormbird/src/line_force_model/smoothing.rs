@@ -11,9 +11,22 @@ use crate::math_utils::smoothing;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SmoothingSettings {
-    pub gaussian_length_factor: Option<f64>,
-    pub circulation_viscosity: Option<f64>,
-    pub circulation_viscosity_iterations: Option<usize>,
+    #[serde(default)]
+    pub gaussian: Option<GaussianSmoothingSettings>,
+    #[serde(default)]
+    pub artificial_viscosity: Option<ArtificialViscositySettings>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GaussianSmoothingSettings {
+    pub length_factor: f64,
+    pub end_corrections: Vec<(bool, bool)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtificialViscositySettings {
+    pub viscosity: f64,
+    pub iterations: usize,
 }
 
 impl LineForceModel {
@@ -21,45 +34,86 @@ impl LineForceModel {
         let mut strength = input_strength.to_vec();
 
         if let Some(settings) = &self.smoothing_settings {
-            if let Some(gaussian_length_factor) = settings.gaussian_length_factor {
-                strength = self.gaussian_smoothed_strength(&strength, gaussian_length_factor);
+            if let Some(gaussian) = &settings.gaussian {
+                strength = self.gaussian_smoothed_strength(&strength, gaussian);
             }
 
-            if let Some(circulation_viscosity) = settings.circulation_viscosity {
-                let iterations = settings.circulation_viscosity_iterations.unwrap_or(1);
-
-                for _ in 0..iterations {
-                    strength = self.circulation_strength_with_viscosity(&strength, circulation_viscosity);
-                }
+            if let Some(artificial_viscosity) = &settings.artificial_viscosity {
+                strength = self.circulation_strength_with_viscosity(&strength, artificial_viscosity);
             }
         }
 
         strength
     }
 
-    /// Function that applies a Gaussian smoothing to the strength of the line force model.
+    /// Function that applies a Gaussian smoothing to the supplied strength vector.
     pub fn gaussian_smoothed_strength(
         &self, 
         noisy_strength: &[f64],
-        smoothing_length_factor: f64,
-    ) -> Vec<f64> {   
+        settings: &GaussianSmoothingSettings,
+    ) -> Vec<f64> {
+        assert_eq!(settings.end_corrections.len(), self.nr_wings());
+
         let mut smoothed_strength: Vec<f64> = Vec::with_capacity(noisy_strength.len());
 
         let wing_span_lengths = self.wing_span_lengths();
         
         let span_distance = self.span_distance_in_local_coordinates();
 
-        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
-            let smoothing_length = smoothing_length_factor * wing_span_lengths[wing_index];
+        let end_corrections_distance_factor = 1.0;
 
-            let wing_smoothed_strength = smoothing::gaussian_smoothing(
-                &span_distance[wing_indices.clone()], 
-                &noisy_strength[wing_indices.clone()], 
+        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
+            let smoothing_length = settings.length_factor * wing_span_lengths[wing_index];
+
+            let end_corrections = settings.end_corrections[wing_index];
+
+            let mut local_span_distance = span_distance[wing_indices.clone()].to_vec();
+            let mut local_noisy_strength = noisy_strength[wing_indices.clone()].to_vec();
+
+            let start_index = if end_corrections.0 {
+                let delta_span = local_span_distance[1] - local_span_distance[0];
+                let mut span_to_be_inserted = delta_span;
+
+                let mut number_of_insertions = 0;
+
+                while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
+                    local_span_distance.insert(0, local_span_distance[0] - delta_span);
+                    local_noisy_strength.insert(0, 0.0);
+                    span_to_be_inserted += delta_span;
+                    number_of_insertions += 1;
+                }
+                
+                number_of_insertions
+            } else {
+                0
+            };
+
+            let end_index = if end_corrections.1 {
+                let delta_span = local_span_distance[local_span_distance.len()-1] - local_span_distance[local_span_distance.len()-2];
+                let mut span_to_be_inserted = delta_span;
+
+                let mut number_of_insertions = 0;
+
+                while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
+                    local_span_distance.push(local_span_distance[local_span_distance.len()-1] + delta_span);
+                    local_noisy_strength.push(0.0);
+                    span_to_be_inserted += delta_span;
+                    number_of_insertions += 1;
+                }
+
+                local_span_distance.len() - number_of_insertions
+            } else {
+                local_span_distance.len()
+            };
+
+            let raw_wing_smoothed_strength = smoothing::gaussian_smoothing(
+                &local_span_distance, 
+                &local_noisy_strength, 
                 smoothing_length
             );
-
-            for index in 0..wing_smoothed_strength.len() {
-                smoothed_strength.push(wing_smoothed_strength[index]);
+            
+            for index in start_index..end_index {
+                smoothed_strength.push(raw_wing_smoothed_strength[index]);
             }
         }
 
@@ -69,18 +123,20 @@ impl LineForceModel {
     pub fn circulation_strength_with_viscosity(
         &self, 
         input_strength: &[f64], 
-        circulation_viscosity: f64
+        settings: &ArtificialViscositySettings
     ) -> Vec<f64> {
-        let circulation_strength_second_derivative = self.circulation_strength_second_derivative(
-            &input_strength
-        );
-
         let mut new_estimated_strength = input_strength.to_vec();
 
-        for i in 0..new_estimated_strength.len() {
-            let viscosity_term = circulation_viscosity * circulation_strength_second_derivative[i];
-            
-            new_estimated_strength[i] += viscosity_term;
+        for _ in 0..settings.iterations {
+            let circulation_strength_second_derivative = self.circulation_strength_second_derivative(
+                &new_estimated_strength
+            );
+
+            for i in 0..new_estimated_strength.len() {
+                let viscosity_term = settings.viscosity * circulation_strength_second_derivative[i];
+                
+                new_estimated_strength[i] = input_strength[i] + viscosity_term;
+            }
         }
 
         new_estimated_strength

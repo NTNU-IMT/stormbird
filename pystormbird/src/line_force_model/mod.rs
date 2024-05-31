@@ -8,8 +8,15 @@ pub mod span_line;
 pub mod builder;
 
 use crate::vec3::Vec3;
+use stormbird::vec3::Vec3 as Vec3Rust;
 
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
+use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
+
+use stormbird::line_force_model::smoothing::{
+    GaussianSmoothingSettings,
+    ArtificialViscositySettings
+};
 
 #[pyclass]
 #[derive(Clone)]
@@ -19,6 +26,59 @@ pub struct LineForceModel {
 
 #[pymethods]
 impl LineForceModel {
+    #[new]
+    pub fn new(json_string: String) -> Self {
+        let builder = LineForceModelBuilderRust::new_from_string(&json_string);
+
+        Self {
+            data: builder.build()
+        }
+    }
+
+    pub fn relative_span_distance(&self) -> Vec<f64> {
+        self.data.relative_span_distance()
+    }
+
+    pub fn circulation_strength(&self, velocity: Vec<Vec3>) -> Vec<f64> {
+        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+        self.data.circulation_strength(&rust_velocity)
+    }
+
+    #[pyo3(signature = (
+        *,
+        noisy_strength, 
+        length_factor,
+        end_corrections
+    ))]
+    pub fn gaussian_smoothed_strength(
+        &self, 
+        noisy_strength: Vec<f64>, 
+        length_factor: f64, 
+        end_corrections: Vec<(bool, bool)>
+    ) -> Vec<f64> {
+        let settings = GaussianSmoothingSettings {
+            length_factor,
+            end_corrections
+        };
+
+        self.data.gaussian_smoothed_strength(&noisy_strength, &settings)
+    }
+
+    #[pyo3(signature = (
+        *,
+        noisy_strength, 
+        viscosity,
+        iterations
+    ))]
+    pub fn circulation_strength_with_viscosity(&self, noisy_strength: Vec<f64>, viscosity: f64, iterations: usize) -> Vec<f64> {
+        let settings = ArtificialViscositySettings {
+            viscosity,
+            iterations
+        };
+        
+        self.data.circulation_strength_with_viscosity(&noisy_strength, &settings)
+    }
+
     #[getter]
     pub fn ctrl_points(&self) -> Vec<Vec3> {
         self.data.ctrl_points().iter().map(|v| Vec3::from(v.clone())).collect()

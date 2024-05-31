@@ -12,4 +12,4 @@
 // pub mod viscous_wakes;
 
 /// Correction factors that can be applied to a calculated circulation distribution.
-pub mod tip_loss_factors;
+pub mod freestream;

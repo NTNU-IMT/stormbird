@@ -33,6 +33,37 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Returns the circulation strength, either directly or based on the prescribed shape, 
+    /// depending on the fields in self.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
+    pub fn circulation_strength(&self, velocity: &[Vec3]) -> Vec<f64> {
+        if self.prescribed_circulation.is_some() {
+            self.prescribed_circulation_strength(velocity)
+        } else {
+            let raw_strength = self.circulation_strength_raw(velocity);
+
+            if self.smoothing_settings.is_some() {
+                self.smoothed_strength(&raw_strength)
+            } else {
+                raw_strength
+            }
+        }
+    }
+
+    /// Returns the circulation strength on each line based on the lifting line equation.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
+    pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
+        let cl = self.lift_coefficients(&velocity);
+
+        (0..velocity.len()).map(|index| {
+            -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index] * self.density
+        }).collect()
+    }
+
     /// Returns the viscous drag coefficient on each line element, based on the section model
     /// and the input velocity. 
     ///

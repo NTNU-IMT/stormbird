@@ -7,6 +7,7 @@
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
     - [Move and modify a line model](./line_model/move_line_models.md)
+    - [Circulation strength](./line_model/circulation_strength.md)
     - [Force calculations](./line_model/force_calculations.md)
     - [Results from simulations](./line_model/results.md)
 - [Sectional models](./sectional_models/sectional_models_intro.md)
