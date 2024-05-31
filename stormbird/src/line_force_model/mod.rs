@@ -10,7 +10,7 @@ use std::f64::consts::PI;
 
 pub mod force_calculations;
 pub mod derivatives;
-pub mod solver_utils;
+pub mod smoothing;
 pub mod span_line;
 pub mod builder;
 pub mod prescribed_circulations;
@@ -331,55 +331,6 @@ impl LineForceModel {
         }).collect()
     }
 
-    /// Returns the local lift coefficient on each line element.
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angles_of_attack = self.angles_of_attack(velocity);
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => 
-                        foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) => 
-                        foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) => 
-                        cylinder.lift_coefficient(
-                            self.chord_vectors_local[index].length(), velocity[index].length()
-                        ),
-                }
-            }
-        ).collect()
-    }
-
-    /// Returns the viscous drag coefficient on each line element, based on the section model
-    /// and the input velocity. 
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angles_of_attack = self.angles_of_attack(velocity);
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => 
-                        foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) => 
-                        foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) => 
-                        cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
-                }
-            }
-        ).collect()
-    }
-
     /// Calculates the wake angle behind each line element.
     pub fn wake_angles(&self, velocity: &[Vec3]) -> Vec<f64> {
         (0..self.nr_span_lines()).map(
@@ -597,4 +548,3 @@ impl LineForceModel {
     }
     
 }
-

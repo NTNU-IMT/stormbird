@@ -8,6 +8,84 @@ use super::*;
 /// on the wings. These are generally used as the last step in a simulation method using the 
 /// line force model.
 impl LineForceModel {
+    /// Returns the local lift coefficient on each line element.
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
+    pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
+        let angles_of_attack = self.angles_of_attack(velocity);
+
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index  = self.wing_index_from_global(index);
+
+                match &self.section_models[wing_index] {
+                    SectionModel::Foil(foil) => 
+                        foil.lift_coefficient(angles_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) => 
+                        foil.lift_coefficient(angles_of_attack[index]),
+                    SectionModel::RotatingCylinder(cylinder) => 
+                        cylinder.lift_coefficient(
+                            self.chord_vectors_local[index].length(), velocity[index].length()
+                        ),
+                }
+            }
+        ).collect()
+    }
+
+    /// Returns the viscous drag coefficient on each line element, based on the section model
+    /// and the input velocity. 
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
+    pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
+        let angles_of_attack = self.angles_of_attack(velocity);
+
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index  = self.wing_index_from_global(index);
+
+                match &self.section_models[wing_index] {
+                    SectionModel::Foil(foil) => 
+                        foil.drag_coefficient(angles_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) => 
+                        foil.drag_coefficient(angles_of_attack[index]),
+                    SectionModel::RotatingCylinder(cylinder) => 
+                        cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
+                }
+            }
+        ).collect()
+    }
+
+    pub fn sectional_force_input(&self, solver_result: &SolverResult, time_step: f64) -> SectionalForcesInput {
+        let angles_of_attack = self.angles_of_attack(&solver_result.ctrl_point_velocity);
+
+        let mut acceleration = vec![Vec3::default(); self.nr_span_lines()];
+        let mut angles_of_attack_derivative = vec![0.0; self.nr_span_lines()];
+        let mut rotation_velocity = Vec3::default();
+
+        if let Some(derivatives) = &self.derivatives {
+            acceleration = derivatives.flow.acceleration(
+                &solver_result.ctrl_point_velocity, time_step
+            );
+
+            angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(
+                &angles_of_attack, time_step
+            );
+
+            rotation_velocity = derivatives.motion.rotation_velocity(self, time_step);
+        }
+
+        SectionalForcesInput {
+            circulation_strength: solver_result.circulation_strength.clone(),
+            velocity: solver_result.ctrl_point_velocity.clone(),
+            angles_of_attack,
+            acceleration,
+            angles_of_attack_derivative,
+            rotation_velocity
+        }
+    }
+
      /// Calculates the forces on each line element.
      pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
         let mut sectional_forces = SectionalForces {
@@ -133,6 +211,47 @@ impl LineForceModel {
                     }
                 }
 
+            }
+        ).collect()
+    }
+
+    /// Calculates the magnitude of the lift force on each line element based on the given 
+    /// circulation and velocity.
+    pub fn lift_from_circulation(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<f64> {
+        let force = self.sectional_circulatory_forces(strength, velocity);
+
+        force.iter().map(|f| f.length()).collect()
+    }
+
+    /// Calculates the magnitude of the lift force on each line element based on the given
+    /// coefficients and velocity
+    pub fn lift_from_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {        
+        let cl = self.lift_coefficients(velocity);
+        
+        self.span_lines().iter().enumerate().map(
+            |(i_span, span_line)| {
+                let chord = self.chord_vectors_local[i_span].length();
+                let lift_area = chord * span_line.length();
+
+                let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length().powi(2);
+
+                cl[i_span] * force_factor
+            }
+        ).collect()
+    }
+
+    pub fn residual_absolute(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<f64> {
+        let circulation_lift = self.lift_from_circulation(strength, velocity);
+        let lift_coefficients = self.lift_coefficients(velocity);
+
+        self.span_lines().iter().enumerate().map(
+            |(i_span, span_line)| {
+                let chord = self.chord_vectors_local[i_span].length();
+                let lift_area = chord * span_line.length();
+
+                let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length().powi(2);
+
+                (circulation_lift[i_span] / force_factor - lift_coefficients[i_span]).abs()
             }
         ).collect()
     }

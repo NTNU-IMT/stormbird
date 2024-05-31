@@ -50,34 +50,4 @@ impl LineForceModel {
             derivatives.flow.update(current_velocity, current_angles_of_attack);
         }
     }
-
-    pub fn sectional_force_input(&self, solver_result: &SolverResult, time_step: f64) -> SectionalForcesInput {
-        let angles_of_attack = self.angles_of_attack(&solver_result.ctrl_point_velocity);
-
-        let mut acceleration = vec![Vec3::default(); self.nr_span_lines()];
-        let mut angles_of_attack_derivative = vec![0.0; self.nr_span_lines()];
-        let mut rotation_velocity = Vec3::default();
-
-        if let Some(derivatives) = &self.derivatives {
-            acceleration = derivatives.flow.acceleration(
-                &solver_result.ctrl_point_velocity, time_step
-            );
-
-            angles_of_attack_derivative = derivatives.flow.angles_of_attack_derivative(
-                &angles_of_attack, time_step
-            );
-
-            rotation_velocity = derivatives.motion.rotation_velocity(self, time_step);
-        }
-
-        SectionalForcesInput {
-            circulation_strength: solver_result.circulation_strength.clone(),
-            velocity: solver_result.ctrl_point_velocity.clone(),
-            angles_of_attack,
-            acceleration,
-            angles_of_attack_derivative,
-            rotation_velocity
-        }
-    }
-
 }

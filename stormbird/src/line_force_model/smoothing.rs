@@ -6,56 +6,7 @@
 
 use super::*;
 
-use serde::{Serialize, Deserialize};
-
 use crate::math_utils::smoothing;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConvergenceTest {
-    pub minimum_sucesses: usize,
-    pub allowed_error: f64,
-}
-
-impl Default for ConvergenceTest {
-    fn default() -> Self {
-        Self {
-            minimum_sucesses: 20,
-            allowed_error: 1e-6,
-        }
-    }
-}
-
-impl ConvergenceTest {
-    pub fn build(&self) -> ConvergenceTestExecutor {
-        ConvergenceTestExecutor {
-            number_of_sucesses: 0,
-            minimum_sucesses: self.minimum_sucesses,
-            allowed_error: self.allowed_error,
-        }
-    }
-}
-
-pub struct ConvergenceTestExecutor {
-    pub number_of_sucesses: usize,
-    pub minimum_sucesses: usize,
-    pub allowed_error: f64,
-}
-
-impl ConvergenceTestExecutor {
-    pub fn test(&mut self, max_error: f64) -> bool {
-        if max_error < self.allowed_error {
-            self.number_of_sucesses += 1;
-        } else {
-            self.number_of_sucesses = 0;
-        }
-
-        if max_error < self.allowed_error && self.number_of_sucesses >= self.minimum_sucesses {
-            true
-        } else {
-            false
-        }
-    }
-}
 
 impl LineForceModel {
     /// Function that applies a Gaussian smoothing to the strength of the line force model.

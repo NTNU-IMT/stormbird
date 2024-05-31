@@ -6,12 +6,11 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::line_force_model::solver_utils::ConvergenceTest;
-
 #[derive(Debug, Clone)]
 pub struct SolverSettings {
     pub max_iterations_per_time_step: usize,
-    pub damping_factor: f64,
+    pub damping_factor_start: f64,
+    pub damping_factor_end: Option<f64>,
     pub circulation_viscosity: f64,
     pub gaussian_smoothing_length: Option<f64>,
     pub convergence_test: ConvergenceTest,
@@ -24,7 +23,9 @@ pub struct SteadySolverSettings {
     #[serde(default="SteadySolverSettings::default_max_iterations_per_time_step")]
     pub max_iterations_per_time_step: usize,
     #[serde(default="SteadySolverSettings::default_damping_factor")]
-    pub damping_factor: f64,
+    pub damping_factor_start: f64,
+    #[serde(default)]
+    pub damping_factor_end: Option<f64>,
     #[serde(default)]
     pub circulation_viscosity: f64,
     #[serde(default)]
@@ -41,7 +42,9 @@ pub struct UnsteadySolverSettings {
     #[serde(default="UnsteadySolverSettings::default_max_iterations_per_time_step")]
     pub max_iterations_per_time_step: usize,
     #[serde(default="UnsteadySolverSettings::default_damping_factor")]
-    pub damping_factor: f64,
+    pub damping_factor_start: f64,
+    #[serde(default)]
+    pub damping_factor_end: Option<f64>,
     #[serde(default)]
     pub circulation_viscosity: f64,
     #[serde(default)]
@@ -59,7 +62,8 @@ impl SteadySolverSettings {
     pub fn to_solver_settings(&self) -> SolverSettings {
         SolverSettings {
             max_iterations_per_time_step: self.max_iterations_per_time_step,
-            damping_factor: self.damping_factor,
+            damping_factor_start: self.damping_factor_start,
+            damping_factor_end: self.damping_factor_end,
             circulation_viscosity: self.circulation_viscosity,
             gaussian_smoothing_length: self.gaussian_smoothing_length,
             convergence_test: self.convergence_test.clone(),
@@ -72,7 +76,8 @@ impl Default for SteadySolverSettings {
     fn default() -> Self {
         SteadySolverSettings {
             max_iterations_per_time_step: Self::default_max_iterations_per_time_step(),
-            damping_factor: Self::default_damping_factor(),
+            damping_factor_start: Self::default_damping_factor(),
+            damping_factor_end: None,
             circulation_viscosity: Default::default(),
             gaussian_smoothing_length: Default::default(),
             convergence_test: Default::default(),
@@ -88,7 +93,8 @@ impl UnsteadySolverSettings {
     pub fn to_solver_settings(&self) -> SolverSettings {
         SolverSettings {
             max_iterations_per_time_step: self.max_iterations_per_time_step,
-            damping_factor: self.damping_factor,
+            damping_factor_start: self.damping_factor_start,
+            damping_factor_end: self.damping_factor_end,
             circulation_viscosity: self.circulation_viscosity,
             gaussian_smoothing_length: self.gaussian_smoothing_length,
             convergence_test: self.convergence_test.clone(),
@@ -101,11 +107,59 @@ impl Default for UnsteadySolverSettings {
     fn default() -> Self {
         UnsteadySolverSettings {
             max_iterations_per_time_step: Self::default_max_iterations_per_time_step(),
-            damping_factor: Self::default_damping_factor(),
+            damping_factor_start: Self::default_damping_factor(),
+            damping_factor_end: None,
             circulation_viscosity: Default::default(),
             gaussian_smoothing_length: Default::default(),
             convergence_test: Default::default(),
             print_log: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConvergenceTest {
+    pub minimum_successes: usize,
+    pub allowed_error: f64,
+}
+
+impl Default for ConvergenceTest {
+    fn default() -> Self {
+        Self {
+            minimum_successes: 5,
+            allowed_error: 1e-4,
+        }
+    }
+}
+
+impl ConvergenceTest {
+    pub fn build(&self) -> ConvergenceTestExecutor {
+        ConvergenceTestExecutor {
+            number_of_successes: 0,
+            minimum_successes: self.minimum_successes,
+            allowed_error: self.allowed_error,
+        }
+    }
+}
+
+pub struct ConvergenceTestExecutor {
+    pub number_of_successes: usize,
+    pub minimum_successes: usize,
+    pub allowed_error: f64,
+}
+
+impl ConvergenceTestExecutor {
+    pub fn test(&mut self, max_error: f64) -> bool {
+        if max_error.abs() < self.allowed_error {
+            self.number_of_successes += 1;
+        } else {
+            self.number_of_successes = 0;
+        }
+
+        if max_error.abs() < self.allowed_error && self.number_of_successes >= self.minimum_successes {
+            true
+        } else {
+            false
         }
     }
 }

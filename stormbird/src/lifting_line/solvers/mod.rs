@@ -76,13 +76,10 @@ pub fn solve_time_step(
             );
         }
 
-        let strength_difference: Vec<f64> = (0..ctrl_points.len()).map(|i| {
-            (new_estimated_strength[i] - circulation_strength[i]).abs()
-        }).collect();
+        let residual = line_force_model.residual_absolute(&circulation_strength, &velocity);
+        let max_residual = statistics::max(&residual);
 
-        let max_strength_difference = statistics::max(&strength_difference);
-
-        if convergence_test.test(max_strength_difference) {
+        if convergence_test.test(max_residual) {
             if solver_settings.print_log {
                 println!(
                     "Converged after {} iterations with {} sections", iteration+1, ctrl_points.len()
@@ -92,9 +89,15 @@ pub fn solve_time_step(
             break;
         }
 
+        let damping_factor = if let Some(damping_factor_end) = solver_settings.damping_factor_end {
+            solver_settings.damping_factor_start * max_residual.min(1.0) + damping_factor_end * (1.0 - max_residual.min(1.0))
+        } else {
+            solver_settings.damping_factor_start
+        };
+
         for i in 0..ctrl_points.len() {
             let strength_difference = new_estimated_strength[i] - circulation_strength[i];
-            circulation_strength[i] += solver_settings.damping_factor * strength_difference;
+            circulation_strength[i] += damping_factor * strength_difference;
         }
 
         if let WakeModel::Unsteady(wake) = wake_model {

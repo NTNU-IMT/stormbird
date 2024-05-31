@@ -40,13 +40,23 @@ fn steady_lift() {
 
     let steady_settings  = SteadySettings{
         solver: SteadySolverSettings {
-            circulation_viscosity: 0.0,
+            damping_factor_start: 0.05,
+            damping_factor_end: Some(0.25),
+            print_log: true,
             ..Default::default()
         },
         ..Default::default()
     };
 
-    let dynamic_settings = UnsteadySettings::default();
+    let dynamic_settings = UnsteadySettings {
+        solver: UnsteadySolverSettings {
+            damping_factor_start: 0.05,
+            damping_factor_end: Some(0.25),
+            print_log: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let nr_time_steps = 200;
 
