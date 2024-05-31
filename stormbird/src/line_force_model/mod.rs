@@ -26,6 +26,7 @@ use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
 use prescribed_circulations::PrescribedCirculation;
+use smoothing::SmoothingSettings;
 
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
@@ -60,6 +61,8 @@ pub struct LineForceModel {
     pub density: f64,
     /// Optional model for calculation motion and flow derivatives
     pub derivatives: Option<Derivatives>,
+    /// Optional smoothing settings
+    pub smoothing_settings: Option<SmoothingSettings>,
     /// Optional prescribed circulation shape
     pub prescribed_circulation: Option<PrescribedCirculation>,
 }
@@ -85,6 +88,7 @@ impl LineForceModel {
             local_wing_angles: Vec::new(),
             density,
             derivatives: None,
+            smoothing_settings: None,
             prescribed_circulation: None,
         }
     }
@@ -279,44 +283,14 @@ impl LineForceModel {
         if self.prescribed_circulation.is_some() {
             self.prescribed_circulation_strength(velocity)
         } else {
-            self.circulation_strength_raw(velocity)
+            let raw_strength = self.circulation_strength_raw(velocity);
+
+            if self.smoothing_settings.is_some() {
+                self.smoothed_strength(&raw_strength)
+            } else {
+                raw_strength
+            }
         }
-    }
-
-    /// Calculates the second derivative of the circulation strength on each line element. This can 
-    /// be used to calculate artificial viscosity damping when estimating the circulation strength
-    pub fn circulation_strength_second_derivative(&self, circulation_strength: &[f64]) -> Vec<f64> {
-        let span_distance = self.span_distance_in_local_coordinates();
-
-        let mut first_derivative = Vec::with_capacity(circulation_strength.len());
-
-        for wing_index in 0..self.wing_indices.len() {
-            let local_span_distance = &span_distance[self.wing_indices[wing_index].clone()];
-            let local_circulation_strength = &circulation_strength[self.wing_indices[wing_index].clone()];
-
-            let local_circulation_derivative = finite_difference::derivative_spatial_arrays(
-                local_span_distance, 
-                local_circulation_strength
-            );
-
-            first_derivative.extend(local_circulation_derivative);
-        }
-
-        let mut second_derivative = Vec::with_capacity(circulation_strength.len());
-
-        for wing_index in 0..self.wing_indices.len() {
-            let local_span_distance = &span_distance[self.wing_indices[wing_index].clone()];
-            let local_circulation_derivative = &first_derivative[self.wing_indices[wing_index].clone()];
-
-            let local_circulation_derivative = finite_difference::derivative_spatial_arrays(
-                local_span_distance, 
-                local_circulation_derivative
-            );
-
-            second_derivative.extend(local_circulation_derivative);
-        }
-
-        second_derivative
     }
 
     /// Returns the circulation strength on each line based on the lifting line equation.

@@ -56,25 +56,7 @@ pub fn solve_time_step(
             velocity[i] = fixed_velocities[i] + velocity_update[i];
         }
 
-        let mut new_estimated_strength = line_force_model.circulation_strength(&velocity);
-
-        if solver_settings.circulation_viscosity != 0.0 {
-            let circulation_strength_second_derivative = line_force_model.circulation_strength_second_derivative(
-                &new_estimated_strength
-            );
-
-            for i in 0..ctrl_points.len() {
-                let viscosity_term = solver_settings.circulation_viscosity * circulation_strength_second_derivative[i];
-                
-                new_estimated_strength[i] += viscosity_term;
-            }
-        }
-
-        if let Some(smoothing_length) = solver_settings.gaussian_smoothing_length {
-            new_estimated_strength = line_force_model.gaussian_smoothed_strength(
-                &new_estimated_strength, smoothing_length
-            );
-        }
+        let new_estimated_strength = line_force_model.circulation_strength(&velocity);
 
         let residual = line_force_model.residual_absolute(&circulation_strength, &velocity);
         let max_residual = statistics::max(&residual);

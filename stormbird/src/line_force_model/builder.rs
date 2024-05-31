@@ -21,6 +21,8 @@ pub struct LineForceModelBuilder {
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,
     #[serde(default)]
+    pub smoothing_settings: Option<SmoothingSettings>,
+    #[serde(default)]
     pub prescribed_circulation: Option<PrescribedCirculation>,
 }
 
@@ -30,6 +32,7 @@ impl LineForceModelBuilder {
             wing_builders: Vec::new(),
             nr_sections,
             density: LineForceModel::default_density(),
+            smoothing_settings: None,
             prescribed_circulation: None,
         }
     }
@@ -55,6 +58,7 @@ impl LineForceModelBuilder {
             line_force_model.add_wing(&wing);
         }
 
+        line_force_model.smoothing_settings = self.smoothing_settings.clone();
         line_force_model.prescribed_circulation = self.prescribed_circulation.clone();
 
         line_force_model

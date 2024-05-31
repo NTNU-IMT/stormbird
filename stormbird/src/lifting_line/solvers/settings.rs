@@ -11,8 +11,6 @@ pub struct SolverSettings {
     pub max_iterations_per_time_step: usize,
     pub damping_factor_start: f64,
     pub damping_factor_end: Option<f64>,
-    pub circulation_viscosity: f64,
-    pub gaussian_smoothing_length: Option<f64>,
     pub convergence_test: ConvergenceTest,
     pub print_log: bool,
 }
@@ -26,10 +24,6 @@ pub struct SteadySolverSettings {
     pub damping_factor_start: f64,
     #[serde(default)]
     pub damping_factor_end: Option<f64>,
-    #[serde(default)]
-    pub circulation_viscosity: f64,
-    #[serde(default)]
-    pub gaussian_smoothing_length: Option<f64>,
     #[serde(default)]
     pub convergence_test: ConvergenceTest,
     #[serde(default)]
@@ -46,10 +40,6 @@ pub struct UnsteadySolverSettings {
     #[serde(default)]
     pub damping_factor_end: Option<f64>,
     #[serde(default)]
-    pub circulation_viscosity: f64,
-    #[serde(default)]
-    pub gaussian_smoothing_length: Option<f64>,
-    #[serde(default)]
     pub convergence_test: ConvergenceTest,
     #[serde(default)]
     pub print_log: bool,
@@ -64,8 +54,6 @@ impl SteadySolverSettings {
             max_iterations_per_time_step: self.max_iterations_per_time_step,
             damping_factor_start: self.damping_factor_start,
             damping_factor_end: self.damping_factor_end,
-            circulation_viscosity: self.circulation_viscosity,
-            gaussian_smoothing_length: self.gaussian_smoothing_length,
             convergence_test: self.convergence_test.clone(),
             print_log: self.print_log,
         }
@@ -78,8 +66,6 @@ impl Default for SteadySolverSettings {
             max_iterations_per_time_step: Self::default_max_iterations_per_time_step(),
             damping_factor_start: Self::default_damping_factor(),
             damping_factor_end: None,
-            circulation_viscosity: Default::default(),
-            gaussian_smoothing_length: Default::default(),
             convergence_test: Default::default(),
             print_log: Default::default(),
         }
@@ -95,8 +81,6 @@ impl UnsteadySolverSettings {
             max_iterations_per_time_step: self.max_iterations_per_time_step,
             damping_factor_start: self.damping_factor_start,
             damping_factor_end: self.damping_factor_end,
-            circulation_viscosity: self.circulation_viscosity,
-            gaussian_smoothing_length: self.gaussian_smoothing_length,
             convergence_test: self.convergence_test.clone(),
             print_log: self.print_log,
         }
@@ -109,8 +93,6 @@ impl Default for UnsteadySolverSettings {
             max_iterations_per_time_step: Self::default_max_iterations_per_time_step(),
             damping_factor_start: Self::default_damping_factor(),
             damping_factor_end: None,
-            circulation_viscosity: Default::default(),
-            gaussian_smoothing_length: Default::default(),
             convergence_test: Default::default(),
             print_log: Default::default(),
         }
