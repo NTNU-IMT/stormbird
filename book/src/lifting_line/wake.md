@@ -46,7 +46,7 @@ Main wake builder structure:
 pub struct UnsteadyWakeBuilder {
     pub wake_length: WakeLength,
     pub viscous_core_length: ViscousCoreLength,
-    pub first_panel_behavior: FirstPanelBehavior,
+    pub first_panel_relative_length: f64,
     pub strength_damping_last_panel_ratio: f64,
     pub symmetry_condition: SymmetryCondition,
     pub ratio_of_wake_affected_by_induced_velocities: Option<f64>,
@@ -64,12 +64,5 @@ Special sub structures used only for the dynamic wake:
 pub enum WakeLength {
     NrPanels(usize),
     TargetLengthFactor(f64),
-}
-```
-
-```rust
-pub enum FirstPanelBehavior {
-    ChordFixed(f64),
-    VelocityFixed(f64)
 }
 ```
