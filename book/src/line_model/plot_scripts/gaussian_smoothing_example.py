@@ -38,7 +38,7 @@ if __name__ == '__main__':
     plt.plot(relative_span_distance, circulation_org, label="Original")
     plt.plot(relative_span_distance, circulation_noisy, label="With noise", alpha=0.5)
 
-    smoothing_lengths = [0.1, 0.01]
+    smoothing_lengths = [0.1, 0.05]
 
     for length_factor in smoothing_lengths:
         circulation_smoothed = line_force_model.gaussian_smoothed_strength(

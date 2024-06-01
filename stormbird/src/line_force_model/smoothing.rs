@@ -72,12 +72,12 @@ impl LineForceModel {
 
             let start_index = if end_corrections.0 {
                 let delta_span = local_span_distance[1] - local_span_distance[0];
-                let mut span_to_be_inserted = delta_span;
+                let mut span_to_be_inserted = 0.5 * delta_span;
 
                 let mut number_of_insertions = 0;
 
                 while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
-                    local_span_distance.insert(0, local_span_distance[0] - delta_span);
+                    local_span_distance.insert(0, local_span_distance[0] - span_to_be_inserted);
                     local_noisy_strength.insert(0, 0.0);
                     span_to_be_inserted += delta_span;
                     number_of_insertions += 1;
@@ -90,12 +90,12 @@ impl LineForceModel {
 
             let end_index = if end_corrections.1 {
                 let delta_span = local_span_distance[local_span_distance.len()-1] - local_span_distance[local_span_distance.len()-2];
-                let mut span_to_be_inserted = delta_span;
+                let mut span_to_be_inserted = 0.5 * delta_span;
 
                 let mut number_of_insertions = 0;
 
                 while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
-                    local_span_distance.push(local_span_distance[local_span_distance.len()-1] + delta_span);
+                    local_span_distance.push(local_span_distance[local_span_distance.len()-1] + span_to_be_inserted);
                     local_noisy_strength.push(0.0);
                     span_to_be_inserted += delta_span;
                     number_of_insertions += 1;
