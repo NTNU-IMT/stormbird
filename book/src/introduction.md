@@ -35,10 +35,10 @@ Stormbird is a library that is primarily made for people with some programming e
 - **Don't implement hypothetical use cases:** Stormbird only implements features that are necessary for the use case - meaning simulation of wind power devices. There are many ways to extend Stormbird to also handle other use cases better, but this is not prioritized, at least not at the moment. The goal is to attempt to be **done** at some point. Hypothetical future use cases are a future problem we do not consider today
 
 ## Who the Book is for
-You should read this if you are interested in using Stormbird to run lifting line or actuator line simulations, or if you just want more information on the theory behind each method. The book is written primarily for *users*, and are therefore not focused on the underlying source code. However, developers should off course read this as well, to understand the intended use case.
+You should read this if you are interested in using Stormbird to run lifting line or actuator line simulations, or if you just want more information on the theory behind each method. The book is written primarily for *users*, and are therefore not focused directly on the underlying source code. However, there will often be examples from the source code when that is the easiest way to illustrate functionality. For instance, data structures will often be shown directly source code to illustrate what fields and settings that are available.
 
 ## How to Use This Book
-The books is intended to give an introduction to the theory and the models available as well as overall concepts in the implementation. The goal is  to give a birds eye view of the library and the functionality. There will also be references to other literature for more details when that is appropriate. 
+The books is intended to give an introduction to the theory and the models available as well as overall concepts in the implementation. IN other words, the goal is to give a birds eye view of the library and the functionality. There will also be references to other literature for more details when that is appropriate. 
 
 To truly learn how to use it, though, it is recommended to look at actual input files and code examples. This should be distributed along with the book. See the [tutorial chapter](./tutorials.md) for more on this 
 

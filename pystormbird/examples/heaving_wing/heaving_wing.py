@@ -116,7 +116,8 @@ if __name__ == "__main__":
 
     solver_settings = {
         "max_iterations_per_time_step": 300,
-        "print_log": True
+        "damping_factor_start": 0.05,
+        "damping_factor_end": 0.2,
     }
 
     sim_settings_list = [

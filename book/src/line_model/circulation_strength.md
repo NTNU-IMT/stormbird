@@ -46,13 +46,17 @@ The `length_factor` gives a factor used to calculated The smoothing length from 
 
 The `end_corrections` contains a vector - that should be equal in length to the number of wings - with a tuple of booleans that specifies whether or not the circulation distribution on the ends of the wing should be corrected for the fact that the ends typically have zero circulations.
 
-An example of how this smoothing method affects the circulation distribution is illustrated in the figure below. It shows an example where an artificial elliptic circulation distribution was first generated, and then modified by adding random numerical noise. The plot then shows how the noise is reduced when the noisy circulation distribution is corrected using the Gaussian smoothing filer, with different values for the `gaussian_length_factor`.
+An example of how this smoothing method affects the circulation distribution is illustrated in the figure below. **Note**: the example is with an excessive amount of noise, and is not representative of actual numerical noise from a lifting line simulation. Rather, it shows an example where an artificial elliptic circulation distribution was first generated, and then modified by adding random numerical noise. The plot then shows how the noise is reduced when the noisy circulation distribution is corrected using the Gaussian smoothing filer, with different values for the `gaussian_length_factor`. The end corrections are set to `true` in this case, as the circulation distribution is supposed to be zero at the ends. 
 
 ![Gaussian smoothing example](figures/gaussian_smoothing_example.png)
 
 As can bee seen, simple Gaussian smoothing introduces some errors towards the end of the wings if the smoothing length is too large, although the random noise is effectively reduced. It is therefore generally recommended to only apply as little smoothing as necessary to stabilize a solution. 
 
 ### Artificial viscosity
+This is currently an experimental feature and should be **used with care**. It adds a viscosity term to the estimated circulation distribution, based on the second derivative of the circulation as a function of span location multiplied with this parameter. The idea is taken from this [pre-print](https://www.researchgate.net/publication/378262301_An_Efficient_3D_Non-Linear_Lifting-Line_Method_with_Correction_for_Post-Stall_Regime). The paper suggest that an artificial viscosity term can in some cases stabilize the results in challenging conditions for the solver. Similar results are found when using the same approach in Stormbird. However, the parameter requires careful tuning to work properly, and can quickly also lead to instabilities. A particular problem is that both too low and too high values may cause instabilities. At the moment, Gaussian smoothing is recommended for cases with unstable results.
+
+Available fields:
+
 ```rust
 pub struct ArtificialViscositySettings {
     pub viscosity: f64,
@@ -60,11 +64,7 @@ pub struct ArtificialViscositySettings {
 }
 ```
 
-The parameters `viscosity` and `iterations` adds the possibility of using an artificial viscosity term when estimating the circulation distribution. This is currently an experimental feature and should be **used with care**. It adds a viscosity term to the estimated circulation distribution, based on the second derivative of the circulation as a function of span location multiplied with this parameter. The idea is taken from this [pre-print](https://www.researchgate.net/publication/378262301_An_Efficient_3D_Non-Linear_Lifting-Line_Method_with_Correction_for_Post-Stall_Regime). The paper suggest that an artificial viscosity term can in some cases stabilize the results in challenging conditions for the solver. Similar results are found when using the same approach in Stormbird. However, the parameter requires careful tuning to work properly. Both too low and too high values may cause instabilities. At the moment, Gaussian smoothing is recommended for cases with unstable results.
-
-An example of how the artifical viscosity can affect a noise circulation distribution is shown for the same type of example as described above for the Gaussian smoothing:
-
-![Circulation viscosity example](figures/circulation_viscosity_example.png)
+More will come if we find good recommendations for the settings. If not, the option might be removed... 
 
 ## Predetermined distributions
 

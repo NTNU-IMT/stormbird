@@ -29,6 +29,10 @@ pub struct LineForceModel {
     pub local_wing_angles: Vec<f64>,
     /// Density used in force calculations
     pub density: f64,
+    /// Optional model for calculation motion and flow derivatives
+    pub derivatives: Option<Derivatives>,
+    /// Optional smoothing settings
+    pub smoothing_settings: Option<SmoothingSettings>,
     /// Optional prescribed circulation shape
     pub prescribed_circulation: Option<PrescribedCirculation>,
 }

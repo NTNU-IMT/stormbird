@@ -2,7 +2,7 @@
 
 [Introduction](./introduction.md)
 
-- [Publications using Stormbird](./publications_overview.md)
+- [Publications overview](./publications_overview.md)
 - [Input/output format](./io_info.md)
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
@@ -16,8 +16,8 @@
     - [Rotating cylinder](./sectional_models/rotating_cylinder.md)
 - [Lifting line simulations](./lifting_line/lifting_line_intro.md)
     - [Simulation overview](./lifting_line/simulation_overview.md)
-    - [Solver settings](./lifting_line/solver_settings.md)
-    - [Wake builders](./lifting_line/wake_builders.md)
+    - [Solver](./lifting_line/solver.md)
+    - [Wake](./lifting_line/wake.md)
     - [Velocity input](./lifting_line/velocity_input.md)
 - [Tutorials](./tutorials/tutorials.md)
     - [Rotor sail](./tutorials/rotor_sail.md)
