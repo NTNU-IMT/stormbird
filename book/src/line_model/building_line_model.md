@@ -18,14 +18,14 @@ pub struct LineForceModelBuilder {
 }
 ```
 
-The only required input is the vector of `WingBuilder`s and the `nr_sections` [^nr_sections_note]. The density is set to the air density by default ( which = 1.225 kg / m^3), and the smoothing settings prescribed circulation is not used by default [^prescribed_note]. The nr sections should be tested for each project, adn will affect both the accuracy and the computational speed. Typical values range between 10-50.
+The only required input is the vector containing  `WingBuilder` structures and the `nr_sections` [^nr_sections_note]. The density is set to the air density by default ( which = 1.225 kg / m^3). The smoothing settings and prescribed circulation is not used by default [^prescribed_note]. The nr sections should be tested for each project, and will affect both the accuracy and the computational speed. Typical values range between 10-50.
 
 [^nr_sections_note]: Right now, the number of sections will be the same for each wing in the simulation. The interface was made in this way, because this scenario is believed to be the most common. However, it is fairly straight forward to implement functionality to allow each wing to have different values. This might be implemented in the future.
 
 [^prescribed_note]: There will be more on the smoothing settings and prescribed circulation option later. This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues. 
 
-### Wing builders
-The wing builders contain data to build line segments for a single wing. When a vector (or list) of wing builders are provided, the `LineForceModelBuilder` will automatically keep track of which line segment belong to each wing. The input to a wing builder is as shown as Rust code below:
+### Wing builder
+A wing builder contain data to build line segments for a single wing. When a vector (or list) of wing builders are provided, the `LineForceModelBuilder` will automatically keep track of which line segment belong to each wing. The fields in a `WingBuilder` structure is as shown as Rust code below:
 
 ```rust
 pub struct WingBuilder {
