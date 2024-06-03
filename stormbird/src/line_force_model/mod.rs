@@ -263,12 +263,14 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn angles_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
+        let velocity_corrected = self.remove_span_velocity(velocity);
+
         let chord_vectors = self.chord_vectors();
         let span_lines    = self.span_lines();
         
-        (0..velocity.len()).map(|index| {
+        (0..velocity_corrected.len()).map(|index| {
             chord_vectors[index].signed_angle_between(
-                velocity[index], 
+                velocity_corrected[index], 
                 span_lines[index].direction()
             )
         }).collect()
