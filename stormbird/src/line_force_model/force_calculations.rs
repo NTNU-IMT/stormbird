@@ -256,7 +256,7 @@ impl LineForceModel {
 
     /// Calculates the magnitude of the lift force on each line element based on the given
     /// coefficients and velocity
-    pub fn lift_from_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {        
+    pub fn lift_from_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {  
         let cl = self.lift_coefficients(velocity);
         
         self.span_lines().iter().enumerate().map(

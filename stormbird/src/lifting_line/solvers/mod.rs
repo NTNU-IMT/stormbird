@@ -56,6 +56,8 @@ pub fn solve_time_step(
             velocity[i] = fixed_velocities[i] + velocity_update[i];
         }
 
+        let velocity = line_force_model.remove_span_velocity(&velocity);
+
         let new_estimated_strength = line_force_model.circulation_strength(&velocity);
 
         let residual = line_force_model.residual_absolute(&circulation_strength, &velocity);
