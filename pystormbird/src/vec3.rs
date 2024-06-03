@@ -50,6 +50,10 @@ impl Vec3 {
         }
     }
 
+    pub fn dot(&self, other: Vec3) -> f64 {
+        self.data.dot(other.data)
+    }
+
     #[getter]
     pub fn length(&self) -> f64 {
         self.data.length()

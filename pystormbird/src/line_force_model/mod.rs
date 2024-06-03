@@ -44,6 +44,12 @@ impl LineForceModel {
         self.data.circulation_strength(&rust_velocity)
     }
 
+    pub fn angles_of_attack(&self, velocity: Vec<Vec3>) -> Vec<f64> {
+        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+        
+        self.data.angles_of_attack(&rust_velocity)
+    }
+
     #[pyo3(signature = (
         *,
         noisy_strength, 
