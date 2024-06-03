@@ -20,7 +20,7 @@ impl Default for RectangularWing {
             aspect_ratio: 5.0,
             cl_zero_angle: 0.5,
             angle_of_attack: 0.0,
-            nr_strips: 10,
+            nr_strips: 20,
             negative_span_orientation: false
         }
     }
@@ -38,7 +38,8 @@ impl RectangularWing {
             -self.angle_of_attack, rotation_axis
         );
 
-        let mut line_force_model_builder = LineForceModelBuilder::new(self.nr_strips); 
+        let mut line_force_model_builder = LineForceModelBuilder::new(self.nr_strips);
+        line_force_model_builder.density = 10.0;
         
         let last_z = if self.negative_span_orientation {
             -self.aspect_ratio

@@ -8,7 +8,7 @@ The circulation distribution will also affect the velocity in the simulation dom
 The calculation of the circulation strength on each line element follows the [Kutta–Joukowski theorem](https://en.wikipedia.org/wiki/Kutta%E2%80%93Joukowski_theorem). The mathematical definition of the circulation value, \\( \Gamma \\), on a line element is as follows, where \\(U \\) is the velocity, and \\( L \\) is the lift per unit span [^gamma_definition_note]
 
 \\[
-    \Gamma = L / U
+    \Gamma = L / (U \rho)
 \\]
 
 The lift per unit span is further computed from the sectional lift coefficient, \\(C_L\\) as follows, where \\(\rho\\) is the density and \\(c \\) the chord length:
@@ -24,12 +24,10 @@ pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
     let cl = self.lift_coefficients(&velocity);
 
     (0..velocity.len()).map(|index| {
-        -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index] * self.density
+        -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index]
     }).collect()
 }
 ```
-
-[^gamma_definition_note]: Usually, the definition of \\( \Gamma \\) is written slightly differently, with the density as a separate variable. In Stormbird, the density is *built in* the circulation value, so that \\(\Gamma_{stormbird} = \rho \Gamma_{textbooks}\\). The reason is just that this avoids having to always multiply the value of the circulation distribution with the density, whenever it is used, which seemed unnecessary from a computational point of view. However, it is important to be aware of this when interpreting the value
 
 ## Optional smoothing for difficult cases
 

@@ -60,7 +60,7 @@ impl LineForceModel {
         let cl = self.lift_coefficients(&velocity);
 
         (0..velocity.len()).map(|index| {
-            -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index] * self.density
+            -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index]
         }).collect()
     }
 
@@ -141,7 +141,7 @@ impl LineForceModel {
                 if velocity[index].length() == 0.0 {
                     Vec3::default()
                 } else {
-                    strength[index] * velocity[index].cross(span_lines[index].relative_vector())
+                    strength[index] * velocity[index].cross(span_lines[index].relative_vector()) * self.density
                 }
             }
         ).collect()
