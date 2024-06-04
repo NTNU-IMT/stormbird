@@ -12,7 +12,7 @@ use super::viscous_core_length::ViscousCoreLength;
 
 
 #[derive(Clone, Debug)]
-/// Data necessary when calcualting induced velocities from a quadrilateral panel in a simplified 
+/// Data necessary when calculating induced velocities from a quadrilateral panel in a simplified 
 /// manner.
 pub struct PanelGeometry {
     pub area: f64,
@@ -107,6 +107,7 @@ impl PotentialTheoryModel {
                 ViscousCoreLength::Absolute(core_length * representative_length)
             },
             ViscousCoreLength::Absolute(core_length) => ViscousCoreLength::Absolute(core_length),
+            ViscousCoreLength::NoViscousCore => ViscousCoreLength::NoViscousCore,
         };
 
         for i_point in 0..panel_points.len() {

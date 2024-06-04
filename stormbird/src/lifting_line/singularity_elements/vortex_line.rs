@@ -29,7 +29,11 @@ impl PotentialTheoryModel {
         let denominator = r_1_r_2 * (r_1_r_2 + r_1.dot(r_2));
 
         if denominator.abs() > closeness_error {
-            let viscous_core_term = viscous_core_length.viscous_core_term(line_points, ctrl_point);
+            let viscous_core_term = if let ViscousCoreLength::NoViscousCore = viscous_core_length {
+                1.0
+            } else {
+                viscous_core_length.viscous_core_term(line_points, ctrl_point)
+            };
 
             let k = (r_1_length + r_2_length) / denominator;
 

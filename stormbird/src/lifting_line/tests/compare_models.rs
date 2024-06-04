@@ -35,13 +35,14 @@ fn steady_lift() {
         aspect_ratio,
         cl_zero_angle,
         angle_of_attack,
+        nr_strips: 128,
         ..Default::default()
     }.build();
 
     let steady_settings  = SteadySettings{
         solver: SteadySolverSettings {
-            damping_factor_start: 0.05,
-            damping_factor_end: Some(0.25),
+            damping_factor_start: 0.01,
+            damping_factor_end: Some(0.1),
             print_log: true,
             ..Default::default()
         },
@@ -50,12 +51,15 @@ fn steady_lift() {
 
     let dynamic_settings = UnsteadySettings {
         solver: UnsteadySolverSettings {
-            damping_factor_start: 0.05,
-            damping_factor_end: Some(0.25),
+            damping_factor_start: 0.01,
+            damping_factor_end: Some(0.1),
             print_log: true,
             ..Default::default()
         },
-        ..Default::default()
+        wake: UnsteadyWakeBuilder {
+            ratio_of_wake_affected_by_induced_velocities: Some(0.0),
+            ..Default::default()
+        }
     };
 
     let nr_time_steps = 200;
