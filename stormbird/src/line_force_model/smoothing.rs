@@ -60,7 +60,7 @@ impl LineForceModel {
         
         let span_distance = self.span_distance_in_local_coordinates();
 
-        let end_corrections_distance_factor = 1.0;
+        let end_corrections_distance_factor = 2.0;
 
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let smoothing_length = settings.length_factor * wing_span_lengths[wing_index];
@@ -79,7 +79,13 @@ impl LineForceModel {
                 while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
                     local_span_distance.insert(0, local_span_distance[0] - span_to_be_inserted);
                     local_noisy_strength.insert(0, 0.0);
-                    span_to_be_inserted += delta_span;
+                    
+                    span_to_be_inserted += if number_of_insertions == 0 {
+                        0.5 * delta_span
+                    } else {
+                        delta_span
+                    };
+
                     number_of_insertions += 1;
                 }
                 
@@ -97,7 +103,13 @@ impl LineForceModel {
                 while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
                     local_span_distance.push(local_span_distance[local_span_distance.len()-1] + span_to_be_inserted);
                     local_noisy_strength.push(0.0);
-                    span_to_be_inserted += delta_span;
+                    
+                    span_to_be_inserted += if number_of_insertions == 0 {
+                        0.5 * delta_span
+                    } else {
+                        delta_span
+                    };
+
                     number_of_insertions += 1;
                 }
 

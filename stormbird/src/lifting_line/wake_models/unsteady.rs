@@ -69,12 +69,16 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default)]
     /// Data used to determine the length of the wake. 
     pub wake_length: WakeLength,
+    
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
     pub viscous_core_length: ViscousCoreLength,
     #[serde(default="UnsteadyWakeBuilder::default_first_panel_relative_length")]
     /// How the first panel in the wake is treated
     pub first_panel_relative_length: f64,
+    #[serde(default="UnsteadyWakeBuilder::default_last_panel_relative_length")]
+    /// Factor used to calculate the length of the final panel, relative to the chord length.
+    pub last_panel_relative_length: f64,
     #[serde(default="UnsteadyWakeBuilder::default_strength_damping_last_panel_ratio")]
     /// Determines the damping factor for the wake strength. Specifies how much damping there should
     /// be on the last panel. The actual damping factor also depends on the number of wake panels.
@@ -114,6 +118,7 @@ pub struct UnsteadyWakeBuilder {
 impl UnsteadyWakeBuilder {
     fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
     fn default_first_panel_relative_length() -> f64 {0.75}
+    fn default_last_panel_relative_length() -> f64 {10.0}
 
     pub fn build(
         &self,
@@ -186,6 +191,7 @@ impl UnsteadyWakeBuilder {
 
         let settings = UnsteadyWakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
+            last_panel_relative_length: self.last_panel_relative_length,
             strength_damping_factor,
             nr_wake_points_along_span,
             nr_wake_panels_along_span,
@@ -242,6 +248,7 @@ impl Default for UnsteadyWakeBuilder {
             wake_length: Default::default(),
             viscous_core_length: Default::default(),
             first_panel_relative_length: Self::default_first_panel_relative_length(),
+            last_panel_relative_length: Self::default_last_panel_relative_length(),
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: None,
@@ -258,6 +265,7 @@ impl Default for UnsteadyWakeBuilder {
 /// Settings for the unsteady wake
 pub struct UnsteadyWakeSettings {
     pub first_panel_relative_length: f64,
+    pub last_panel_relative_length: f64,
     pub strength_damping_factor: f64,
     pub nr_wake_points_along_span: usize,
     pub nr_wake_panels_along_span: usize,
@@ -590,6 +598,28 @@ impl UnsteadyWake {
         }
     }
 
+
+    /// Moves the last points in the wake based on the chord length and the freestream velocity
+    fn move_last_wake_points(
+        &mut self,
+        line_force_model: &LineForceModel,
+        wake_points_freestream: &[Vec3]
+    ) {
+        let start_index_last = self.wake_points.len() - self.settings.nr_wake_points_along_span;
+        let start_index_previous = start_index_last - self.settings.nr_wake_points_along_span;
+
+        let chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
+            &line_force_model.chord_vectors(), true
+        );
+
+        for i in 0..self.settings.nr_wake_points_along_span {
+            let current_velocity = wake_points_freestream[start_index_last + i];
+            let change_vector = self.settings.last_panel_relative_length * chord_vectors[i].length() * current_velocity.normalize();
+
+            self.wake_points[start_index_last + i] = self.wake_points[start_index_previous + i] + change_vector;
+        }
+    }
+
     /// Update the wake points by streaming them downstream.
     /// 
     /// The first and second "rows" - meaning the wing geometries and the first row of wake points -
@@ -602,7 +632,8 @@ impl UnsteadyWake {
         wake_points_freestream: &[Vec3]
     ) {
         self.move_first_free_wake_points(line_force_model, ctrl_points_freestream);
-        self.stream_free_wake_points(time_step, wake_points_freestream); 
+        self.stream_free_wake_points(time_step, wake_points_freestream);
+        self.move_last_wake_points(line_force_model, wake_points_freestream);
     }
 
     /// Returns the velocity at all the wake points.

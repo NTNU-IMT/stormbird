@@ -74,7 +74,7 @@ impl Default for SteadySolverSettings {
 
 impl UnsteadySolverSettings {
     pub fn default_max_iterations_per_time_step() -> usize {20}
-    pub fn default_damping_factor() -> f64 {0.1}
+    pub fn default_damping_factor() -> f64 {0.05}
 
     pub fn to_solver_settings(&self) -> SolverSettings {
         SolverSettings {

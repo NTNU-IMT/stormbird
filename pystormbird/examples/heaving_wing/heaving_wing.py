@@ -54,6 +54,8 @@ if __name__ == "__main__":
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
     args = parser.parse_args()
+
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
     if args.write_wake_files:
         wake_files_folder_path  = Path("wake_files_output")
@@ -109,9 +111,15 @@ if __name__ == "__main__":
         }
     ]
 
-    line_force_model = {
+    line_force_model_stat = {
         "wing_builders": wings,
         "nr_sections": nr_sections,
+    }
+
+    line_force_model_dyn = {
+        "wing_builders": wings,
+        "nr_sections": nr_sections,
+        "ctrl_point_chord_factor": 0.0
     }
 
     solver_settings = {
@@ -120,12 +128,22 @@ if __name__ == "__main__":
         "damping_factor_end": 0.2,
     }
 
+    dt = period / 64
+    final_time = 5.0 * period
+
+    first_panel_relative_length = (dt / velocity) / chord_length
+
     sim_settings_list = [
         {
             "Dynamic": {
                 "solver": solver_settings,
                 "wake": {
-                    "ratio_of_wake_affected_by_induced_velocities": 0.0
+                    "ratio_of_wake_affected_by_induced_velocities": 0.0,
+                    "first_panel_relative_length": 0.75,
+                    "last_panel_relative_length": 20.0,
+                    "wake_length": {
+                        "NrPanels": 200
+                    }
                 }
             }
         },
@@ -136,17 +154,24 @@ if __name__ == "__main__":
         }
     ]
 
-    label_list = ["Dynamic", "Quasi-steady"]
+    
+    line_force_model_list = [line_force_model_dyn, line_force_model_stat]
 
-    dt = period / 64
-    final_time = 5.0 * period
+    label_list = ["Dynamic", "Quasi-steady"]
+    color_list = [default_colors[0], default_colors[1]]
+
 
     w_plot = 14
     fig = plt.figure(figsize=(w_plot, w_plot / 3.0))
 
     max_cl = []
 
-    for simulation_settings, label in zip(sim_settings_list, label_list):
+    for simulation_settings, line_force_model, label, color in zip(
+        sim_settings_list,
+        line_force_model_list,
+        label_list,
+        color_list
+    ):
         print("Running ", label, "simulations:")
 
         setup = {
@@ -201,7 +226,7 @@ if __name__ == "__main__":
 
             t += dt
 
-        plt.plot(time, lift, label=label)
+        plt.plot(time, lift, label=label, color=color)
 
         max_cl.append(np.max(lift))
 
@@ -210,11 +235,20 @@ if __name__ == "__main__":
     theodorsen_reduction = theodorsen_lift_reduction_data(reduced_frequency)
     three_dim_reduction = 1 / (1 + 2/aspect_ratio)
 
-    total_reduction = theodorsen_reduction * three_dim_reduction
+    cl_quasi_steady_theory = -2 * np.pi * three_dim_reduction* velocity_func(np.array(time)) / velocity
+    cl_theodorsen = cl_quasi_steady_theory * theodorsen_reduction
 
-    cl_theodorsen = -2 * np.pi * total_reduction * velocity_func(np.array(time)) / velocity
+    plt.plot(
+        time, 
+        cl_theodorsen, 
+        label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color=color_list[0]
+    )
 
-    plt.plot(time, cl_theodorsen, label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color="grey")
+    plt.plot(
+        time, 
+        cl_quasi_steady_theory, 
+        label="Simplified quasi-steady", linestyle="--", color=color_list[1]
+    )
 
     print("Theodorsen ratio", theodorsen_reduction)
     print("CL ratio", max_cl[0] / max_cl[1])

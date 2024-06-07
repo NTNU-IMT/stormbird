@@ -65,6 +65,8 @@ pub struct LineForceModel {
     pub smoothing_settings: Option<SmoothingSettings>,
     /// Optional prescribed circulation shape
     pub prescribed_circulation: Option<PrescribedCirculation>,
+    /// Factor used to control the control point location
+    pub ctrl_point_chord_factor: f64,
 }
 
 impl Default for LineForceModel {
@@ -90,6 +92,7 @@ impl LineForceModel {
             derivatives: None,
             smoothing_settings: None,
             prescribed_circulation: None,
+            ctrl_point_chord_factor: 0.0,
         }
     }
 
@@ -214,7 +217,12 @@ impl LineForceModel {
     /// Returns the control points of each line element. This is calculated as the midpoint of each
     /// span line
     pub fn ctrl_points(&self) -> Vec<Vec3> {
-        self.span_lines().iter().map(|line| line.ctrl_point()).collect()
+        let span_lines = self.span_lines();
+        let chord_vectors = self.chord_vectors();
+
+        span_lines.iter().zip(chord_vectors.iter()).map(|(line, chord)| {
+            line.ctrl_point() + *chord * self.ctrl_point_chord_factor
+        }).collect()
     }
 
     /// Returns the control points of each line element in local coordinates. This is calculated as
