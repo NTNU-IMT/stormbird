@@ -128,8 +128,10 @@ if __name__ == "__main__":
         "damping_factor_end": 0.2,
     }
 
-    dt = period / 64
+    dt = period / 128
     final_time = 5.0 * period
+
+    relative_panel_length = dt * velocity / chord_length
 
     first_panel_relative_length = (dt / velocity) / chord_length
 
@@ -139,10 +141,10 @@ if __name__ == "__main__":
                 "solver": solver_settings,
                 "wake": {
                     "ratio_of_wake_affected_by_induced_velocities": 0.0,
-                    "first_panel_relative_length": 0.75,
+                    "first_panel_relative_length": relative_panel_length,
                     "last_panel_relative_length": 20.0,
                     "wake_length": {
-                        "NrPanels": 200
+                        "NrPanels": 400
                     }
                 }
             }

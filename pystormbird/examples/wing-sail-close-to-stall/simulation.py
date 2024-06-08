@@ -14,9 +14,11 @@ class SimulationCase():
     span: float = 33
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 64
+    nr_sections: int = 32
     simulation_type: str = "dynamic"
-    smoothing: bool = False
+    smoothing_length: float | None = None
+    section_model: dict | None = None
+    z_symmetry: bool = False
 
     @property
     def force_factor(self) -> float:
@@ -27,9 +29,14 @@ def run_simulation(simulation_case: SimulationCase):
 
     start_height = 10.0
 
-    
-
     chord_vector = Vec3(simulation_case.chord_length, 0.0, 0.0)
+
+    if simulation_case.section_model is None:
+        section_model = {
+            "Foil": "{}"
+        }
+    else:
+        section_model = simulation_case.section_model
 
     wing_builder = {
         "section_points": [
@@ -40,11 +47,7 @@ def run_simulation(simulation_case: SimulationCase):
             {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
             {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
         ],
-        "section_model": {
-            "Foil": {
-                "cl_zero_angle": 1.0
-            }
-        }
+        "section_model": section_model
     }
 
     line_force_model = {
@@ -53,11 +56,13 @@ def run_simulation(simulation_case: SimulationCase):
         "density": simulation_case.density,
     }
 
-    if simulation_case.smoothing:
+    if simulation_case.smoothing_length is not None:
+        end_corrections = [(False, True)] if simulation_case.z_symmetry else [(True, True)]
+
         smoothing_settings = {
             "gaussian": {
-                "length_factor": 0.02,
-                "end_corrections": [(True, True)]
+                "length_factor": simulation_case.smoothing_length,
+                "end_corrections": end_corrections
             }
         }
 
@@ -66,24 +71,23 @@ def run_simulation(simulation_case: SimulationCase):
     solver = {
         "damping_factor_start": 0.01,
         "damping_factor_end": 0.1,
-        "max_iterations_per_time_step": 30
+        "max_iterations_per_time_step": 20
     }
 
+    end_time = 40 * simulation_case.chord_length / simulation_case.freestream_velocity
+    dt = end_time / 512
 
-    wake = {
-        "symmetry_condition": "Z"
-    }
+    wake = {}
 
-    wake["induced_velocity_corrections"] = {
-        "max_magnitude_ratio": 1.0
-    }
+    if simulation_case.z_symmetry:
+        wake["symmetry_condition"] = "Z"
 
     if simulation_case.simulation_type == "dynamic":
-        wake["ratio_of_wake_affected_by_induced_velocities"] = 0.25
+        wake["ratio_of_wake_affected_by_induced_velocities"] = 0.0
         wake["first_panel_relative_length"] = 0.75
-        wake["last_panel_relative_length"] = 10.0
+        wake["last_panel_relative_length"] = 0.1
         wake["wake_length"] = {
-            "NrPanels": 50
+            "NrPanels": 400
         }
         sim_settings = {
             "Dynamic": {
@@ -108,10 +112,7 @@ def run_simulation(simulation_case: SimulationCase):
 
     setup_string = json.dumps(setup)
 
-    dt = 0.05 * simulation_case.chord_length / simulation_case.freestream_velocity
-    end_time = 40 * simulation_case.chord_length / simulation_case.freestream_velocity
-
-    angle_speed = 20 / (0.5 * end_time)
+    angle_speed = 10 / (0.5 * end_time)
 
     simulation = Simulation(
         setup_string = setup_string,
@@ -131,13 +132,13 @@ def run_simulation(simulation_case: SimulationCase):
 
     result_history = []
 
-    current_angle = (
-        np.radians(simulation_case.angle_of_attack) if simulation_case.start_angle_of_attack is None 
-        else np.radians(simulation_case.start_angle_of_attack)
+    current_angle_deg = (
+        simulation_case.angle_of_attack if simulation_case.start_angle_of_attack is None 
+        else simulation_case.start_angle_of_attack
     )
 
     while current_time < end_time:
-        simulation.set_local_wing_angles([-current_angle])
+        simulation.set_local_wing_angles([-np.radians(current_angle_deg)])
 
         result = simulation.do_step(
             time = current_time, 
@@ -149,11 +150,11 @@ def run_simulation(simulation_case: SimulationCase):
 
         result_history.append(result)
 
-        if current_angle < np.radians(simulation_case.angle_of_attack):
-            current_angle += angle_speed * dt
+        if current_angle_deg < simulation_case.angle_of_attack:
+            current_angle_deg += angle_speed * dt
 
-        if current_angle > np.radians(simulation_case.angle_of_attack):
-            current_angle = np.radians(simulation_case.angle_of_attack)
+        if current_angle_deg > simulation_case.angle_of_attack:
+            current_angle_deg = simulation_case.angle_of_attack
 
     return result_history
 

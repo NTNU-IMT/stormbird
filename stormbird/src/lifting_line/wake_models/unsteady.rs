@@ -69,7 +69,6 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default)]
     /// Data used to determine the length of the wake. 
     pub wake_length: WakeLength,
-    
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
     pub viscous_core_length: ViscousCoreLength,
@@ -79,6 +78,8 @@ pub struct UnsteadyWakeBuilder {
     #[serde(default="UnsteadyWakeBuilder::default_last_panel_relative_length")]
     /// Factor used to calculate the length of the final panel, relative to the chord length.
     pub last_panel_relative_length: f64,
+    #[serde(default)]
+    pub use_chord_direction: bool,
     #[serde(default="UnsteadyWakeBuilder::default_strength_damping_last_panel_ratio")]
     /// Determines the damping factor for the wake strength. Specifies how much damping there should
     /// be on the last panel. The actual damping factor also depends on the number of wake panels.
@@ -192,6 +193,7 @@ impl UnsteadyWakeBuilder {
         let settings = UnsteadyWakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
             last_panel_relative_length: self.last_panel_relative_length,
+            use_chord_direction: self.use_chord_direction,
             strength_damping_factor,
             nr_wake_points_along_span,
             nr_wake_panels_along_span,
@@ -249,6 +251,7 @@ impl Default for UnsteadyWakeBuilder {
             viscous_core_length: Default::default(),
             first_panel_relative_length: Self::default_first_panel_relative_length(),
             last_panel_relative_length: Self::default_last_panel_relative_length(),
+            use_chord_direction: false,
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: None,
@@ -266,6 +269,7 @@ impl Default for UnsteadyWakeBuilder {
 pub struct UnsteadyWakeSettings {
     pub first_panel_relative_length: f64,
     pub last_panel_relative_length: f64,
+    pub use_chord_direction: bool,
     pub strength_damping_factor: f64,
     pub nr_wake_points_along_span: usize,
     pub nr_wake_panels_along_span: usize,
@@ -563,14 +567,17 @@ impl UnsteadyWake {
             // chord vector. Large flow separation means that the ctrl point should move in the
             // direction of the velocity vector, but with an optional rotation around the axis of
             // the span line.
-            let wake_direction = if amount_of_flow_separation.abs() < 0.5 {
-                chord_vectors[i].normalize()
-            } else {
-                let axis = span_lines[i].relative_vector().normalize();
+            let velocity_direction = ctrl_points_velocity[i].rotate_around_axis(
+                wake_angles[i], 
+                span_lines[i].relative_vector().normalize()
+            ).normalize();
 
-                ctrl_points_velocity[i]
-                    .normalize()
-                    .rotate_around_axis(wake_angles[i], axis)
+            let wake_direction = if self.settings.use_chord_direction {
+                let chord_direction = chord_vectors[i].normalize();
+
+                (velocity_direction * amount_of_flow_separation + chord_direction * (1.0 - amount_of_flow_separation)).normalize()
+            } else {
+                velocity_direction
             };
 
             ctrl_points_change_vector.push(
