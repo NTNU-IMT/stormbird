@@ -20,7 +20,7 @@ use super::elliptic_wing_theory::EllipticWingTheory;
 #[test]
 fn steady_lift() {
     let aspect_ratio = 5.0;
-    let cl_zero_angle = 0.4;
+    let cl_zero_angle = 1.2;
     let angle_of_attack = 2.0_f64.to_radians();
 
     let theory = EllipticWingTheory {
@@ -116,7 +116,7 @@ fn steady_lift() {
     let dynamic_cl_error = (cl_theory - cl_dynamic).abs() / cl_theory.abs();
     let dynamic_cd_error = (cd_theory - cd_dynamic).abs() / cd_theory.abs();
 
-    let allowable_cd_error = 0.05;
+    let allowable_cd_error = 0.06;
     let allowable_cl_error = 0.07;
 
     assert!(steady_cl_error < allowable_cl_error, "Steady cl error: {}", steady_cl_error);

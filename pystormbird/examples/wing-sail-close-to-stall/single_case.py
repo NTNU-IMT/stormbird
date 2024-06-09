@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser.add_argument("--start-angle-of-attack", type=float, default = None, help="Start angle of attack in degrees")
     parser.add_argument("--dynamic", action="store_true", help="Use dynamic model")
     parser.add_argument("--smoothing", action="store_true", help="Use smoothing")
+    parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
 
     args = parser.parse_args()
@@ -21,7 +22,8 @@ if __name__ == "__main__":
         angle_of_attack = args.angle_of_attack,
         start_angle_of_attack = args.start_angle_of_attack,
         simulation_type = simulation_type,
-        smoothing = args.smoothing
+        smoothing = args.smoothing,
+        write_wake_files=args.write_wake_files
     )
 
     result_history = run_simulation(sim_case)
@@ -36,15 +38,21 @@ if __name__ == "__main__":
         cl[i] = force.y
 
     circulation_strength = np.array(result_history[-1].circulation_strength)
+    angle_of_attack = np.array(result_history[-1].angle_of_attack)
 
-    fig = plt.figure()
-    ax1 = fig.add_subplot(121)
-    ax2 = fig.add_subplot(122)
+    w_plot = 16
+    fig = plt.figure(figsize=(w_plot, w_plot/3.0))
+    ax1 = fig.add_subplot(131)
+    ax2 = fig.add_subplot(132)
+    ax3 = fig.add_subplot(133)
 
     plt.sca(ax1)
     plt.plot(cl)
 
     plt.sca(ax2)
     plt.plot(-circulation_strength)
+
+    plt.sca(ax3)
+    plt.plot(angle_of_attack)
 
     plt.show()

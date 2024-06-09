@@ -80,9 +80,13 @@ pub struct Foil {
     /// default.
     pub cd_power_after_stall: f64,
     #[serde(default="Foil::default_mean_stall_angle")]
-    /// The mean stall angle, which is the mean angle where the model transitions from pre-stall to
+    /// The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to
     /// post-stall behavior. The default value is 20 degrees.
-    pub mean_stall_angle: f64,
+    pub mean_positive_stall_angle: f64,
+    #[serde(default="Foil::default_mean_stall_angle")]
+    /// The mean stall angle for negative angles of attack, which is the mean angle where the model transitions from pre-stall to
+    /// post-stall behavior. The default value is 20 degrees.
+    pub mean_negative_stall_angle: f64,
     #[serde(default="Foil::default_stall_range")]
     /// The range of the stall transition. The default value is 6 degrees.
     pub stall_range: f64,
@@ -111,7 +115,7 @@ fn get_stall_angle(angle_of_attack: f64) -> f64 {
 }
 
 impl Foil {
-    fn default_one()                  -> f64 {1.0}
+    fn default_one() -> f64 {1.0}
     pub fn default_cl_initial_slope()     -> f64 {2.0 * PI}
     pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
@@ -133,7 +137,13 @@ impl Foil {
                 self.combine_pre_and_post_stall(angle_of_attack, cl_pre_stall, cl_post_stall)
             },
             StallModel::ConstantLift => {
-                let cl_post_stall = self.lift_coefficient_pre_stall(self.mean_stall_angle);
+                let mean_stall_angle = if angle_of_attack >= 0.0 {
+                    self.mean_positive_stall_angle.abs()
+                } else {
+                    self.mean_negative_stall_angle.abs()
+                };
+
+                let cl_post_stall = self.lift_coefficient_pre_stall(mean_stall_angle * angle_of_attack.signum());
 
                 cl_pre_stall.abs().min(cl_post_stall.abs())*cl_pre_stall.signum()
             }
@@ -180,9 +190,15 @@ impl Foil {
 
     /// Calculates the amount of stall for a given angle of attack.
     pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
+        let mean_stall_angle = if angle_of_attack >= 0.0 {
+            self.mean_positive_stall_angle.abs()
+        } else {
+            self.mean_negative_stall_angle.abs()
+        };
+
         common_functions::sigmoid_function(
             angle_of_attack.abs(), 
-            self.mean_stall_angle, 
+            mean_stall_angle, 
             self.stall_range
         )
     }
@@ -206,7 +222,8 @@ impl Default for Foil {
             cd_second_order_factor: 0.0,
             cd_max_after_stall:     Self::default_one(),
             cd_power_after_stall:   Self::default_cd_power_after_stall(),
-            mean_stall_angle:       Self::default_mean_stall_angle(),
+            mean_positive_stall_angle: Self::default_mean_stall_angle(),
+            mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),
             cl_changing_aoa_factor: 0.0,
             added_mass_factor:      0.0,

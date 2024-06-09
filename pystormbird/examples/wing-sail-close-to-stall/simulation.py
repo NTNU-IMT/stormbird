@@ -19,6 +19,7 @@ class SimulationCase():
     smoothing_length: float | None = None
     section_model: dict | None = None
     z_symmetry: bool = False
+    write_wake_files: bool = False
 
     @property
     def force_factor(self) -> float:
@@ -27,7 +28,7 @@ class SimulationCase():
 def run_simulation(simulation_case: SimulationCase):
     freestream_velocity = Vec3(simulation_case.freestream_velocity, 0.0, 0.0)
 
-    start_height = 10.0
+    start_height = 0.0
 
     chord_vector = Vec3(simulation_case.chord_length, 0.0, 0.0)
 
@@ -61,6 +62,8 @@ def run_simulation(simulation_case: SimulationCase):
 
         smoothing_settings = {
             "gaussian": {
+                "use_for_circulation_strength": True,
+                "use_for_angles_of_attack": True,
                 "length_factor": simulation_case.smoothing_length,
                 "end_corrections": end_corrections
             }
@@ -74,8 +77,8 @@ def run_simulation(simulation_case: SimulationCase):
         "max_iterations_per_time_step": 20
     }
 
-    end_time = 40 * simulation_case.chord_length / simulation_case.freestream_velocity
-    dt = end_time / 512
+    end_time = 50 * simulation_case.chord_length / simulation_case.freestream_velocity
+    dt = end_time / 500
 
     wake = {}
 
@@ -83,12 +86,19 @@ def run_simulation(simulation_case: SimulationCase):
         wake["symmetry_condition"] = "Z"
 
     if simulation_case.simulation_type == "dynamic":
-        wake["ratio_of_wake_affected_by_induced_velocities"] = 0.0
+        wake["ratio_of_wake_affected_by_induced_velocities"] = 0.75
         wake["first_panel_relative_length"] = 0.75
-        wake["last_panel_relative_length"] = 0.1
+        wake["last_panel_relative_length"] = 50.0
+        wake["use_chord_direction"] = True
+
         wake["wake_length"] = {
-            "NrPanels": 400
+            "NrPanels": 60
         }
+
+        wake["viscous_core_length_off_body"] = {
+            "Absolute": 0.25 * simulation_case.chord_length
+        }
+
         sim_settings = {
             "Dynamic": {
                 "solver": solver,
@@ -108,11 +118,13 @@ def run_simulation(simulation_case: SimulationCase):
     setup = {
         "line_force_model": line_force_model,
         "simulation_mode": sim_settings,
+        "write_wake_data_to_file": simulation_case.write_wake_files,
+        "wake_files_folder_path": "wake_files_output"
     }
 
     setup_string = json.dumps(setup)
 
-    angle_speed = 10 / (0.5 * end_time)
+    angle_speed = 10 / (0.25 * end_time)
 
     simulation = Simulation(
         setup_string = setup_string,

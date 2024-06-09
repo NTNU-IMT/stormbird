@@ -19,6 +19,8 @@ pub struct SmoothingSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GaussianSmoothingSettings {
+    pub use_for_angles_of_attack: bool,
+    pub use_for_circulation_strength: bool,
     pub length_factor: f64,
     pub end_corrections: Vec<(bool, bool)>,
 }
@@ -35,7 +37,9 @@ impl LineForceModel {
 
         if let Some(settings) = &self.smoothing_settings {
             if let Some(gaussian) = &settings.gaussian {
-                strength = self.gaussian_smoothed_strength(&strength, gaussian);
+                if gaussian.use_for_circulation_strength {
+                    strength = self.gaussian_smoothed_values(&strength, gaussian);
+                }
             }
 
             if let Some(artificial_viscosity) = &settings.artificial_viscosity {
@@ -47,14 +51,14 @@ impl LineForceModel {
     }
 
     /// Function that applies a Gaussian smoothing to the supplied strength vector.
-    pub fn gaussian_smoothed_strength(
+    pub fn gaussian_smoothed_values(
         &self, 
-        noisy_strength: &[f64],
+        noisy_values: &[f64],
         settings: &GaussianSmoothingSettings,
     ) -> Vec<f64> {
         assert_eq!(settings.end_corrections.len(), self.nr_wings());
 
-        let mut smoothed_strength: Vec<f64> = Vec::with_capacity(noisy_strength.len());
+        let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
 
         let wing_span_lengths = self.wing_span_lengths();
         
@@ -68,7 +72,7 @@ impl LineForceModel {
             let end_corrections = settings.end_corrections[wing_index];
 
             let mut local_span_distance = span_distance[wing_indices.clone()].to_vec();
-            let mut local_noisy_strength = noisy_strength[wing_indices.clone()].to_vec();
+            let mut local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 
             let start_index = if end_corrections.0 {
                 let delta_span = local_span_distance[1] - local_span_distance[0];
@@ -78,7 +82,7 @@ impl LineForceModel {
 
                 while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
                     local_span_distance.insert(0, local_span_distance[0] - span_to_be_inserted);
-                    local_noisy_strength.insert(0, 0.0);
+                    local_noisy_values.insert(0, 0.0);
                     
                     span_to_be_inserted += if number_of_insertions == 0 {
                         0.5 * delta_span
@@ -102,7 +106,7 @@ impl LineForceModel {
 
                 while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
                     local_span_distance.push(local_span_distance[local_span_distance.len()-1] + span_to_be_inserted);
-                    local_noisy_strength.push(0.0);
+                    local_noisy_values.push(0.0);
                     
                     span_to_be_inserted += if number_of_insertions == 0 {
                         0.5 * delta_span
@@ -118,18 +122,18 @@ impl LineForceModel {
                 local_span_distance.len()
             };
 
-            let raw_wing_smoothed_strength = smoothing::gaussian_smoothing(
+            let raw_wing_smoothed_values = smoothing::gaussian_smoothing(
                 &local_span_distance, 
-                &local_noisy_strength, 
+                &local_noisy_values, 
                 smoothing_length
             );
             
             for index in start_index..end_index {
-                smoothed_strength.push(raw_wing_smoothed_strength[index]);
+                smoothed_values.push(raw_wing_smoothed_values[index]);
             }
         }
 
-        smoothed_strength
+        smoothed_values
     }
 
     pub fn circulation_strength_with_viscosity(

@@ -30,7 +30,8 @@ impl Foil {
             cd_second_order_factor = 0.0, 
             cd_max_after_stall     = 1.0, 
             cd_power_after_stall   = FoilRust::default_cd_power_after_stall(), 
-            mean_stall_angle       = FoilRust::default_mean_stall_angle(), 
+            mean_positive_stall_angle = FoilRust::default_mean_stall_angle(),
+            mean_negative_stall_angle = FoilRust::default_mean_stall_angle(),
             stall_range            = FoilRust::default_stall_range()
         )
     )]
@@ -44,7 +45,8 @@ impl Foil {
         cd_second_order_factor: f64,
         cd_max_after_stall: f64,
         cd_power_after_stall: f64,
-        mean_stall_angle: f64,
+        mean_positive_stall_angle: f64,
+        mean_negative_stall_angle: f64,
         stall_range: f64,
     ) -> Self {
         Self {
@@ -58,7 +60,8 @@ impl Foil {
                 cd_second_order_factor,
                 cd_max_after_stall,
                 cd_power_after_stall,
-                mean_stall_angle,
+                mean_positive_stall_angle,
+                mean_negative_stall_angle,
                 stall_range,
                 ..Default::default()
             }
@@ -125,8 +128,13 @@ impl Foil {
     }
 
     #[getter]
-    pub fn mean_stall_angle(&self) -> f64 {
-        self.data.mean_stall_angle
+    pub fn mean_positive_stall_angle(&self) -> f64 {
+        self.data.mean_positive_stall_angle
+    }
+
+    #[getter]
+    pub fn mean_negative_stall_angle(&self) -> f64 {
+        self.data.mean_negative_stall_angle
     }
 
     #[getter]

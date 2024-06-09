@@ -63,11 +63,13 @@ impl LineForceModel {
         end_corrections: Vec<(bool, bool)>
     ) -> Vec<f64> {
         let settings = GaussianSmoothingSettings {
+            use_for_angles_of_attack: false,
+            use_for_circulation_strength: true,
             length_factor,
             end_corrections
         };
 
-        self.data.gaussian_smoothed_strength(&noisy_strength, &settings)
+        self.data.gaussian_smoothed_values(&noisy_strength, &settings)
     }
 
     #[pyo3(signature = (

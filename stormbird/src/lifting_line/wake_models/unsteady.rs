@@ -479,7 +479,6 @@ impl UnsteadyWake {
     }
 
     /// Returns the index of the wing that the span index belongs to
-    /// 
     fn wing_index(&self, span_index: usize) -> usize {
         for i in 0..self.wing_indices.len() {
             if self.wing_indices[i].contains(&span_index) {
@@ -537,15 +536,21 @@ impl UnsteadyWake {
         let ctrl_points = line_force_model.ctrl_points();
 
         // Compute the induced velocities at the control points
-        let u_i: Vec<Vec3> = self.induced_velocities(&ctrl_points, true);
+        let u_i = if let Some(end_index) = self.settings.end_index_induced_velocities_on_wake {
+            if end_index > 0 {
+                self.induced_velocities(&ctrl_points, true)
+            } else {
+                vec![Vec3::default(); ctrl_points.len()]
+            }
+        } else {
+            self.induced_velocities(&ctrl_points, true)
+        };
 
         let mut ctrl_points_velocity: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
 
         for i in 0..ctrl_points.len() {
             ctrl_points_velocity.push(ctrl_points_freestream[i] + u_i[i]);
         }
-
-        ctrl_points_velocity = line_force_model.remove_span_velocity(&ctrl_points_velocity);
 
         let angles_of_attack = line_force_model.angles_of_attack(&ctrl_points_velocity);
 
@@ -575,7 +580,10 @@ impl UnsteadyWake {
             let wake_direction = if self.settings.use_chord_direction {
                 let chord_direction = chord_vectors[i].normalize();
 
-                (velocity_direction * amount_of_flow_separation + chord_direction * (1.0 - amount_of_flow_separation)).normalize()
+                (
+                    velocity_direction * amount_of_flow_separation + 
+                    chord_direction * (1.0 - amount_of_flow_separation)
+                ).normalize()
             } else {
                 velocity_direction
             };
