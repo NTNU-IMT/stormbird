@@ -72,7 +72,7 @@ def run_simulation(simulation_case: SimulationCase):
         line_force_model["smoothing_settings"] = smoothing_settings
 
     solver = {
-        "damping_factor_start": 0.01,
+        "damping_factor_start": 0.005,
         "damping_factor_end": 0.1,
         "max_iterations_per_time_step": 20
     }
@@ -102,7 +102,7 @@ def run_simulation(simulation_case: SimulationCase):
         sim_settings = {
             "Dynamic": {
                 "solver": solver,
-                "wake": wake
+                "wake": wake,
             }
         }
     elif simulation_case.simulation_type == "static":
