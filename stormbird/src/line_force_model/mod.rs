@@ -276,23 +276,12 @@ impl LineForceModel {
         let chord_vectors = self.chord_vectors();
         let span_lines    = self.span_lines();
         
-        let mut angles_of_attack: Vec<f64> = (0..velocity_corrected.len()).map(|index| {
+        let angles_of_attack: Vec<f64> = (0..velocity_corrected.len()).map(|index| {
             chord_vectors[index].signed_angle_between(
                 velocity_corrected[index], 
                 span_lines[index].direction()
             )
         }).collect();
-
-        if let Some(settings) = &self.smoothing_settings {
-            if let Some(gaussian) = &settings.gaussian {
-                if gaussian.use_for_angles_of_attack {
-                    let mut corrected_settings = gaussian.clone();
-                    corrected_settings.end_corrections = vec![(false, false); self.nr_wings()];
-
-                    angles_of_attack = self.gaussian_smoothed_values(&angles_of_attack, &corrected_settings);
-                }
-            }
-        }
 
         angles_of_attack
     }

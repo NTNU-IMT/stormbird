@@ -22,7 +22,7 @@ pub enum ViscousCoreLength {
 
 impl Default for ViscousCoreLength {
     fn default() -> Self {
-        Self::Relative(0.01)
+        Self::Relative(0.1)
     }
 }
 

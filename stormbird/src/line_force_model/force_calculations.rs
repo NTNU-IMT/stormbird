@@ -45,7 +45,7 @@ impl LineForceModel {
             let raw_strength = self.circulation_strength_raw(velocity);
 
             if self.smoothing_settings.is_some() {
-                self.smoothed_strength(&raw_strength)
+                self.smoothed_strength(&raw_strength, velocity)
             } else {
                 raw_strength
             }

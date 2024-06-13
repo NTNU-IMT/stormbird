@@ -63,8 +63,6 @@ impl LineForceModel {
         end_corrections: Vec<(bool, bool)>
     ) -> Vec<f64> {
         let settings = GaussianSmoothingSettings {
-            use_for_angles_of_attack: false,
-            use_for_circulation_strength: true,
             length_factor,
             end_corrections
         };
@@ -74,17 +72,22 @@ impl LineForceModel {
 
     #[pyo3(signature = (
         *,
-        noisy_strength, 
+        noisy_strength,
+        velocity,
         viscosity,
-        iterations
+        solver_iterations,
+        solver_damping
     ))]
-    pub fn circulation_strength_with_viscosity(&self, noisy_strength: Vec<f64>, viscosity: f64, iterations: usize) -> Vec<f64> {
+    pub fn circulation_strength_with_viscosity(&self, noisy_strength: Vec<f64>, velocity: Vec<Vec3>, viscosity: f64, solver_iterations: usize, solver_damping: f64) -> Vec<f64> {
         let settings = ArtificialViscositySettings {
             viscosity,
-            iterations
+            solver_iterations,
+            solver_damping
         };
+
+        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
         
-        self.data.circulation_strength_with_viscosity(&noisy_strength, &settings)
+        self.data.circulation_strength_with_viscosity(&noisy_strength, &rust_velocity, &settings)
     }
 
     #[getter]

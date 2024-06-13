@@ -5,6 +5,11 @@ from pystormbird.lifting_line import Simulation
 from pystormbird import Vec3
 
 from dataclasses import dataclass
+from enum import Enum
+
+class SimulationMode(Enum):
+    DYNAMIC = 0
+    STATIC = 1
 
 @dataclass(frozen=True, kw_only=True)
 class SimulationCase():
@@ -15,8 +20,9 @@ class SimulationCase():
     freestream_velocity: float = 8.0
     density: float = 1.225
     nr_sections: int = 32
-    simulation_type: str = "dynamic"
+    simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
+    circulation_viscosity: float | None = None
     section_model: dict | None = None
     z_symmetry: bool = False
     write_wake_files: bool = False
@@ -27,8 +33,6 @@ class SimulationCase():
 
 def run_simulation(simulation_case: SimulationCase):
     freestream_velocity = Vec3(simulation_case.freestream_velocity, 0.0, 0.0)
-
-    start_height = 0.0
 
     chord_vector = Vec3(simulation_case.chord_length, 0.0, 0.0)
 
@@ -41,8 +45,8 @@ def run_simulation(simulation_case: SimulationCase):
 
     wing_builder = {
         "section_points": [
-            {"x": 0.0, "y": 0.0, "z": start_height},
-            {"x": 0.0, "y": 0.0, "z": start_height + simulation_case.span}
+            {"x": 0.0, "y": 0.0, "z": 0.0},
+            {"x": 0.0, "y": 0.0, "z": simulation_case.span}
         ],
         "chord_vectors": [
             {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
@@ -57,24 +61,39 @@ def run_simulation(simulation_case: SimulationCase):
         "density": simulation_case.density,
     }
 
+    gaussian_smoothing_settings = None
+    artificial_viscosity = None
     if simulation_case.smoothing_length is not None:
         end_corrections = [(False, True)] if simulation_case.z_symmetry else [(True, True)]
 
-        smoothing_settings = {
-            "gaussian": {
-                "use_for_circulation_strength": True,
-                "use_for_angles_of_attack": True,
-                "length_factor": simulation_case.smoothing_length,
-                "end_corrections": end_corrections
-            }
+        gaussian_smoothing_settings = {
+            "length_factor": simulation_case.smoothing_length,
+            "end_corrections": end_corrections
         }
+    
+    if simulation_case.circulation_viscosity is not None:
+        artificial_viscosity = {
+            "viscosity": simulation_case.circulation_viscosity,
+            "solver_iterations": 20,
+            "solver_damping": 0.1
+        }
+        
 
+    if gaussian_smoothing_settings is not None or artificial_viscosity is not None:
+        smoothing_settings = {}
+
+        if gaussian_smoothing_settings is not None:
+            smoothing_settings["gaussian"] = gaussian_smoothing_settings
+        
+        if artificial_viscosity is not None:
+            smoothing_settings["artificial_viscosity"] = artificial_viscosity
+    
         line_force_model["smoothing_settings"] = smoothing_settings
 
     solver = {
-        "damping_factor_start": 0.005,
+        "damping_factor_start": 0.01,
         "damping_factor_end": 0.1,
-        "max_iterations_per_time_step": 20
+        "max_iterations_per_time_step": 3
     }
 
     end_time = 50 * simulation_case.chord_length / simulation_case.freestream_velocity
@@ -85,35 +104,36 @@ def run_simulation(simulation_case: SimulationCase):
     if simulation_case.z_symmetry:
         wake["symmetry_condition"] = "Z"
 
-    if simulation_case.simulation_type == "dynamic":
-        wake["ratio_of_wake_affected_by_induced_velocities"] = 0.75
-        wake["first_panel_relative_length"] = 0.75
-        wake["last_panel_relative_length"] = 50.0
-        wake["use_chord_direction"] = True
+    match simulation_case.simulation_mode:
+        case SimulationMode.DYNAMIC:
+            wake["ratio_of_wake_affected_by_induced_velocities"] = 0.75
+            wake["first_panel_relative_length"] = 0.75
+            wake["last_panel_relative_length"] = 50.0
+            wake["use_chord_direction"] = True
 
-        wake["wake_length"] = {
-            "NrPanels": 60
-        }
-
-        wake["viscous_core_length_off_body"] = {
-            "Absolute": 0.25 * simulation_case.chord_length
-        }
-
-        sim_settings = {
-            "Dynamic": {
-                "solver": solver,
-                "wake": wake,
+            wake["wake_length"] = {
+                "NrPanels": 60
             }
-        }
-    elif simulation_case.simulation_type == "static":
-        sim_settings = {
-            "QuasiSteady": {
-                "solver": solver,
-                "wake": wake
+
+            wake["viscous_core_length_off_body"] = {
+                "Absolute": 0.25 * simulation_case.chord_length
             }
-        }
-    else:
-        raise ValueError("Invalid simulation type")
+
+            sim_settings = {
+                "Dynamic": {
+                    "solver": solver,
+                    "wake": wake,
+                }
+            }
+        case SimulationMode.STATIC:
+            sim_settings = {
+                "QuasiSteady": {
+                    "solver": solver,
+                    "wake": wake
+                }
+            }
+        case _:
+            raise ValueError("Invalid simulation type")
 
     setup = {
         "line_force_model": line_force_model,

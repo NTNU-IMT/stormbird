@@ -17,7 +17,13 @@ The lift per unit span is further computed from the sectional lift coefficient, 
     L = 0.5 \cdot \rho \cdot c \cdot C_L \cdot U^2 
 \\]
 
-These equations are combined, and modified to account for the directional definitions, as follows in the actual source code:
+When these equations are combined, we get the following equation for the circulation strength:
+
+\\[
+    \Gamma = 0.5 \cdot c \cdot C_L \cdot U 
+\\]
+
+The actual source code looks like the following (the negative values are to account for directional definitions)
 
 ```rust
 pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
@@ -33,7 +39,7 @@ pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
 
 Sometimes, there might be noise in the estimated circulation strength, which might cause instabilities and errors in the estimated forces. Typical examples are lifting line simulations of stalled wings - at least when the wake is quasi-static - and actuator line simulations with very large lift-coefficients - such as for rotor sails.
 
-To handle such cases in a practical manner, there are optional *smoothing* methods that can be used when estimating the circulation strength. These methods are controlled through a `SmoothingSettings` structure that is specified for the line force model. The fields in the complete structure is given below:
+To handle such cases in a practical manner, there are optional *smoothing methods* that can be used when estimating the circulation strength. These methods are controlled through a `SmoothingSettings` structure that is specified for the line force model. The fields in the complete structure is given below:
 
 ```rust
 pub struct SmoothingSettings {
@@ -45,6 +51,7 @@ pub struct SmoothingSettings {
 These fields control two different smoothing methods, which are further explained below. All parameters are optional and set to `None` by default, meaning that none of the methods are used unless they are activated by the user. 
 
 ### Gaussian smoothing
+
 The `GaussianSmoothingSettings` contains parameters used to apply a [Gaussian smoothing filter](https://en.wikipedia.org/wiki/Kernel_smoother) to the estimated circulation distribution. The available fields are shown below:
 
 ```rust
@@ -65,19 +72,41 @@ An example of how this smoothing method affects the circulation distribution is 
 As can bee seen, simple Gaussian smoothing introduces some errors towards the end of the wings if the smoothing length is too large, although the random noise is effectively reduced. It is therefore generally recommended to only apply as little smoothing as necessary to stabilize a solution. 
 
 ### Artificial viscosity
-This is currently an experimental feature and should be **used with care**. It adds a viscosity term to the estimated circulation distribution, based on the second derivative of the circulation as a function of span location multiplied with this parameter. The idea is taken from this [pre-print](https://www.researchgate.net/publication/378262301_An_Efficient_3D_Non-Linear_Lifting-Line_Method_with_Correction_for_Post-Stall_Regime). The paper suggest that an artificial viscosity term can in some cases stabilize the results in challenging conditions for the solver. Early testing indicate that similar results as the preprint can achieved using the same method in Stormbird. However, the parameter seems to require careful tuning to work properly, and can quickly also increase any instabilities. A particular problem is that both too low and too high values may cause instabilities. At the moment, Gaussian smoothing is recommended for cases with unstable results.
+This concept is Based on the work first presented in Chattot (2004), but also used in other papers such as in Gallay et al. (2015) and Simonet et al. (2024). 
 
-Available fields:
+It is found that it is possible to stabilize the solution of the circulation distribution in non-linear cases by adding an *artificial viscosity term* that is dependent on the second derivative of the distribution. 
+
+That is, if the raw circulation strength from the original lifting line theory at line element i is called \\(\Gamma_{i, 0} \\) and the span distance of element i is labeled \\(s\\), then we can calculate a corrected circulation strength, \\( \Gamma_i \\), using an artificial viscosity parameter \\(\mu\\), as follows:
+
+\\[
+    \Gamma_i = \Gamma_{i,0} + \mu \frac{\partial^2\Gamma_i}{\partial s^2}
+\\]
+
+The double derivative of the circulation distribution can be calculated using finite difference. 
+
+However, a challenge is that the solution of \\(\Gamma_i \\) also depends on the second derivative of itself. A solver is therefore necessary to find the correction term. 
+
+At the moment, this is handled using the same type on dampened iterative solver as for the raw circulation strength[^solver_note]. 
+
+The available fields for this solver is given below:
 
 ```rust
 pub struct ArtificialViscositySettings {
     pub viscosity: f64,
-    pub iterations: usize,
+    pub solver_iterations: usize,
+    pub solver_damping: f64
 }
 ```
 
-More information on this method will come if we find good recommendations for the settings. If not, the option might be removed... 
+[^solver_note]: It seems like there should be a more elegant solution to this solver. However, this has not been prioritized yet.
 
 ## Predetermined distributions
 
-To come!
+Predetermined circulation distributions are a solution that allow the simulation to directly use lift and drag data from some external source for a single wing - e.g., CFD or experimental data - but still be able to model interaction effects between several wings in a simplified manner. This solution is particularly useful for rotor sails (see the rotor sail tutorial for more), or for any other cases with complex flow around the wings that are not modelled accurately directly by the lifting line method.
+
+More to come!
+
+## References
+- Chattot, J., 2004. Analysis and design of wings and wing/winglet combinations at low speeds. Computational Fluid Dynamics. Available [here](https://arc.aiaa.org/doi/10.2514/6.2004-220)
+- Gallay, S., Laurendeau, E., 2015. Nonlinear Generalized Lifting-Line Coupling Algorithms for Pre/Poststall Flows. AiAA Journal. Available [here](https://www.researchgate.net/publication/276123891_Nonlinear_Generalized_Lifting-Line_Coupling_Algorithms_for_PrePoststall_Flows)
+- Simonet, T., Roncin, K., Faure, T. M., Daridon, L., 2024. An efficient 3D non-linear lifting-line method with correction for post-stall regime. Preprint. Available [here](https://www.researchsquare.com/article/rs-3955527/v1)

@@ -19,8 +19,6 @@ pub struct SmoothingSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GaussianSmoothingSettings {
-    pub use_for_angles_of_attack: bool,
-    pub use_for_circulation_strength: bool,
     pub length_factor: f64,
     pub end_corrections: Vec<(bool, bool)>,
 }
@@ -28,22 +26,27 @@ pub struct GaussianSmoothingSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtificialViscositySettings {
     pub viscosity: f64,
-    pub iterations: usize,
+    pub solver_iterations: usize,
+    pub solver_damping: f64,
 }
 
 impl LineForceModel {
-    pub fn smoothed_strength(&self, input_strength: &[f64]) -> Vec<f64> {
+    pub fn smoothed_strength(&self, input_strength: &[f64], velocity: &[Vec3]) -> Vec<f64> {
         let mut strength = input_strength.to_vec();
 
         if let Some(settings) = &self.smoothing_settings {
             if let Some(gaussian) = &settings.gaussian {
-                if gaussian.use_for_circulation_strength {
+                if gaussian.length_factor > 0.0 {
                     strength = self.gaussian_smoothed_values(&strength, gaussian);
                 }
             }
 
             if let Some(artificial_viscosity) = &settings.artificial_viscosity {
-                strength = self.circulation_strength_with_viscosity(&strength, artificial_viscosity);
+                strength = self.circulation_strength_with_viscosity(
+                    &strength,
+                    velocity,
+                    artificial_viscosity
+                );
             }
         }
 
@@ -138,20 +141,23 @@ impl LineForceModel {
 
     pub fn circulation_strength_with_viscosity(
         &self, 
-        input_strength: &[f64], 
+        input_strength: &[f64],
+        velocity: &[Vec3],
         settings: &ArtificialViscositySettings
     ) -> Vec<f64> {
         let mut new_estimated_strength = input_strength.to_vec();
 
-        for _ in 0..settings.iterations {
+        for _ in 0..settings.solver_iterations {
             let circulation_strength_second_derivative = self.circulation_strength_second_derivative(
                 &new_estimated_strength
             );
 
             for i in 0..new_estimated_strength.len() {
-                let viscosity_term = settings.viscosity * circulation_strength_second_derivative[i];
+                let scaling_factor = 0.5 * self.chord_vectors_local[i].length() * velocity[i].length();
                 
-                new_estimated_strength[i] = input_strength[i] + viscosity_term;
+                let viscosity_term = settings.viscosity * scaling_factor * circulation_strength_second_derivative[i];
+                
+                new_estimated_strength[i] = input_strength[i] + settings.solver_damping * viscosity_term;
             }
         }
 
