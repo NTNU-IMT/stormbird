@@ -1,6 +1,6 @@
 [package]
 name = "stormbird"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "A library for modelling modern wind propulsion devices"
 homepage = "https://github.com/jarlekramer/stormbird"
