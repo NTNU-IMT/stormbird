@@ -5,7 +5,6 @@
 #ifndef ACTUATOR_LINE_H
 #define ACTUATOR_LINE_H
 
-#include <vector>
 #include "cellSetOption.H"
 #include "cpp_actuator_line.hpp"
 
@@ -15,8 +14,6 @@ namespace Foam {
         public:
             TypeName("actuatorLine")
 
-            stormbird_interface::CppActuatorLine* model;
-
             ActuatorLine(const word& name, const word& modelType, const dictionary& dict, const fvMesh& mesh);
             virtual ~ActuatorLine() = default;
 
@@ -25,14 +22,14 @@ namespace Foam {
             virtual void addSup(const volScalarField& alpha, const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi);
 
         private:
+            stormbird_interface::CppActuatorLine* model;
             volVectorField* body_force_field;
             volScalarField* body_force_field_weight;
 
             void add(const volVectorField& U, fvMatrix<vector>& eqn);
-            void add_cell_information_to_model(const volVectorField& velocity);
-            void add_interpolated_velocity(const volVectorField& velocity);
-            
-            double measure_average_cell_length(const std::vector<stormbird_interface::Vec3>& points);
+
+            void set_integrated_weighted_velocity(const volVectorField& velocity);
+            void set_interpolated_velocity(const volVectorField& velocity);
 
             ActuatorLine(const ActuatorLine&) = delete;
             void operator=(const ActuatorLine&) = delete;

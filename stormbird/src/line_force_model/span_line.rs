@@ -15,7 +15,7 @@ pub struct LineCoordinates {
     pub span: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// A line segement of a wing span
 pub struct SpanLine {
     pub start_point: Vec3,

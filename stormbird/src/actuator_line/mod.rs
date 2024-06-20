@@ -5,8 +5,6 @@
 //! Implementation of actuator line functionality. 
 
 pub mod projection;
-pub mod velocity_sampling;
-pub mod settings;
 
 use std::path::Path;
 use std::fs;
@@ -21,8 +19,27 @@ use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::io_structs::prelude::*;
 
 use projection::Projection;
-use velocity_sampling::{VelocitySampling, VelocitySamplingBuilder};
-use settings::ActuatorLineSettings;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActuatorLineSettings {
+    #[serde(default)]
+    pub strength_damping: f64,
+    #[serde(default)]
+    pub remove_span_velocity: bool,
+    #[serde(default)]
+    pub velocity_aligned_projection: bool,
+}
+
+impl Default for ActuatorLineSettings {
+    fn default() -> Self {
+        Self {
+            strength_damping: 0.0,
+            remove_span_velocity: false,
+            velocity_aligned_projection: false,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,8 +49,6 @@ pub struct ActuatorLineBuilder {
     #[serde(default)]
     pub projection: Projection,
     #[serde(default)]
-    pub velocity_sampling: VelocitySamplingBuilder,
-    #[serde(default)]
     pub settings: ActuatorLineSettings,
 }
 
@@ -42,7 +57,6 @@ impl ActuatorLineBuilder {
         Self {
             line_force_model_builder,
             projection: Projection::default(),
-            velocity_sampling: VelocitySamplingBuilder::default(),
             settings: ActuatorLineSettings::default(),
         }
     }
@@ -56,7 +70,7 @@ impl ActuatorLineBuilder {
         ActuatorLine{
             line_force_model,
             projection: self.projection.clone(),
-            velocity_sampling: self.velocity_sampling.build(nr_span_lines),
+            ctrl_points_velocity: vec![Vec3::default(); nr_span_lines],
             results: Vec::new(),
             settings: self.settings.clone(),
         }
@@ -72,8 +86,8 @@ pub struct ActuatorLine {
     /// Enum, with an internal structure, that determines how forces are projected in a CFD 
     /// simulation
     pub projection: Projection,
-    /// Model that determines how the velocity is sampled around the line segments
-    pub velocity_sampling: VelocitySampling,
+    /// Vector to store interpolated velocity values for each control point
+    pub ctrl_points_velocity: Vec<Vec3>,
     /// Results from the model
     pub results: Vec<SimulationResult>,
     /// Numerical settings
@@ -96,45 +110,51 @@ impl ActuatorLine {
         builder.build()
     }
 
-    pub fn clear_cell_information(&mut self) {
-        self.velocity_sampling.reset();
-    }
+    pub fn get_weighted_velocity_integral_terms_for_cell(
+        &self, 
+        line_index: usize, 
+        velocity: Vec3, 
+        cell_center: Vec3, 
+        cell_volume: f64
+    ) -> (Vec3, f64) {
+        let span_line = self.line_force_model.span_lines()[line_index];
+        let chord_vector = self.line_force_model.chord_vectors()[line_index];
 
-    pub fn add_cell_information(&mut self, center: Vec3, velocity: Vec3, volume: f64) {
-        let span_lines = self.line_force_model.span_lines();
-        let chord_vectors = self.line_force_model.chord_vectors();
+        let projection_value_org = self.projection.projection_value_at_point(
+            cell_center, chord_vector, &span_line
+        );
 
-        for i in 0..self.line_force_model.nr_span_lines() {
-            let projection_value_org = self.projection.projection_value_at_point(
-                center, chord_vectors[i], &span_lines[i]
+        let projection_value = if projection_value_org > 0.0 {
+            let line_coordinates = span_line.line_coordinates(cell_center, chord_vector);
+            
+            // TODO: check if this is necessary
+            let span_projection = gaussian_kernel(
+                line_coordinates.span, 
+                0.0, 
+                0.5 * span_line.length()
             );
 
-            if projection_value_org > 0.0 {
-                let line_coordinates = span_lines[i].line_coordinates(center, chord_vectors[i]);
+            projection_value_org * span_projection
+        } else {
+            0.0
+        };
 
-                let span_projection = gaussian_kernel(
-                    line_coordinates.span, 
-                    0.0, 
-                    self.velocity_sampling.span_gaussian_width_factor * span_lines[i].length()
-                );
+        let denominator = cell_volume * projection_value;
+        let numerator = velocity * denominator; 
 
-                let projection_value = projection_value_org * span_projection;
-
-                self.velocity_sampling.add_cell_information(i, velocity, volume, projection_value);
-            }
-        }
+        (numerator, denominator)
     }
 
     pub fn calculate_and_add_result(&mut self) {        
-        let mut velocity_ctrl_points = self.velocity_sampling.freestream_velocity();
+        let mut ctrl_points_velocity = self.ctrl_points_velocity.clone();
          
         if self.settings.remove_span_velocity {
-            velocity_ctrl_points = self.line_force_model.remove_span_velocity(
-                &velocity_ctrl_points
+            ctrl_points_velocity = self.line_force_model.remove_span_velocity(
+                &ctrl_points_velocity
             );
         }
 
-        let result = self.calculate_result(&velocity_ctrl_points);
+        let result = self.calculate_result(&ctrl_points_velocity);
 
         self.results.push(result);
     }

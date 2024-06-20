@@ -22,6 +22,7 @@ namespace Foam {
     }
 }
 
+// Constructor
 Foam::fv::ActuatorLine::ActuatorLine(
     const word& name, 
     const word& modelType, 
@@ -59,70 +60,14 @@ Foam::fv::ActuatorLine::ActuatorLine(
     );
 }
 
-void Foam::fv::ActuatorLine::add_cell_information_to_model(const volVectorField& velocity) {
-    const vectorField& cell_centers = mesh_.C();
-    const scalarField& cell_volumes = mesh_.V();
-    const labelList& cell_ids       = cells();
-
-    this->model->clear_cell_information();
-
-    // -------------------- Loop over all cells for the current processor --------------------------
-    forAll(cell_ids, i) {
-        label cell_id = cell_ids[i];
-
-        auto center_sb = stormbird_interface::Vec3{
-            cell_centers[cell_id][0],
-            cell_centers[cell_id][1],
-            cell_centers[cell_id][2]
-        };
-
-        auto velocity_sb = stormbird_interface::Vec3{
-            velocity[cell_id][0],
-            velocity[cell_id][1],
-            velocity[cell_id][2]
-        };
-
-        double cell_volume = cell_volumes[cell_id];
-
-        this->model->add_cell_information(center_sb, velocity_sb, cell_volume);
-    }
-
-    // ------------------ Sync the values between processors ---------------------------------------
-    int n = this->model->nr_sampling_span_lines();
-
-    for (int i = 0; i < n; i++) {
-        auto numerator_sb = this->model->get_velocity_sampling_numerator(i);
-
-        vector numerator(vector::zero);
-        
-        numerator[0] = numerator_sb.x;
-        numerator[1] = numerator_sb.y;
-        numerator[2] = numerator_sb.z;
-
-        reduce(numerator, sumOp<vector>());
-
-        numerator_sb.x = numerator[0];
-        numerator_sb.y = numerator[1];
-        numerator_sb.z = numerator[2];
-
-        this->model->set_velocity_sampling_numerator(i, numerator_sb);
-
-        double denominator = this->model->get_velocity_sampling_denominator(i);
-
-        reduce(denominator, sumOp<double>());
-
-        this->model->set_velocity_sampling_denominator(i, denominator);
-    }
-}
-
-void Foam::fv::ActuatorLine::add(const volVectorField& U, fvMatrix<vector>& eqn)
+void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
 {
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
     const labelList& cell_ids      = cells();
     vectorField& equation_source   = eqn.source();
 
-    this->add_cell_information_to_model(U);
+    this->set_integrated_weighted_velocity(velocity_field);
 
     this->model->calculate_result();
     
@@ -133,21 +78,21 @@ void Foam::fv::ActuatorLine::add(const volVectorField& U, fvMatrix<vector>& eqn)
     forAll(cell_ids, i) {
         label cell_id = cell_ids[i];
 
-        auto cell_center_sb = stormbird_interface::Vec3{
+        std::array<double, 3> cell_center = {
             cell_centers[cell_id][0],
             cell_centers[cell_id][1],
             cell_centers[cell_id][2]
         };
 
-        auto body_force_sb = this->model->distributed_body_force_at_point(cell_center_sb);
+        std::array<double, 3> body_force_sb = this->model->distributed_body_force_at_point(cell_center);
 
-        double body_force_weight = this->model->distributed_body_force_weight_at_point(cell_center_sb);
+        double body_force_weight = this->model->distributed_body_force_weight_at_point(cell_center);
 
         vector body_force(vector::zero);
 
-        body_force[0] = body_force_sb.x * cell_volumes[cell_id];
-        body_force[1] = body_force_sb.y * cell_volumes[cell_id];
-        body_force[2] = body_force_sb.z * cell_volumes[cell_id];
+        body_force[0] = body_force_sb[0] * cell_volumes[cell_id];
+        body_force[1] = body_force_sb[1] * cell_volumes[cell_id];
+        body_force[2] = body_force_sb[2] * cell_volumes[cell_id];
 
         equation_source[cell_id] += body_force;
 
@@ -156,57 +101,105 @@ void Foam::fv::ActuatorLine::add(const volVectorField& U, fvMatrix<vector>& eqn)
     }
 }
 
-double Foam::fv::ActuatorLine::measure_average_cell_length(const std::vector<stormbird_interface::Vec3>& points) {
-    double volume_sum = 0.0;
-    
-    for (unsigned int i = 0; i < points.size(); i++) {
-        scalar volume_sample = scalar(VGREAT);
+void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) {
+    const vectorField& cell_centers = mesh_.C();
+    const scalarField& cell_volumes = mesh_.V();
+    const labelList& cell_ids       = cells();
 
-        vector point_local = vector(points[i].x, points[i].y, points[i].z);
+    // ------------------ Initialize the numerator and denominator ---------------------------------
+    std::vector<vector> numerator;
+    std::vector<double> denominator;
 
-        label cell_id = mesh_.findCell(point_local);
+    int nr_span_lines = this->model->nr_span_lines();
 
-        if (cell_id != -1) {
-            volume_sample = mesh_.V()[cell_id];
-        }
-        
-        reduce(volume_sample, minOp<scalar>());
-
-        volume_sum += volume_sample; 
+    for (int line_index = 0; line_index < nr_span_lines; line_index++) {
+        numerator.push_back(vector::zero);
+        denominator.push_back(0.0);
     }
 
-    double average_volume = volume_sum / points.size();
-    double average_cell_length = pow(average_volume, 1.0/3.0);
+    // -------------------- Loop over all cells for the current processor --------------------------
+    forAll(cell_ids, i) {
+        label cell_id = cell_ids[i];
 
-    return average_cell_length;
+        std::array<double, 3> velocity = {
+            velocity_field[cell_id][0],
+            velocity_field[cell_id][1],
+            velocity_field[cell_id][2]
+        };
+
+        double cell_volume = cell_volumes[cell_id];
+
+        std::array<double, 3> cell_center = {
+            cell_centers[cell_id][0],
+            cell_centers[cell_id][1],
+            cell_centers[cell_id][2]
+        };
+
+        for (int line_index = 0; line_index < nr_span_lines; line_index++) {
+            std::array<double, 4> temp_out = this->model->get_weighted_velocity_integral_terms_for_cell(
+                line_index,
+                velocity,
+                cell_center,
+                cell_volume
+            );
+            
+            numerator[line_index][0] += temp_out[0];
+            numerator[line_index][1] += temp_out[1];
+            numerator[line_index][2] += temp_out[2];
+            denominator[line_index] += temp_out[3];
+        }
+    }
+
+    // ------------------ Sync the values between processors ---------------------------------------
+    for (int line_index = 0; line_index < nr_span_lines; line_index++) {
+        reduce(numerator[line_index], sumOp<vector>());
+        reduce(denominator[line_index], sumOp<double>());
+    }
+
+    // ------------------ Set the values in the model ------------------------------------------------
+    for (int line_index = 0; line_index < nr_span_lines; line_index++) {
+        std::array<double, 3> velocity = {
+            numerator[line_index][0] / denominator[line_index],
+            numerator[line_index][1] / denominator[line_index],
+            numerator[line_index][2] / denominator[line_index]
+        };
+
+        this->model->set_velocity_at_index(line_index, velocity);
+    }
 }
 
-void add_interpolated_velocity(const volVectorField& velocity) {
-    auto points = this->model.ctrl_points();
-    
-    interpolationCellPoint<vector> u_interpolator(U); // create interpolation object
+void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {
+    std::vector<vector> points;
 
-    std::vector<stormbird_interface::Vec3> velocity;
+    for (unsigned i = 0; i < this->model->nr_span_lines(); i++) {
+        std::array<double, 3> point_sb = this->model->get_ctrl_point_at_index(i);
+        
+        points.push_back(
+            vector(point_sb[0], point_sb[1], point_sb[2])
+        );
+    }
+    
+    interpolationCellPoint<vector> u_interpolator(velocity_field); // create interpolation object
 
     for (unsigned int i = 0; i < points.size(); i++) {
         vector u_sample = vector(VGREAT, VGREAT, VGREAT);
 
-        vector point_local = vector(points[i].x, points[i].y, points[i].z);
-
-        label cell_id = mesh_.findCell(point_local);
+        label cell_id = mesh_.findCell(points[i]);
 
         if (cell_id != -1) {
-            u_sample = u_interpolator.interpolate(point_local, cell_id);
+            u_sample = u_interpolator.interpolate(points[i], cell_id);
         }
         
         reduce(u_sample, minOp<vector>());
 
-        velocity.push_back(
-            stormbird_interface::Vec3{u_sample[0], u_sample[1], u_sample[2]}
-        );
-    }
+        std::array<double, 3> velocity = {
+            u_sample[0],
+            u_sample[1],
+            u_sample[2]
+        };
 
-    this->model.add_interpolated_velocity(velocity);
+        this->model->set_velocity_at_index(i, velocity);
+    }
  }
 
 void Foam::fv::ActuatorLine::addSup(fvMatrix<vector>& eqn, const label fieldi) {

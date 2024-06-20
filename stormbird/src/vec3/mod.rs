@@ -161,6 +161,24 @@ impl Default for Vec3 {
     }
 }
 
+/// Convert from a 3-element array to a Vec3
+impl From<[f64; 3]> for Vec3 {
+    fn from(array: [f64; 3]) -> Self {
+        Self {
+            x: array[0],
+            y: array[1],
+            z: array[2],
+        }
+    }
+}
+
+/// Convert from a Vec3 to a 3-element array
+impl From<Vec3> for [f64; 3] {
+    fn from(vector: Vec3) -> [f64; 3] {
+        [vector.x, vector.y, vector.z]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -190,6 +190,14 @@ impl LineForceModel {
         }
     }
 
+    pub fn span_line_at_index(&self, index: usize) -> SpanLine {
+        let (angle, axis) = self.wing_rotation_data_from_global(index);
+
+        self.span_lines_local[index].rotate_around_axis(angle, axis)
+            .rotate(self.rotation)
+            .translate(self.translation)
+    }
+
     /// Returns the span lines in global coordinates.
     pub fn span_lines(&self) -> Vec<SpanLine> {
         self.span_lines_local.iter().enumerate().map(
