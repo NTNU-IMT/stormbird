@@ -5,6 +5,11 @@
 //! Tests for the static simulation capabilities of the lifting line module
 
 use crate::lifting_line::prelude::*;
+use crate::lifting_line::simulation_builder::{
+    SimulationBuilder,
+    SimulationMode,
+    SteadySettings
+};
 
 use super::test_setup::RectangularWing;
 
@@ -14,7 +19,7 @@ fn moment_test() {
     let cl_zero_angle = 0.5;
     let angle_of_attack = 0.0;
 
-    let wing_builder = RectangularWing {
+    let line_force_model_builder = RectangularWing {
         aspect_ratio,
         cl_zero_angle,
         angle_of_attack,
@@ -22,29 +27,27 @@ fn moment_test() {
         ..Default::default()
     }.build();
 
-    let line_force_model = wing_builder.build();
-
-    let solver_settings = SteadySolverSettings::default();
-    let wake_builder  = SteadyWakeBuilder::default();
-
     let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
 
-    let freestream = Freestream::Constant(freestream_velocity);
+    let mut sim = SimulationBuilder {
+        line_force_model: line_force_model_builder,
+        simulation_mode: SimulationMode::QuasiSteady(
+            SteadySettings::default()
+        ),
+        wake_files_folder_path: "".to_string(),
+        write_wake_data_to_file: false,
 
-    let result = steady_solvers::solve_steady(
-        1.0, 
-        &line_force_model,
-        &freestream,
-        None,
-        &solver_settings,
-        &wake_builder,
-        vec![0.0; line_force_model.nr_span_lines()].as_slice()
-    );
+        
+    }.build(1.0, freestream_velocity);
+
+    let input_freestream_velocity = vec![freestream_velocity; sim.line_force_model.nr_span_lines()];
+
+    let result = sim.do_step(0.0, 1.0, &input_freestream_velocity);
 
     let force = result.integrated_forces_sum();
     let moment = result.integrated_moments_sum();
 
-    let cl = force.y / line_force_model.total_force_factor(freestream_velocity.length());
+    let cl = force.y / sim.line_force_model.total_force_factor(freestream_velocity.length());
 
     dbg!(cl);
 

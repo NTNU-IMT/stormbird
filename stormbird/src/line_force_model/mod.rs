@@ -8,7 +8,9 @@
 
 use std::f64::consts::PI;
 
-pub mod solver_utils;
+pub mod force_calculations;
+pub mod derivatives;
+pub mod smoothing;
 pub mod span_line;
 pub mod builder;
 pub mod prescribed_circulations;
@@ -17,12 +19,14 @@ pub mod prelude;
 use std::ops::Range;
 
 use crate::math_utils::statistics::mean;
+use crate::math_utils::finite_difference;
 
 use crate::io_structs::prelude::*;
 use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
 use span_line::*;
 use prescribed_circulations::PrescribedCirculation;
+use smoothing::SmoothingSettings;
 
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
@@ -55,8 +59,20 @@ pub struct LineForceModel {
     pub local_wing_angles: Vec<f64>,
     /// Density used in force calculations
     pub density: f64,
+    /// Optional model for calculation motion and flow derivatives
+    pub derivatives: Option<Derivatives>,
+    /// Optional smoothing settings
+    pub smoothing_settings: Option<SmoothingSettings>,
     /// Optional prescribed circulation shape
     pub prescribed_circulation: Option<PrescribedCirculation>,
+    /// Factor used to control the control point location
+    pub ctrl_point_chord_factor: f64,
+}
+
+impl Default for LineForceModel {
+    fn default() -> Self {
+        Self::new(Self::default_density())
+    }
 }
 
 impl LineForceModel {
@@ -73,7 +89,10 @@ impl LineForceModel {
             rotation: Vec3::default(),
             local_wing_angles: Vec::new(),
             density,
+            derivatives: None,
+            smoothing_settings: None,
             prescribed_circulation: None,
+            ctrl_point_chord_factor: 0.0,
         }
     }
 
@@ -104,12 +123,10 @@ impl LineForceModel {
         self.local_wing_angles.push(0.0);
     }
 
-
     /// Short hand for querying for the number of wings in the model
     pub fn nr_wings(&self) -> usize {
         self.wing_indices.len()
     }
-
 
     /// Short hand for querying for the number of span lines in the model
     pub fn nr_span_lines(&self) -> usize {
@@ -200,7 +217,12 @@ impl LineForceModel {
     /// Returns the control points of each line element. This is calculated as the midpoint of each
     /// span line
     pub fn ctrl_points(&self) -> Vec<Vec3> {
-        self.span_lines().iter().map(|line| line.ctrl_point()).collect()
+        let span_lines = self.span_lines();
+        let chord_vectors = self.chord_vectors();
+
+        span_lines.iter().zip(chord_vectors.iter()).map(|(line, chord)| {
+            line.ctrl_point() + *chord * self.ctrl_point_chord_factor
+        }).collect()
     }
 
     /// Returns the control points of each line element in local coordinates. This is calculated as
@@ -249,89 +271,19 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn angles_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
+        let velocity_corrected = self.remove_span_velocity(velocity);
+
         let chord_vectors = self.chord_vectors();
         let span_lines    = self.span_lines();
         
-        (0..velocity.len()).map(|index| {
+        let angles_of_attack: Vec<f64> = (0..velocity_corrected.len()).map(|index| {
             chord_vectors[index].signed_angle_between(
-                velocity[index], 
+                velocity_corrected[index], 
                 span_lines[index].direction()
             )
-        }).collect()
-    }
+        }).collect();
 
-    /// Returns the circulation strength, either directly or based on the prescribed shape, 
-    /// depending on the fields in self.
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn circulation_strength(&self, velocity: &[Vec3]) -> Vec<f64> {
-        if self.prescribed_circulation.is_some() {
-            self.prescribed_circulation_strength(velocity)
-        } else {
-            self.circulation_strength_raw(velocity)
-        }
-    }
-
-    /// Returns the circulation strength on each line based on the lifting line equation.
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let cl = self.lift_coefficients(&velocity);
-
-        (0..velocity.len()).map(|index| {
-            -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index] * self.density
-        }).collect()
-    }
-
-    /// Returns the local lift coefficient on each line element.
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn lift_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angles_of_attack = self.angles_of_attack(velocity);
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => 
-                        foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) => 
-                        foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) => 
-                        cylinder.lift_coefficient(
-                            self.chord_vectors_local[index].length(), velocity[index].length()
-                        ),
-                }
-            }
-        ).collect()
-    }
-
-    /// Returns the viscous drag coefficient on each line element, based on the section model
-    /// and the input velocity. 
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let angles_of_attack = self.angles_of_attack(velocity);
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => 
-                        foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) => 
-                        foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) => 
-                        cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
-                }
-            }
-        ).collect()
+        angles_of_attack
     }
 
     /// Calculates the wake angle behind each line element.
@@ -352,141 +304,42 @@ impl LineForceModel {
         ).collect()
     }
 
+    pub fn span_distance_in_local_coordinates(&self) -> Vec<f64> {
+        let mut span_distance: Vec<f64> = Vec::new();
 
-    /// Calculates the average viscous drag coefficient for each wing.
-    pub fn average_viscous_drag_coefficients(&self, velocity: &[Vec3]) -> Vec<f64> {
-        let cd = self.viscous_drag_coefficients(velocity);
+        for wing_index in 0..self.wing_indices.len() {
+            let start_point = self.span_lines_local[
+                self.wing_indices[wing_index].start
+            ].start_point;
+            
+            let mut previous_point = start_point;
+            let mut previous_distance = 0.0;
 
-        self.wing_averaged_values(&cd)
-    }
-    
-    /// Calculates the forces on each line element.
-    pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
-        let mut sectional_forces = SectionalForces {
-            circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.velocity),
-            sectional_drag: self.sectional_drag_forces(&input.velocity),
-            added_mass: self.sectional_added_mass_force(&input.acceleration),
-            gyroscopic: self.sectional_gyroscopic_force(input.rotation_velocity),
-            total: vec![Vec3::default(); self.nr_span_lines()],
-        };
+            let mut current_wing_span_distance: Vec<f64> = Vec::new();
 
-        sectional_forces.compute_total();
+            for i in self.wing_indices[wing_index].clone() {
+                let line = &self.span_lines_local[i];
 
-        sectional_forces
-    }
+                let increase_in_distance = line.ctrl_point().distance(previous_point);
+                previous_point = line.ctrl_point();
 
-    /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
-    pub fn sectional_circulatory_forces(&self, strength: &[f64], velocity: &[Vec3]) -> Vec<Vec3> {
-        let span_lines = self.span_lines();
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                if velocity[index].length() == 0.0 {
-                    Vec3::default()
-                } else {
-                    strength[index] * velocity[index].cross(span_lines[index].relative_vector())
-                }
+                current_wing_span_distance.push(previous_distance + increase_in_distance);
+                
+                previous_distance += increase_in_distance;
             }
-        ).collect()
-    }
 
-    /// Calculates the forces on each line element due to the sectional drag model. This is most 
-    /// often the viscous drag, but it can also include other physical effects if that is included
-    /// in the sectional drag model.
-    pub fn sectional_drag_forces(&self, velocity: &[Vec3]) -> Vec<Vec3> {
-        let span_lines = self.span_lines();
-        let cd = self.viscous_drag_coefficients(velocity);
+            let end_point = self.span_lines_local[
+                self.wing_indices[wing_index].clone().last().unwrap()
+            ].end_point;
 
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let drag_direction = velocity[index].normalize();
+            let total_distance = current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
 
-                let drag_area = self.chord_vectors_local[index].length() * span_lines[index].length();
-
-                let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
-
-                drag_direction * cd[index] * force_factor
+            for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
+                span_distance.push(current_wing_span_distance[i] - 0.5 * total_distance);
             }
-        ).collect()
-    }
+        }
 
-    /// Calculates the added mass force on each line element due to the flow acceleration at each 
-    /// control point. 
-    /// 
-    /// **Note**: At the moment, this function only calculates the added mass due to the point 
-    /// acceleration. However, according to, for instance, Theodorsen, the added mass should also 
-    /// depend on the angular velocity and angular acceleration of the wing. Although these effects
-    /// are expected to be small, it should be included in the future. This would, however, require
-    /// more information about the motion of the wing to be included as arguments.
-    /// 
-    /// # Argument
-    /// * `acceleration` - the acceleration of the flow at each control point. That is, if the only
-    /// velocity is due to the motion of the wings, the acceleration will be opposite to the motion
-    /// of the wings.
-    pub fn sectional_added_mass_force(&self, acceleration: &[Vec3]) -> Vec<Vec3> {
-        let span_lines = self.span_lines();
-        let chord_vectors = self.chord_vectors();
-        
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
-
-                let strip_area = chord_vectors[index].length() * span_lines[index].length();
-
-                let mut relevant_acceleration = acceleration[index];
-
-                relevant_acceleration -= relevant_acceleration.project(span_lines[index].direction());
-
-                match self.section_models[wing_index] {
-                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => {
-                        relevant_acceleration -= relevant_acceleration.project(chord_vectors[index]);
-                    },
-                    _ => {}
-                }
-
-                let added_mass_coefficient = match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => {
-                        foil.added_mass_coefficient(relevant_acceleration.length())
-                    },
-                    SectionModel::VaryingFoil(foil) => {
-                        foil.added_mass_coefficient(relevant_acceleration.length())
-                    },
-                    SectionModel::RotatingCylinder(cylinder) => {
-                        cylinder.added_mass_coefficient(relevant_acceleration.length())
-                    }
-                };
-
-                added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
-            }
-        ).collect()
-    }
-
-    /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
-    /// 
-    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be 
-    /// significantly larger than the rotational velocity of the sail, for instance due to roll or
-    /// pitch motion of the boat.
-    pub fn sectional_gyroscopic_force(&self, rotation_velocity: Vec3) -> Vec<Vec3> {
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index = self.wing_index_from_global(index);
-                let span_lines = self.span_lines();
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => Vec3::default(),
-                    SectionModel::RotatingCylinder(cylinder) => {
-                        let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
-
-                        let radial_velocity = 2.0 * PI * cylinder.revolutions_per_second;
-
-                        let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
-
-                        angular_momentum.cross(rotation_velocity)
-                    }
-                }
-
-            }
-        ).collect()
+        span_distance
     }
 
     /// Calculates the relative distance from the center off each wing for each control point.
@@ -543,6 +396,19 @@ impl LineForceModel {
         total_area
     }
 
+    /// returns the span length of each wing in the model
+    pub fn wing_span_lengths(&self) -> Vec<f64> {
+        let mut span_length = vec![0.0; self.nr_wings()];
+
+        for i in 0..self.nr_span_lines() {
+            let wing_index = self.wing_index_from_global(i);
+
+            span_length[wing_index] += self.span_lines_local[i].length();
+        }
+
+        span_length
+    }
+
     /// Shorthand for quickly calculating the typical force factor used when presenting 
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)
     pub fn total_force_factor(&self, freestream_velocity: f64) -> f64 {
@@ -568,19 +434,6 @@ impl LineForceModel {
         result
     }
 
-    /// Maps a constant value to a vector of values for each section
-    pub fn section_values_from_constant_value<T>(&self, value: &T) -> Vec<T> 
-    where T: Clone
-    {
-        let mut result: Vec<T> = Vec::new();
-
-        for _ in 0..self.nr_span_lines() {
-            result.push(value.clone());
-        }
-
-        result
-    }
-
     /// Maps a vector of values for each wing to a vector of values for each section
     pub fn section_values_from_wing_values<T>(&self, wing_values: &[T]) -> Vec<T> 
     where T: Clone
@@ -600,7 +453,11 @@ impl LineForceModel {
 
     /// Maps the values at the control points to the values at the span points using linear 
     /// interpolation.
-    pub fn span_point_values_from_ctrl_point_values<T>(&self, ctrl_point_values: &[T], extrapolate_ends: bool) -> Vec<T> 
+    pub fn span_point_values_from_ctrl_point_values<T>(
+        &self, 
+        ctrl_point_values: &[T], 
+        extrapolate_ends: bool
+    ) -> Vec<T> 
     where T: 
         std::ops::Add<T, Output = T> + 
         std::ops::Sub<T, Output = T> +
@@ -645,10 +502,4 @@ impl LineForceModel {
         span_point_values
     }
     
-}
-
-impl Default for LineForceModel {
-    fn default() -> Self {
-        Self::new(Self::default_density())
-    }
 }

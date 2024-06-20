@@ -31,6 +31,7 @@ impl PotentialTheoryModel {
                 ViscousCoreLength::Absolute(core_length * span_line.length())
             },
             ViscousCoreLength::Absolute(core_length) => ViscousCoreLength::Absolute(core_length),
+            ViscousCoreLength::NoViscousCore => ViscousCoreLength::NoViscousCore,
         };
 
         let u_i = line_list.iter().map(

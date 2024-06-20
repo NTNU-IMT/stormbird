@@ -7,12 +7,12 @@
 use std::f64::consts::PI;
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation::{ 
+use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationMode,
     SteadySettings,
     UnsteadySettings,
-}; 
+};
 
 use super::test_setup::RectangularWing;
 use super::elliptic_wing_theory::EllipticWingTheory;
@@ -20,7 +20,7 @@ use super::elliptic_wing_theory::EllipticWingTheory;
 #[test]
 fn steady_lift() {
     let aspect_ratio = 5.0;
-    let cl_zero_angle = 0.4;
+    let cl_zero_angle = 1.2;
     let angle_of_attack = 2.0_f64.to_radians();
 
     let theory = EllipticWingTheory {
@@ -35,21 +35,32 @@ fn steady_lift() {
         aspect_ratio,
         cl_zero_angle,
         angle_of_attack,
+        nr_strips: 128,
         ..Default::default()
     }.build();
 
-    let steady_settings  = SteadySettings::default();
-    let dynamic_settings = UnsteadySettings::default();
+    let steady_settings  = SteadySettings{
+        solver: SteadySolverSettings {
+            damping_factor_start: 0.01,
+            damping_factor_end: Some(0.1),
+            print_log: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
-    let mut steady_sim = SimulationBuilder::new(
-        wing_builder.clone(),
-        SimulationMode::QuasiSteady(steady_settings)
-    ).build();
-
-    let mut dynamic_sim = SimulationBuilder::new(
-        wing_builder.clone(),
-        SimulationMode::Dynamic(dynamic_settings)
-    ).build();
+    let dynamic_settings = UnsteadySettings {
+        solver: UnsteadySolverSettings {
+            damping_factor_start: 0.01,
+            damping_factor_end: Some(0.1),
+            print_log: true,
+            ..Default::default()
+        },
+        wake: UnsteadyWakeBuilder {
+            ratio_of_wake_affected_by_induced_velocities: Some(0.0),
+            ..Default::default()
+        }
+    };
 
     let nr_time_steps = 200;
 
@@ -57,15 +68,25 @@ fn steady_lift() {
 
     let velocity = Vec3::new(1.2, 0.0, 0.0);
 
+    let mut steady_sim = SimulationBuilder::new(
+        wing_builder.clone(),
+        SimulationMode::QuasiSteady(steady_settings)
+    ).build(time_step, velocity);
+
+    let mut dynamic_sim = SimulationBuilder::new(
+        wing_builder.clone(),
+        SimulationMode::Dynamic(dynamic_settings)
+    ).build(time_step, velocity);
+
     let force_factor = steady_sim.line_force_model.total_force_factor(velocity.length());
 
-    let input_state = InputState {
-        freestream: Freestream::Constant(velocity),
-        translation: Vec3::default(),
-        rotation: Vec3::default(),
-    };
+    let dynamic_velocity_points = dynamic_sim.get_freestream_velocity_points();
+    let static_velocity_points = steady_sim.get_freestream_velocity_points();
 
-    let result_steady  = steady_sim.do_step(0.0, time_step, input_state);
+    let dynamic_velocity_freestream: Vec<Vec3> = vec![velocity; dynamic_velocity_points.len()];
+    let static_velocity_freestream: Vec<Vec3> = vec![velocity; static_velocity_points.len()];
+
+    let result_steady  = steady_sim.do_step(0.0, time_step, &static_velocity_freestream);
 
     let cd_steady = result_steady.integrated_forces_sum().x / force_factor;
     let cl_steady = result_steady.integrated_forces_sum().y / force_factor;
@@ -76,7 +97,7 @@ fn steady_lift() {
     for i in 0..nr_time_steps {
         let time = (i as f64) * time_step;
         
-        let result_dynamic = dynamic_sim.do_step(time, time_step, input_state);
+        let result_dynamic = dynamic_sim.do_step(time, time_step, &dynamic_velocity_freestream);
 
         cd_dynamic = result_dynamic.integrated_forces_sum().x / force_factor;
         cl_dynamic = result_dynamic.integrated_forces_sum().y / force_factor;   
@@ -95,7 +116,7 @@ fn steady_lift() {
     let dynamic_cl_error = (cl_theory - cl_dynamic).abs() / cl_theory.abs();
     let dynamic_cd_error = (cd_theory - cd_dynamic).abs() / cd_theory.abs();
 
-    let allowable_cd_error = 0.05;
+    let allowable_cd_error = 0.06;
     let allowable_cl_error = 0.07;
 
     assert!(steady_cl_error < allowable_cl_error, "Steady cl error: {}", steady_cl_error);

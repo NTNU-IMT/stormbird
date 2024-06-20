@@ -11,11 +11,15 @@
 
 use serde::{Serialize, Deserialize};
 
+use rayon::prelude::*;
+
 use ndarray::prelude::*;
 
 use crate::vec3::Vec3;
-use crate::line_force_model::LineForceModel;
-use crate::io_structs::freestream::Freestream;
+use crate::line_force_model::{
+    LineForceModel,
+    span_line::SpanLine
+};
 
 use crate::lifting_line::singularity_elements::prelude::*;
 
@@ -49,7 +53,7 @@ impl SteadyWakeBuilder {
     pub fn build(
         &self, 
         line_force_model: &LineForceModel, 
-        freestream: &Freestream, 
+        ctrl_points_freestream: &[Vec3], 
     ) -> SteadyWake {
         let mean_chord_length: f64 = line_force_model.chord_vectors().iter().map(
             |chord| chord.length()
@@ -57,18 +61,14 @@ impl SteadyWakeBuilder {
 
         let ctrl_points = line_force_model.ctrl_points();
 
-        let freestream_velocity = freestream.velocity_at_locations(
-            &ctrl_points
-        );
-
-        let average_freestream_velocity: Vec3 = freestream_velocity.iter().sum::<Vec3>() / freestream_velocity.len() as f64;
+        let average_freestream_velocity: Vec3 = ctrl_points_freestream.iter().sum::<Vec3>() / ctrl_points_freestream.len() as f64;
 
         let wake_length = self.wake_length_factor * mean_chord_length;
 
-        let wake_line_vector = average_freestream_velocity * wake_length;
-        
         let span_lines = line_force_model.span_lines();
 
+        let wake_line_vectors = vec![average_freestream_velocity * wake_length; span_lines.len()];
+        
         let nr_span_lines = span_lines.len();
 
         let potential_theory_model = PotentialTheoryModel {
@@ -91,7 +91,7 @@ impl SteadyWakeBuilder {
                     potential_theory_model.induced_velocity_from_horseshoe_with_unit_strength(
                         ctrl_point, 
                         &span_lines[i_col], 
-                        wake_line_vector, 
+                        wake_line_vectors[i_col], 
                     );
             }
         }
@@ -99,6 +99,9 @@ impl SteadyWakeBuilder {
         let induced_velocity_corrections = self.induced_velocity_corrections.build(average_freestream_velocity);
 
         SteadyWake {
+            span_lines,
+            wake_line_vectors,
+            potential_theory_model,
             velocity_factors,
             induced_velocity_corrections
         }
@@ -121,14 +124,46 @@ impl Default for SteadyWakeBuilder {
 /// Data used to calculate the velocity at the ctrl points of the span lines, as a function of 
 /// strength
 pub struct SteadyWake {
+    /// A copy of the span lines of the line force model used to construct the wake. The data is 
+    /// necessary to when calculating the induced velocity at off-wing points.
+    pub span_lines: Vec<SpanLine>,
+    /// Wake line vectors used to determine the length and direction of the wake
+    pub wake_line_vectors: Vec<Vec3>,
+    /// Potential theory model used to call induced velocity functions
+    potential_theory_model: PotentialTheoryModel,
     /// The factors that are multiplied with the strength of each vortex line to calculate the 
     /// lift-induced velocity at each control point
     pub velocity_factors: Array2<Vec3>,
     /// Optional corrections to the induced velocity
     pub induced_velocity_corrections: VelocityCorrections,
+   
 }
 
 impl SteadyWake {
+    pub fn induced_velocities(&self, strength: &[f64], points: &[Vec3]) -> Vec<Vec3> {
+        let mut induced_velocities: Vec<Vec3> = points.par_iter().map(|point| {
+            let mut u_i = Vec3::default();
+
+            for i in 0..self.span_lines.len() {
+                let u_i_unit = self.potential_theory_model.induced_velocity_from_horseshoe_with_unit_strength(
+                    *point, 
+                    &self.span_lines[i], 
+                    self.wake_line_vectors[i], 
+                );
+
+                u_i += strength[i] * u_i_unit;
+            }
+
+            u_i
+        }).collect();
+
+        if self.induced_velocity_corrections.any_active_corrections() {
+            self.induced_velocity_corrections.correct(&mut induced_velocities);
+        }
+
+        induced_velocities
+    }
+
     /// Calculated the induced velocity at each control point.
     ///
     /// # Argument

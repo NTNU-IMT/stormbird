@@ -7,15 +7,11 @@
 //! multiple places.
 
 pub mod result;
-pub mod freestream;
-pub mod input_state;
 pub mod forces_and_moments;
 pub mod derivatives;
 
 pub mod prelude {
     pub use super::result::*;
-    pub use super::freestream::*;
-    pub use super::input_state::*;
     pub use super::forces_and_moments::*;
     pub use super::derivatives::*;
 }

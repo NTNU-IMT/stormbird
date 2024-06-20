@@ -1,6 +1,6 @@
 # Building a line model
 
-As shown in the [intro section](./line_model_intro.md), a line model consist of many line elements. To simplify the construction of this line model, Stormbird uses a *line force model builder*. A builder helps with at least two things:
+As shown in the [intro section](./line_model_intro.md), a line model consist of many line elements. To simplify the construction of this line model, Stormbird uses a *line force model builder* that helps with at least two things:
 
 1) **Reduce the amount of input data:** Rather than having to specify data directly for each line element, it is possible to only specify data at some chosen points along the span - such as the beginning and the end - at let the builder interpolate for every line segment between the specified points
 2) **Automate the setup of multiple wings:** The line force model requires information about which line element belongs to which wing. This can be cumbersome to set up manually, and it is not really necessary to do so. The builder automatically keep tracks of which line element belong to which wing.
@@ -13,18 +13,19 @@ pub struct LineForceModelBuilder {
     pub wing_builders: Vec<WingBuilder>,
     pub nr_sections: usize,
     pub density: f64,
+    pub smoothing_settings: Option<SmoothingSettings>,
     pub prescribed_circulation: Option<PrescribedCirculation>,
 }
 ```
 
-The only required input is the vector of `WingBuilder`s and the `nr_sections` [^nr_sections_note]. The density is set to the air density by default ( which = 1.225 kg / m^3), and the prescribed circulation is not used by default [^prescribed_note]. The nr sections should be tested for each project, adn will affect both the accuracy and the computational speed. Typical values range between 10-50.
+The only required input is the vector containing  `WingBuilder` structures and the `nr_sections` [^nr_sections_note]. The density is set to the air density by default ( which = 1.225 kg / m^3). The smoothing settings and prescribed circulation is not used by default [^prescribed_note]. The nr sections should be tested for each project, and will affect both the accuracy and the computational speed. Typical values range between 10-50.
 
 [^nr_sections_note]: Right now, the number of sections will be the same for each wing in the simulation. The interface was made in this way, because this scenario is believed to be the most common. However, it is fairly straight forward to implement functionality to allow each wing to have different values. This might be implemented in the future.
 
-[^prescribed_note]: There will be more on the prescribed circulation option later. This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues. 
+[^prescribed_note]: There will be more on the smoothing settings and prescribed circulation option later. This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues. 
 
-### Wing builders
-The wing builders contain data to build line segments for a single wing. When a vector (or list) of wing builders are provided, the `LineForceModelBuilder` will automatically keep track of which line segment belong to each wing. The input to a wing builder is as shown as Rust code below:
+### Wing builder
+A wing builder contain data to build line segments for a single wing. When a vector (or list) of wing builders are provided, the `LineForceModelBuilder` will automatically keep track of which line segment belong to each wing. The fields in a `WingBuilder` structure is as shown as Rust code below:
 
 ```rust
 pub struct WingBuilder {
@@ -41,7 +42,7 @@ When building a line force model from a wing builder, the wings are divided into
 [^interpolation_note]: The interpolation method is possible to change or update to something that can handle non-linear changes between section points. This is, however, so far not prioritized as most sail types tend to use fairly simple geometrical structures. This might change in the future if there is a need to do so.
 
 ## Input to methods
-For the most part, the methods in Stormbird will handle the actual building of the line force models automatically, using a builder structure as input. That is, the input to most of the functionality is the builder and not the line force model itself. The reason is simply that some of the methods may build different versions of the same line force model. For instance, the steady state lifting line solver actually uses several line force models with different resolutions to more quickly find a solution, inspired by multi-grid solvers in CFD. 
+In many cases, the methods in Stormbird will handle the actual building of the line force models automatically, using a builder structure as input. That is, the input to some function is often the builder and not the line force model itself. For instance, when setting up a lifting line simulation in Python, you only have to supply the builder data, and the line force model will be built automatically internally.  
 
-However, it is also possible to convert a builder into a line force model. This happens by calling the `build()` method, as usual for Rust builder structures. When using the Python or the FMU versions of Stormbird, the builder is typically the only thing needed, while the actual line force model is created internally.
+However, it is also possible to convert a builder into a line force model. This happens by calling the `build()` method, as usual for Rust builder structures. 
 

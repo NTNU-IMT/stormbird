@@ -14,9 +14,15 @@ use crate::line_force_model::span_line::SpanLine;
 fn compare_horseshoe_against_panel() {
     let model = PotentialTheoryModel::default();
 
+    let rotation = Vec3::new(-12.0_f64.to_radians(), 21.2_f64.to_radians(), 34.3_f64.to_radians());
+    let translation = Vec3::new(21.0, -14.0, 45.0);
+
+    let start_point = Vec3::new(0.0, 0.0, 0.0).rotate(rotation) + translation;
+    let end_point = Vec3::new(0.0, 0.0, 1.2).rotate(rotation) + translation;
+
     let span_line = SpanLine {
-        start_point: Vec3::new(0.0, 0.0, 0.0),
-        end_point: Vec3::new(0.0, 0.0, 1.2),
+        start_point,
+        end_point,
     };
 
     let wake_line_vector = Vec3::new(100.0, 0.0, 0.0);
@@ -29,7 +35,7 @@ fn compare_horseshoe_against_panel() {
         span_line.start_point + wake_line_vector,
     ];
 
-    let ctrl_point = Vec3::new(-0.5, 0.0, 0.0);
+    let ctrl_point = span_line.ctrl_point();
 
     let u_i_panel = model.induced_velocity_from_panel_as_vortex_lines_with_unit_strength(
         &panel_points, ctrl_point, false

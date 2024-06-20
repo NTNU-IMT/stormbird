@@ -1,4 +1,4 @@
-# Wake builders
+# Lifting line Wake
 
 The vortex wakes from the wings are the most important part of a lifting line simulation. They are responsible for modelling how the velocity is affected by the wings themselves. How the velocity should be calculated depends on a several settings variables. Setting up a wake model is therefore done using "wake builders" which both contain settings used directly by the final wake structures and settings used for initializing the wake structures. An overview of the fields available in the wake builders are given in this section. **More detailed information will come later**. 
 
@@ -46,7 +46,7 @@ Main wake builder structure:
 pub struct UnsteadyWakeBuilder {
     pub wake_length: WakeLength,
     pub viscous_core_length: ViscousCoreLength,
-    pub first_panel_behavior: FirstPanelBehavior,
+    pub first_panel_relative_length: f64,
     pub strength_damping_last_panel_ratio: f64,
     pub symmetry_condition: SymmetryCondition,
     pub ratio_of_wake_affected_by_induced_velocities: Option<f64>,
@@ -64,12 +64,5 @@ Special sub structures used only for the dynamic wake:
 pub enum WakeLength {
     NrPanels(usize),
     TargetLengthFactor(f64),
-}
-```
-
-```rust
-pub enum FirstPanelBehavior {
-    ChordFixed(f64),
-    VelocityFixed(f64)
 }
 ```

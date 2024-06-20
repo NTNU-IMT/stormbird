@@ -39,7 +39,7 @@ fn compare_near_and_far_field() {
     let ctrl_point = ctrl_point_0.rotate(rotation);
 
     let panel = PanelGeometry::new(panel_points);
-
+    
     assert!(panel.area - 1.0 < 1e-10);
 
     // Compare velcoity calculations

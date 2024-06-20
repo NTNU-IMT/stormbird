@@ -24,7 +24,7 @@ impl RotatingCylinder {
             spin_ratio_data = RotatingCylinderRust::default_spin_ratio_data(),
             cl_data         = RotatingCylinderRust::default_cl_data(),
             cd_data         = RotatingCylinderRust::default_cd_data(),
-            wake_angle_data = RotatingCylinderRust::default_wake_angle_data(),
+            wake_angle_data = None,
         )
     )]
     pub fn new(
@@ -32,7 +32,7 @@ impl RotatingCylinder {
         spin_ratio_data: Vec<f64>,
         cl_data: Vec<f64>,
         cd_data: Vec<f64>,
-        wake_angle_data: Vec<f64>
+        wake_angle_data: Option<Vec<f64>>
     ) -> Self {
         Self {
             data: RotatingCylinderRust {

@@ -15,21 +15,30 @@ from pystormbird import Vec3
 import json
 
 from foil_model import get_foil_dict
+from atmospheric_boundary_layer import AtmosphericBoundaryLayer
 
 import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation of a multiple two-element wings")
-    parser.add_argument("--flap-angle", type=float, default = 5.0, help="Flap angle in degrees")
-    parser.add_argument("--angle-of-attack", type=float, default = 0.0, help="Angle of attack in degrees")
-    parser.add_argument("--wind-velocity", type=float, default = 8.0, help="Wind velocity in m/s")
-    parser.add_argument("--wind-direction", type=float, default = 45.0, help="Wind direction in degrees")
-    parser.add_argument("--dynamic", action="store_true", help="Use dynamic model")
+    parser.add_argument("--flap-angle",      type=float, default = 5.0,  help="Flap angle in degrees")
+    parser.add_argument("--angle-of-attack", type=float, default = 0.0,  help="Angle of attack in degrees")
+    parser.add_argument("--wind-velocity",   type=float, default = 8.0,  help="Wind velocity in m/s")
+    parser.add_argument("--wind-direction",  type=float, default = 45.0, help="Wind direction in degrees")
+
+    parser.add_argument("--velocity-plane-height", type=float, default = 15.0, help="Height of the velocity plane")
+
+    parser.add_argument("--dynamic",          action="store_true", help="Use dynamic model")
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
+    parser.add_argument("--plot-velocity-plane", action="store_true", help="Plot velocity plane")
 
     args = parser.parse_args()
 
-    velocity = args.wind_velocity
+    wind_model = AtmosphericBoundaryLayer(
+        ship_velocity           = 0.0,
+        reference_wind_velocity = args.wind_velocity,
+        wind_direction          = np.radians(args.wind_direction)
+    )
 
     chord_length = 9.8
     span = 37.0
@@ -73,7 +82,7 @@ if __name__ == "__main__":
             }
         )
 
-    force_factor = 0.5 * chord_length * span * density * velocity**2 * len(wings)
+    
 
     line_force_model = {
         "wing_builders": wings,
@@ -118,33 +127,44 @@ if __name__ == "__main__":
 
     setup_string = json.dumps(setup)
 
-    simulation = Simulation.new_from_string(setup_string)
-
     if args.dynamic:
-        end_time = 20 * chord_length / velocity
+        end_time = 20 * chord_length / args.wind_velocity
         dt = end_time / 128
     else:
         end_time = 1.0
         dt = 1.0
+
+    simulation = Simulation(
+        setup_string = setup_string,
+        initial_time_step = dt,
+        wake_initial_velocity = wind_model.get_velocity(
+            Vec3(0.0, 0.0, start_height + span/2)
+        )
+    )
+
+    '''
+    Create the freestream velocity vector, which depends on the z coordinate of the points. However, 
+    it does not change as a function of time, so it is created once and used for all time steps.
+    '''
+
+    freestream_velocity_points = simulation.get_freestream_velocity_points()
+
+    freestream_velocity = []
+    for point in freestream_velocity_points:
+        freestream_velocity.append(
+            wind_model.get_velocity(point)
+        )
+
+    force_factor = 0.5 * chord_length * span * density * args.wind_velocity**2 * len(wings)
     
     current_time = 0.0
 
-    '''
-    Note: the freestream velocity functionality in Python is currently limited to constant velocity.
-
-    However, more advanced options exist the Rust library. An interface to this is on its way...
-    '''
-    freestream = Vec3(
-        velocity * np.cos(np.radians(args.wind_direction)), 
-        velocity * np.sin(np.radians(args.wind_direction)), 
-        0.0
-    )
-
     while current_time < end_time:
+        print("Time: ", current_time)
         result = simulation.do_step(
             time = current_time, 
             time_step = dt, 
-            freestream_velocity = freestream
+            freestream_velocity = freestream_velocity
         )
 
         current_time += dt
@@ -153,4 +173,48 @@ if __name__ == "__main__":
 
     print("Thrust factor:     ", -forces.x / force_factor)
     print("Side force factor: ", forces.y / force_factor)
+
+    '''
+    Optional plotting of the velocity at a given height.
+
+    This is mostly shown to illustrate how induced velocities can be extracted at custom points from
+    the simulation.
+    '''
+
+    if args.plot_velocity_plane:
+        n_plot = 200
+        x = np.linspace(-60, 60, n_plot)
+        y = np.linspace(-30, 30, n_plot)
+
+        xx, yy = np.meshgrid(x, y)
+
+        velocity_plane_points = []
+
+        for i in range(len(xx)):
+            for j in range(len(yy)):
+                velocity_plane_points.append(
+                    Vec3(xx[i][j], yy[i][j], args.velocity_plane_height)
+                )
+
+        induced_velocity_at_plane = simulation.induced_velocities(velocity_plane_points)
+
+        induced_velocity_magnitude = np.zeros((len(xx), len(yy)))
+
+        index = 0
+
+        for i in range(len(xx)):
+            for j in range(len(yy)):
+                induced_velocity_magnitude[i][j] = induced_velocity_at_plane[index].length
+                    
+                index += 1
+
+        levels = np.linspace(0, 0.1 * args.wind_velocity, 100)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+        plt.contourf(xx, yy, induced_velocity_magnitude, levels=levels, cmap="viridis")
+        plt.colorbar()
+
+        plt.scatter(x_positions, y_positions, color="white")
+        plt.show()
     

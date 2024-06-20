@@ -41,7 +41,7 @@ where T:
 
 /// Calculates the double derivative based on the data using a backwards finite difference scheme.
 /// 
-/// Souce: https://en.wikipedia.org/wiki/Finite_difference
+/// Source: https://en.wikipedia.org/wiki/Finite_difference
 /// 
 /// # Arguments
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
@@ -56,6 +56,49 @@ where T:
     Copy
 {
     (data[2] - data[1] * 2.0 + data[0]) / step_size.powi(2)
+}
+
+/// Calculates the spatial derivative of the data using central finite difference scheme on the 
+/// interior points, and forward and backward finite difference on the end points.
+pub fn derivative_spatial_arrays<T>(x_data: &[f64], y_data: &[T]) -> Vec<T> 
+where T: 
+    std::ops::Mul<f64, Output = T> + 
+    std::ops::Add<T, Output = T> + 
+    std::ops::Sub<T, Output = T> + 
+    std::ops::Div<f64, Output = T> +
+    std::default::Default +
+    Copy
+{   
+    assert!(x_data.len() == y_data.len(), "The x and y data must have the same length");
+
+    let mut result = Vec::with_capacity(x_data.len());
+
+    for i in 0..x_data.len() {
+        let (delta_x, delta_y) = if i == 0 {
+            (
+                x_data[1] - x_data[0], 
+                y_data[1] - y_data[0]
+            )
+        } else if i == x_data.len() - 1 {
+            (
+                x_data[i] - x_data[i - 1], 
+                y_data[i] - y_data[i - 1]
+            )
+        } else {
+            (
+                x_data[i + 1] - x_data[i - 1], 
+                y_data[i + 1] - y_data[i - 1]
+            )
+        };
+
+        if delta_x == 0.0 {
+            result.push(T::default());
+        } else {
+            result.push(delta_y / delta_x);
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]

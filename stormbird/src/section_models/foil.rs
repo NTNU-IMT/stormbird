@@ -7,6 +7,13 @@ use super::common_functions;
 
 use std::f64::consts::PI;
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub enum StallModel {
+    #[default]
+    Harmonic,
+    ConstantLift,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Parametric model of a foil profile that can compute lift and drag coefficients.
@@ -73,9 +80,13 @@ pub struct Foil {
     /// default.
     pub cd_power_after_stall: f64,
     #[serde(default="Foil::default_mean_stall_angle")]
-    /// The mean stall angle, which is the mean angle where the model transitions from pre-stall to
+    /// The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to
     /// post-stall behavior. The default value is 20 degrees.
-    pub mean_stall_angle: f64,
+    pub mean_positive_stall_angle: f64,
+    #[serde(default="Foil::default_mean_stall_angle")]
+    /// The mean stall angle for negative angles of attack, which is the mean angle where the model transitions from pre-stall to
+    /// post-stall behavior. The default value is 20 degrees.
+    pub mean_negative_stall_angle: f64,
     #[serde(default="Foil::default_stall_range")]
     /// The range of the stall transition. The default value is 6 degrees.
     pub stall_range: f64,
@@ -86,6 +97,9 @@ pub struct Foil {
     #[serde(default)]
     /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
     pub added_mass_factor: f64,
+    #[serde(default)]
+    /// Type of stall model to use. The default is harmonic.
+    pub stall_model: StallModel,
 }
 
 fn get_stall_angle(angle_of_attack: f64) -> f64 {
@@ -101,7 +115,7 @@ fn get_stall_angle(angle_of_attack: f64) -> f64 {
 }
 
 impl Foil {
-    fn default_one()                  -> f64 {1.0}
+    fn default_one() -> f64 {1.0}
     pub fn default_cl_initial_slope()     -> f64 {2.0 * PI}
     pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
@@ -112,22 +126,44 @@ impl Foil {
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
-        let stall_angle = get_stall_angle(angle_of_attack);
+        let cl_pre_stall  = self.lift_coefficient_pre_stall(angle_of_attack);
 
+        match self.stall_model {
+            StallModel::Harmonic => {
+                let stall_angle = get_stall_angle(angle_of_attack);
+
+                let cl_post_stall = self.lift_coefficient_post_stall(stall_angle);
+
+                self.combine_pre_and_post_stall(angle_of_attack, cl_pre_stall, cl_post_stall)
+            },
+            StallModel::ConstantLift => {
+                let mean_stall_angle = if angle_of_attack >= 0.0 {
+                    self.mean_positive_stall_angle.abs()
+                } else {
+                    self.mean_negative_stall_angle.abs()
+                };
+
+                let cl_post_stall = self.lift_coefficient_pre_stall(mean_stall_angle * angle_of_attack.signum());
+
+                cl_pre_stall.abs().min(cl_post_stall.abs())*cl_pre_stall.signum()
+            }
+        }
+    }
+
+    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: f64) -> f64 {
         let angle_high_power = if self.cl_high_order_power > 0.0 {
-            angle_of_attack.powf(self.cl_high_order_power)
+            angle_of_attack.abs().powf(self.cl_high_order_power) * angle_of_attack.signum()
         } else {
             0.0
         };
+        
+        self.cl_zero_angle + 
+        self.cl_initial_slope * angle_of_attack +
+        self.cl_high_order_factor * angle_high_power
+    }
 
-        let cl_pre_stall  = 
-            self.cl_zero_angle + 
-            self.cl_initial_slope * angle_of_attack +
-            self.cl_high_order_factor * angle_high_power;
-
-        let cl_post_stall = self.cl_max_after_stall * (2.0 * stall_angle).sin();
-
-        self.combine_pre_and_post_stall(angle_of_attack.abs(), cl_pre_stall, cl_post_stall)
+    pub fn lift_coefficient_post_stall(&self, angle_of_attack: f64) -> f64 {
+        self.cl_max_after_stall * (2.0 * angle_of_attack).sin()
     }
 
     /// Calculates the drag coefficient for a given angle of attack.
@@ -140,7 +176,7 @@ impl Foil {
         let cd_pre_stall  = self.cd_zero_angle + self.cd_second_order_factor * angle_of_attack.powi(2);
         let cd_post_stall = self.cd_max_after_stall * stall_angle.sin().abs().powf(self.cd_power_after_stall);
 
-        self.combine_pre_and_post_stall(angle_of_attack.abs(), cd_pre_stall, cd_post_stall)
+        self.combine_pre_and_post_stall(angle_of_attack, cd_pre_stall, cd_post_stall)
     }
 
     /// Calculates the added mass force in the direction of the heave motion of the foil.
@@ -152,12 +188,23 @@ impl Foil {
         self.added_mass_factor * heave_acceleration
     }
 
-    fn combine_pre_and_post_stall(&self, angle_of_attack: f64, pre_stall: f64, post_stall: f64) -> f64 {
-        let amount_of_stall = common_functions::sigmoid_function(
-            angle_of_attack, 
-            self.mean_stall_angle, 
+    /// Calculates the amount of stall for a given angle of attack.
+    pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
+        let mean_stall_angle = if angle_of_attack >= 0.0 {
+            self.mean_positive_stall_angle.abs()
+        } else {
+            self.mean_negative_stall_angle.abs()
+        };
+
+        common_functions::sigmoid_function(
+            angle_of_attack.abs(), 
+            mean_stall_angle, 
             self.stall_range
-        );
+        )
+    }
+
+    fn combine_pre_and_post_stall(&self, angle_of_attack: f64, pre_stall: f64, post_stall: f64) -> f64 {
+        let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
         pre_stall * (1.0 - amount_of_stall) + amount_of_stall * post_stall
     }
@@ -175,10 +222,12 @@ impl Default for Foil {
             cd_second_order_factor: 0.0,
             cd_max_after_stall:     Self::default_one(),
             cd_power_after_stall:   Self::default_cd_power_after_stall(),
-            mean_stall_angle:       Self::default_mean_stall_angle(),
+            mean_positive_stall_angle: Self::default_mean_stall_angle(),
+            mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),
             cl_changing_aoa_factor: 0.0,
             added_mass_factor:      0.0,
+            stall_model:            StallModel::Harmonic,
         }
     }
 }

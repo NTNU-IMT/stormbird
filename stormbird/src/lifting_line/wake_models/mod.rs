@@ -8,8 +8,43 @@ pub mod steady;
 pub mod unsteady;
 pub mod velocity_corrections;
 
+use crate::vec3::Vec3;
+use crate::line_force_model::LineForceModel;
+
+use steady::{SteadyWakeBuilder, SteadyWake};
+use unsteady::UnsteadyWake;
+
+#[derive(Debug, Clone)]
+/// Enum to stor different types of wake models.
+pub enum WakeModel {
+    Steady((SteadyWakeBuilder, SteadyWake)),
+    Unsteady(UnsteadyWake)
+}
+
+impl WakeModel {
+    pub fn pre_solver_initialization(
+        &mut self, 
+        line_force_model: &LineForceModel, 
+        ctrl_points_freestream: &[Vec3]
+    ) {
+        match self {
+            WakeModel::Steady((builder, wake)) => {
+                *wake = builder.build(
+                    line_force_model,
+                    ctrl_points_freestream
+                );
+            },
+            WakeModel::Unsteady(wake) => {
+                wake.synchronize_wing_geometry(line_force_model);
+            }
+        }
+    }
+    
+}
+
 /// Typical imports when using the velocity models
 pub mod prelude {
+    pub use super::WakeModel;
     pub use super::steady::{SteadyWakeBuilder, SteadyWake};
     pub use super::unsteady::{UnsteadyWakeBuilder, UnsteadyWake};
 }

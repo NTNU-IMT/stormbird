@@ -16,6 +16,8 @@ pub enum ViscousCoreLength {
     /// Signifies that the viscous core length is an absolute value, and that it can be used without
     /// any more information about the geometry.
     Absolute(f64),
+    /// Signifies that the viscous core length is not used.
+    NoViscousCore,
 }
 
 impl Default for ViscousCoreLength {
@@ -53,6 +55,7 @@ impl ViscousCoreLength {
         match self {
             Self::Relative(relative_length) => relative_length * line_length,
             Self::Absolute(absolute_length) => *absolute_length,
+            Self::NoViscousCore => 0.0,
         }
     }
 

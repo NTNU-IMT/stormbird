@@ -9,7 +9,7 @@ use crate::vec3::Vec3;
 #[serde(deny_unknown_fields)]
 /// Enum that represent a symmetry plane. 
 /// 
-/// To be used when calcualting induced velocities in space from a potential theory velocity model.
+/// To be used when calculating induced velocities in space from a potential theory velocity model.
 pub enum SymmetryCondition {
     NoSymmetry,
     X,

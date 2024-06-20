@@ -29,5 +29,15 @@ pub enum SectionModel {
     RotatingCylinder(RotatingCylinder),
 }
 
+impl SectionModel {
+    pub fn amount_of_flow_separation(&self, angle_of_attack: f64) -> f64 {
+        match self {
+            SectionModel::Foil(foil) => foil.amount_of_stall(angle_of_attack),
+            SectionModel::VaryingFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
+            SectionModel::RotatingCylinder(_) => 1.0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;

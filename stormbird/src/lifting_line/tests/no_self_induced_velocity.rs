@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation::{ 
+use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
     SimulationMode,
     UnsteadySettings,
@@ -74,10 +74,10 @@ fn no_self_induced_velocity() {
                     spin_ratio_data: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
                     cd_data: vec![0.554, 0.674, 1.497, 2.877, 3.556, 3.816],
                     cl_data: vec![0.0, 1.889, 4.638, 6.794, 7.680, 7.950],
-                    wake_angle_data: vec![
+                    wake_angle_data: Some(vec![
                         0.0, 20.0_f64.to_radians(), 25.0_f64.to_radians(), 
                         35.0_f64.to_radians(), 45.0_f64.to_radians(), 60.0_f64.to_radians()
-                    ],
+                    ]),
                     ..Default::default()
                 }
             ),
@@ -86,35 +86,38 @@ fn no_self_induced_velocity() {
         line_force_model_builder.add_wing(wing_builder);
     }
 
-    let settings = UnsteadySettings{
-        wake: UnsteadyWakeBuilder::new_rotor_sail(diameter),
+    let wake = UnsteadyWakeBuilder {
+        neglect_self_induced_velocities: true,
+        viscous_core_length_off_body: Some(ViscousCoreLength::Absolute(0.5 * diameter)),
         ..Default::default()
     };
 
-    let mut sim = SimulationBuilder::new(
-        line_force_model_builder,
-        SimulationMode::Dynamic(settings)
-    ).build();
-
+    let settings = UnsteadySettings{
+        wake,
+        ..Default::default()
+    };
+    
     let nr_time_steps = 100;
     let time_step = 0.5;
 
     let velocity = Vec3::new(velocity_mag, 0.0, 0.0);
 
+    let mut sim = SimulationBuilder::new(
+        line_force_model_builder,
+        SimulationMode::Dynamic(settings)
+    ).build(time_step, velocity);
+
     let force_factor = sim.line_force_model.total_force_factor(velocity.length());
 
-    let input_state = InputState {
-        freestream: Freestream::Constant(velocity),
-        translation: Vec3::default(),
-        rotation: Vec3::default(),
-    };
+    let freestream_velocity_points = sim.get_freestream_velocity_points();
+    let input_freestream_velocity = vec![velocity; freestream_velocity_points.len()];
 
     let mut result = SimulationResult::default();
 
     for i in 0..nr_time_steps {
         let time = (i as f64) * time_step;
         
-        result = sim.do_step(time, time_step, input_state);
+        result = sim.do_step(time, time_step, &input_freestream_velocity);
     }
 
     let cd = result.integrated_forces_sum().x / force_factor;

@@ -27,7 +27,7 @@ Foam::fv::ActuatorLine::ActuatorLine(
     const word& modelType, 
     const dictionary& dict, 
     const fvMesh& mesh
-    ): cellSetOption(name, modelType, dict, mesh) {
+): cellSetOption(name, modelType, dict, mesh) {
 
     coeffs_.readEntry("fields", fieldNames_);
     applied_.setSize(fieldNames_.size(), false);
@@ -88,7 +88,6 @@ void Foam::fv::ActuatorLine::add_cell_information_to_model(const volVectorField&
     }
 
     // ------------------ Sync the values between processors ---------------------------------------
-
     int n = this->model->nr_sampling_span_lines();
 
     for (int i = 0; i < n; i++) {
@@ -181,6 +180,34 @@ double Foam::fv::ActuatorLine::measure_average_cell_length(const std::vector<sto
 
     return average_cell_length;
 }
+
+void add_interpolated_velocity(const volVectorField& velocity) {
+    auto points = this->model.ctrl_points();
+    
+    interpolationCellPoint<vector> u_interpolator(U); // create interpolation object
+
+    std::vector<stormbird_interface::Vec3> velocity;
+
+    for (unsigned int i = 0; i < points.size(); i++) {
+        vector u_sample = vector(VGREAT, VGREAT, VGREAT);
+
+        vector point_local = vector(points[i].x, points[i].y, points[i].z);
+
+        label cell_id = mesh_.findCell(point_local);
+
+        if (cell_id != -1) {
+            u_sample = u_interpolator.interpolate(point_local, cell_id);
+        }
+        
+        reduce(u_sample, minOp<vector>());
+
+        velocity.push_back(
+            stormbird_interface::Vec3{u_sample[0], u_sample[1], u_sample[2]}
+        );
+    }
+
+    this->model.add_interpolated_velocity(velocity);
+ }
 
 void Foam::fv::ActuatorLine::addSup(fvMatrix<vector>& eqn, const label fieldi) {
     add(eqn.psi(), eqn);

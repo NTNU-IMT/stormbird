@@ -30,6 +30,7 @@ namespace Foam {
 
             void add(const volVectorField& U, fvMatrix<vector>& eqn);
             void add_cell_information_to_model(const volVectorField& velocity);
+            void add_interpolated_velocity(const volVectorField& velocity);
             
             double measure_average_cell_length(const std::vector<stormbird_interface::Vec3>& points);
 

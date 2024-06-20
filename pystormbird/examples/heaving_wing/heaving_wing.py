@@ -54,9 +54,10 @@ if __name__ == "__main__":
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
     args = parser.parse_args()
+
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
     if args.write_wake_files:
-    
         wake_files_folder_path  = Path("wake_files_output")
 
         if not wake_files_folder_path.exists():
@@ -110,35 +111,69 @@ if __name__ == "__main__":
         }
     ]
 
-    line_force_model = {
+    line_force_model_stat = {
         "wing_builders": wings,
         "nr_sections": nr_sections,
     }
 
+    line_force_model_dyn = {
+        "wing_builders": wings,
+        "nr_sections": nr_sections,
+        "ctrl_point_chord_factor": 0.0
+    }
+
+    solver_settings = {
+        "max_iterations_per_time_step": 300,
+        "damping_factor_start": 0.05,
+        "damping_factor_end": 0.2,
+    }
+
+    dt = period / 128
+    final_time = 5.0 * period
+
+    relative_panel_length = dt * velocity / chord_length
+
+    first_panel_relative_length = (dt / velocity) / chord_length
+
     sim_settings_list = [
         {
             "Dynamic": {
+                "solver": solver_settings,
                 "wake": {
-                    "ratio_of_wake_affected_by_induced_velocities": 0.0
+                    "ratio_of_wake_affected_by_induced_velocities": 0.0,
+                    "first_panel_relative_length": relative_panel_length,
+                    "last_panel_relative_length": 20.0,
+                    "wake_length": {
+                        "NrPanels": 400
+                    }
                 }
             }
         },
         {
-            "QuasiSteady": {}
+            "QuasiSteady": {
+                "solver": solver_settings,
+            }
         }
     ]
 
-    label_list = ["Dynamic", "Quasi-steady"]
+    
+    line_force_model_list = [line_force_model_dyn, line_force_model_stat]
 
-    dt = period / 64
-    final_time = 5.0 * period
+    label_list = ["Dynamic", "Quasi-steady"]
+    color_list = [default_colors[0], default_colors[1]]
+
 
     w_plot = 14
     fig = plt.figure(figsize=(w_plot, w_plot / 3.0))
 
     max_cl = []
 
-    for simulation_settings, label in zip(sim_settings_list, label_list):
+    for simulation_settings, line_force_model, label, color in zip(
+        sim_settings_list,
+        line_force_model_list,
+        label_list,
+        color_list
+    ):
         print("Running ", label, "simulations:")
 
         setup = {
@@ -150,7 +185,11 @@ if __name__ == "__main__":
 
         setup_string = json.dumps(setup)
 
-        simulation = Simulation.new_from_string(setup_string)
+        simulation = Simulation(
+            setup_string = setup_string,
+            initial_time_step = dt,
+            wake_initial_velocity = Vec3(velocity, 0.0, 0.0), 
+        )
 
         time = []
         lift = []
@@ -158,14 +197,27 @@ if __name__ == "__main__":
 
         t = 0.0
 
+        '''
+        Query the simulation struct for points where the freestream velocity is defined. This is 
+        only done once in this case as the velocity is not dependent on the position of the wing.
+        Also, because there is noe spatial variation in the velocity, the freestream velocity is
+        the same for all points.
+        '''
+        freestream_velocity_points = simulation.get_freestream_velocity_points()
+
+        freestream_velocity = []
+        for point in freestream_velocity_points:
+            freestream_velocity.append(Vec3(velocity, 0.0, 0.0))
+
         while t < final_time:
             print("Running sim at time = ", t)
+
+            simulation.set_translation(Vec3(0.0, position_func(t), 0.0))
 
             result = simulation.do_step(
                 time = t, 
                 time_step = dt, 
-                freestream_velocity = Vec3(velocity, 0.0, 0.0),
-                translation = Vec3(0.0, position_func(t), 0.0)
+                freestream_velocity = freestream_velocity,
             )
 
             forces = result.integrated_forces_sum()
@@ -176,7 +228,7 @@ if __name__ == "__main__":
 
             t += dt
 
-        plt.plot(time, lift, label=label)
+        plt.plot(time, lift, label=label, color=color)
 
         max_cl.append(np.max(lift))
 
@@ -185,11 +237,20 @@ if __name__ == "__main__":
     theodorsen_reduction = theodorsen_lift_reduction_data(reduced_frequency)
     three_dim_reduction = 1 / (1 + 2/aspect_ratio)
 
-    total_reduction = theodorsen_reduction * three_dim_reduction
+    cl_quasi_steady_theory = -2 * np.pi * three_dim_reduction* velocity_func(np.array(time)) / velocity
+    cl_theodorsen = cl_quasi_steady_theory * theodorsen_reduction
 
-    cl_theodorsen = -2 * np.pi * total_reduction * velocity_func(np.array(time)) / velocity
+    plt.plot(
+        time, 
+        cl_theodorsen, 
+        label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color=color_list[0]
+    )
 
-    plt.plot(time, cl_theodorsen, label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color="grey")
+    plt.plot(
+        time, 
+        cl_quasi_steady_theory, 
+        label="Simplified quasi-steady", linestyle="--", color=color_list[1]
+    )
 
     print("Theodorsen ratio", theodorsen_reduction)
     print("CL ratio", max_cl[0] / max_cl[1])

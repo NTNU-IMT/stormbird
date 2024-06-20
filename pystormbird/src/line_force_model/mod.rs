@@ -8,8 +8,15 @@ pub mod span_line;
 pub mod builder;
 
 use crate::vec3::Vec3;
+use stormbird::vec3::Vec3 as Vec3Rust;
 
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
+use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
+
+use stormbird::line_force_model::smoothing::{
+    GaussianSmoothingSettings,
+    ArtificialViscositySettings
+};
 
 #[pyclass]
 #[derive(Clone)]
@@ -19,14 +26,73 @@ pub struct LineForceModel {
 
 #[pymethods]
 impl LineForceModel {
+    #[new]
+    pub fn new(json_string: String) -> Self {
+        let builder = LineForceModelBuilderRust::new_from_string(&json_string);
+
+        Self {
+            data: builder.build()
+        }
+    }
+
+    pub fn relative_span_distance(&self) -> Vec<f64> {
+        self.data.relative_span_distance()
+    }
+
+    pub fn circulation_strength(&self, velocity: Vec<Vec3>) -> Vec<f64> {
+        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+        self.data.circulation_strength(&rust_velocity)
+    }
+
+    pub fn angles_of_attack(&self, velocity: Vec<Vec3>) -> Vec<f64> {
+        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+        
+        self.data.angles_of_attack(&rust_velocity)
+    }
+
+    #[pyo3(signature = (
+        *,
+        noisy_strength, 
+        length_factor,
+        end_corrections
+    ))]
+    pub fn gaussian_smoothed_strength(
+        &self, 
+        noisy_strength: Vec<f64>, 
+        length_factor: f64, 
+        end_corrections: Vec<(bool, bool)>
+    ) -> Vec<f64> {
+        let settings = GaussianSmoothingSettings {
+            length_factor,
+            end_corrections
+        };
+
+        self.data.gaussian_smoothed_values(&noisy_strength, &settings)
+    }
+
+    #[pyo3(signature = (
+        *,
+        noisy_strength,
+        velocity,
+        viscosity,
+        solver_iterations,
+        solver_damping
+    ))]
+    pub fn circulation_strength_with_viscosity(&self, noisy_strength: Vec<f64>, velocity: Vec<Vec3>, viscosity: f64, solver_iterations: usize, solver_damping: f64) -> Vec<f64> {
+        let settings = ArtificialViscositySettings {
+            viscosity,
+            solver_iterations,
+            solver_damping
+        };
+
+        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+        
+        self.data.circulation_strength_with_viscosity(&noisy_strength, &rust_velocity, &settings)
+    }
+
     #[getter]
     pub fn ctrl_points(&self) -> Vec<Vec3> {
         self.data.ctrl_points().iter().map(|v| Vec3::from(v.clone())).collect()
-    }
-
-    #[pyo3(signature = (self_strength, target_model, end_correction = (false, false), gaussian_length_factor = 0.5))]
-    pub fn map_strength_gaussian(&self, self_strength: Vec<f64>, target_model: &LineForceModel, end_correction: (bool, bool), gaussian_length_factor: f64) -> Vec<f64> {
-        self.data.map_strength_gaussian(&self_strength, &target_model.data, end_correction, gaussian_length_factor)
     }
 }
 

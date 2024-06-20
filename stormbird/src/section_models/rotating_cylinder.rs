@@ -24,12 +24,13 @@ pub struct RotatingCylinder {
     #[serde(default = "RotatingCylinder::default_cd_data")]
     /// Drag coefficient data as a function of spin ratio
     pub cd_data: Vec<f64>,
-    #[serde(default = "RotatingCylinder::default_wake_angle_data")]
-    /// The angle of the wake behind the cylinder, as a function of spin ratio.
-    pub wake_angle_data: Vec<f64>,
+    #[serde(default)]
+    /// Optional specification of non-zero angles of the wake behind the cylinder, as a function of spin ratio.
+    pub wake_angle_data: Option<Vec<f64>>,
     #[serde(default)]
     /// Added mass factor for the cylinder
     pub added_mass_factor: f64,
+    #[serde(default)]
     /// Two-dimensional moment of inertia
     pub moment_of_inertia_2d: f64,
 }
@@ -41,7 +42,7 @@ impl Default for RotatingCylinder {
             spin_ratio_data: Self::default_spin_ratio_data(),
             cl_data: Self::default_cl_data(),
             cd_data: Self::default_cd_data(),
-            wake_angle_data: Self::default_wake_angle_data(),
+            wake_angle_data: None,
             added_mass_factor: 0.0,
             moment_of_inertia_2d: 0.0,
         }
@@ -62,11 +63,6 @@ impl RotatingCylinder {
     /// Default values for cd data based on two dimensional CFD simulations
     pub fn default_cd_data() -> Vec<f64> {
         vec![0.457, 0.411, 0.296, 0.093, 0.066, 0.042, 0.064, 0.05, 0.076]
-    }
-
-    /// Default values for wake angle data based on two dimensional CFD simulations
-    pub fn default_wake_angle_data() -> Vec<f64> {
-        vec![0.0, 0.4360, 0.4360, 0.4623, 0.7812, 1.1929, 1.2568, 1.2568, 1.2568]
     }
 
     /// Calculates non-dimensional spin ratio, defined as the ratio of the surface velocity of the 
@@ -109,11 +105,15 @@ impl RotatingCylinder {
     }
 
     pub fn wake_angle(&self, diameter: f64, velocity: f64) -> f64 {
-        let spin_ratio = self.spin_ratio(diameter, velocity);
+        if let Some(wake_angle_data) = &self.wake_angle_data {
+            let spin_ratio = self.spin_ratio(diameter, velocity);
 
-        let angle_magnitude = interpolation::linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &self.wake_angle_data);
+            let angle_magnitude = interpolation::linear_interpolation(spin_ratio.abs(), &self.spin_ratio_data, &wake_angle_data);
 
-        -angle_magnitude * spin_ratio.signum()
+            -angle_magnitude * spin_ratio.signum()
+        } else {
+            0.0
+        }
     }
 
     pub fn added_mass_coefficient(&self, acceleration_magnitude: f64) -> f64 {
