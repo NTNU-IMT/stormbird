@@ -37,7 +37,7 @@ class StormbirdSettings():
 
         line_force_model = {
             "wing_builders": [wing_builder],
-            "nr_sections": 40,
+            "nr_sections": 64,
             "density": 1.0
         }
 
