@@ -17,7 +17,7 @@ pub struct SectionModel{
 }
 
 #[pymodule]
-pub fn section_models(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn section_models(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SectionModel>()?;
     m.add_class::<foil::Foil>()?;
     m.add_class::<varying_foil::VaryingFoil>()?;

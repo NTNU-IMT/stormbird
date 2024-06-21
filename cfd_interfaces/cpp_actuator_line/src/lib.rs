@@ -30,9 +30,9 @@ mod ffi {
         fn set_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]);
 
         // ---- Force methods ----        
-        fn calculate_result(&mut self);
+        fn calculate_result(&mut self, time_step: f64);
         fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3];
-        fn distributed_body_force_weight_at_point(&self, point: &[f64; 3]) -> f64;
+        fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
         
         // ---- Export data ----
         fn write_results(&self);
@@ -85,8 +85,8 @@ impl CppActuatorLine {
         self.model.ctrl_points_velocity[index] = Vec3::from(velocity);
     }
 
-    pub fn calculate_result(&mut self) {
-        self.model.calculate_and_add_result()
+    pub fn calculate_result(&mut self, time_step: f64) {
+        self.model.calculate_and_add_result(time_step)
     }
 
     pub fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3] {
@@ -95,8 +95,8 @@ impl CppActuatorLine {
         body_force.into()
     }
 
-    pub fn distributed_body_force_weight_at_point(&self, point: &[f64; 3]) -> f64 {
-        self.model.distributed_body_force_weight_at_point(Vec3::from(*point))
+    pub fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64 {
+        self.model.summed_projection_weights_at_point(Vec3::from(*point))
     }
 
     pub fn write_results(&self) {

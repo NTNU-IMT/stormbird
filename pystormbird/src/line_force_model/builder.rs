@@ -49,7 +49,7 @@ impl LineForceModelBuilder {
     }
 
     #[classmethod]
-    pub fn new_from_string(_cls: &PyType, string: String) -> Self {
+    pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
         Self {
             data: LineForceModelBuilderRust::new_from_string(&string),
         }

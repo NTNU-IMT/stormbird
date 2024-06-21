@@ -211,6 +211,12 @@ impl LineForceModel {
         ).collect()
     }
 
+    pub fn chord_vector_at_index(&self, index: usize) -> Vec3 {
+        let (angle, axis) = self.wing_rotation_data_from_global(index);
+
+        self.chord_vectors_local[index].rotate_around_axis(angle, axis).rotate(self.rotation)
+    }
+
     /// Returns the chord vectors in global coordinates.
     pub fn chord_vectors(&self) -> Vec<Vec3> {
         self.chord_vectors_local.iter().enumerate().map(

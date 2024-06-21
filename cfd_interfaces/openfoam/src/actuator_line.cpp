@@ -60,16 +60,57 @@ Foam::fv::ActuatorLine::ActuatorLine(
     );
 }
 
+void Foam::fv::ActuatorLine::set_projection_data() {
+    const vectorField& cell_centers = mesh_.C();
+    
+    const labelList& cell_ids = cells();
+
+    this->relevant_cells = labelList();
+
+    forAll(cell_ids, i) {
+        label cell_id = cell_ids[i];
+
+        std::array<double, 3> cell_center = {
+            cell_centers[cell_id][0],
+            cell_centers[cell_id][1],
+            cell_centers[cell_id][2]
+        };
+
+        double body_force_weight = this->model->summed_projection_weights_at_point(cell_center);
+
+        if (body_force_weight > 1e-6) {
+            this->relevant_cells.append(cell_id);
+
+            this->body_force_field_weight[0][cell_id] = body_force_weight;
+        } else {
+            this->body_force_field_weight[0][cell_id] = 0.0;
+        }
+    }
+
+    this->projection_data_is_set = true;
+}
+
 void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
 {
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
-    const labelList& cell_ids      = cells();
-    vectorField& equation_source   = eqn.source();
+    double time_step = mesh_.time().deltaTValue();
 
-    this->set_integrated_weighted_velocity(velocity_field);
+    if (!this->projection_data_is_set) {
+        this->set_projection_data();
+    }
 
-    this->model->calculate_result();
+    const labelList& cell_ids = this->relevant_cells;
+    
+    vectorField& equation_source = eqn.source();
+
+    if (this->use_integral_velocity_sampling) {
+        this->set_integrated_weighted_velocity(velocity_field);
+    } else {
+        this->set_interpolated_velocity(velocity_field);
+    }
+
+    this->model->calculate_result(time_step);
     
     if (Pstream::master()) {
         this->model->write_results();
@@ -86,8 +127,6 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
 
         std::array<double, 3> body_force_sb = this->model->distributed_body_force_at_point(cell_center);
 
-        double body_force_weight = this->model->distributed_body_force_weight_at_point(cell_center);
-
         vector body_force(vector::zero);
 
         body_force[0] = body_force_sb[0] * cell_volumes[cell_id];
@@ -97,14 +136,13 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
         equation_source[cell_id] += body_force;
 
         this->body_force_field[0][cell_id] = body_force / cell_volumes[cell_id];
-        this->body_force_field_weight[0][cell_id] = body_force_weight;
     }
 }
 
 void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) {
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
-    const labelList& cell_ids       = cells();
+    const labelList& cell_ids = !this->projection_data_is_set ? cells() : this->relevant_cells;
 
     // ------------------ Initialize the numerator and denominator ---------------------------------
     std::vector<vector> numerator;
@@ -168,26 +206,39 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
     }
 }
 
-void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {
-    std::vector<vector> points;
-
+void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
+    this->ctrl_points.clear();
+    this->interpolation_cells.clear();
+    
     for (unsigned i = 0; i < this->model->nr_span_lines(); i++) {
         std::array<double, 3> point_sb = this->model->get_ctrl_point_at_index(i);
         
-        points.push_back(
+        this->ctrl_points.push_back(
             vector(point_sb[0], point_sb[1], point_sb[2])
         );
+
+        this->interpolation_cells.push_back(
+            mesh_.findCell(this->ctrl_points[i])
+        );
+    }
+
+    this->velocity_sampling_data_is_set = true;
+}
+
+void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {
+    if (!this->velocity_sampling_data_is_set) {
+        this->set_velocity_sampling_data_interpolation();
     }
     
     interpolationCellPoint<vector> u_interpolator(velocity_field); // create interpolation object
 
-    for (unsigned int i = 0; i < points.size(); i++) {
+    for (unsigned int i = 0; i < this->ctrl_points.size(); i++) {
         vector u_sample = vector(VGREAT, VGREAT, VGREAT);
 
-        label cell_id = mesh_.findCell(points[i]);
+        label cell_id = this->interpolation_cells[i];
 
-        if (cell_id != -1) {
-            u_sample = u_interpolator.interpolate(points[i], cell_id);
+        if (this->interpolation_cells[i] != -1) {
+            u_sample = u_interpolator.interpolate(this->ctrl_points[i], cell_id);
         }
         
         reduce(u_sample, minOp<vector>());

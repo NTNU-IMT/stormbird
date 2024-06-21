@@ -38,7 +38,7 @@ def run_simulation(simulation_case: SimulationCase):
 
     if simulation_case.section_model is None:
         section_model = {
-            "Foil": "{}"
+            "Foil": {}
         }
     else:
         section_model = simulation_case.section_model

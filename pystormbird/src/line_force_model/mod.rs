@@ -97,7 +97,7 @@ impl LineForceModel {
 }
 
 #[pymodule]
-pub fn line_force_model(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn line_force_model(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<span_line::SpanLine>()?;
     m.add_class::<builder::WingBuilder>()?;
     m.add_class::<builder::LineForceModelBuilder>()?;

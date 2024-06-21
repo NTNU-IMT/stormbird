@@ -31,6 +31,13 @@ pub struct SimulationResult {
 }
 
 impl SimulationResult {
+    pub fn result_history_from_file(file_path: &str) -> Vec<SimulationResult> {
+        let file = std::fs::File::open(file_path).unwrap();
+        let reader = std::io::BufReader::new(file);
+
+        serde_json::from_reader(reader).unwrap()
+    }
+
     pub fn integrated_forces_sum(&self) -> Vec3 {
         let mut sum = Vec3::default();
 
