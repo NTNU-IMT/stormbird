@@ -12,6 +12,15 @@ from folder_paths import FolderPaths
 def run_lifting_line_simulation(stormbird_settings: StormbirdSettings):
     line_force_model = stormbird_settings.get_line_force_model_dict()
 
+    gaussian_smoothing_settings = {
+        "length_factor": 0.02,
+        "end_corrections": [(True, True)]
+    }
+
+    line_force_model["smoothing_settings"] = {
+        "gaussian": gaussian_smoothing_settings
+    }
+
     solver = {
         "damping_factor_start": 0.01,
         "damping_factor_end": 0.1,

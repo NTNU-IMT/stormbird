@@ -29,6 +29,8 @@ mod ffi {
 
         fn set_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]);
 
+        fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize;
+
         // ---- Force methods ----        
         fn calculate_result(&mut self, time_step: f64);
         fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3];
@@ -83,6 +85,10 @@ impl CppActuatorLine {
 
     fn set_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]) {
         self.model.ctrl_points_velocity[index] = Vec3::from(velocity);
+    }
+
+    fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize {
+        self.model.dominating_line_element_index_at_point(Vec3::from(*point))
     }
 
     pub fn calculate_result(&mut self, time_step: f64) {

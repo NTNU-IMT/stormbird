@@ -50,15 +50,27 @@ namespace Foam {
             volScalarField* body_force_field_weight;
 
             // Mesh to actuator line data
-            bool use_integral_velocity_sampling = false;
+            // TODO: make these parameters available in the input file
+            bool use_integral_velocity_sampling = true;
+            bool only_use_dominating_line_element_when_sampling = true;
+            bool only_use_dominating_line_element_when_projecting = true;
             
             bool velocity_sampling_data_is_set = false;
             bool projection_data_is_set = false;
 
+            double projection_limit = 0.1;
+            double sampling_integral_limit = 0.1;
+
+            // Store all relevant data
             std::vector<label> interpolation_cells;
             std::vector<vector> ctrl_points;
 
-            labelList relevant_cells;
+            labelList relevant_cells_for_projection;
+            labelList dominating_line_element_index_projection;
+
+            labelList relevant_cells_for_velocity_sampling;
+            labelList dominating_line_element_index_sampling;
+
 
             // Custom add function
             void add(const volVectorField& velocity, fvMatrix<vector>& eqn);
@@ -66,6 +78,7 @@ namespace Foam {
             // Check which cells are relevant
             void set_projection_data();
             void set_velocity_sampling_data_interpolation();
+            void set_velocity_sampling_data_integral();
 
             // Ways to estimate the velocity
             void set_integrated_weighted_velocity(const volVectorField& velocity);

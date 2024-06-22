@@ -227,4 +227,20 @@ impl ActuatorLine {
     pub fn summed_projection_weights_at_point(&self, point: Vec3) -> f64 {
         self.line_segments_projection_weights_at_point(point).iter().sum()
     }
+
+    pub fn dominating_line_element_index_at_point(&self, point: Vec3) -> usize {
+        let projection_weights = self.line_segments_projection_weights_at_point(point);
+
+        let mut max_weight = -1.0;
+        let mut max_index = 0;
+
+        for (i, weight) in projection_weights.iter().enumerate() {
+            if *weight > max_weight {
+                max_weight = *weight;
+                max_index = i;
+            }
+        }
+
+        max_index
+    }
 }

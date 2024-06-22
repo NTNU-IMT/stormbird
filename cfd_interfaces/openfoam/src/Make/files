@@ -1,4 +1,5 @@
 actuator_line.cpp
+sampling.cpp
 cpp_actuator_line.cpp
 
 LIB = $(FOAM_USER_LIBBIN)/libActuatorLine
