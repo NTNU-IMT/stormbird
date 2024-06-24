@@ -55,7 +55,7 @@ castellatedMeshControls
         wingBox
         {
             mode inside;
-            levels ((1.0 4));
+            levels ((1.0 3));
         }
 
         wakeBox
