@@ -13,6 +13,7 @@ pub struct SolverSettings {
     pub damping_factor_end: Option<f64>,
     pub convergence_test: ConvergenceTest,
     pub print_log: bool,
+    pub only_consider_change_in_angle: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +29,8 @@ pub struct SteadySolverSettings {
     pub convergence_test: ConvergenceTest,
     #[serde(default)]
     pub print_log: bool,
+    #[serde(default)]
+    pub only_consider_change_in_angle: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +46,8 @@ pub struct UnsteadySolverSettings {
     pub convergence_test: ConvergenceTest,
     #[serde(default)]
     pub print_log: bool,
+    #[serde(default)]
+    pub only_consider_change_in_angle: bool,
 }
 
 impl SteadySolverSettings {
@@ -56,6 +61,7 @@ impl SteadySolverSettings {
             damping_factor_end: self.damping_factor_end,
             convergence_test: self.convergence_test.clone(),
             print_log: self.print_log,
+            only_consider_change_in_angle: self.only_consider_change_in_angle,
         }
     }
 }
@@ -68,6 +74,7 @@ impl Default for SteadySolverSettings {
             damping_factor_end: None,
             convergence_test: Default::default(),
             print_log: Default::default(),
+            only_consider_change_in_angle: Default::default(),
         }
     }
 }
@@ -83,6 +90,7 @@ impl UnsteadySolverSettings {
             damping_factor_end: self.damping_factor_end,
             convergence_test: self.convergence_test.clone(),
             print_log: self.print_log,
+            only_consider_change_in_angle: self.only_consider_change_in_angle,
         }
     }
 }
@@ -95,6 +103,7 @@ impl Default for UnsteadySolverSettings {
             damping_factor_end: None,
             convergence_test: Default::default(),
             print_log: Default::default(),
+            only_consider_change_in_angle: Default::default(),
         }
     }
 }

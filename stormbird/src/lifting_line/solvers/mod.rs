@@ -56,7 +56,13 @@ pub fn solve_time_step(
             velocity[i] = fixed_velocities[i] + velocity_update[i];
         }
 
-        let velocity = line_force_model.remove_span_velocity(&velocity);
+        let mut velocity = line_force_model.remove_span_velocity(&velocity);
+
+        if solver_settings.only_consider_change_in_angle {
+            for i in 0..ctrl_points.len() {
+                velocity[i] = velocity[i].normalize() * felt_ctrl_points_freestream[i].length();
+            }
+        }
 
         let new_estimated_strength = line_force_model.circulation_strength(&velocity);
 
