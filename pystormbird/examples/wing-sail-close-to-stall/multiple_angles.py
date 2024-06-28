@@ -3,17 +3,17 @@ import matplotlib.pyplot as plt
 
 import argparse
 
-from simulation import run_simulation, SimulationCase
+from simulation import SimulationCase, SimulationMode
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a single case")
     parser.add_argument("--dynamic", action="store_true", help="Use dynamic model")
-    parser.add_argument("--smoothing", action="store_true", help="Use smoothing")
+    parser.add_argument("--smoothing-length", type=float, default=None, help="Smoothing length")
     parser.add_argument("--use-start-angle", action="store_true", help="Use start angle of attack")
 
     args = parser.parse_args()
 
-    simulation_type = "dynamic" if args.dynamic else "static"
+    simulation_mode = SimulationMode.DYNAMIC if args.dynamic else SimulationMode.STATIC
 
     angles_of_attack = np.arange(0, 35.0, 1)
     n_angles = len(angles_of_attack)
@@ -32,13 +32,13 @@ if __name__ == "__main__":
         sim_case = SimulationCase(
             angle_of_attack = angles_of_attack[i],
             start_angle_of_attack = start_angle,
-            simulation_type = simulation_type,
-            smoothing = args.smoothing
+            simulation_mode = simulation_mode,
+            smoothing_length = args.smoothing_length
         )
 
-        result_history = run_simulation(sim_case)
+        result_history = sim_case.run()
 
-        force = result_history[-1].integrated_forces[0]
+        force = result_history[-1].integrated_forces[0].total
 
         cd[i] = force.x / sim_case.force_factor
         cl[i] = force.y / sim_case.force_factor
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     plt.sca(ax1)
     plt.plot(angles_of_attack, cl)
 
-    plt.ylim(0, 2.5)
+    plt.ylim(0, 2.0)
 
     plt.sca(ax2)
     plt.plot(angles_of_attack, cd)

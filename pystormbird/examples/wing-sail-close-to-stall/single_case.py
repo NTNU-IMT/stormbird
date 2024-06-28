@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import argparse
 
-from simulation import run_simulation, SimulationCase
+from simulation import SimulationCase
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a single case")
@@ -26,13 +26,13 @@ if __name__ == "__main__":
         write_wake_files=args.write_wake_files
     )
 
-    result_history = run_simulation(sim_case)
+    result_history = sim_case.run()
 
     cd = np.zeros(len(result_history))
     cl = np.zeros(len(result_history))
 
     for i in range(len(result_history)):
-        force = result_history[i].integrated_forces[0]
+        force = result_history[i].integrated_forces[0].total
 
         cd[i] = force.x
         cl[i] = force.y
