@@ -24,10 +24,13 @@ class RotorSimulationCase():
     smoothing_length: float | None = None
     circulation_viscosity: float | None = None
     z_symmetry: bool = True
-    virtual_end_disk: bool = True
-    virtual_end_disk_height_factor: float = 0.25
+    virtual_end_disks: (bool, bool) = (False, True)
+    virtual_end_disk_height_factor: float = 0.5
     only_consider_change_in_angle: bool = False
     write_wake_files: bool = False
+    spin_ratio_data: list | None = None
+    cd_data: list | None = None
+    cl_data: list | None = None
 
     @property
     def force_factor(self) -> float:
@@ -38,7 +41,7 @@ class RotorSimulationCase():
         circumference = np.pi * self.diameter
         tangential_velocity = self.freestream_velocity * self.spin_ratio
                 
-        revolutions_per_second = -tangential_velocity / circumference
+        revolutions_per_second = -tangential_velocity / circumference 
 
         return revolutions_per_second
     
@@ -47,10 +50,17 @@ class RotorSimulationCase():
 
         section_model = {
             "RotatingCylinder": {
-                "revolutions_per_second": self.revolutions_per_second
+                "revolutions_per_second": float(self.revolutions_per_second)
             }
         }
 
+        if self.spin_ratio_data is not None and self.cl_data is not None and self.cd_data is not None:
+            if len(self.spin_ratio_data) != len(self.cl_data):
+                raise ValueError("Section data input does not have the same length")
+            
+            section_model["RotatingCylinder"]["spin_ratio_data"] = self.spin_ratio_data
+            section_model["RotatingCylinder"]["cl_data"] = self.cl_data
+            section_model["RotatingCylinder"]["cd_data"] = self.cd_data
         
         rotor_builder = {
             "section_points": [
@@ -66,7 +76,22 @@ class RotorSimulationCase():
 
         wing_builders = [rotor_builder]
 
-        if self.virtual_end_disk:
+        if self.virtual_end_disks[0]:
+            virtual_end_sections = {
+                "section_points": [
+                    {"x": 0.0, "y": 0.0, "z": -self.virtual_end_disk_height_factor * self.diameter},
+                    {"x": 0.0, "y": 0.0, "z": 0.0}
+                ],
+                "chord_vectors": [
+                    {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
+                    {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
+                ],
+                "section_model": section_model
+            }
+
+            wing_builders.append(virtual_end_sections)
+
+        if self.virtual_end_disks[1]:
             virtual_end_sections = {
                 "section_points": [
                     {"x": 0.0, "y": 0.0, "z": self.height},
@@ -110,8 +135,8 @@ class RotorSimulationCase():
 
         solver = {
             "damping_factor_start": 0.01,
-            "damping_factor_end": 0.05,
-            "max_iterations_per_time_step": 3,
+            "damping_factor_end": 0.02,
+            "max_iterations_per_time_step": 10,
             "only_consider_change_in_angle": self.only_consider_change_in_angle
         }
 
@@ -161,7 +186,7 @@ class RotorSimulationCase():
             "wake_files_folder_path": "wake_files_output"
         }
 
-        setup_string = json.dumps(setup)
+        setup_string = json.dumps(setup, indent=4)
 
         simulation = Simulation(
             setup_string = setup_string,
