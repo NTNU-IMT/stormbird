@@ -4,8 +4,8 @@
 
 //! Lifting line solvers
 //! 
-use crate::math_utils::statistics;
-use crate::vec3::Vec3;
+use math_utils::statistics;
+use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::prelude::*;
 use crate::io_structs::prelude::*;
 use crate::lifting_line::wake_models::prelude::*;
@@ -16,7 +16,7 @@ use settings::SolverSettings;
 
 pub fn solve_time_step(
     line_force_model: &LineForceModel,
-    felt_ctrl_points_freestream: &[Vec3],
+    felt_ctrl_points_freestream: &[SpatialVector<3>],
     solver_settings: &SolverSettings,
     wake_model: &mut WakeModel,
     initial_solution: &[f64],
@@ -40,7 +40,7 @@ pub fn solve_time_step(
     };
 
     let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
-    let mut velocity = vec![Vec3::default(); ctrl_points.len()];
+    let mut velocity = vec![SpatialVector::<3>::default(); ctrl_points.len()];
 
     for iteration in 0..solver_settings.max_iterations_per_time_step {
         let velocity_update = match wake_model {

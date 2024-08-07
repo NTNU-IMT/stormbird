@@ -29,12 +29,12 @@ impl Default for RectangularWing {
 impl RectangularWing {
     pub fn build(&self) -> LineForceModelBuilder {
         let rotation_axis = if self.negative_span_orientation {
-            -Vec3::unit_z()
+            -SpatialVector::<3>::unit_z()
         } else {
-            Vec3::unit_z()
+            SpatialVector::<3>::unit_z()
         };
 
-        let chord_vector = Vec3::new(1.0, 0.0, 0.0).rotate_around_axis(
+        let chord_vector = SpatialVector::<3>::new(1.0, 0.0, 0.0).rotate_around_axis(
             -self.angle_of_attack, rotation_axis
         );
 
@@ -49,8 +49,8 @@ impl RectangularWing {
 
         let wing_builder = WingBuilder {
             section_points: vec![
-                Vec3::new(0.0, 0.0, 0.0),
-                Vec3::new(0.0, 0.0, last_z),
+                SpatialVector::<3>::new(0.0, 0.0, 0.0),
+                SpatialVector::<3>::new(0.0, 0.0, last_z),
             ],
             chord_vectors: vec![
                 chord_vector,

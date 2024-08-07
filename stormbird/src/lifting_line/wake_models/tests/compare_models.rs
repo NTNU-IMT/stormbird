@@ -4,7 +4,7 @@
 
 use super::*;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::lifting_line::tests::test_setup::RectangularWing;
 
 #[test]
@@ -14,7 +14,7 @@ fn compare_wake_models() {
         ..Default::default()
     }.build().build();
 
-    let velocity = Vec3::new(1.2, 0.0, 0.0);
+    let velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
 
     let ctrl_points_freestream = vec![velocity; line_force_model.nr_span_lines()];
 

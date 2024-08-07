@@ -6,7 +6,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 /// Builder for a [VelocityCorrections] struct. The only difference between the fields is the
@@ -21,7 +21,7 @@ pub struct VelocityCorrectionsBuilder {
 
 impl VelocityCorrectionsBuilder {
     /// Returns a [VelocityCorrections] struct based on the settings in `self`
-    pub fn build(&self, freestream: Vec3) -> VelocityCorrections {
+    pub fn build(&self, freestream: SpatialVector<3>) -> VelocityCorrections {
         let max_magnitude = if let Some(max_magnitude_ratio) = self.max_magnitude_ratio {
             Some(max_magnitude_ratio * freestream.length())
         } else {
@@ -66,7 +66,7 @@ impl VelocityCorrections {
     /// # Argument
     /// * `induced_velocities` - a vector containing the raw induced velocities calculated from a
     /// wake model, such as [super::unsteady::UnsteadyWake] or [super::steady::SteadyWake]
-    pub fn correct(&self, induced_velocities: &mut [Vec3]) {
+    pub fn correct(&self, induced_velocities: &mut [SpatialVector<3>]) {
          self.apply_max_magnitude(induced_velocities);
          self.apply_correction_factor(induced_velocities);
     }
@@ -82,7 +82,7 @@ impl VelocityCorrections {
 
     /// Applies the max magnitude correction. The magnitude of any velocity in the input vector that
     /// is larger than the max magnitude in the struct will be reduced to the max magnitude
-    fn apply_max_magnitude(&self, induced_velocities: &mut [Vec3]) {
+    fn apply_max_magnitude(&self, induced_velocities: &mut [SpatialVector<3>]) {
         if let Some(max_magnitude) = self.max_magnitude {
             for i in 0..induced_velocities.len() {
                 if induced_velocities[i].length() > max_magnitude {
@@ -94,7 +94,7 @@ impl VelocityCorrections {
 
     /// Applies the correction factor. All induced velocities in the input vector will be multiplied
     /// with the correction factor.
-    fn apply_correction_factor(&self, induced_velocities: &mut [Vec3]) {
+    fn apply_correction_factor(&self, induced_velocities: &mut [SpatialVector<3>]) {
         if let Some(correction_factor) = self.correction_factor {
             for i in 0..induced_velocities.len() {
                 induced_velocities[i] = correction_factor * induced_velocities[i];

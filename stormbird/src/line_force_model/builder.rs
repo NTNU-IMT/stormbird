@@ -5,7 +5,7 @@
 use serde::{Serialize, Deserialize};
 use serde_json;
 
-use crate::math_utils::interpolation::linear_interpolation;
+use math_utils::interpolation::linear_interpolation;
 
 use super::*;
 
@@ -75,8 +75,8 @@ impl LineForceModelBuilder {
 /// section model is set. Between these points the chord length and section model is linearly 
 /// interpolated 
 pub struct WingBuilder {
-    pub section_points: Vec<Vec3>,
-    pub chord_vectors: Vec<Vec3>,
+    pub section_points: Vec<SpatialVector<3>>,
+    pub chord_vectors: Vec<SpatialVector<3>>,
     pub section_model: SectionModel,
 }
 
@@ -110,7 +110,7 @@ impl WingBuilder {
         let delta_span_distance = total_span_distance / (nr_sections as f64);        
 
         let mut span_lines_local: Vec<SpanLine> = Vec::new();
-        let mut chord_vectors_local: Vec<Vec3> = Vec::new();
+        let mut chord_vectors_local: Vec<SpatialVector<3>> = Vec::new();
 
         for i in 0..nr_sections {
             let start_distance = i as f64 * delta_span_distance;

@@ -4,9 +4,9 @@
 
 //! Geometry transformations, such as rotation and translation
 
-use crate::vec3::Vec3;
+use super::*;
 
-impl Vec3 {
+impl SpatialVector<3> {
     #[inline]
     /// Translates the vector by the given translation vector
     pub fn translate(self, translation: Self) -> Self {
@@ -52,25 +52,25 @@ impl Vec3 {
     pub fn rotate(self, rotation: Self) -> Self {
         let mut new_vector = self;
 
-        if rotation.x != 0.0 {
-            let temp_y = new_vector.y;
-            let temp_z = new_vector.z;
-            new_vector.y = temp_y * rotation.x.cos() - temp_z * rotation.x.sin();
-            new_vector.z = temp_y * rotation.x.sin() + temp_z * rotation.x.cos();
+        if rotation[0] != 0.0 {
+            let temp_y = new_vector[1];
+            let temp_z = new_vector[2];
+            new_vector[1] = temp_y * rotation[0].cos() - temp_z * rotation[0].sin();
+            new_vector[2] = temp_y * rotation[0].sin() + temp_z * rotation[0].cos();
         }
 
-        if rotation.y != 0.0 {
-            let temp_x = new_vector.x;
-            let temp_z = new_vector.z;
-            new_vector.x = temp_x * rotation.y.cos() + temp_z * rotation.y.sin();
-            new_vector.z = -temp_x * rotation.y.sin() + temp_z * rotation.y.cos();
+        if rotation[1] != 0.0 {
+            let temp_x = new_vector[0];
+            let temp_z = new_vector[2];
+            new_vector[0] = temp_x * rotation[1].cos() + temp_z * rotation[1].sin();
+            new_vector[2] = -temp_x * rotation[1].sin() + temp_z * rotation[1].cos();
         }
 
-        if rotation.z != 0.0 {
-            let temp_x = new_vector.x;
-            let temp_y = new_vector.y;
-            new_vector.x = temp_x * rotation.z.cos() - temp_y * rotation.z.sin();
-            new_vector.y = temp_x * rotation.z.sin() + temp_y * rotation.z.cos();
+        if rotation[2] != 0.0 {
+            let temp_x = new_vector[0];
+            let temp_y = new_vector[1];
+            new_vector[0] = temp_x * rotation[2].cos() - temp_y * rotation[2].sin();
+            new_vector[1] = temp_x * rotation[2].sin() + temp_y * rotation[2].cos();
         }
 
         new_vector
@@ -91,20 +91,19 @@ mod tests {
     /// The spatial vector implements to different algorithms for rotations, with slightly different
     /// use cases. This test compares the two algorithms to ensure they produce the same result.
     fn compare_rotations() {
+        let rotation = SpatialVector::<3>::new(
+            30.0_f64.to_radians(),
+            21.2_f64.to_radians(),
+            -16.1_f64.to_radians(),
+        );
 
-        let rotation = Vec3 {
-            x: 30.0_f64.to_radians(),
-            y: 21.2_f64.to_radians(),
-            z: -16.1_f64.to_radians(),
-        };
-
-        let original_vector = Vec3::new(1.3, 1.2, 1.5);
+        let original_vector = SpatialVector::<3>::new(1.3, 1.2, 1.5);
 
         let rotated_vector_1 = original_vector.rotate(rotation);
         let rotated_vector_2 = original_vector
-            .rotate_around_axis(rotation.x, Vec3::unit_x())
-            .rotate_around_axis(rotation.y, Vec3::unit_y())
-            .rotate_around_axis(rotation.z, Vec3::unit_z());
+            .rotate_around_axis(rotation[0], SpatialVector::<3>::unit_x())
+            .rotate_around_axis(rotation[1], SpatialVector::<3>::unit_y())
+            .rotate_around_axis(rotation[2], SpatialVector::<3>::unit_z());
 
         dbg!(rotated_vector_1, rotated_vector_2);
 

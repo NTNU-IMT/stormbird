@@ -15,7 +15,7 @@ pub mod shape;
 use serde::{Serialize, Deserialize};
 
 use crate::line_force_model::LineForceModel;
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 use shape::PrescribedCirculationShape;
 
@@ -71,7 +71,7 @@ impl PrescribedCirculation {
 impl LineForceModel {
     /// Returns a circulation distribution that is forced to follow a specific distribution where 
     /// magnitude and direction is based on the average quantities for each wing.
-    pub fn prescribed_circulation_strength(&self, velocity: &[Vec3]) -> Vec<f64> {
+    pub fn prescribed_circulation_strength(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
         let wing_averaged_velocity = self.wing_averaged_values(velocity);
 
         let effective_velocity = self.section_values_from_wing_values(&wing_averaged_velocity);

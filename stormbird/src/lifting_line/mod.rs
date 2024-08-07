@@ -16,7 +16,7 @@ pub mod simulation;
 
 /// Typical imports when using the lifting line functionality
 pub mod prelude {
-    pub use crate::vec3::Vec3;
+    pub use math_utils::spatial_vector::SpatialVector;
     pub use crate::io_structs::prelude::*;
 
     pub use super::wake_models::prelude::*;

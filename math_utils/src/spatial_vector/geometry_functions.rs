@@ -3,11 +3,11 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use crate::vec3::Vec3;
+use super::*;
 
 /// Function that calculates the induced velocity from a vortex panel, based on the corner points
 /// given as input. Source: <https://en.wikipedia.org/wiki/Brahmagupta%27s_formula>
-pub fn area_of_quadrilateral(vertices: &[Vec3; 4]) -> f64 {
+pub fn area_of_quadrilateral(vertices: &[SpatialVector<3>; 4]) -> f64 {
     let a = (vertices[1] - vertices[0]).length();
     let b = (vertices[2] - vertices[1]).length();
     let c = (vertices[3] - vertices[2]).length();
@@ -20,7 +20,7 @@ pub fn area_of_quadrilateral(vertices: &[Vec3; 4]) -> f64 {
 }
 
 /// Function that calculates the normal of a quadrilateral, based on the corner points
-pub fn normal_of_quadrilateral(vertices: &[Vec3; 4]) -> Vec3 {
+pub fn normal_of_quadrilateral(vertices: &[SpatialVector<3>; 4]) -> SpatialVector<3> {
     let a = vertices[2] - vertices[0];
     let b = vertices[3] - vertices[1];
 

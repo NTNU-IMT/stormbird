@@ -25,7 +25,7 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new_from_string(setup_string: &str, initial_time_step: f64, wake_initial_velocity: Vec3) -> Result<Self, String> {
+    pub fn new_from_string(setup_string: &str, initial_time_step: f64, wake_initial_velocity: SpatialVector<3>) -> Result<Self, String> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
         Ok(builder.build(initial_time_step, wake_initial_velocity))
@@ -38,7 +38,7 @@ impl Simulation {
     /// simulation, the points are only the control points of the line force model. In case of a 
     /// dynamic simulation, the points are the control points of the line force model and the 
     /// points in the wake.
-    pub fn get_freestream_velocity_points(&self) -> Vec<Vec3> {
+    pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
         match &self.wake_model {
             WakeModel::Steady(_) => {
                 self.line_force_model.ctrl_points()
@@ -66,11 +66,11 @@ impl Simulation {
         &mut self, 
         time: f64,
         time_step: f64,
-        freestream_velocity: &[Vec3],
+        freestream_velocity: &[SpatialVector<3>],
     ) -> SimulationResult {
         let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
 
-        let wake_points_freestream: Option<Vec<Vec3>> = match &self.wake_model {
+        let wake_points_freestream: Option<Vec<SpatialVector<3>>> = match &self.wake_model {
             WakeModel::Steady(_) => {
                 None
             },
@@ -150,7 +150,7 @@ impl Simulation {
         result
     }
 
-    pub fn induced_velocities(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
+    pub fn induced_velocities(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
         match &self.wake_model {
             WakeModel::Steady((_, wake)) => {
                 wake.induced_velocities(&self.previous_circulation_strength, points)

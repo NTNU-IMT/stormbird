@@ -4,8 +4,8 @@
 
 use std::f64::consts::PI;
 
-use crate::vec3::Vec3;
-use crate::vec3::geometry_functions;
+use math_utils::spatial_vector::SpatialVector;
+use math_utils::spatial_vector::geometry_functions;
 
 use super::PotentialTheoryModel;
 use super::viscous_core_length::ViscousCoreLength;
@@ -16,8 +16,8 @@ use super::viscous_core_length::ViscousCoreLength;
 /// manner.
 pub struct PanelGeometry {
     pub area: f64,
-    pub normal: Vec3,
-    pub center: Vec3,
+    pub normal: SpatialVector<3>,
+    pub center: SpatialVector<3>,
 }
 
 impl Default for PanelGeometry {
@@ -25,14 +25,14 @@ impl Default for PanelGeometry {
     fn default() -> Self {
         Self {
             area: 0.0,
-            normal: Vec3::default(),
-            center: Vec3::default(),
+            normal: SpatialVector::<3>::default(),
+            center: SpatialVector::<3>::default(),
         }
     }
 }
 
 impl PanelGeometry {
-    pub fn new(points: [Vec3; 4]) -> Self {
+    pub fn new(points: [SpatialVector<3>; 4]) -> Self {
         let area   = geometry_functions::area_of_quadrilateral(&points);
         let normal = geometry_functions::normal_of_quadrilateral(&points);
         
@@ -55,11 +55,11 @@ impl PotentialTheoryModel {
     /// given as input
     pub fn induced_velocity_from_panel_with_unit_strength(
         &self, 
-        panel_points: &[Vec3; 4], 
+        panel_points: &[SpatialVector<3>; 4], 
         panel: &PanelGeometry, 
-        ctrl_point: Vec3,
+        ctrl_point: SpatialVector<3>,
         off_body: bool,
-    ) -> Vec3 {
+    ) -> SpatialVector<3> {
         let distance_to_ctrl_point = (ctrl_point - panel.center).length();
 
         let u_i = if distance_to_ctrl_point > panel.representative_length() * self.far_field_ratio {
@@ -87,11 +87,11 @@ impl PotentialTheoryModel {
 
     pub fn induced_velocity_from_panel_as_vortex_lines_with_unit_strength(
         &self, 
-        panel_points: &[Vec3; 4], 
-        ctrl_point: Vec3,
+        panel_points: &[SpatialVector<3>; 4], 
+        ctrl_point: SpatialVector<3>,
         off_body: bool,
-    ) -> Vec3 {
-        let mut u_i: Vec3 = Vec3::default();
+    ) -> SpatialVector<3> {
+        let mut u_i: SpatialVector<3> = SpatialVector::<3>::default();
 
         let viscous_core_length_raw = if off_body && self.viscous_core_length_off_body.is_some() {
             self.viscous_core_length_off_body.unwrap()
@@ -111,7 +111,7 @@ impl PotentialTheoryModel {
         };
 
         for i_point in 0..panel_points.len() {
-            let line_points: [Vec3; 2] = if i_point == panel_points.len() - 1 {
+            let line_points: [SpatialVector<3>; 2] = if i_point == panel_points.len() - 1 {
                 [panel_points[i_point], panel_points[0]]
             } else {
                 [panel_points[i_point], panel_points[i_point + 1]]
@@ -131,8 +131,8 @@ impl PotentialTheoryModel {
     pub fn induced_velocity_from_panel_as_point_doublet_with_unit_strength(
         &self, 
         panel: &PanelGeometry, 
-        ctrl_point: Vec3
-    ) -> Vec3 {
+        ctrl_point: SpatialVector<3>
+    ) -> SpatialVector<3> {
         let area_term = panel.area / (4.0 * PI);
 
         let translated_point = ctrl_point - panel.center;

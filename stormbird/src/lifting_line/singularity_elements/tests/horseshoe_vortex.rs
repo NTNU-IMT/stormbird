@@ -4,7 +4,7 @@
 
 use super::*;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 
 #[test]
@@ -14,18 +14,18 @@ use crate::line_force_model::span_line::SpanLine;
 fn compare_horseshoe_against_panel() {
     let model = PotentialTheoryModel::default();
 
-    let rotation = Vec3::new(-12.0_f64.to_radians(), 21.2_f64.to_radians(), 34.3_f64.to_radians());
-    let translation = Vec3::new(21.0, -14.0, 45.0);
+    let rotation = SpatialVector::<3>::new(-12.0_f64.to_radians(), 21.2_f64.to_radians(), 34.3_f64.to_radians());
+    let translation = SpatialVector::<3>::new(21.0, -14.0, 45.0);
 
-    let start_point = Vec3::new(0.0, 0.0, 0.0).rotate(rotation) + translation;
-    let end_point = Vec3::new(0.0, 0.0, 1.2).rotate(rotation) + translation;
+    let start_point = SpatialVector::<3>::new(0.0, 0.0, 0.0).rotate(rotation) + translation;
+    let end_point = SpatialVector::<3>::new(0.0, 0.0, 1.2).rotate(rotation) + translation;
 
     let span_line = SpanLine {
         start_point,
         end_point,
     };
 
-    let wake_line_vector = Vec3::new(100.0, 0.0, 0.0);
+    let wake_line_vector = SpatialVector::<3>::new(100.0, 0.0, 0.0);
 
     // Set up a panel in a local coordinate system
     let panel_points = [

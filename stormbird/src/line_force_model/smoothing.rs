@@ -7,7 +7,7 @@
 use super::*;
 use serde::{Serialize, Deserialize};
 
-use crate::math_utils::smoothing;
+use math_utils::smoothing;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SmoothingSettings {
@@ -31,7 +31,7 @@ pub struct ArtificialViscositySettings {
 }
 
 impl LineForceModel {
-    pub fn smoothed_strength(&self, input_strength: &[f64], velocity: &[Vec3]) -> Vec<f64> {
+    pub fn smoothed_strength(&self, input_strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<f64> {
         let mut strength = input_strength.to_vec();
 
         if let Some(settings) = &self.smoothing_settings {
@@ -142,7 +142,7 @@ impl LineForceModel {
     pub fn circulation_strength_with_viscosity(
         &self, 
         input_strength: &[f64],
-        velocity: &[Vec3],
+        velocity: &[SpatialVector<3>],
         settings: &ArtificialViscositySettings
     ) -> Vec<f64> {
         let mut new_estimated_strength = input_strength.to_vec();

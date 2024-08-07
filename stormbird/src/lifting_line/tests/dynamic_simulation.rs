@@ -34,7 +34,7 @@ fn right_sign_of_the_force_when_translating() {
         ..Default::default()
     }.build();
 
-    let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
 
     let vel_magnitude = (freestream_velocity).length();
 
@@ -61,13 +61,13 @@ fn right_sign_of_the_force_when_translating() {
         let translation_y = amplitude * (time * frequency).sin();
         let velocity_y = amplitude * frequency * (time * frequency).cos();
 
-        let translation = Vec3::new(0.0, translation_y, 0.0);
+        let translation = SpatialVector::<3>::new(0.0, translation_y, 0.0);
 
         sim.line_force_model.translation = translation;
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
     
-        let cl = result.integrated_forces_sum().y / force_factor;
+        let cl = result.integrated_forces_sum()[1] / force_factor;
     
         //dbg!(cl * velocity_y);
     
@@ -98,7 +98,7 @@ fn right_sign_of_the_moment_when_rotating() {
     }.build();
 
     
-    let freestream_velocity = Vec3::new(10.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector::<3>::new(10.2, 0.0, 0.0);
 
     let period = 2.0;
     let nr_time_steps_per_period = 20;
@@ -121,11 +121,11 @@ fn right_sign_of_the_moment_when_rotating() {
     for i in 1..nr_time_steps_per_period {
         let time = (i as f64) * time_step;
 
-        let rotation = Vec3 {
-            x: amplitude * (frequency * time).sin(),
-            y: 0.0,
-            z: 0.0,
-        };
+        let rotation = SpatialVector::<3>::new(
+            amplitude * (frequency * time).sin(),
+            0.0,
+            0.0,
+        );
 
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
@@ -134,7 +134,7 @@ fn right_sign_of_the_moment_when_rotating() {
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
         
         
-        let moment_in_x = result.integrated_moments_sum().x;
+        let moment_in_x = result.integrated_moments_sum()[0];
     
         assert!(
             moment_in_x * rotation_vel_x <= 0.0, 
@@ -167,7 +167,7 @@ fn rotational_velocity() {
         ..Default::default()
     }.build().build();
 
-    let freestream_velocity = Vec3::new(1.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
 
     let mut motion_calculator = MotionDerivatives::new(&line_force_model);
 
@@ -177,8 +177,8 @@ fn rotational_velocity() {
         let rotation_x     = amplitude * (frequency * time).sin();
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
-        let rotation = Vec3::new(rotation_x, 0.0, 0.0);
-        let velocity = Vec3::new(rotation_vel_x, 0.0, 0.0);
+        let rotation = SpatialVector::<3>::new(rotation_x, 0.0, 0.0);
+        let velocity = SpatialVector::<3>::new(rotation_vel_x, 0.0, 0.0);
 
         line_force_model.rotation = rotation;
 
@@ -195,12 +195,12 @@ fn rotational_velocity() {
         for i in 0..ctrl_points.len() {
             let velocity_local = velocity.cross(ctrl_points[i]);
 
-            if velocity_local.y.abs() < 1e-6 {
+            if velocity_local[1].abs() < 1e-6 {
                 continue;
             }
 
             if i_t > 3 {
-                let error = (velocity_local.y + ctrl_point_velocity_est[i].y).abs() / velocity_local.y.abs();
+                let error = (velocity_local[1] + ctrl_point_velocity_est[i][1]).abs() / velocity_local[1].abs();
 
                 assert!(error < 0.06, "Error in rotational velocity estimation at ctrl point {} = {}", i, error);
             }

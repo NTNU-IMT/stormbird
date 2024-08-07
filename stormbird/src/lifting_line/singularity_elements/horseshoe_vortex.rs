@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 
 use super::PotentialTheoryModel;
@@ -13,14 +13,14 @@ impl PotentialTheoryModel {
     /// strength.
     pub fn induced_velocity_from_horseshoe_with_unit_strength(
         &self,
-        ctrl_point: Vec3,
+        ctrl_point: SpatialVector<3>,
         span_line: &SpanLine,
-        wake_line_vector: Vec3,
-    ) -> Vec3 {
+        wake_line_vector: SpatialVector<3>,
+    ) -> SpatialVector<3> {
 
         // Assume the points are ordered in the same way as panel points, only neglect the line 
         // between the end points at the back of the wake.
-        let line_list: [[Vec3; 2]; 3] = [
+        let line_list: [[SpatialVector<3>; 2]; 3] = [
             [span_line.start_point, span_line.end_point],
             [span_line.end_point,   span_line.end_point + wake_line_vector],
             [span_line.start_point + wake_line_vector, span_line.start_point],

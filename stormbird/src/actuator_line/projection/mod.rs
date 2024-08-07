@@ -4,7 +4,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 
 pub mod gaussian;
@@ -34,7 +34,7 @@ impl Default for Projection {
 
 
 impl Projection {
-    pub fn projection_value_at_point(&self, point: Vec3, chord_vector: Vec3, span_line: &SpanLine) -> f64 {
+    pub fn projection_value_at_point(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>, span_line: &SpanLine) -> f64 {
         match self {
             Self::Gaussian(gaussian) => gaussian.clone().projection_value_at_point(point, chord_vector, span_line),
             Self::Elliptic(elliptic) => elliptic.clone().projection_value_at_point(point, chord_vector, span_line),

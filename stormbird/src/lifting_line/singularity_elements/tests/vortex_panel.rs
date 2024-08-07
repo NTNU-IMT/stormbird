@@ -4,7 +4,7 @@
 
 use super::*;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::lifting_line::singularity_elements::prelude::*;
 
 #[test]
@@ -13,21 +13,21 @@ fn compare_near_and_far_field() {
 
     // Set up a panel in a local coordinate system
     let panel_points_0 = [
-        Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(1.0, 0.0, 0.0),
-        Vec3::new(1.0, 1.0, 0.0),
-        Vec3::new(0.0, 1.0, 0.0),
+        SpatialVector::<3>::new(0.0, 0.0, 0.0),
+        SpatialVector::<3>::new(1.0, 0.0, 0.0),
+        SpatialVector::<3>::new(1.0, 1.0, 0.0),
+        SpatialVector::<3>::new(0.0, 1.0, 0.0),
     ];
 
     // Set a control point in the local coordinate system
-    let ctrl_point_0 = Vec3::new(5.0, 2.0, 1.0);
+    let ctrl_point_0 = SpatialVector::<3>::new(5.0, 2.0, 1.0);
 
     // Add some rotation to test a "arbitrary" oriented panel (the angles should not matter)
-    let rotation = Vec3{
-        x: 45.0_f64.to_radians(),
-        y: -10.0_f64.to_radians(),
-        z: 0.0,
-    };
+    let rotation = SpatialVector::<3>::new(
+        45.0_f64.to_radians(),
+        -10.0_f64.to_radians(),
+        0.0,
+    );
 
     let panel_points = [
         panel_points_0[0].rotate(rotation),

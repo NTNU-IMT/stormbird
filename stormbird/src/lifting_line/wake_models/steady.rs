@@ -15,7 +15,7 @@ use rayon::prelude::*;
 
 use ndarray::prelude::*;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::{
     LineForceModel,
     span_line::SpanLine
@@ -53,7 +53,7 @@ impl SteadyWakeBuilder {
     pub fn build(
         &self, 
         line_force_model: &LineForceModel, 
-        ctrl_points_freestream: &[Vec3], 
+        ctrl_points_freestream: &[SpatialVector<3>], 
     ) -> SteadyWake {
         let mean_chord_length: f64 = line_force_model.chord_vectors().iter().map(
             |chord| chord.length()
@@ -61,7 +61,7 @@ impl SteadyWakeBuilder {
 
         let ctrl_points = line_force_model.ctrl_points();
 
-        let average_freestream_velocity: Vec3 = ctrl_points_freestream.iter().sum::<Vec3>() / ctrl_points_freestream.len() as f64;
+        let average_freestream_velocity: SpatialVector<3> = ctrl_points_freestream.iter().sum::<SpatialVector<3>>() / ctrl_points_freestream.len() as f64;
 
         let wake_length = self.wake_length_factor * mean_chord_length;
 
@@ -77,8 +77,8 @@ impl SteadyWakeBuilder {
             ..Default::default()
         };
 
-        let mut velocity_factors: Array2<Vec3> = Array2::from_elem(
-            (nr_span_lines, nr_span_lines), Vec3::default()
+        let mut velocity_factors: Array2<SpatialVector<3>> = Array2::from_elem(
+            (nr_span_lines, nr_span_lines), SpatialVector::<3>::default()
         );
 
         // For each control point ...
@@ -128,21 +128,21 @@ pub struct SteadyWake {
     /// necessary to when calculating the induced velocity at off-wing points.
     pub span_lines: Vec<SpanLine>,
     /// Wake line vectors used to determine the length and direction of the wake
-    pub wake_line_vectors: Vec<Vec3>,
+    pub wake_line_vectors: Vec<SpatialVector<3>>,
     /// Potential theory model used to call induced velocity functions
     potential_theory_model: PotentialTheoryModel,
     /// The factors that are multiplied with the strength of each vortex line to calculate the 
     /// lift-induced velocity at each control point
-    pub velocity_factors: Array2<Vec3>,
+    pub velocity_factors: Array2<SpatialVector<3>>,
     /// Optional corrections to the induced velocity
     pub induced_velocity_corrections: VelocityCorrections,
    
 }
 
 impl SteadyWake {
-    pub fn induced_velocities(&self, strength: &[f64], points: &[Vec3]) -> Vec<Vec3> {
-        let mut induced_velocities: Vec<Vec3> = points.par_iter().map(|point| {
-            let mut u_i = Vec3::default();
+    pub fn induced_velocities(&self, strength: &[f64], points: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
+        let mut induced_velocities: Vec<SpatialVector<3>> = points.par_iter().map(|point| {
+            let mut u_i = SpatialVector::<3>::default();
 
             for i in 0..self.span_lines.len() {
                 let u_i_unit = self.potential_theory_model.induced_velocity_from_horseshoe_with_unit_strength(
@@ -151,7 +151,7 @@ impl SteadyWake {
                     self.wake_line_vectors[i], 
                 );
 
-                u_i += strength[i] * u_i_unit;
+                u_i += u_i_unit * strength[i];
             }
 
             u_i
@@ -169,10 +169,10 @@ impl SteadyWake {
     /// # Argument
     /// * `strength` - the strength for each vortex line in the line force model that the wake is
     /// built with.
-    pub fn induced_velocities_at_control_points(&self, strength: &[f64]) -> Vec<Vec3> {
+    pub fn induced_velocities_at_control_points(&self, strength: &[f64]) -> Vec<SpatialVector<3>> {
         let (nr_rows, nr_cols) = self.velocity_factors.dim();
 
-        let mut induced_velocities: Vec<Vec3> = vec![Vec3::default(); nr_rows];
+        let mut induced_velocities: Vec<SpatialVector<3>> = vec![SpatialVector::<3>::default(); nr_rows];
 
         for i_row in 0..nr_rows {
             for i_col in 0..nr_cols {

@@ -4,7 +4,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone)]
 /// Struct that represents spatial coordinates in a coordinate system that is oriented along the 
@@ -18,33 +18,33 @@ pub struct LineCoordinates {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// A line segement of a wing span
 pub struct SpanLine {
-    pub start_point: Vec3,
-    pub end_point: Vec3
+    pub start_point: SpatialVector<3>,
+    pub end_point: SpatialVector<3>
 }
 
 impl SpanLine {
-    pub fn translate(&self, translation: Vec3) -> Self {
+    pub fn translate(&self, translation: SpatialVector<3>) -> Self {
         Self {
             start_point: self.start_point + translation,
             end_point: self.end_point + translation
         }
     }
 
-    pub fn rotate(&self, rotation: Vec3) -> Self {
+    pub fn rotate(&self, rotation: SpatialVector<3>) -> Self {
         Self {
             start_point: self.start_point.rotate(rotation),
             end_point: self.end_point.rotate(rotation)
         }
     }
 
-    pub fn rotate_around_axis(&self, angle: f64, axis: Vec3) -> Self {
+    pub fn rotate_around_axis(&self, angle: f64, axis: SpatialVector<3>) -> Self {
         Self {
             start_point: self.start_point.rotate_around_axis(angle, axis),
             end_point: self.end_point.rotate_around_axis(angle, axis)
         }
     }
 
-    pub fn relative_vector(&self) -> Vec3 {
+    pub fn relative_vector(&self) -> SpatialVector<3> {
         self.end_point - self.start_point
     }
 
@@ -52,21 +52,21 @@ impl SpanLine {
         self.relative_vector().length()
     }
 
-    pub fn direction(&self) -> Vec3 {
+    pub fn direction(&self) -> SpatialVector<3> {
         self.relative_vector().normalize()
     }
 
-    pub fn as_array(&self) -> [Vec3; 2] {
+    pub fn as_array(&self) -> [SpatialVector<3>; 2] {
         [self.start_point, self.end_point]
     }
 
     /// Return the control point of the line segment, which corresponds to the average point along 
     /// the line segment. 
-    pub fn ctrl_point(&self) -> Vec3 {
+    pub fn ctrl_point(&self) -> SpatialVector<3> {
         0.5 * (self.start_point + self.end_point)
     }
 
-    pub fn distance(&self, point: Vec3) -> f64 {
+    pub fn distance(&self, point: SpatialVector<3>) -> f64 {
         let relative_vector = self.relative_vector();
         let start_to_point  = point - self.start_point;
         let end_to_point    = point - self.end_point;
@@ -85,7 +85,7 @@ impl SpanLine {
     /// 
     /// The chord and span direction is given directly by Self and the input. The thickness 
     /// direction is assumed to be normal to the two other directions.
-    pub fn line_coordinates(&self, point: Vec3, chord_vector: Vec3) -> LineCoordinates {
+    pub fn line_coordinates(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>) -> LineCoordinates {
         let translated_point = point - self.ctrl_point();
 
         let span_direction      = self.relative_vector().normalize();

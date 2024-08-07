@@ -14,7 +14,7 @@ use rayon::iter::ParallelIterator;
 
 use std::ops::Range;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 use crate::line_force_model::LineForceModel;
 
@@ -125,7 +125,7 @@ impl UnsteadyWakeBuilder {
         &self,
         time_step: f64, 
         line_force_model: &LineForceModel, 
-        initial_velocity: Vec3, 
+        initial_velocity: SpatialVector<3>, 
     ) -> UnsteadyWake {                
         let span_points   = line_force_model.span_points();
         let chord_vectors = line_force_model.chord_vectors();
@@ -156,12 +156,12 @@ impl UnsteadyWakeBuilder {
 
         let nr_wake_points_per_line_element = nr_wake_panels_per_line_element + 1;
 
-        let mut wake_points: Vec<Vec3> = Vec::with_capacity(
+        let mut wake_points: Vec<SpatialVector<3>> = Vec::with_capacity(
             nr_wake_points_per_line_element * nr_wake_points_along_span
         );
 
         let wake_building_velocity = if initial_velocity.length() == 0.0 {
-            Vec3::new(1e-6, 1e-6, 1e-6)
+            SpatialVector::<3>::new(1e-6, 1e-6, 1e-6)
         } else {
             initial_velocity
         };
@@ -301,7 +301,7 @@ pub struct UnsteadyWakeSettings {
 /// the simulation.
 pub struct UnsteadyWake {
     /// The points making up the vortex wake
-    pub wake_points: Vec<Vec3>,
+    pub wake_points: Vec<SpatialVector<3>>,
     /// The strengths of the vortex lines
     pub strengths: Vec<f64>,
     /// Panel geometry data used to determine what method to use for calculating the induced 
@@ -345,7 +345,7 @@ impl UnsteadyWake {
     /// * `points` - The points at which the induced velocities are calculated
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
-    pub fn induced_velocities(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
+    pub fn induced_velocities(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
         self.induced_velocities_local(points, 0, self.strengths.len(), off_body, false)
     }
 
@@ -357,7 +357,7 @@ impl UnsteadyWake {
     /// * `points` - The points at which the induced velocities are calculated
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
-    pub fn induced_velocities_from_first_panels(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
+    pub fn induced_velocities_from_first_panels(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
         self.induced_velocities_local(points, 0, self.settings.nr_wake_panels_along_span, off_body, self.settings.neglect_self_induced_velocities)
     }
 
@@ -368,7 +368,7 @@ impl UnsteadyWake {
     /// * `points` - The points at which the induced velocities are calculated
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
-    pub fn induced_velocities_from_free_wake(&self, points: &[Vec3], off_body: bool) -> Vec<Vec3> {
+    pub fn induced_velocities_from_free_wake(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
         self.induced_velocities_local(
             points, 
             self.settings.nr_wake_panels_along_span, 
@@ -395,8 +395,8 @@ impl UnsteadyWake {
         new_circulation_strength: &[f64], 
         time_step: f64, 
         line_force_model: &LineForceModel,
-        ctrl_points_freestream: &[Vec3],
-        wake_points_freestream: &[Vec3]
+        ctrl_points_freestream: &[SpatialVector<3>],
+        wake_points_freestream: &[SpatialVector<3>]
     ) {
         self.update_wake_points_after_completed_time_step(
             time_step, 
@@ -424,13 +424,13 @@ impl UnsteadyWake {
     /// Calculates induced velocities from the panels starting at start_index and ending at end_index
     fn induced_velocities_local(
         &self, 
-        points: &[Vec3], 
+        points: &[SpatialVector<3>], 
         start_index: usize, 
         end_index: usize, 
         off_body: bool,
         neglect_self_induced: bool
-    ) -> Vec<Vec3> {
-        let mut induced_velocities: Vec<Vec3> = points.par_iter().enumerate().map(|(point_index, point)| {
+    ) -> Vec<SpatialVector<3>> {
+        let mut induced_velocities: Vec<SpatialVector<3>> = points.par_iter().enumerate().map(|(point_index, point)| {
             (start_index..end_index).into_iter().map(|i_panel| {
                 if neglect_self_induced {
                     let (_stream_index, span_index) = self.reverse_panel_index(i_panel);
@@ -439,7 +439,7 @@ impl UnsteadyWake {
                     let wing_index_point = self.wing_index(point_index);
 
                     if wing_index_panel == wing_index_point {
-                        Vec3::default()
+                        SpatialVector::<3>::default()
                     } else {
                         self.induced_velocity_from_panel(i_panel, *point, off_body)
                     }
@@ -505,7 +505,7 @@ impl UnsteadyWake {
     }
 
     /// Returns the four points that make up a panel at the given indices
-    fn panel_wake_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [Vec3; 4] {
+    fn panel_wake_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector<3>; 4] {
         let point_indices = self.panel_wake_point_indices(panel_stream_index, panel_span_index);
 
         [
@@ -523,7 +523,7 @@ impl UnsteadyWake {
     fn move_first_free_wake_points(
         &mut self, 
         line_force_model: &LineForceModel, 
-        ctrl_points_freestream: &[Vec3]
+        ctrl_points_freestream: &[SpatialVector<3>]
     ) {                
         assert!(
             line_force_model.nr_span_lines() == self.settings.nr_wake_panels_along_span, 
@@ -540,13 +540,13 @@ impl UnsteadyWake {
             if end_index > 0 {
                 self.induced_velocities(&ctrl_points, true)
             } else {
-                vec![Vec3::default(); ctrl_points.len()]
+                vec![SpatialVector::<3>::default(); ctrl_points.len()]
             }
         } else {
             self.induced_velocities(&ctrl_points, true)
         };
 
-        let mut ctrl_points_velocity: Vec<Vec3> = Vec::with_capacity(ctrl_points.len());
+        let mut ctrl_points_velocity: Vec<SpatialVector<3>> = Vec::with_capacity(ctrl_points.len());
 
         for i in 0..ctrl_points.len() {
             ctrl_points_velocity.push(ctrl_points_freestream[i] + u_i[i]);
@@ -557,7 +557,7 @@ impl UnsteadyWake {
         let wake_angles     = line_force_model.wake_angles(&ctrl_points_velocity);
 
         // Compute a change vector based on ctrl point data
-        let mut ctrl_points_change_vector: Vec<Vec3> = Vec::with_capacity(
+        let mut ctrl_points_change_vector: Vec<SpatialVector<3>> = Vec::with_capacity(
             self.settings.nr_wake_panels_along_span
         );
 
@@ -618,7 +618,7 @@ impl UnsteadyWake {
     fn move_last_wake_points(
         &mut self,
         line_force_model: &LineForceModel,
-        wake_points_freestream: &[Vec3]
+        wake_points_freestream: &[SpatialVector<3>]
     ) {
         let start_index_last = self.wake_points.len() - self.settings.nr_wake_points_along_span;
         let start_index_previous = start_index_last - self.settings.nr_wake_points_along_span;
@@ -643,8 +643,8 @@ impl UnsteadyWake {
         &mut self, 
         time_step: f64,
         line_force_model: &LineForceModel,
-        ctrl_points_freestream: &[Vec3],
-        wake_points_freestream: &[Vec3]
+        ctrl_points_freestream: &[SpatialVector<3>],
+        wake_points_freestream: &[SpatialVector<3>]
     ) {
         self.move_first_free_wake_points(line_force_model, ctrl_points_freestream);
         self.stream_free_wake_points(time_step, wake_points_freestream);
@@ -659,8 +659,8 @@ impl UnsteadyWake {
     ///
     /// # Argument
     /// * `freestream` - A model for the freestream velocity in the simulation
-    pub fn velocity_at_wake_points(&self, wake_points_freestream: &[Vec3]) -> Vec<Vec3> {
-        let mut velocity: Vec<Vec3> = wake_points_freestream.to_vec();
+    pub fn velocity_at_wake_points(&self, wake_points_freestream: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
+        let mut velocity: Vec<SpatialVector<3>> = wake_points_freestream.to_vec();
 
         let end_index: usize = if let Some(end_index) = self.settings.end_index_induced_velocities_on_wake {
             self.wake_point_index(end_index, 0).min(self.wake_points.len())
@@ -669,7 +669,7 @@ impl UnsteadyWake {
         };
 
         if end_index > 0 && self.number_of_time_steps_completed > 2 {
-            let u_i_calc: Vec<Vec3> = self.induced_velocities(&self.wake_points[0..end_index], true);
+            let u_i_calc: Vec<SpatialVector<3>> = self.induced_velocities(&self.wake_points[0..end_index], true);
 
             for i in 0..end_index {
                 velocity[i] += u_i_calc[i];
@@ -680,7 +680,7 @@ impl UnsteadyWake {
     }
 
     /// Stream all free wake points based on the Euler method.
-    fn stream_free_wake_points(&mut self, time_step: f64, wake_points_freestream: &[Vec3]) {
+    fn stream_free_wake_points(&mut self, time_step: f64, wake_points_freestream: &[SpatialVector<3>]) {
         let old_wake_points = self.wake_points.clone();
 
         let velocity = self.velocity_at_wake_points(wake_points_freestream);
@@ -706,9 +706,9 @@ impl UnsteadyWake {
     }
 
     /// Calculates the induced velocity from a single panel at the input point
-    fn induced_velocity_from_panel(&self, panel_index: usize, point: Vec3, off_body: bool) -> Vec3 {
+    fn induced_velocity_from_panel(&self, panel_index: usize, point: SpatialVector<3>, off_body: bool) -> SpatialVector<3> {
         if self.strengths[panel_index] == 0.0 {
-            Vec3::default()
+            SpatialVector::<3>::default()
         } else {
             let (stream_index, span_index) = self.reverse_panel_index(panel_index);
 
@@ -762,9 +762,9 @@ impl UnsteadyWake {
             write!(
                 writer, 
                 "v {} {} {}\n", 
-                self.wake_points[i].x, 
-                self.wake_points[i].y, 
-                self.wake_points[i].z
+                self.wake_points[i][0], 
+                self.wake_points[i][1], 
+                self.wake_points[i][2]
             )?;
         };
 
@@ -818,9 +818,9 @@ impl UnsteadyWake {
             write!(
                 writer, 
                 "\t\t\t\t\t{} {} {}\n", 
-                self.wake_points[i].x, 
-                self.wake_points[i].y, 
-                self.wake_points[i].z
+                self.wake_points[i][0], 
+                self.wake_points[i][1], 
+                self.wake_points[i][2]
             )?;
         }
 

@@ -94,7 +94,7 @@ impl SimulationBuilder {
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.
-    pub fn build(&self, initial_time_step: f64, wake_initial_velocity: Vec3) -> Simulation {
+    pub fn build(&self, initial_time_step: f64, wake_initial_velocity: SpatialVector<3>) -> Simulation {
         let line_force_model = self.line_force_model.build();
         let nr_of_lines = line_force_model.nr_span_lines();
 

@@ -43,7 +43,7 @@ fn no_self_induced_velocity() {
         }
     );
 
-    let chord_vector = Vec3::new(diameter, 0.0, 0.0);
+    let chord_vector = SpatialVector::<3>::new(diameter, 0.0, 0.0);
 
     let wing_x_positions = vec![
         -1.0 * span,
@@ -61,8 +61,8 @@ fn no_self_induced_velocity() {
     for (x_pos, y_pos) in wing_x_positions.iter().zip(wing_y_positions.iter()) {
         let wing_builder = WingBuilder {
             section_points: vec![
-                Vec3::new(*x_pos, *y_pos, 0.0),
-                Vec3::new(*x_pos, *y_pos, span),
+                SpatialVector::<3>::new(*x_pos, *y_pos, 0.0),
+                SpatialVector::<3>::new(*x_pos, *y_pos, span),
             ],
             chord_vectors: vec![
                 chord_vector,
@@ -100,7 +100,7 @@ fn no_self_induced_velocity() {
     let nr_time_steps = 100;
     let time_step = 0.5;
 
-    let velocity = Vec3::new(velocity_mag, 0.0, 0.0);
+    let velocity = SpatialVector::<3>::new(velocity_mag, 0.0, 0.0);
 
     let mut sim = SimulationBuilder::new(
         line_force_model_builder,
@@ -120,8 +120,8 @@ fn no_self_induced_velocity() {
         result = sim.do_step(time, time_step, &input_freestream_velocity);
     }
 
-    let cd = result.integrated_forces_sum().x / force_factor;
-    let cl = result.integrated_forces_sum().y / force_factor;
+    let cd = result.integrated_forces_sum()[0] / force_factor;
+    let cl = result.integrated_forces_sum()[1] / force_factor;
 
     dbg!(&result.force_input.velocity);
 

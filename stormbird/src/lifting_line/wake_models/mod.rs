@@ -8,7 +8,7 @@ pub mod steady;
 pub mod unsteady;
 pub mod velocity_corrections;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
 
 use steady::{SteadyWakeBuilder, SteadyWake};
@@ -25,7 +25,7 @@ impl WakeModel {
     pub fn pre_solver_initialization(
         &mut self, 
         line_force_model: &LineForceModel, 
-        ctrl_points_freestream: &[Vec3]
+        ctrl_points_freestream: &[SpatialVector<3>]
     ) {
         match self {
             WakeModel::Steady((builder, wake)) => {

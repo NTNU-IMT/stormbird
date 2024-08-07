@@ -66,7 +66,7 @@ fn steady_lift() {
 
     let time_step = 0.25;
 
-    let velocity = Vec3::new(1.2, 0.0, 0.0);
+    let velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
@@ -83,13 +83,13 @@ fn steady_lift() {
     let dynamic_velocity_points = dynamic_sim.get_freestream_velocity_points();
     let static_velocity_points = steady_sim.get_freestream_velocity_points();
 
-    let dynamic_velocity_freestream: Vec<Vec3> = vec![velocity; dynamic_velocity_points.len()];
-    let static_velocity_freestream: Vec<Vec3> = vec![velocity; static_velocity_points.len()];
+    let dynamic_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; dynamic_velocity_points.len()];
+    let static_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; static_velocity_points.len()];
 
     let result_steady  = steady_sim.do_step(0.0, time_step, &static_velocity_freestream);
 
-    let cd_steady = result_steady.integrated_forces_sum().x / force_factor;
-    let cl_steady = result_steady.integrated_forces_sum().y / force_factor;
+    let cd_steady = result_steady.integrated_forces_sum()[0] / force_factor;
+    let cl_steady = result_steady.integrated_forces_sum()[1] / force_factor;
 
     let mut cd_dynamic = 0.0;
     let mut cl_dynamic = 0.0;
@@ -99,8 +99,8 @@ fn steady_lift() {
         
         let result_dynamic = dynamic_sim.do_step(time, time_step, &dynamic_velocity_freestream);
 
-        cd_dynamic = result_dynamic.integrated_forces_sum().x / force_factor;
-        cl_dynamic = result_dynamic.integrated_forces_sum().y / force_factor;   
+        cd_dynamic = result_dynamic.integrated_forces_sum()[0] / force_factor;
+        cl_dynamic = result_dynamic.integrated_forces_sum()[1] / force_factor;   
     }
 
     println!("Theory");

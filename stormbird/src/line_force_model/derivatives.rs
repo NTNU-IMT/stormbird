@@ -10,7 +10,7 @@ use crate::io_structs::derivatives::Derivatives;
 /// accelerations due to motion and changing inflow conditions. This is necessary to generate input
 /// to force calculations in the line force model.
 impl LineForceModel {
-    pub fn initialize_derivatives(&mut self, ctrl_points_freestream: &[Vec3]) {
+    pub fn initialize_derivatives(&mut self, ctrl_points_freestream: &[SpatialVector<3>]) {
         let initial_angles = self.angles_of_attack(ctrl_points_freestream);
 
         self.derivatives = Some(
@@ -22,13 +22,13 @@ impl LineForceModel {
         )
     }
 
-    pub fn felt_ctrl_points_freestream(&self, ctrl_points_freestream: &[Vec3], time_step: f64) -> Vec<Vec3> {
+    pub fn felt_ctrl_points_freestream(&self, ctrl_points_freestream: &[SpatialVector<3>], time_step: f64) -> Vec<SpatialVector<3>> {
         let mut ctrl_point_velocity = Vec::with_capacity(ctrl_points_freestream.len());
 
         let motion_velocity = if let Some(derivatives) = &self.derivatives {
             derivatives.motion.ctrl_point_velocity(self, time_step)
         } else {
-            vec![Vec3::default(); self.nr_span_lines()]
+            vec![SpatialVector::<3>::default(); self.nr_span_lines()]
         };
 
         for i in 0..ctrl_points_freestream.len() {
@@ -40,7 +40,7 @@ impl LineForceModel {
         ctrl_point_velocity
     }
 
-    pub fn update_derivatives(&mut self, current_velocity: &[Vec3], current_angles_of_attack: &[f64]) {
+    pub fn update_derivatives(&mut self, current_velocity: &[SpatialVector<3>], current_angles_of_attack: &[f64]) {
         let ctrl_points = self.ctrl_points();
         let rotation = self.rotation.clone();
         

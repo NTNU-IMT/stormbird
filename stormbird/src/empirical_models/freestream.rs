@@ -4,7 +4,7 @@
 
 /// Functionality to represent the freestream velocity in a simulation
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 use serde::{Serialize, Deserialize};
 
@@ -13,10 +13,10 @@ use serde::{Serialize, Deserialize};
 pub struct PowerModelABL {
     /// A constant velocity component, independent of position. Primarily meant to represent the 
     /// velocity due to the forward motion of a vessel.
-    pub constant_velocity: Vec3,
+    pub constant_velocity: SpatialVector<3>,
     /// The reference wind velocity at the reference height. This value is used to as input when 
     /// computing how the wind velocity varies with height.
-    pub reference_wind_velocity: Vec3,
+    pub reference_wind_velocity: SpatialVector<3>,
     #[serde(default="PowerModelABL::default_reference_height")]
     /// Reference height for the input reference wind velocity.
     pub reference_height: f64,
@@ -25,7 +25,7 @@ pub struct PowerModelABL {
     pub power_factor: f64,
     #[serde(default="PowerModelABL::default_up_direction")]
     /// The up direction in the simulation. This is used to compute the height of a location.
-    pub up_direction: Vec3,
+    pub up_direction: SpatialVector<3>,
     #[serde(default)]
     /// Reference value for the water plane height, used in cases where the origin of the coordinate
     /// system does not match the water plane location.
@@ -35,9 +35,9 @@ pub struct PowerModelABL {
 impl PowerModelABL {
     fn default_reference_height() -> f64 {10.0}
     fn default_power_factor() -> f64 {1.0/9.0}
-    fn default_up_direction() -> Vec3 {Vec3::new(0.0, 0.0, 1.0)}
+    fn default_up_direction() -> SpatialVector<3> {SpatialVector::<3>::new(0.0, 0.0, 1.0)}
 
-    pub fn velocity_at_location(&self, location: &Vec3) -> Vec3 {
+    pub fn velocity_at_location(&self, location: &SpatialVector<3>) -> SpatialVector<3> {
         let height = location.dot(self.up_direction) - self.water_plane_height;
 
         if height < 0.0 {
@@ -59,20 +59,20 @@ impl PowerModelABL {
 /// Enum to store the freestream velocity using different approaches
 pub enum Freestream {
     /// Constant freestream velocity
-    Constant(Vec3),
+    Constant(SpatialVector<3>),
     /// Freestream velocity that varies with time
     PowerModelABL(PowerModelABL),
 }
 
 impl Freestream {
-    pub fn velocity_at_location(&self, location: &Vec3) -> Vec3 {
+    pub fn velocity_at_location(&self, location: &SpatialVector<3>) -> SpatialVector<3> {
         match self {
             Freestream::Constant(v) => v.clone(),
             Freestream::PowerModelABL(model) => model.velocity_at_location(location),
         }
     }
 
-    pub fn velocity_at_locations(&self, locations: &[Vec3]) -> Vec<Vec3> {
+    pub fn velocity_at_locations(&self, locations: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
         locations.iter().map(|loc| self.velocity_at_location(loc)).collect()
     }
 }
