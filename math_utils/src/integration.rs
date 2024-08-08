@@ -32,7 +32,7 @@ where T:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math_utils::array_generation;
+    use crate::array_generation;
 
     #[test]
     fn polynomial_integration() {

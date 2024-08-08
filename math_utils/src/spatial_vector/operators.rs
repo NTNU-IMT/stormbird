@@ -79,6 +79,21 @@ impl<const N: usize> ops::Mul<f64> for SpatialVector<N> {
     }
 }
 
+impl<const N: usize> ops::Mul<Self> for SpatialVector<N> {
+    type Output = Self;
+
+    /// Element-wise multiplication of two vectors.
+    fn mul(self, other: Self) -> Self {
+        let mut result = [0.0; N];
+
+        for i in 0..N {
+            result[i] = self[i] * other[i];
+        }
+
+        Self(result)
+    }
+}
+
 impl<const N: usize> ops::MulAssign<f64> for SpatialVector<N> {
     fn mul_assign(&mut self, rhs: f64) {
         for i in 0..N {
