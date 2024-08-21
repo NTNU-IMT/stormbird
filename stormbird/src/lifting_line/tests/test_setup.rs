@@ -34,7 +34,7 @@ impl RectangularWing {
             SpatialVector::<3>::unit_z()
         };
 
-        let chord_vector = SpatialVector::<3>::new(1.0, 0.0, 0.0).rotate_around_axis(
+        let chord_vector = SpatialVector([1.0, 0.0, 0.0]).rotate_around_axis(
             -self.angle_of_attack, rotation_axis
         );
 
@@ -49,8 +49,8 @@ impl RectangularWing {
 
         let wing_builder = WingBuilder {
             section_points: vec![
-                SpatialVector::<3>::new(0.0, 0.0, 0.0),
-                SpatialVector::<3>::new(0.0, 0.0, last_z),
+                SpatialVector([0.0, 0.0, 0.0]),
+                SpatialVector([0.0, 0.0, last_z]),
             ],
             chord_vectors: vec![
                 chord_vector,
