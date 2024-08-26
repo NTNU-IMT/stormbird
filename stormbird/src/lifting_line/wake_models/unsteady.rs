@@ -378,7 +378,9 @@ impl UnsteadyWake {
         )
     }
 
-    /// Update the strength of the wake panels closest to the wing geometry
+    /// Update the strength of the wake panels closest to the wing geometry.
+    /// 
+    /// This is the same as updating the circulation strength on the first panels in the wake.
     pub fn update_wing_strength(&mut self, new_circulation_strength: &[f64]) {
         for i in 0..new_circulation_strength.len() {
             self.strengths[i] = new_circulation_strength[i];

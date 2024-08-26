@@ -8,6 +8,8 @@ pub mod steady;
 pub mod unsteady;
 pub mod velocity_corrections;
 
+pub mod frozen_wake;
+
 use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
 
