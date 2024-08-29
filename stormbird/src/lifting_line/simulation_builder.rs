@@ -17,7 +17,7 @@ pub struct SteadySettings {
     #[serde(default)]
     pub solver: SteadySolverSettings,
     #[serde(default)]
-    pub wake: SteadyWakeBuilder,
+    pub wake: WakeBuilder,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -27,7 +27,7 @@ pub struct UnsteadySettings {
     #[serde(default)]
     pub solver: UnsteadySolverSettings,
     #[serde(default)]
-    pub wake: UnsteadyWakeBuilder,
+    pub wake: WakeBuilder,
 }
 
 
@@ -98,24 +98,20 @@ impl SimulationBuilder {
         let line_force_model = self.line_force_model.build();
         let nr_of_lines = line_force_model.nr_span_lines();
 
-        let wake_model = match &self.simulation_mode {
+        let wake = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
-                WakeModel::Unsteady(
-                    settings.wake.build(
-                        initial_time_step,
-                        &line_force_model,
-                        wake_initial_velocity,
-                    )
+                settings.wake.build(
+                    initial_time_step,
+                    &line_force_model,
+                    wake_initial_velocity,
                 )
             },
             SimulationMode::QuasiSteady(settings) => {
-                let ctrl_points_freestream = vec![wake_initial_velocity; nr_of_lines];
-
-                let wake = settings.wake.build(
+                settings.wake.build(
+                    initial_time_step,
                     &line_force_model,
-                    &ctrl_points_freestream,
-                );
-                WakeModel::Steady((settings.wake.clone(), wake))
+                    wake_initial_velocity,
+                )
             }
         };
 
@@ -130,7 +126,7 @@ impl SimulationBuilder {
 
         Simulation {
             line_force_model,
-            wake_model,
+            wake,
             solver_settings,
             derivatives: None,
             previous_circulation_strength: vec![0.0; nr_of_lines],

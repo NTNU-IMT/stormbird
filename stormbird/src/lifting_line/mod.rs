@@ -8,7 +8,7 @@
 //! wing based on potential theory and line representation of wings. Uses the 
 //! [crate::line_force_model] as input
 
-pub mod wake_models;
+pub mod wake;
 pub mod solvers;
 pub mod singularity_elements;
 pub mod simulation_builder;
@@ -19,7 +19,7 @@ pub mod prelude {
     pub use math_utils::spatial_vector::SpatialVector;
     pub use crate::io_structs::prelude::*;
 
-    pub use super::wake_models::prelude::*;
+    pub use super::wake::prelude::*;
 
     pub use super::singularity_elements::prelude::*;
 

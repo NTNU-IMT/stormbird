@@ -5,7 +5,7 @@ use ndarray::prelude::*;
 
 use rayon::prelude::*;
 
-use crate::lifting_line::wake_models::unsteady::UnsteadyWake;
+use crate::lifting_line::wake::unsteady::UnsteadyWake;
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone)]
@@ -16,15 +16,26 @@ use crate::line_force_model::LineForceModel;
 /// - The wake is steady, and consists of one horseshoe vortex per span line, where the strength is
 /// unknown
 /// - The wake is actually dynamic, but most of the wake consists of panels where the strength is 
-/// known. The only unknown strength is the strength of the first panels right behind the span lines
-/// making up the wings. The induced velocities therefore comes from both the panels with known 
-/// strength and the panels with unknown strength.
+/// known from previous time steps. The only unknown strength is the strength of the first panels 
+/// right behind the span lines making up the wings. The induced velocities therefore comes from 
+/// both the panels with known strength and the panels with unknown strength.
 pub struct FrozenWake {
+    /// Vector containing values for the induced velocities that are constant each control point in 
+    /// the simulation. That is, velocities that do not depend on the circulation strength of the
+    /// panels right behind the line model.
     pub fixed_velocities: Vec<SpatialVector<3>>,
+    /// Matrix containing coefficients that can be used to calculate induced velocities as a 
+    /// function of the strength of each vortex line. 
+    /// 
+    /// The shape of the matrix is (nr_span_lines, nr_span_lines). Each row corresponds to a control
+    /// point. Each column for a given row corresponds to the induced velocity from each panel. The 
+    /// induced velocity can therefore be calculated as the dot product of the row and the 
+    /// circulation strength.
     pub variable_velocity_factors: Array2<SpatialVector<3>>,
 }
 
 impl FrozenWake {
+    /// Construct a frozen wake from a full dynamic wake. 
     pub fn from_wake(line_force_model: &LineForceModel, wake: &mut UnsteadyWake) -> Self {
         let ctrl_points = line_force_model.ctrl_points();
 
@@ -36,17 +47,15 @@ impl FrozenWake {
             (nr_span_lines, nr_span_lines), SpatialVector::<3>::default()
         );
 
-        for strength_index in 0..nr_span_lines {
-            let mut strength = vec![0.0; nr_span_lines];
-
-            strength[strength_index] = 1.0;
-
-            wake.update_wing_strength(&strength);
-
-            let u_i = wake.induced_velocities_from_first_panels(&ctrl_points, false);
-
-            for ctrl_point_index in 0..nr_span_lines {
-                variable_velocity_factors[[ctrl_point_index, strength_index]] = u_i[ctrl_point_index]; // TODO: check indexing
+        for ctrl_point_index in 0..nr_span_lines {
+            for panel_index in 0..nr_span_lines {
+                variable_velocity_factors[[ctrl_point_index, panel_index]] = 
+                    wake.unit_strength_induced_velocity_from_panel(
+                        0, 
+                        ctrl_point_index, 
+                        ctrl_points[ctrl_point_index], 
+                        false
+                    );
             }
         }
 
@@ -54,8 +63,6 @@ impl FrozenWake {
             fixed_velocities,
             variable_velocity_factors,
         }
-
-
     }
 
     /// Returns the total velocity at the control points, given the circulation strength.

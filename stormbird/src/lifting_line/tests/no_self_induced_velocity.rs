@@ -86,7 +86,7 @@ fn no_self_induced_velocity() {
         line_force_model_builder.add_wing(wing_builder);
     }
 
-    let wake = UnsteadyWakeBuilder {
+    let wake = WakeBuilder {
         neglect_self_induced_velocities: true,
         viscous_core_length_off_body: Some(ViscousCoreLength::Absolute(0.5 * diameter)),
         ..Default::default()

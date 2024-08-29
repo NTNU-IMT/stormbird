@@ -16,7 +16,7 @@ use super::simulation_builder::SimulationBuilder;
 /// Struct that contains the data needed to run a dynamic simulation.
 pub struct Simulation {
     pub line_force_model: LineForceModel,
-    pub wake_model: WakeModel,
+    pub wake: Wake,
     pub solver_settings: SolverSettings,
     pub previous_circulation_strength: Vec<f64>,
     pub derivatives: Option<Derivatives>,
@@ -39,20 +39,13 @@ impl Simulation {
     /// dynamic simulation, the points are the control points of the line force model and the 
     /// points in the wake.
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
-        match &self.wake_model {
-            WakeModel::Steady(_) => {
-                self.line_force_model.ctrl_points()
-            },
-            WakeModel::Unsteady(wake) => {
-                let mut points = self.line_force_model.ctrl_points();
+        let mut points = self.line_force_model.ctrl_points();
 
-                for i in 0..wake.wake_points.len() {
-                    points.push(wake.wake_points[i]);
-                }
-
-                points
-            }
+        for i in 0..self.wake.wake_points.len() {
+            points.push(self.wake.wake_points[i]);
         }
+
+        points
     }
 
     /// Steps the simulation forward in time by one time step. 
@@ -69,15 +62,7 @@ impl Simulation {
         freestream_velocity: &[SpatialVector<3>],
     ) -> SimulationResult {
         let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
-
-        let wake_points_freestream: Option<Vec<SpatialVector<3>>> = match &self.wake_model {
-            WakeModel::Steady(_) => {
-                None
-            },
-            WakeModel::Unsteady(_) => {
-                Some(freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec())
-            }
-        };
+        let wake_points_freestream = freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec();
 
         // If the force input calculator has not been initialized, initialize it.
         if self.line_force_model.derivatives.is_none() {
@@ -88,39 +73,37 @@ impl Simulation {
             &ctrl_points_freestream, time_step
         );
 
-        self.wake_model.pre_solver_initialization(&self.line_force_model, &ctrl_points_freestream);
+        self.wake.synchronize_wing_geometry(&self.line_force_model);
 
         // Solve for the circulation strength
         let solver_result = solve_time_step(
             &self.line_force_model,
             &felt_ctrl_points_freestream,
             &self.solver_settings,
-            &mut self.wake_model,
+            &mut self.wake,
             &self.previous_circulation_strength
         );
 
         // Update the wake model if needed
-        if let WakeModel::Unsteady(wake) = &mut self.wake_model {
-            wake.update_after_completed_time_step(
-                &solver_result.circulation_strength, 
-                time_step, 
-                &self.line_force_model,
-                &ctrl_points_freestream,
-                wake_points_freestream.as_ref().unwrap(),
-            );
+        self.wake.update_after_completed_time_step(
+            &solver_result.circulation_strength, 
+            time_step, 
+            &self.line_force_model,
+            &ctrl_points_freestream,
+            &wake_points_freestream,
+        );
 
-            let time_step_index = (time / time_step) as usize;
+        let time_step_index = (time / time_step) as usize;
 
-            if self.write_wake_data_to_file {
-                let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
+        if self.write_wake_data_to_file {
+            let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
 
-                let write_result = wake.write_wake_to_vtk_file(&wake_file_path);
+            let write_result = self.wake.write_wake_to_vtk_file(&wake_file_path);
 
-                match write_result {
-                    Ok(_) => {},
-                    Err(e) => {
-                        println!("Error writing wake data to file: {}", e);
-                    }
+            match write_result {
+                Ok(_) => {},
+                Err(e) => {
+                    println!("Error writing wake data to file: {}", e);
                 }
             }
         }
@@ -151,13 +134,6 @@ impl Simulation {
     }
 
     pub fn induced_velocities(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
-        match &self.wake_model {
-            WakeModel::Steady((_, wake)) => {
-                wake.induced_velocities(&self.previous_circulation_strength, points)
-            },
-            WakeModel::Unsteady(wake) => {
-                wake.induced_velocities(points, off_body)
-            }
-        }
+        self.wake.induced_velocities(points, off_body)
     }
 }

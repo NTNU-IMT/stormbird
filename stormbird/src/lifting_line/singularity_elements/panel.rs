@@ -125,7 +125,7 @@ impl PotentialTheoryModel {
         u_i
     }
 
-    /// Simplfied formulation for a panel, based on a point formulation.
+    /// Simplified formulation for a panel, based on a point formulation.
     /// Based on the equations from: 
     /// <https://ntrs.nasa.gov/api/citations/19900004884/downloads/19900004884.pdf>, page 38
     pub fn induced_velocity_from_panel_as_point_doublet_with_unit_strength(

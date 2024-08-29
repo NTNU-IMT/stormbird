@@ -56,8 +56,7 @@ fn steady_lift() {
             print_log: true,
             ..Default::default()
         },
-        wake: UnsteadyWakeBuilder {
-            ratio_of_wake_affected_by_induced_velocities: Some(0.0),
+        wake: WakeBuilder {
             ..Default::default()
         }
     };

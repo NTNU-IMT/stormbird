@@ -2,271 +2,31 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality for calculating lift-induced velocities from full dynamic wake.
+//! Implementations of wake models used to calculate induced velocities in lifting line simulations
 
-use std::fs::File;
-use std::io::{Write, BufWriter, Error};
+pub mod steady;
+pub mod builders;
+pub mod unsteady;
+pub mod velocity_corrections;
+pub mod file_export;
 
-use serde::{Serialize, Deserialize};
+pub mod frozen_wake;
+
+use math_utils::spatial_vector::SpatialVector;
+use crate::line_force_model::LineForceModel;
 
 use rayon::prelude::*;
 use rayon::iter::ParallelIterator;
 
 use std::ops::Range;
 
-use math_utils::spatial_vector::SpatialVector;
-
-use crate::line_force_model::LineForceModel;
-
 use crate::lifting_line::singularity_elements::prelude::*;
 
-use super::velocity_corrections::{VelocityCorrections, VelocityCorrectionsBuilder};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-/// Enum to choose how to set the length of the wake. 
-/// 
-/// # Variants
-/// * `NrPanels` - The wake length is determined by the number of panels in the wake. This makes it
-/// independent of the freestream velocity and the mean chord length.
-/// * `TargetLengthFactor` - The wake length is determined by the freestream velocity and the mean
-/// chord length, multiplied by the given factor. This variant can only be used safely when the 
-/// freestream velocity is properly defined when initializing the wake. This is not always the case, 
-/// and the `NrPanels` variant is therefore the default.
-pub enum WakeLength {
-    NrPanels(usize),
-    TargetLengthFactor(f64),
-}
-
-impl Default for WakeLength {
-    fn default() -> Self {
-        Self::NrPanels(200)
-    }
-}
-
-impl WakeLength {
-    fn nr_wake_panels_from_target_length_factor(
-        &self, 
-        chord_length: f64, 
-        velocity: f64, 
-        time_step: f64
-    ) -> Result<usize, String> {
-        match self {
-            Self::NrPanels(_) => Err(
-                "This function is only intended for the TargetLengthFactor variant".to_string()
-            ),
-            Self::TargetLengthFactor(factor) => Ok(
-                (factor * chord_length / (velocity * time_step)).ceil() as usize
-            )
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-/// Variables used to build an unsteady wake. 
-pub struct UnsteadyWakeBuilder {
-    #[serde(default)]
-    /// Data used to determine the length of the wake. 
-    pub wake_length: WakeLength,
-    #[serde(default)]
-    /// The viscous core length used when calculating the induced velocities
-    pub viscous_core_length: ViscousCoreLength,
-    #[serde(default="UnsteadyWakeBuilder::default_first_panel_relative_length")]
-    /// How the first panel in the wake is treated
-    pub first_panel_relative_length: f64,
-    #[serde(default="UnsteadyWakeBuilder::default_last_panel_relative_length")]
-    /// Factor used to calculate the length of the final panel, relative to the chord length.
-    pub last_panel_relative_length: f64,
-    #[serde(default)]
-    pub use_chord_direction: bool,
-    #[serde(default="UnsteadyWakeBuilder::default_strength_damping_last_panel_ratio")]
-    /// Determines the damping factor for the wake strength. Specifies how much damping there should
-    /// be on the last panel. The actual damping factor also depends on the number of wake panels.
-    pub strength_damping_last_panel_ratio: f64,
-    #[serde(default)]
-    /// Symmetry condition
-    pub symmetry_condition: SymmetryCondition,
-    #[serde(default)]
-    /// Ratio that determines how much of the wake points that are affected by the induced 
-    /// velocities. A value lower than 1.0 can be used to speed up a simulation.
-    pub ratio_of_wake_affected_by_induced_velocities: Option<f64>,
-    #[serde(default="PotentialTheoryModel::default_far_field_ratio")]
-    /// Determines how far away from a panel it is necessary to be before the far field method is
-    /// used to calculate the induced velocity, rather than the full method.
-    pub far_field_ratio: f64,
-    #[serde(default)]
-    /// Damping factor for the shape of the wake. A value of 0.0 means no damping (the wake moves
-    /// freely), while a value of 1.0 means that the wake points are fixed in space.
-    pub shape_damping_factor: f64,
-    #[serde(default)]
-    /// Optional corrections for the calculated induced velocity.
-    pub induced_velocity_corrections: VelocityCorrectionsBuilder,
-    #[serde(default)]
-    /// Optional viscous core to be used when calculating induced velocities off body.
-    pub viscous_core_length_off_body: Option<ViscousCoreLength>,
-    #[serde(default)]
-    /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is 
-    /// useful if the effect of self-induced velocities on lift and drag is calculated in another 
-    /// way, for example with CFD, and the only reason for running lifting-line simulations is to 
-    /// calculate the wing-to-wing interaction.
-    /// 
-    /// **WARNING**: should probably always be used in combination with a prescribed circulation 
-    /// shape in the line force model to maintain a realistic local shape.
-    pub neglect_self_induced_velocities: bool
-}
-
-impl UnsteadyWakeBuilder {
-    fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
-    fn default_first_panel_relative_length() -> f64 {0.75}
-    fn default_last_panel_relative_length() -> f64 {10.0}
-
-    pub fn build(
-        &self,
-        time_step: f64, 
-        line_force_model: &LineForceModel, 
-        initial_velocity: SpatialVector<3>, 
-    ) -> UnsteadyWake {                
-        let span_points   = line_force_model.span_points();
-        let chord_vectors = line_force_model.chord_vectors();
-
-        let span_points_chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
-            &chord_vectors, true
-        );
-        
-        let nr_wake_panels_along_span = line_force_model.nr_span_lines();
-        let nr_wake_points_along_span = span_points.len();
-
-        let mean_chord_length: f64 = chord_vectors.iter()
-            .map(|chord| chord.length())
-            .sum::<f64>() / chord_vectors.len() as f64;
-        
-        let nr_wake_panels_per_line_element = match self.wake_length {
-            WakeLength::NrPanels(nr_panels) => nr_panels,
-            WakeLength::TargetLengthFactor(_) => {
-                if initial_velocity.length() == 0.0 {
-                    panic!("Freestream velocity is zero. Cannot calculate wake length.");
-                }
-
-                self.wake_length.nr_wake_panels_from_target_length_factor(
-                    mean_chord_length, initial_velocity.length(), time_step
-                ).unwrap()
-            }
-        };
-
-        let nr_wake_points_per_line_element = nr_wake_panels_per_line_element + 1;
-
-        let mut wake_points: Vec<SpatialVector<3>> = Vec::with_capacity(
-            nr_wake_points_per_line_element * nr_wake_points_along_span
-        );
-
-        let wake_building_velocity = if initial_velocity.length() == 0.0 {
-            SpatialVector::<3>::new(1e-6, 1e-6, 1e-6)
-        } else {
-            initial_velocity
-        };
-
-        for i_stream in 0..nr_wake_points_per_line_element {
-            for i_span in 0..span_points.len() {
-                let start_point = span_points[i_span];
-
-                if i_stream == 0 {
-                    wake_points.push(start_point);
-                } else {
-                    wake_points.push(
-                        start_point + 
-                        self.first_panel_relative_length * span_points_chord_vectors[i_span] +
-                        ((i_stream-1) as f64) * time_step * wake_building_velocity
-                    );
-                }
-            }
-        }
-
-        let end_index_induced_velocities_on_wake = if let Some(ratio) = self.ratio_of_wake_affected_by_induced_velocities {
-            Some((ratio * nr_wake_panels_per_line_element as f64).ceil() as usize)
-        } else {
-            None
-        };
-
-        let strength_damping_factor =self.strength_damping_factor(nr_wake_panels_per_line_element);
-
-        let settings = UnsteadyWakeSettings {
-            first_panel_relative_length: self.first_panel_relative_length,
-            last_panel_relative_length: self.last_panel_relative_length,
-            use_chord_direction: self.use_chord_direction,
-            strength_damping_factor,
-            nr_wake_points_along_span,
-            nr_wake_panels_along_span,
-            nr_wake_panels_per_line_element,
-            end_index_induced_velocities_on_wake,
-            shape_damping_factor: self.shape_damping_factor,
-            neglect_self_induced_velocities: self.neglect_self_induced_velocities
-        };
-
-        let potential_theory_model = PotentialTheoryModel {
-            viscous_core_length: self.viscous_core_length.clone(),
-            symmetry_condition: self.symmetry_condition.clone(),
-            far_field_ratio: self.far_field_ratio,
-            viscous_core_length_off_body: self.viscous_core_length_off_body.clone(),
-            ..Default::default()
-        };
-
-        let nr_panels = nr_wake_panels_per_line_element * nr_wake_panels_along_span;
-
-        let strengths: Vec<f64> = vec![0.0; nr_panels];
-
-        let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); nr_panels];
-
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(initial_velocity);
-
-        let mut wake = UnsteadyWake {
-            wake_points,
-            strengths,
-            panel_geometry,
-            settings,
-            potential_theory_model,
-            wing_indices: line_force_model.wing_indices.clone(),
-            number_of_time_steps_completed: 0,
-            induced_velocity_corrections
-        };
-
-        wake.update_panel_geometry_from_wake_points();
-
-        wake
-    }
-
-    fn strength_damping_factor(&self, nr_wake_panels_per_line_element: usize) -> f64 {
-        let estimated_value = 1.0 - self.strength_damping_last_panel_ratio.powf(
-            1.0 / (nr_wake_panels_per_line_element - 1) as f64
-        );
-
-        estimated_value.max(0.0).min(1.0)
-    }
-}
-
-impl Default for UnsteadyWakeBuilder {
-    fn default() -> Self {
-        Self {
-            wake_length: Default::default(),
-            viscous_core_length: Default::default(),
-            first_panel_relative_length: Self::default_first_panel_relative_length(),
-            last_panel_relative_length: Self::default_last_panel_relative_length(),
-            use_chord_direction: false,
-            strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
-            symmetry_condition: Default::default(),
-            ratio_of_wake_affected_by_induced_velocities: None,
-            far_field_ratio: PotentialTheoryModel::default_far_field_ratio(),
-            shape_damping_factor: 0.0,
-            induced_velocity_corrections: Default::default(),
-            viscous_core_length_off_body: None,
-            neglect_self_induced_velocities: false
-        }
-    }
-}
+use velocity_corrections::VelocityCorrections;
 
 #[derive(Debug, Clone)]
-/// Settings for the unsteady wake
-pub struct UnsteadyWakeSettings {
+/// Settings for the wake
+pub struct WakeSettings {
     pub first_panel_relative_length: f64,
     pub last_panel_relative_length: f64,
     pub use_chord_direction: bool,
@@ -274,13 +34,13 @@ pub struct UnsteadyWakeSettings {
     pub nr_wake_points_along_span: usize,
     pub nr_wake_panels_along_span: usize,
     pub nr_wake_panels_per_line_element: usize,
-    pub end_index_induced_velocities_on_wake: Option<usize>,
+    pub end_index_induced_velocities_on_wake: usize,
     pub shape_damping_factor: f64,
     pub neglect_self_induced_velocities: bool
 }
 
 #[derive(Debug, Clone)]
-/// Model of an unsteady wake for lifting line simulations
+/// Model of a wake for lifting line simulations
 /// 
 /// The induced velocities are calculated from vortex panels and their strengths.
 /// 
@@ -299,31 +59,31 @@ pub struct UnsteadyWakeSettings {
 /// 
 /// There are methods to update the strength and the shape of the vortex line for each time step in 
 /// the simulation.
-pub struct UnsteadyWake {
+pub struct Wake {
     /// The points making up the vortex wake
     pub wake_points: Vec<SpatialVector<3>>,
     /// The strengths of the vortex lines
     pub strengths: Vec<f64>,
     /// Panel geometry data used to determine what method to use for calculating the induced 
     /// velocities, and in the far field methods for the same purpose
-    panel_geometry: Vec<PanelGeometry>,
+    pub panel_geometry: Vec<PanelGeometry>,
     /// Settings for the wake behavior
-    settings: UnsteadyWakeSettings,
+    pub settings: WakeSettings,
     /// The model used to calculate induced velocities from vortex lines
-    potential_theory_model: PotentialTheoryModel,
+    pub potential_theory_model: PotentialTheoryModel,
     /// To determine which wing the wake points belong to. Copied directly from the line force model
-    wing_indices: Vec<Range<usize>>,
+    pub wing_indices: Vec<Range<usize>>,
     /// Counter to keep track of the number of time steps that have been completed
-    number_of_time_steps_completed: usize,
+    pub number_of_time_steps_completed: usize,
     /// Corrections for the induced velocity, such as max magnitude and correction factor.
     /// 
     /// By default, this is not used. However, it can be used on cases where the simulation is known
     /// to create unstable and too large induced velocities. The original use case is for rotor 
     /// sails.
-    induced_velocity_corrections: VelocityCorrections
+    pub induced_velocity_corrections: VelocityCorrections
 }
 
-impl UnsteadyWake {
+impl Wake {
     /// Takes a line force vector as input, that might have a different position and orientation 
     /// than the current model, and updates the relevant internal geometry
     ///
@@ -413,7 +173,7 @@ impl UnsteadyWake {
     }
 
     /// Update the panel geometry based on the current wake points
-    fn update_panel_geometry_from_wake_points(&mut self) {
+    pub fn update_panel_geometry_from_wake_points(&mut self) {
         for i in 0..self.strengths.len() {
             let (stream_index, span_index) = self.reverse_panel_index(i);
 
@@ -424,7 +184,7 @@ impl UnsteadyWake {
     }
 
     /// Calculates induced velocities from the panels starting at start_index and ending at end_index
-    fn induced_velocities_local(
+    pub fn induced_velocities_local(
         &self, 
         points: &[SpatialVector<3>], 
         start_index: usize, 
@@ -458,6 +218,7 @@ impl UnsteadyWake {
 
         induced_velocities
     }
+
 
     #[inline(always)]
     /// Returns a flatten index for the wake panels. The panels are ordered streamwise-major.
@@ -538,21 +299,15 @@ impl UnsteadyWake {
         let ctrl_points = line_force_model.ctrl_points();
 
         // Compute the induced velocities at the control points
-        let u_i = if let Some(end_index) = self.settings.end_index_induced_velocities_on_wake {
-            if end_index > 0 {
-                self.induced_velocities(&ctrl_points, true)
-            } else {
-                vec![SpatialVector::<3>::default(); ctrl_points.len()]
-            }
-        } else {
+        let induced_velocities = if self.settings.end_index_induced_velocities_on_wake > 0 {
             self.induced_velocities(&ctrl_points, true)
+        } else {
+            vec![SpatialVector::<3>::default(); ctrl_points.len()]
         };
 
-        let mut ctrl_points_velocity: Vec<SpatialVector<3>> = Vec::with_capacity(ctrl_points.len());
-
-        for i in 0..ctrl_points.len() {
-            ctrl_points_velocity.push(ctrl_points_freestream[i] + u_i[i]);
-        }
+        let ctrl_points_velocity: Vec<SpatialVector<3>> = ctrl_points_freestream.iter().zip(induced_velocities.iter()).map(
+            |(u_inf, u_i)| *u_inf + *u_i
+        ).collect();
 
         let angles_of_attack = line_force_model.angles_of_attack(&ctrl_points_velocity);
 
@@ -617,7 +372,11 @@ impl UnsteadyWake {
 
 
     /// Moves the last points in the wake based on the chord length and the freestream velocity
-    fn move_last_wake_points(
+    /// 
+    /// # Arguments
+    /// * `line_force_model` - The line force model that the wake is based on
+    /// * `wake_points_freestream` - The freestream velocity at the wake points
+    pub fn move_last_wake_points(
         &mut self,
         line_force_model: &LineForceModel,
         wake_points_freestream: &[SpatialVector<3>]
@@ -664,11 +423,7 @@ impl UnsteadyWake {
     pub fn velocity_at_wake_points(&self, wake_points_freestream: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
         let mut velocity: Vec<SpatialVector<3>> = wake_points_freestream.to_vec();
 
-        let end_index: usize = if let Some(end_index) = self.settings.end_index_induced_velocities_on_wake {
-            self.wake_point_index(end_index, 0).min(self.wake_points.len())
-        } else {
-            self.wake_points.len()
-        };
+        let end_index = self.settings.end_index_induced_velocities_on_wake.min(self.wake_points.len());
 
         if end_index > 0 && self.number_of_time_steps_completed > 2 {
             let u_i_calc: Vec<SpatialVector<3>> = self.induced_velocities(&self.wake_points[0..end_index], true);
@@ -707,21 +462,45 @@ impl UnsteadyWake {
         }
     }
 
+    /// Calculates the induced velocity from a single panel at the input point with unit strength
+    pub fn unit_strength_induced_velocity_from_panel(
+        &self, 
+        stream_index: usize,
+        span_index: usize,
+        point: SpatialVector<3>, 
+        off_body: bool
+    ) -> SpatialVector<3> {
+        let panel_index = self.panel_index(stream_index, span_index);
+        let panel_points = self.panel_wake_points(stream_index, span_index);
+
+        self.potential_theory_model.induced_velocity_from_panel_with_unit_strength(
+            &panel_points, 
+            &self.panel_geometry[panel_index], 
+            point,
+            off_body
+        )
+    }
+
+    /// Calculates the induced velocity from a single panel at the input point with unit strength
+    pub fn unit_strength_induced_velocity_from_panel_flat_index(
+        &self, 
+        panel_index: usize, 
+        point: SpatialVector<3>, 
+        off_body: bool
+    ) -> SpatialVector<3> {
+        let (stream_index, span_index) = self.reverse_panel_index(panel_index);
+
+        self.unit_strength_induced_velocity_from_panel(stream_index, span_index, point, off_body)
+    }
+
     /// Calculates the induced velocity from a single panel at the input point
     fn induced_velocity_from_panel(&self, panel_index: usize, point: SpatialVector<3>, off_body: bool) -> SpatialVector<3> {
         if self.strengths[panel_index] == 0.0 {
             SpatialVector::<3>::default()
         } else {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
+            let unit_velocity = self.unit_strength_induced_velocity_from_panel_flat_index(panel_index, point, off_body);
 
-            let panel_points = self.panel_wake_points(stream_index, span_index);
-    
-            self.potential_theory_model.induced_velocity_from_panel_with_unit_strength(
-                &panel_points, 
-                &self.panel_geometry[panel_index], 
-                point,
-                off_body
-            ) * self.strengths[panel_index]
+            self.strengths[panel_index] * unit_velocity
         }
     }
 
@@ -748,130 +527,14 @@ impl UnsteadyWake {
 
         self.update_wing_strength(new_circulation_strength);
     }
-
-    /// Export the wake geometry as an obj file
-    ///
-    /// # Argument
-    /// * `file_path` - The path to the file to be written
-    pub fn write_wake_to_obj_file(&self, file_path: &str) -> Result<(), Error> {
-        let f = File::create(file_path)?;
-
-        let mut writer = BufWriter::new(f);
-
-        write!(writer, "o wake\n")?;
-
-        for i in 0..self.wake_points.len(){
-            write!(
-                writer, 
-                "v {} {} {}\n", 
-                self.wake_points[i][0], 
-                self.wake_points[i][1], 
-                self.wake_points[i][2]
-            )?;
-        };
-
-        for panel_index in 0..self.strengths.len() {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
-
-            let indices = self.panel_wake_point_indices(stream_index, span_index);
-
-            write!(
-                writer, 
-                "f {} {} {} {}\n", 
-                indices[0] + 1, 
-                indices[1] + 1, 
-                indices[2] + 1, 
-                indices[3] + 1
-            )?;
-        }
-
-        writer.flush()?;
-
-        Ok(())
-    }
-
-    /// Export the wake geometry and strength as a VTK file
-    ///
-    /// # Argument
-    /// * `file_path` - The path to the file to be written
-    pub fn write_wake_to_vtk_file(&self, file_path: &str) -> Result<(), Error> {
-        let f = File::create(file_path)?;
-
-        let mut writer = BufWriter::new(f);
-
-        let nr_points = self.wake_points.len();
-        let nr_faces  = self.strengths.len();
-
-        // Header
-        write!(writer, "<?xml version=\"1.0\"?>\n")?;
-        write!(writer, "<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n")?;
-        write!(writer, "\t<PolyData>\n")?;
-        write!(
-            writer, 
-            "\t\t<Piece NumberOfPoints=\"{}\" NumberOfVerts=\"0\" NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"{}\">\n", 
-            nr_points, 
-            nr_faces
-        )?;
-
-        // Write points
-        write!(writer, "\t\t\t<Points>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n")?;
-        for i in 0..nr_points {
-            write!(
-                writer, 
-                "\t\t\t\t\t{} {} {}\n", 
-                self.wake_points[i][0], 
-                self.wake_points[i][1], 
-                self.wake_points[i][2]
-            )?;
-        }
-
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</Points>\n")?;
-
-        // Write faces
-        write!(writer, "\t\t\t<Polys>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n")?;
-
-        for panel_index in 0..self.strengths.len() {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
-
-            let indices = self.panel_wake_point_indices(stream_index, span_index);
-
-            write!(
-                writer, 
-                "\t\t\t\t\t{} {} {} {}\n", 
-                indices[0], 
-                indices[1], 
-                indices[2], 
-                indices[3]
-            )?;
-        }
-
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n")?;
-        for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", (i+1)*4)?;
-        }
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</Polys>\n")?;
-
-        // Write strength
-        write!(writer, "\t\t\t<CellData Scalars=\"strength\">\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"strength\" format=\"ascii\">\n")?;
-        for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", self.strengths[i])?;
-        }
-
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</CellData>\n")?;
-
-        write!(writer, "\t\t</Piece>\n")?;
-        write!(writer, "\t</PolyData>\n")?;
-        write!(writer, "</VTKFile>\n")?;
-
-        writer.flush()?;
-
-        Ok(())
-    }
 }
+
+
+/// Typical imports when using the velocity models
+pub mod prelude {
+    pub use super::Wake;
+    pub use super::builders::WakeBuilder;
+}
+
+#[cfg(test)]
+mod tests;

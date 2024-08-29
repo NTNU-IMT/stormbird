@@ -20,7 +20,7 @@ fn compare_wake_models() {
 
     let time_step = 0.5; 
 
-    let mut dynamic_wake = UnsteadyWakeBuilder::default()
+    let mut dynamic_wake = WakeBuilder::default()
         .build(time_step, &line_force_model, velocity);
 
     let steady_wake = SteadyWakeBuilder::default()

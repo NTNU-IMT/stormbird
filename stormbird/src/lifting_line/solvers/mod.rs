@@ -8,7 +8,7 @@ use math_utils::statistics;
 use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::prelude::*;
 use crate::io_structs::prelude::*;
-use crate::lifting_line::wake_models::prelude::*;
+use crate::lifting_line::wake::prelude::*;
 
 pub mod settings;
 
@@ -18,39 +18,27 @@ pub fn solve_time_step(
     line_force_model: &LineForceModel,
     felt_ctrl_points_freestream: &[SpatialVector<3>],
     solver_settings: &SolverSettings,
-    wake_model: &mut WakeModel,
+    wake: &mut Wake,
     initial_solution: &[f64],
 ) -> SolverResult {
     let ctrl_points = line_force_model.ctrl_points();
 
     let mut convergence_test = solver_settings.convergence_test.build();
 
-    let fixed_velocities = match wake_model {
-        WakeModel::Steady((_, _)) => {
-            felt_ctrl_points_freestream.to_vec()
-        },
-        WakeModel::Unsteady(wake) => {
-            let u_i_free_wake = wake.induced_velocities_from_free_wake(&ctrl_points, false);
+    let fixed_velocities: Vec<SpatialVector<3>> = {
+        let u_i_free_wake = wake.induced_velocities_from_free_wake(&ctrl_points, false);
 
-            (0..ctrl_points.len()).map(|i| {
-                    felt_ctrl_points_freestream[i] + u_i_free_wake[i]
-                }
-            ).collect()
-        }
+        (0..ctrl_points.len()).map(|i| {
+                felt_ctrl_points_freestream[i] + u_i_free_wake[i]
+            }
+        ).collect()
     };
 
     let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
     let mut velocity = vec![SpatialVector::<3>::default(); ctrl_points.len()];
 
     for iteration in 0..solver_settings.max_iterations_per_time_step {
-        let velocity_update = match wake_model {
-            WakeModel::Steady((_, wake)) => {
-                wake.induced_velocities_at_control_points(&circulation_strength)
-            },
-            WakeModel::Unsteady(wake) => {
-                wake.induced_velocities_from_first_panels(&ctrl_points, false)
-            }
-        };
+        let velocity_update = wake.induced_velocities_from_first_panels(&ctrl_points, false);
 
         for i in 0..ctrl_points.len() {
             velocity[i] = fixed_velocities[i] + velocity_update[i];
@@ -90,9 +78,7 @@ pub fn solve_time_step(
             circulation_strength[i] += damping_factor * strength_difference;
         }
 
-        if let WakeModel::Unsteady(wake) = wake_model {
-            wake.update_wing_strength(&circulation_strength);
-        }
+        wake.update_wing_strength(&circulation_strength);
     }
 
     SolverResult {
