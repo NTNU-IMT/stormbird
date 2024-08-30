@@ -5,9 +5,6 @@
 //! Models of two dimensional lift and drag on wing sections, such as foil profiles and rotating 
 //! cylinders. 
 
-
-/// Collection of functions that are useful for multiple section models.
-pub mod common_functions;
 /// Section model of a foil profile
 pub mod foil;
 /// Section model of a foil profile where the parameters can vary depending on an internal state

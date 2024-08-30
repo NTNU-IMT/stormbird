@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use super::*;
-use super::common_functions;
+use math_utils::special_functions;
 
 use std::f64::consts::PI;
 
@@ -196,7 +196,7 @@ impl Foil {
             self.mean_negative_stall_angle.abs()
         };
 
-        common_functions::sigmoid_function(
+        special_functions::sigmoid_zero_to_one(
             angle_of_attack.abs(), 
             mean_stall_angle, 
             self.stall_range

@@ -5,6 +5,7 @@
 //! Compare the result from different solvers
 
 use std::f64::consts::PI;
+use std::time::Instant;
 
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
@@ -39,33 +40,14 @@ fn steady_lift() {
         ..Default::default()
     }.build();
 
-    let steady_settings  = SteadySettings{
-        solver: SteadySolverSettings {
-            damping_factor_start: 0.01,
-            damping_factor_end: Some(0.1),
-            print_log: true,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let dynamic_settings = UnsteadySettings {
-        solver: UnsteadySolverSettings {
-            damping_factor_start: 0.01,
-            damping_factor_end: Some(0.1),
-            print_log: true,
-            ..Default::default()
-        },
-        wake: WakeBuilder {
-            ..Default::default()
-        }
-    };
+    let steady_settings  = SteadySettings::default();
+    let dynamic_settings = UnsteadySettings::default();
 
     let nr_time_steps = 200;
 
     let time_step = 0.25;
 
-    let velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
+    let velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
@@ -85,7 +67,15 @@ fn steady_lift() {
     let dynamic_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; dynamic_velocity_points.len()];
     let static_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; static_velocity_points.len()];
 
-    let result_steady  = steady_sim.do_step(0.0, time_step, &static_velocity_freestream);
+    let start = Instant::now();
+    let result_steady  = steady_sim.do_step(
+        0.0, 
+        time_step, 
+        &static_velocity_freestream
+    );
+    println!("Time to run steady simulation: {} secs", start.elapsed().as_secs_f64());
+    println!("Number of steady iterations: {}", result_steady.iterations);
+    println!("Residual for steady simulation: {}", result_steady.residual);
 
     let cd_steady = result_steady.integrated_forces_sum()[0] / force_factor;
     let cl_steady = result_steady.integrated_forces_sum()[1] / force_factor;
@@ -93,14 +83,25 @@ fn steady_lift() {
     let mut cd_dynamic = 0.0;
     let mut cl_dynamic = 0.0;
 
+    let mut result_dynamic = SimulationResult::default();
+    let start = Instant::now();
     for i in 0..nr_time_steps {
         let time = (i as f64) * time_step;
         
-        let result_dynamic = dynamic_sim.do_step(time, time_step, &dynamic_velocity_freestream);
+        result_dynamic = dynamic_sim.do_step(
+            time, 
+            time_step, 
+            &dynamic_velocity_freestream
+        );
 
         cd_dynamic = result_dynamic.integrated_forces_sum()[0] / force_factor;
-        cl_dynamic = result_dynamic.integrated_forces_sum()[1] / force_factor;   
+        cl_dynamic = result_dynamic.integrated_forces_sum()[1] / force_factor;         
     }
+
+    println!("Time to run dynamic simulation: {} secs", start.elapsed().as_secs_f64());
+    println!("Number of dynamic iterations on last time step: {}", result_dynamic.iterations);
+    println!("Residual for dynamic simulation: {}", result_dynamic.residual);
+    
 
     println!("Theory");
     dbg!(cd_theory, cl_theory);

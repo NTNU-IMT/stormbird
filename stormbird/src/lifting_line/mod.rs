@@ -18,20 +18,13 @@ pub mod simulation;
 pub mod prelude {
     pub use math_utils::spatial_vector::SpatialVector;
     pub use crate::io_structs::prelude::*;
+    pub use crate::line_force_model::prelude::*;
 
     pub use super::wake::prelude::*;
 
     pub use super::singularity_elements::prelude::*;
 
-    pub use super::solvers::solve_time_step;
-    pub use super::solvers::settings::*;
-    
-    pub use crate::line_force_model::span_line::SpanLine;
-    pub use crate::line_force_model::LineForceModel;
-    pub use crate::line_force_model::builder::{
-        LineForceModelBuilder,
-        WingBuilder,
-    };
+    pub use super::solvers::prelude::*;
 
     pub use crate::section_models::{
         SectionModel,

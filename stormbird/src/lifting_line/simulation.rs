@@ -17,7 +17,7 @@ use super::simulation_builder::SimulationBuilder;
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     pub wake: Wake,
-    pub solver_settings: SolverSettings,
+    pub solver: Solver,
     pub previous_circulation_strength: Vec<f64>,
     pub derivatives: Option<Derivatives>,
     pub write_wake_data_to_file: bool,
@@ -25,7 +25,11 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new_from_string(setup_string: &str, initial_time_step: f64, wake_initial_velocity: SpatialVector<3>) -> Result<Self, String> {
+    pub fn new_from_string(
+        setup_string: &str, 
+        initial_time_step: f64, 
+        wake_initial_velocity: SpatialVector<3>
+    ) -> Result<Self, String> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
         Ok(builder.build(initial_time_step, wake_initial_velocity))
@@ -75,12 +79,16 @@ impl Simulation {
 
         self.wake.synchronize_wing_geometry(&self.line_force_model);
 
+        let frozen_wake = FrozenWake::from_wake(
+            &self.line_force_model, 
+            &self.wake
+        );
+
         // Solve for the circulation strength
-        let solver_result = solve_time_step(
+        let solver_result = self.solver.do_step(
             &self.line_force_model,
             &felt_ctrl_points_freestream,
-            &self.solver_settings,
-            &mut self.wake,
+            &frozen_wake,
             &self.previous_circulation_strength
         );
 
@@ -121,6 +129,8 @@ impl Simulation {
             sectional_forces,
             integrated_forces,
             integrated_moments,
+            iterations: solver_result.iterations,
+            residual: solver_result.residual,
         };
 
         self.previous_circulation_strength = result.force_input.circulation_strength.clone();
@@ -133,7 +143,11 @@ impl Simulation {
         result
     }
 
-    pub fn induced_velocities(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
+    pub fn induced_velocities(
+        &self, 
+        points: &[SpatialVector<3>], 
+        off_body: bool
+    ) -> Vec<SpatialVector<3>> {
         self.wake.induced_velocities(points, off_body)
     }
 }

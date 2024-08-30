@@ -6,9 +6,9 @@
 
 pub mod steady;
 pub mod builders;
-pub mod unsteady;
 pub mod velocity_corrections;
 pub mod file_export;
+pub mod prelude;
 
 pub mod frozen_wake;
 
@@ -105,8 +105,16 @@ impl Wake {
     /// * `points` - The points at which the induced velocities are calculated
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
-    pub fn induced_velocities(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
-        self.induced_velocities_local(points, 0, self.strengths.len(), off_body, false)
+    pub fn induced_velocities(
+        &self, 
+        points: &[SpatialVector<3>], 
+        off_body: bool
+    ) -> Vec<SpatialVector<3>> {
+        self.induced_velocities_local(
+            points, 0, 
+            self.strengths.len(), 
+            off_body, 
+            false)
     }
 
     /// Calculates the induced velocity from the first panels in the stream wise direction only. This
@@ -117,8 +125,17 @@ impl Wake {
     /// * `points` - The points at which the induced velocities are calculated
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
-    pub fn induced_velocities_from_first_panels(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
-        self.induced_velocities_local(points, 0, self.settings.nr_wake_panels_along_span, off_body, self.settings.neglect_self_induced_velocities)
+    pub fn induced_velocities_from_first_panels(
+        &self, points: &[SpatialVector<3>], 
+        off_body: bool
+    ) -> Vec<SpatialVector<3>> {
+        self.induced_velocities_local(
+            points, 
+            0, 
+            self.settings.nr_wake_panels_along_span, 
+            off_body, 
+            self.settings.neglect_self_induced_velocities
+        )
     }
 
     /// Calculates the induced velocities from all the panels in the free wake, neglecting the first 
@@ -128,7 +145,11 @@ impl Wake {
     /// * `points` - The points at which the induced velocities are calculated
     /// * `off_body` - If the points are off body, the induced velocities **can** be calculated with 
     /// the off-body viscous core length in the potential theory model if it exists.
-    pub fn induced_velocities_from_free_wake(&self, points: &[SpatialVector<3>], off_body: bool) -> Vec<SpatialVector<3>> {
+    pub fn induced_velocities_from_free_wake(
+        &self, 
+        points: &[SpatialVector<3>], 
+        off_body: bool
+    ) -> Vec<SpatialVector<3>> {
         self.induced_velocities_local(
             points, 
             self.settings.nr_wake_panels_along_span, 
@@ -160,6 +181,8 @@ impl Wake {
         ctrl_points_freestream: &[SpatialVector<3>],
         wake_points_freestream: &[SpatialVector<3>]
     ) {
+        self.update_wing_strength(&new_circulation_strength);
+
         self.update_wake_points_after_completed_time_step(
             time_step, 
             line_force_model, 
@@ -184,7 +207,7 @@ impl Wake {
     }
 
     /// Calculates induced velocities from the panels starting at start_index and ending at end_index
-    pub fn induced_velocities_local(
+    fn induced_velocities_local(
         &self, 
         points: &[SpatialVector<3>], 
         start_index: usize, 
@@ -192,25 +215,27 @@ impl Wake {
         off_body: bool,
         neglect_self_induced: bool
     ) -> Vec<SpatialVector<3>> {
-        let mut induced_velocities: Vec<SpatialVector<3>> = points.par_iter().enumerate().map(|(point_index, point)| {
-            (start_index..end_index).into_iter().map(|i_panel| {
-                if neglect_self_induced {
-                    let (_stream_index, span_index) = self.reverse_panel_index(i_panel);
+        let mut induced_velocities: Vec<SpatialVector<3>> = points.par_iter()
+            .enumerate()
+            .map(|(point_index, point)| {
+                (start_index..end_index).into_iter().map(|i_panel| {
+                    if neglect_self_induced {
+                        let (_stream_index, span_index) = self.reverse_panel_index(i_panel);
 
-                    let wing_index_panel = self.wing_index(span_index);
-                    let wing_index_point = self.wing_index(point_index);
+                        let wing_index_panel = self.wing_index(span_index);
+                        let wing_index_point = self.wing_index(point_index);
 
-                    if wing_index_panel == wing_index_point {
-                        SpatialVector::<3>::default()
+                        if wing_index_panel == wing_index_point {
+                            SpatialVector::<3>::default()
+                        } else {
+                            self.induced_velocity_from_panel(i_panel, *point, off_body)
+                        }
+
                     } else {
                         self.induced_velocity_from_panel(i_panel, *point, off_body)
                     }
-
-                } else {
-                    self.induced_velocity_from_panel(i_panel, *point, off_body)
-                }
-            }).sum()
-        }).collect();
+                }).sum()
+            }).collect();
 
         if self.induced_velocity_corrections.any_active_corrections() {
             self.induced_velocity_corrections.correct(&mut induced_velocities)
@@ -462,6 +487,7 @@ impl Wake {
         }
     }
 
+    #[inline(always)]
     /// Calculates the induced velocity from a single panel at the input point with unit strength
     pub fn unit_strength_induced_velocity_from_panel(
         &self, 
@@ -481,6 +507,7 @@ impl Wake {
         )
     }
 
+    #[inline(always)]
     /// Calculates the induced velocity from a single panel at the input point with unit strength
     pub fn unit_strength_induced_velocity_from_panel_flat_index(
         &self, 
@@ -493,6 +520,7 @@ impl Wake {
         self.unit_strength_induced_velocity_from_panel(stream_index, span_index, point, off_body)
     }
 
+    #[inline(always)]
     /// Calculates the induced velocity from a single panel at the input point
     fn induced_velocity_from_panel(&self, panel_index: usize, point: SpatialVector<3>, off_body: bool) -> SpatialVector<3> {
         if self.strengths[panel_index] == 0.0 {
@@ -527,13 +555,6 @@ impl Wake {
 
         self.update_wing_strength(new_circulation_strength);
     }
-}
-
-
-/// Typical imports when using the velocity models
-pub mod prelude {
-    pub use super::Wake;
-    pub use super::builders::WakeBuilder;
 }
 
 #[cfg(test)]

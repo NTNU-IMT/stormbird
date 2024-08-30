@@ -40,6 +40,7 @@ impl RectangularWing {
 
         let mut line_force_model_builder = LineForceModelBuilder::new(self.nr_strips);
         line_force_model_builder.density = 10.0;
+
         
         let last_z = if self.negative_span_orientation {
             -self.aspect_ratio

@@ -37,7 +37,7 @@ pub enum WakeLength {
 
 impl Default for WakeLength {
     fn default() -> Self {
-        Self::NrPanels(2)
+        Self::NrPanels(100)
     }
 }
 
@@ -61,7 +61,7 @@ impl WakeLength {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Variables used to build an unsteady wake. 
+/// Variables used to build a wake model. 
 pub struct WakeBuilder {
     #[serde(default)]
     /// Data used to determine the length of the wake. 
@@ -76,6 +76,8 @@ pub struct WakeBuilder {
     /// Factor used to calculate the length of the final panel, relative to the chord length.
     pub last_panel_relative_length: f64,
     #[serde(default)]
+    /// Determines if the chord direction should be used when calculating the direction of the first
+    /// wake panels
     pub use_chord_direction: bool,
     #[serde(default="WakeBuilder::default_strength_damping_last_panel_ratio")]
     /// Determines the damping factor for the wake strength. Specifies how much damping there should
@@ -115,10 +117,25 @@ pub struct WakeBuilder {
     pub neglect_self_induced_velocities: bool
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+/// Variables used to build a steady wake model. 
+pub struct SteadyWakeBuilder {
+    #[serde(default="SteadyWakeBuilder::default_wake_length_factor")]
+    pub wake_length_factor: f64,
+    #[serde(default)]
+    pub symmetry_condition: SymmetryCondition,
+    #[serde(default)]
+    pub viscous_core_length: ViscousCoreLength,
+    #[serde(default)]
+    pub induced_velocity_corrections: VelocityCorrectionsBuilder
+}
+
+
 impl WakeBuilder {
     fn default_strength_damping_last_panel_ratio() -> f64 {1.0}
     fn default_first_panel_relative_length() -> f64 {0.75}
-    fn default_last_panel_relative_length() -> f64 {100.0}
+    fn default_last_panel_relative_length() -> f64 {25.0}
 
     pub fn build(
         &self,
@@ -235,6 +252,8 @@ impl WakeBuilder {
             &wake_points_freestream
         );
 
+        wake.update_panel_geometry_from_wake_points();
+
         wake
     }
 
@@ -263,6 +282,43 @@ impl Default for WakeBuilder {
             induced_velocity_corrections: Default::default(),
             viscous_core_length_off_body: None,
             neglect_self_induced_velocities: false
+        }
+    }
+}
+
+impl SteadyWakeBuilder {
+    pub fn default_wake_length_factor() -> f64 {100.0}
+
+    pub fn build(&self,
+        time_step: f64, 
+        line_force_model: &LineForceModel, 
+        initial_velocity: SpatialVector<3>
+    ) -> Wake {
+        WakeBuilder {
+            wake_length: WakeLength::NrPanels(1),
+            viscous_core_length: self.viscous_core_length.clone(),
+            first_panel_relative_length: WakeBuilder::default_first_panel_relative_length(),
+            last_panel_relative_length: self.wake_length_factor,
+            use_chord_direction: false,
+            strength_damping_last_panel_ratio: WakeBuilder::default_strength_damping_last_panel_ratio(),
+            symmetry_condition: self.symmetry_condition.clone(),
+            ratio_of_wake_affected_by_induced_velocities: 0.0,
+            far_field_ratio: f64::INFINITY,
+            shape_damping_factor: 0.0,
+            induced_velocity_corrections: self.induced_velocity_corrections.clone(),
+            viscous_core_length_off_body: None,
+            neglect_self_induced_velocities: false
+        }.build(time_step, line_force_model, initial_velocity)
+    }
+}
+
+impl Default for SteadyWakeBuilder {
+    fn default() -> Self {
+        Self {
+            wake_length_factor: Self::default_wake_length_factor(),
+            symmetry_condition: Default::default(),
+            viscous_core_length: Default::default(),
+            induced_velocity_corrections: Default::default()
         }
     }
 }

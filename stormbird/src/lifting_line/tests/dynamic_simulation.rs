@@ -34,7 +34,7 @@ fn right_sign_of_the_force_when_translating() {
         ..Default::default()
     }.build();
 
-    let freestream_velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let vel_magnitude = (freestream_velocity).length();
 
@@ -61,7 +61,7 @@ fn right_sign_of_the_force_when_translating() {
         let translation_y = amplitude * (time * frequency).sin();
         let velocity_y = amplitude * frequency * (time * frequency).cos();
 
-        let translation = SpatialVector::<3>::new(0.0, translation_y, 0.0);
+        let translation = SpatialVector([0.0, translation_y, 0.0]);
 
         sim.line_force_model.translation = translation;
 
@@ -98,7 +98,7 @@ fn right_sign_of_the_moment_when_rotating() {
     }.build();
 
     
-    let freestream_velocity = SpatialVector::<3>::new(10.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector([10.2, 0.0, 0.0]);
 
     let period = 2.0;
     let nr_time_steps_per_period = 20;
@@ -121,11 +121,11 @@ fn right_sign_of_the_moment_when_rotating() {
     for i in 1..nr_time_steps_per_period {
         let time = (i as f64) * time_step;
 
-        let rotation = SpatialVector::<3>::new(
+        let rotation = SpatialVector([
             amplitude * (frequency * time).sin(),
             0.0,
             0.0,
-        );
+        ]);
 
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
@@ -167,7 +167,7 @@ fn rotational_velocity() {
         ..Default::default()
     }.build().build();
 
-    let freestream_velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let mut motion_calculator = MotionDerivatives::new(&line_force_model);
 
@@ -177,8 +177,8 @@ fn rotational_velocity() {
         let rotation_x     = amplitude * (frequency * time).sin();
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
-        let rotation = SpatialVector::<3>::new(rotation_x, 0.0, 0.0);
-        let velocity = SpatialVector::<3>::new(rotation_vel_x, 0.0, 0.0);
+        let rotation = SpatialVector([rotation_x, 0.0, 0.0]);
+        let velocity = SpatialVector([rotation_vel_x, 0.0, 0.0]);
 
         line_force_model.rotation = rotation;
 

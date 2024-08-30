@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 
 use math_utils::smoothing;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SmoothingSettings {
     #[serde(default)]
     pub gaussian: Option<GaussianSmoothingSettings>,

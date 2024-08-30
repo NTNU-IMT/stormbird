@@ -27,7 +27,7 @@ fn moment_test() {
         ..Default::default()
     }.build();
 
-    let freestream_velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
+    let freestream_velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder,
@@ -35,12 +35,12 @@ fn moment_test() {
             SteadySettings::default()
         ),
         wake_files_folder_path: "".to_string(),
-        write_wake_data_to_file: false,
-
-        
+        write_wake_data_to_file: false,        
     }.build(1.0, freestream_velocity);
 
-    let input_freestream_velocity = vec![freestream_velocity; sim.line_force_model.nr_span_lines()];
+    let freestream_velocity_points = sim.get_freestream_velocity_points();
+
+    let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
 
     let result = sim.do_step(0.0, 1.0, &input_freestream_velocity);
 

@@ -271,7 +271,7 @@ impl LineForceModel {
         ).collect()
     }
 
-    pub fn residual_absolute(&self, strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<f64> {
+    pub fn residual(&self, strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<f64> {
         let circulation_lift = self.lift_from_circulation(strength, velocity);
         let lift_coefficients = self.lift_coefficients(velocity);
 
@@ -282,8 +282,18 @@ impl LineForceModel {
 
                 let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length().powi(2);
 
-                (circulation_lift[i_span] / force_factor - lift_coefficients[i_span]).abs()
+                circulation_lift[i_span] / force_factor - lift_coefficients[i_span]
             }
         ).collect()
+    }
+
+    pub fn residual_absolute(&self, strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<f64> {
+        self.residual(strength, velocity).iter().map(|r| r.abs()).collect()
+    }
+
+    pub fn average_residual_absolute(&self, strength: &[f64], velocity: &[SpatialVector<3>]) -> f64 {
+        let residuals = self.residual_absolute(strength, velocity);
+
+        residuals.iter().sum::<f64>() / residuals.len() as f64
     }
 }

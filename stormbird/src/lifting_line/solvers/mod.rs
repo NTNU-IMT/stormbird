@@ -3,86 +3,84 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 //! Lifting line solvers
-//! 
-use math_utils::statistics;
+
+use serde::{Deserialize, Serialize};
+
 use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::prelude::*;
-use crate::io_structs::prelude::*;
 use crate::lifting_line::wake::prelude::*;
 
-pub mod settings;
+pub mod quasi_newton;
+pub mod simple_iterative;
 
-use settings::SolverSettings;
+use quasi_newton::{
+    QuasiNewtonBuilder,
+    QuasiNewton,
+};
 
-pub fn solve_time_step(
-    line_force_model: &LineForceModel,
-    felt_ctrl_points_freestream: &[SpatialVector<3>],
-    solver_settings: &SolverSettings,
-    wake: &mut Wake,
-    initial_solution: &[f64],
-) -> SolverResult {
-    let ctrl_points = line_force_model.ctrl_points();
+use simple_iterative::SimpleIterative;
 
-    let mut convergence_test = solver_settings.convergence_test.build();
+use super::prelude::SolverResult;
 
-    let fixed_velocities: Vec<SpatialVector<3>> = {
-        let u_i_free_wake = wake.induced_velocities_from_free_wake(&ctrl_points, false);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SolverBuilder {
+    SimpleIterative(SimpleIterative),
+    QuasiNewton(QuasiNewtonBuilder),
+}
 
-        (0..ctrl_points.len()).map(|i| {
-                felt_ctrl_points_freestream[i] + u_i_free_wake[i]
-            }
-        ).collect()
-    };
-
-    let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
-    let mut velocity = vec![SpatialVector::<3>::default(); ctrl_points.len()];
-
-    for iteration in 0..solver_settings.max_iterations_per_time_step {
-        let velocity_update = wake.induced_velocities_from_first_panels(&ctrl_points, false);
-
-        for i in 0..ctrl_points.len() {
-            velocity[i] = fixed_velocities[i] + velocity_update[i];
-        }
-
-        let mut velocity = line_force_model.remove_span_velocity(&velocity);
-
-        if solver_settings.only_consider_change_in_angle {
-            for i in 0..ctrl_points.len() {
-                velocity[i] = velocity[i].normalize() * felt_ctrl_points_freestream[i].length();
-            }
-        }
-
-        let new_estimated_strength = line_force_model.circulation_strength(&velocity);
-
-        let residual = line_force_model.residual_absolute(&circulation_strength, &velocity);
-        let max_residual = statistics::max(&residual);
-
-        if convergence_test.test(max_residual) {
-            if solver_settings.print_log {
-                println!(
-                    "Converged after {} iterations with {} sections", iteration+1, ctrl_points.len()
-                );
-            }
-            
-            break;
-        }
-
-        let damping_factor = if let Some(damping_factor_end) = solver_settings.damping_factor_end {
-            solver_settings.damping_factor_start * max_residual.min(1.0) + damping_factor_end * (1.0 - max_residual.min(1.0))
-        } else {
-            solver_settings.damping_factor_start
-        };
-
-        for i in 0..ctrl_points.len() {
-            let strength_difference = new_estimated_strength[i] - circulation_strength[i];
-            circulation_strength[i] += damping_factor * strength_difference;
-        }
-
-        wake.update_wing_strength(&circulation_strength);
+impl Default for SolverBuilder {
+    fn default() -> Self {
+        SolverBuilder::SimpleIterative(SimpleIterative::default())
     }
+}
 
-    SolverResult {
-        circulation_strength,
-        ctrl_point_velocity: velocity,
+impl SolverBuilder {
+    pub fn build(&self, nr_span_lines: usize) -> Solver {
+        match self {
+            SolverBuilder::SimpleIterative(s) => Solver::SimpleIterative(
+                s.clone()
+            ),
+            SolverBuilder::QuasiNewton(qn) => Solver::QuasiNewton(
+                qn.build(nr_span_lines)
+            ),
+        }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum Solver {
+    SimpleIterative(SimpleIterative),
+    QuasiNewton(QuasiNewton),
+}
+
+impl Solver {
+    pub fn do_step(
+        &mut self, 
+        line_force_model: &LineForceModel,
+        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        frozen_wake: &FrozenWake,
+        initial_solution: &[f64],
+    ) -> SolverResult {
+        match self {
+            Solver::SimpleIterative(s) => s.do_step(
+                line_force_model,
+                felt_ctrl_points_freestream,
+                frozen_wake,
+                initial_solution,
+            ),
+            Solver::QuasiNewton(qn) => qn.do_step(
+                line_force_model,
+                felt_ctrl_points_freestream,
+                frozen_wake,
+                initial_solution,
+            ),
+        }
+    }
+}
+
+pub mod prelude {
+    pub use super::Solver;
+    pub use super::SolverBuilder;
+    pub use super::quasi_newton::QuasiNewtonBuilder;
+    pub use super::simple_iterative::SimpleIterative;
 }

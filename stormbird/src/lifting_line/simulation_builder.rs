@@ -15,9 +15,9 @@ use super::simulation::Simulation;
 /// Settings for a quasi-steady simulation.
 pub struct SteadySettings {
     #[serde(default)]
-    pub solver: SteadySolverSettings,
+    pub solver: SolverBuilder,
     #[serde(default)]
-    pub wake: WakeBuilder,
+    pub wake: SteadyWakeBuilder,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -25,7 +25,7 @@ pub struct SteadySettings {
 /// Settings for a dynamic simulation.
 pub struct UnsteadySettings {
     #[serde(default)]
-    pub solver: UnsteadySolverSettings,
+    pub solver: SolverBuilder,
     #[serde(default)]
     pub wake: WakeBuilder,
 }
@@ -115,19 +115,19 @@ impl SimulationBuilder {
             }
         };
 
-        let solver_settings = match &self.simulation_mode {
+        let solver = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
-                settings.solver.to_solver_settings()
+                settings.solver.build(nr_of_lines)
             },
             SimulationMode::QuasiSteady(settings) => {
-                settings.solver.to_solver_settings()
+                settings.solver.build(nr_of_lines)
             }
         };
 
         Simulation {
             line_force_model,
             wake,
-            solver_settings,
+            solver,
             derivatives: None,
             previous_circulation_strength: vec![0.0; nr_of_lines],
             write_wake_data_to_file: self.write_wake_data_to_file,

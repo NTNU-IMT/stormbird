@@ -18,6 +18,8 @@ use super::forces_and_moments::{
 pub struct SolverResult {
     pub circulation_strength: Vec<f64>,
     pub ctrl_point_velocity: Vec<SpatialVector<3>>,
+    pub iterations: usize,
+    pub residual: f64,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +30,8 @@ pub struct SimulationResult {
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
     pub integrated_moments: Vec<IntegratedValues>,
+    pub iterations: usize,
+    pub residual: f64,
 }
 
 impl SimulationResult {

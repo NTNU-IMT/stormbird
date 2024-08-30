@@ -43,7 +43,7 @@ fn no_self_induced_velocity() {
         }
     );
 
-    let chord_vector = SpatialVector::<3>::new(diameter, 0.0, 0.0);
+    let chord_vector = SpatialVector([diameter, 0.0, 0.0]);
 
     let wing_x_positions = vec![
         -1.0 * span,
@@ -55,14 +55,11 @@ fn no_self_induced_velocity() {
         10.0 * span,
     ];
 
-    //let wing_x_positions = vec![0.0];
-    //let wing_y_positions = vec![0.0];
-
     for (x_pos, y_pos) in wing_x_positions.iter().zip(wing_y_positions.iter()) {
         let wing_builder = WingBuilder {
             section_points: vec![
-                SpatialVector::<3>::new(*x_pos, *y_pos, 0.0),
-                SpatialVector::<3>::new(*x_pos, *y_pos, span),
+                SpatialVector([*x_pos, *y_pos, 0.0]),
+                SpatialVector([*x_pos, *y_pos, span]),
             ],
             chord_vectors: vec![
                 chord_vector,
@@ -100,7 +97,7 @@ fn no_self_induced_velocity() {
     let nr_time_steps = 100;
     let time_step = 0.5;
 
-    let velocity = SpatialVector::<3>::new(velocity_mag, 0.0, 0.0);
+    let velocity = SpatialVector([velocity_mag, 0.0, 0.0]);
 
     let mut sim = SimulationBuilder::new(
         line_force_model_builder,

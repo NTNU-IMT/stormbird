@@ -160,9 +160,16 @@ impl ActuatorLine {
             new_estimated_circulation_strength
         };
 
+        let residual = self.line_force_model.average_residual_absolute(
+            &circulation_strength, 
+            ctrl_point_velocity
+        );
+
         let solver_result = SolverResult {
             circulation_strength,
             ctrl_point_velocity: ctrl_point_velocity.to_vec(),
+            iterations: 1,
+            residual,
         };
 
         let force_input = self.line_force_model.sectional_force_input(&solver_result, time_step);
@@ -177,6 +184,8 @@ impl ActuatorLine {
             sectional_forces,
             integrated_forces,
             integrated_moments,
+            iterations: 1,
+            residual,
         }
     }
 

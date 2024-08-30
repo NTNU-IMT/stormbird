@@ -6,3 +6,8 @@ pub use super::LineForceModel;
 pub use super::builder::LineForceModelBuilder;
 pub use super::builder::WingBuilder;
 pub use super::span_line::SpanLine;
+pub use super::smoothing::{
+    SmoothingSettings,
+    GaussianSmoothingSettings,
+    ArtificialViscositySettings,
+};

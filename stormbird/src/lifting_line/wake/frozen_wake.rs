@@ -5,7 +5,9 @@ use ndarray::prelude::*;
 
 use rayon::prelude::*;
 
-use crate::lifting_line::wake::unsteady::UnsteadyWake;
+use super::velocity_corrections::VelocityCorrections;
+
+use crate::lifting_line::wake::Wake;
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone)]
@@ -13,15 +15,15 @@ use crate::line_force_model::LineForceModel;
 /// the wake can be updated. That is, it is intended to be used while solving for the circulation
 /// strength in a lifting line simulation. Two primary scenarios exists:
 /// 
-/// - The wake is steady, and consists of one horseshoe vortex per span line, where the strength is
+/// - The wake is steady, and consists of just one panel per span line, where the strength is
 /// unknown
 /// - The wake is actually dynamic, but most of the wake consists of panels where the strength is 
 /// known from previous time steps. The only unknown strength is the strength of the first panels 
 /// right behind the span lines making up the wings. The induced velocities therefore comes from 
 /// both the panels with known strength and the panels with unknown strength.
 pub struct FrozenWake {
-    /// Vector containing values for the induced velocities that are constant each control point in 
-    /// the simulation. That is, velocities that do not depend on the circulation strength of the
+    /// Vector containing values for the induced velocities that are constant for each control point 
+    /// in the simulation. That is, velocities that do not depend on the circulation strength of the
     /// panels right behind the line model.
     pub fixed_velocities: Vec<SpatialVector<3>>,
     /// Matrix containing coefficients that can be used to calculate induced velocities as a 
@@ -32,11 +34,17 @@ pub struct FrozenWake {
     /// induced velocity can therefore be calculated as the dot product of the row and the 
     /// circulation strength.
     pub variable_velocity_factors: Array2<SpatialVector<3>>,
+    /// Corrections for the induced velocity, such as max magnitude and correction factor.
+    /// 
+    /// By default, this is not used. However, it can be used on cases where the simulation is known
+    /// to create unstable and too large induced velocities. The original use case is for rotor 
+    /// sails.
+    pub induced_velocity_corrections: VelocityCorrections
 }
 
 impl FrozenWake {
     /// Construct a frozen wake from a full dynamic wake. 
-    pub fn from_wake(line_force_model: &LineForceModel, wake: &mut UnsteadyWake) -> Self {
+    pub fn from_wake(line_force_model: &LineForceModel, wake: &Wake) -> Self {
         let ctrl_points = line_force_model.ctrl_points();
 
         let nr_span_lines = ctrl_points.len();
@@ -47,21 +55,41 @@ impl FrozenWake {
             (nr_span_lines, nr_span_lines), SpatialVector::<3>::default()
         );
 
+        let mut panel_induced_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
+
         for ctrl_point_index in 0..nr_span_lines {
+            let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
+
+            panel_induced_velocities.par_iter_mut().enumerate().for_each(
+                |(panel_index, induced_velocity)| {
+                    let panel_wing_index = wake.wing_index(panel_index);
+
+                    if 
+                    ctrl_point_wing_index == panel_wing_index && 
+                    wake.settings.neglect_self_induced_velocities 
+                    {
+                        *induced_velocity = SpatialVector::<3>::default();
+                    } else {
+                        *induced_velocity = wake.unit_strength_induced_velocity_from_panel(
+                            0, 
+                            panel_index, 
+                            ctrl_points[ctrl_point_index], 
+                            false
+                        );
+                    }
+                }
+            );
+
             for panel_index in 0..nr_span_lines {
                 variable_velocity_factors[[ctrl_point_index, panel_index]] = 
-                    wake.unit_strength_induced_velocity_from_panel(
-                        0, 
-                        ctrl_point_index, 
-                        ctrl_points[ctrl_point_index], 
-                        false
-                    );
+                    panel_induced_velocities[panel_index];
             }
         }
 
         FrozenWake {
             fixed_velocities,
             variable_velocity_factors,
+            induced_velocity_corrections: wake.induced_velocity_corrections.clone()
         }
     }
 
@@ -84,6 +112,10 @@ impl FrozenWake {
                     self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
             }
         });
+
+        if self.induced_velocity_corrections.any_active_corrections() {
+            self.induced_velocity_corrections.correct(&mut induced_velocities)
+        }
 
         induced_velocities
     }
