@@ -9,7 +9,7 @@ use pyo3::types::PyType;
 use stormbird::line_force_model::builder::WingBuilder as WingBuilderRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
-use crate::vec3::Vec3;
+use crate::spatial_vector::SpatialVector;
 use crate::section_models::SectionModel;
 use super::LineForceModel;
 
@@ -22,7 +22,7 @@ pub struct WingBuilder {
 #[pymethods]
 impl WingBuilder {
     #[new]
-    pub fn new(section_points: Vec<Vec3>, chord_vectors: Vec<Vec3>, section_model: SectionModel) -> Self {
+    pub fn new(section_points: Vec<SpatialVector>, chord_vectors: Vec<SpatialVector>, section_model: SectionModel) -> Self {
         WingBuilder {
             data: WingBuilderRust{
                 section_points: section_points.iter().map(|v| v.data).collect(),

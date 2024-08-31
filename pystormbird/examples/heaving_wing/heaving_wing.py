@@ -11,7 +11,7 @@ import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 
 from pystormbird.lifting_line import Simulation
-from pystormbird import Vec3
+from pystormbird import SpatialVector
 
 import argparse
 
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     velocity = 8.0
     chord_length = 1.0 # Deliberately chosen to be small, as the dynamic effects are easier to compare against theory when the 3D effects are small
     span = 32.0
-    nr_sections = 64
+    nr_sections = 32
     density = 1.225
 
     aspect_ratio = span / chord_length
@@ -123,9 +123,10 @@ if __name__ == "__main__":
     }
 
     solver_settings = {
-        "max_iterations_per_time_step": 20,
-        "damping_factor_start": 0.05,
-        "damping_factor_end": 0.2,
+        "SimpleIterative": {
+            "max_iterations_per_time_step": 20,
+            "damping_factor": 0.25,
+        }
     }
 
     dt = period / 128
@@ -140,7 +141,6 @@ if __name__ == "__main__":
             "Dynamic": {
                 "solver": solver_settings,
                 "wake": {
-                    "ratio_of_wake_affected_by_induced_velocities": 0.0,
                     "first_panel_relative_length": relative_panel_length,
                     "last_panel_relative_length": 20.0,
                     "wake_length": {
@@ -188,7 +188,7 @@ if __name__ == "__main__":
         simulation = Simulation(
             setup_string = setup_string,
             initial_time_step = dt,
-            wake_initial_velocity = Vec3(velocity, 0.0, 0.0), 
+            wake_initial_velocity = SpatialVector(velocity, 0.0, 0.0), 
         )
 
         time = []
@@ -207,12 +207,11 @@ if __name__ == "__main__":
 
         freestream_velocity = []
         for point in freestream_velocity_points:
-            freestream_velocity.append(Vec3(velocity, 0.0, 0.0))
+            freestream_velocity.append(SpatialVector(velocity, 0.0, 0.0))
 
         while t < final_time:
             print("Running sim at time = ", t)
-
-            simulation.set_translation(Vec3(0.0, position_func(t), 0.0))
+            simulation.set_translation(SpatialVector(0.0, position_func(t), 0.0))
 
             result = simulation.do_step(
                 time = t, 
@@ -225,6 +224,9 @@ if __name__ == "__main__":
             time.append(t)
             lift.append(forces.y / force_factor)
             drag.append(forces.x / force_factor)
+
+            
+            print("Number of iterations: ", result.iterations)
 
             t += dt
 

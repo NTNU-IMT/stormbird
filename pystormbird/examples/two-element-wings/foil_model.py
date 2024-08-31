@@ -29,7 +29,7 @@ def get_foil_dict(flap_angle: float = 0.0):
                 "cl_zero_angle": cl_zero_angle[i_flap],
                 "cd_zero_angle": cd_zero_angle[i_flap],
                 "cd_second_order_factor": cd_second_order_factor[i_flap],
-                "mean_stall_angle": mean_stall_angle[i_flap]
+                "mean_positive_stall_angle": mean_stall_angle[i_flap]
             }
         )
 

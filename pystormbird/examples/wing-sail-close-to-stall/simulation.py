@@ -2,7 +2,7 @@ import json
 import numpy as np
 
 from pystormbird.lifting_line import Simulation
-from pystormbird import Vec3
+from pystormbird import SpatialVector
 
 from dataclasses import dataclass
 from enum import Enum
@@ -32,9 +32,9 @@ class SimulationCase():
         return 0.5 * self.chord_length * self.span * self.density * self.freestream_velocity**2
 
     def run(self):
-        freestream_velocity = Vec3(self.freestream_velocity, 0.0, 0.0)
+        freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
 
-        chord_vector = Vec3(self.chord_length, 0.0, 0.0)
+        chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
 
         if self.section_model is None:
             section_model = {
@@ -91,10 +91,10 @@ class SimulationCase():
             line_force_model["smoothing_settings"] = smoothing_settings
 
         solver = {
-            "damping_factor_start": 0.01,
-            "damping_factor_end": 0.1,
-            "max_iterations_per_time_step": 3,
-            "only_consider_change_in_angle": True
+            "SimpleIterative": {
+                "max_iterations_per_time_step": 3,
+                "damping_factor": 0.1
+            }
         }
 
         end_time = 50 * self.chord_length / self.freestream_velocity

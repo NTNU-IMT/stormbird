@@ -2,7 +2,7 @@ import json
 import numpy as np
 
 from pystormbird.lifting_line import Simulation
-from pystormbird import Vec3
+from pystormbird import SpatialVector
 
 from dataclasses import dataclass
 from enum import Enum
@@ -46,7 +46,7 @@ class RotorSimulationCase():
         return revolutions_per_second
     
     def get_line_force_model(self):
-        chord_vector = Vec3(self.diameter, 0.0, 0.0)
+        chord_vector = SpatialVector(self.diameter, 0.0, 0.0)
 
         section_model = {
             "RotatingCylinder": {
@@ -130,15 +130,17 @@ class RotorSimulationCase():
 
     
     def run(self):
-        freestream_velocity = Vec3(self.freestream_velocity, 0.0, 0.0)
+        freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
         line_force_model = self.get_line_force_model()
 
         solver = {
-            "damping_factor_start": 0.01,
-            "damping_factor_end": 0.02,
-            "max_iterations_per_time_step": 10,
-            "only_consider_change_in_angle": self.only_consider_change_in_angle
+            "SimpleIterative": {
+                "damping_factor": 0.05,
+                "max_iterations_per_time_step": 10,
+            }
         }
+
+        #"only_consider_change_in_angle": self.only_consider_change_in_angle
 
         end_time = 50 * self.diameter / self.freestream_velocity
         dt = end_time / 200

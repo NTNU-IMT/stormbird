@@ -11,7 +11,7 @@ use pyo3::{
     types::PyDict
 };
 
-mod vec3;
+mod spatial_vector;
 mod section_models;
 mod result_structs;
 mod line_force_model;
@@ -20,7 +20,7 @@ mod lifting_line;
 
 #[pymodule]
 fn pystormbird(py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<vec3::Vec3>()?;
+    m.add_class::<spatial_vector::SpatialVector>()?;
     m.add_class::<result_structs::SimulationResult>()?;
     m.add_class::<result_structs::SectionalForcesInput>()?;
     

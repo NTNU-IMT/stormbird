@@ -12,6 +12,7 @@ use crate::io_structs::prelude::*;
 use crate::lifting_line::wake::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QuasiNewtonBuilder {
     pub damping_factor: f64,
     pub max_iterations: usize,

@@ -4,16 +4,16 @@
 
 use pyo3::prelude::*;
 
-use stormbird::vec3::Vec3 as Vec3Rust;
+use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
 
 #[pyclass]
 #[derive(Clone)]
-pub struct Vec3 {
-    pub data: Vec3Rust
+pub struct SpatialVector {
+    pub data: SpatialVectorRust<3>
 }
 
-impl From<Vec3Rust> for Vec3 {
-    fn from(v: Vec3Rust) -> Self {
+impl From<SpatialVectorRust<3>> for SpatialVector {
+    fn from(v: SpatialVectorRust<3>) -> Self {
         Self {
             data: v
         }
@@ -21,36 +21,36 @@ impl From<Vec3Rust> for Vec3 {
 }
 
 #[pymethods]
-impl Vec3 {
+impl SpatialVector {
     #[new]
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self {
-            data: Vec3Rust::new(x, y, z)
+            data: SpatialVectorRust([x, y, z])
         }
     }
 
     #[getter]
     pub fn x(&self) -> f64 {
-        self.data.x
+        self.data[0]
     }
 
     #[getter]
     pub fn y(&self) -> f64 {
-        self.data.y
+        self.data[1]
     }
 
     #[getter]
     pub fn z(&self) -> f64 {
-        self.data.z
+        self.data[2]
     }
 
-    pub fn rotate(&self, rotation: Vec3) -> Self {
+    pub fn rotate(&self, rotation: SpatialVector) -> Self {
         Self {
             data: self.data.rotate(rotation.data)
         }
     }
 
-    pub fn dot(&self, other: Vec3) -> f64 {
+    pub fn dot(&self, other: SpatialVector) -> f64 {
         self.data.dot(other.data)
     }
 

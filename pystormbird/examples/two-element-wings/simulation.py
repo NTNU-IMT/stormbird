@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pystormbird.lifting_line import Simulation
-from pystormbird import Vec3
+from pystormbird import SpatialVector
 import json
 
 from foil_model import get_foil_dict
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         args.wind_direction - args.angle_of_attack
     )
 
-    chord_vector = Vec3(
+    chord_vector = SpatialVector(
         chord_length * np.cos(chord_angle),
         chord_length * np.sin(chord_angle),
         0.0
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         setup_string = setup_string,
         initial_time_step = dt,
         wake_initial_velocity = wind_model.get_velocity(
-            Vec3(0.0, 0.0, start_height + span/2)
+            SpatialVector(0.0, 0.0, start_height + span/2)
         )
     )
 
@@ -193,7 +193,7 @@ if __name__ == "__main__":
         for i in range(len(xx)):
             for j in range(len(yy)):
                 velocity_plane_points.append(
-                    Vec3(xx[i][j], yy[i][j], args.velocity_plane_height)
+                    SpatialVector(xx[i][j], yy[i][j], args.velocity_plane_height)
                 )
 
         induced_velocity_at_plane = simulation.induced_velocities(velocity_plane_points)

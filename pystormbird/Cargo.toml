@@ -1,6 +1,6 @@
 [package]
 name = "pystormbird"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "Python interface to the Stormbird library."
 homepage = "https://github.com/jarlekramer/stormbird"
@@ -18,3 +18,4 @@ crate-type = ["cdylib"]
 pyo3 = "0.21.0"
 
 stormbird = { path = "../stormbird"}
+math_utils = { path = "../math_utils" }

@@ -13,6 +13,7 @@ use crate::io_structs::prelude::*;
 use crate::lifting_line::wake::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimpleIterative {
     #[serde(default="SimpleIterative::default_max_iterations_per_time_step")]
     pub max_iterations_per_time_step: usize,

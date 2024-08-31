@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 use stormbird::line_force_model::span_line::SpanLine as SpanLineRust;
 
-use crate::vec3::Vec3;
+use crate::spatial_vector::SpatialVector;
 
 #[pyclass]
 pub struct SpanLine {
@@ -17,7 +17,7 @@ pub struct SpanLine {
 impl SpanLine {
     #[new]
     #[pyo3(signature = (start_point, end_point))]
-    fn new(start_point: Vec3, end_point: Vec3) -> Self {
+    fn new(start_point: SpatialVector, end_point: SpatialVector) -> Self {
         Self {
             data: SpanLineRust {
                 start_point: start_point.data,
@@ -27,21 +27,21 @@ impl SpanLine {
     }
 
     #[getter]
-    fn start_point(&self) -> Vec3 {
-        Vec3 {
+    fn start_point(&self) -> SpatialVector {
+        SpatialVector {
             data: self.data.start_point
         }
     }
 
     #[getter]
-    fn end_point(&self) -> Vec3 {
-        Vec3 {
+    fn end_point(&self) -> SpatialVector {
+        SpatialVector {
             data: self.data.end_point
         }
     }
 
-    fn relative_vector(&self) -> Vec3 {
-        Vec3 {
+    fn relative_vector(&self) -> SpatialVector {
+        SpatialVector {
             data: self.data.relative_vector()
         }
     }
@@ -50,21 +50,21 @@ impl SpanLine {
         self.data.length()
     }
 
-    fn direction(&self) -> Vec3 {
-        Vec3 {
+    fn direction(&self) -> SpatialVector {
+        SpatialVector {
             data: self.data.direction()
         }
     }
 
     /// Return the control point of the line segment, which corresponds to the average point along 
     /// the line segment. 
-    fn ctrl_point(&self) -> Vec3 {
-        Vec3 {
+    fn ctrl_point(&self) -> SpatialVector {
+        SpatialVector {
             data: self.data.ctrl_point()
         }
     }
 
-    fn distance(&self, point: Vec3) -> f64 {
+    fn distance(&self, point: SpatialVector) -> f64 {
         self.data.distance(point.data)
     }
 
