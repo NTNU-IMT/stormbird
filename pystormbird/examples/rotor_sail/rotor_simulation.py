@@ -193,7 +193,7 @@ class RotorSimulationCase():
         simulation = Simulation(
             setup_string = setup_string,
             initial_time_step = dt,
-            wake_initial_velocity = freestream_velocity
+            initialization_velocity = freestream_velocity
         )
 
         freestream_velocity_points = simulation.get_freestream_velocity_points()

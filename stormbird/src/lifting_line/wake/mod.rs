@@ -4,7 +4,6 @@
 
 //! Implementations of wake models used to calculate induced velocities in lifting line simulations
 
-pub mod steady;
 pub mod builders;
 pub mod velocity_corrections;
 pub mod file_export;

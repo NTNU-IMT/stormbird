@@ -120,6 +120,10 @@ impl Foil {
     pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
     pub fn default_cd_power_after_stall() -> f64 {1.6}
+
+    pub fn new_from_string(string: &str) -> Self {
+        serde_json::from_str(string).unwrap()
+    }
     
     /// Calculates the lift coefficient for a given angle of attack.
     /// 

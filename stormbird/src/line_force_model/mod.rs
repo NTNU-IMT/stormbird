@@ -25,7 +25,6 @@ use crate::io_structs::prelude::*;
 use math_utils::spatial_vector::SpatialVector;
 use crate::section_models::SectionModel;
 use span_line::*;
-use prescribed_circulations::PrescribedCirculation;
 use smoothing::SmoothingSettings;
 
 /// Input struct to add a single wing to a line force model
@@ -63,8 +62,6 @@ pub struct LineForceModel {
     pub derivatives: Option<Derivatives>,
     /// Optional smoothing settings
     pub smoothing_settings: Option<SmoothingSettings>,
-    /// Optional prescribed circulation shape
-    pub prescribed_circulation: Option<PrescribedCirculation>,
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
 }
@@ -91,7 +88,6 @@ impl LineForceModel {
             density,
             derivatives: None,
             smoothing_settings: None,
-            prescribed_circulation: None,
             ctrl_point_chord_factor: 0.0,
         }
     }

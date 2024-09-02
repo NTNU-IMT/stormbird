@@ -188,7 +188,7 @@ if __name__ == "__main__":
         simulation = Simulation(
             setup_string = setup_string,
             initial_time_step = dt,
-            wake_initial_velocity = SpatialVector(velocity, 0.0, 0.0), 
+            initialization_velocity = SpatialVector(velocity, 0.0, 0.0), 
         )
 
         time = []

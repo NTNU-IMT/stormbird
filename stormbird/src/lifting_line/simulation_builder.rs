@@ -10,6 +10,8 @@ use crate::lifting_line::prelude::*;
 
 use super::simulation::Simulation;
 
+use crate::line_force_model::prescribed_circulations::PrescribedCirculation;
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
@@ -94,7 +96,7 @@ impl SimulationBuilder {
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.
-    pub fn build(&self, initial_time_step: f64, wake_initial_velocity: SpatialVector<3>) -> Simulation {
+    pub fn build(&self, initial_time_step: f64, initialization_velocity: SpatialVector<3>) -> Simulation {
         let line_force_model = self.line_force_model.build();
         let nr_of_lines = line_force_model.nr_span_lines();
 
@@ -103,14 +105,14 @@ impl SimulationBuilder {
                 settings.wake.build(
                     initial_time_step,
                     &line_force_model,
-                    wake_initial_velocity,
+                    initialization_velocity,
                 )
             },
             SimulationMode::QuasiSteady(settings) => {
                 settings.wake.build(
                     initial_time_step,
                     &line_force_model,
-                    wake_initial_velocity,
+                    initialization_velocity,
                 )
             }
         };
@@ -124,12 +126,19 @@ impl SimulationBuilder {
             }
         };
 
+        let initial_prescribed_circulation = PrescribedCirculation::default();
+
+        let previous_circulation_strength = line_force_model.prescribed_circulation_strength(
+            &vec![initialization_velocity; nr_of_lines], 
+            &initial_prescribed_circulation
+        );
+
         Simulation {
             line_force_model,
             wake,
             solver,
             derivatives: None,
-            previous_circulation_strength: vec![0.0; nr_of_lines],
+            previous_circulation_strength,
             write_wake_data_to_file: self.write_wake_data_to_file,
             wake_files_folder_path: self.wake_files_folder_path.clone()
         }

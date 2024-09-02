@@ -9,7 +9,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a single case")
     parser.add_argument("--angle-of-attack", type=float, default = 0.0, help="Angle of attack in degrees")
     parser.add_argument("--start-angle-of-attack", type=float, default = None, help="Start angle of attack in degrees")
-    parser.add_argument("--smoothing-length", type=float, default = None, help="Use smoothing")
+    parser.add_argument("--smoothing-length", type=float, default = None, help="Use smoothing length")
+    parser.add_argument("--circulation-viscosity", type=float, default = None, help="Use circulation viscosity")
     parser.add_argument("--dynamic", action="store_true", help="Use dynamic model")
     
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
@@ -23,6 +24,7 @@ if __name__ == "__main__":
         angle_of_attack = args.angle_of_attack,
         start_angle_of_attack = args.start_angle_of_attack,
         smoothing_length = args.smoothing_length,
+        circulation_viscosity = args.circulation_viscosity,
         write_wake_files=args.write_wake_files
     )
 

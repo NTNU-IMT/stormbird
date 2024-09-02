@@ -4,6 +4,8 @@ import numpy as np
 from pystormbird.lifting_line import Simulation
 from pystormbird import SpatialVector
 
+from section_model import section_model_dict
+
 from dataclasses import dataclass
 from enum import Enum
 
@@ -15,14 +17,13 @@ class SimulationMode(Enum):
 class SimulationCase():
     angle_of_attack: float
     start_angle_of_attack: float | None = None
-    chord_length: float = 11
-    span: float = 33
+    chord_length: float = 1.0
+    span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 16
+    nr_sections: int = 64
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
-    circulation_viscosity: float | None = None
     section_model: dict | None = None
     z_symmetry: bool = False
     write_wake_files: bool = False
@@ -38,7 +39,7 @@ class SimulationCase():
 
         if self.section_model is None:
             section_model = {
-                "Foil": {}
+                "Foil": section_model_dict()
             }
         else:
             section_model = self.section_model
@@ -70,13 +71,6 @@ class SimulationCase():
                 "length_factor": self.smoothing_length,
                 "end_corrections": end_corrections
             }
-        
-        if self.circulation_viscosity is not None:
-            artificial_viscosity = {
-                "viscosity": self.circulation_viscosity,
-                "solver_iterations": 20,
-                "solver_damping": 0.1
-            }
             
 
         if gaussian_smoothing_settings is not None or artificial_viscosity is not None:
@@ -92,12 +86,12 @@ class SimulationCase():
 
         solver = {
             "SimpleIterative": {
-                "max_iterations_per_time_step": 3,
-                "damping_factor": 0.1
+                "max_iterations_per_time_step": 10,
+                "damping_factor": 0.05
             }
         }
 
-        end_time = 50 * self.chord_length / self.freestream_velocity
+        end_time = 20 * self.chord_length / self.freestream_velocity
         dt = end_time / 500
 
         wake = {}
@@ -150,7 +144,7 @@ class SimulationCase():
         simulation = Simulation(
             setup_string = setup_string,
             initial_time_step = dt,
-            wake_initial_velocity = freestream_velocity
+            initialization_velocity = freestream_velocity
         )
 
         freestream_velocity_points = simulation.get_freestream_velocity_points()

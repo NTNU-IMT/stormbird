@@ -11,6 +11,7 @@ pub struct PrescribedCirculationShape {
 }
 
 impl Default for PrescribedCirculationShape {
+    /// Default corresponds to an elliptical circulation distribution
     fn default() -> Self {
         PrescribedCirculationShape {
             inner_power: PrescribedCirculationShape::default_inner_power(),

@@ -131,7 +131,7 @@ if __name__ == "__main__":
     simulation = Simulation(
         setup_string = setup_string,
         initial_time_step = dt,
-        wake_initial_velocity = wind_velocity_vector
+        initialization_velocity = wind_velocity_vector
     )
 
     '''

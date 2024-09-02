@@ -25,19 +25,19 @@ impl Simulation {
             *,
             setup_string, 
             initial_time_step,
-            wake_initial_velocity
+            initialization_velocity
         )
     )]
     pub fn new(
         setup_string: String, 
         initial_time_step: f64, 
-        wake_initial_velocity: SpatialVector
+        initialization_velocity: SpatialVector
     ) -> Self {
         Self {
             data: SimulationRust::new_from_string(
                 &setup_string, 
                 initial_time_step, 
-                wake_initial_velocity.data
+                initialization_velocity.data
             ).unwrap()
         }
     }

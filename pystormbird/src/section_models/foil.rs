@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use stormbird::section_models::foil::Foil as FoilRust;
 
@@ -65,6 +66,13 @@ impl Foil {
                 stall_range,
                 ..Default::default()
             }
+        }
+    }
+
+    #[classmethod]
+    pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
+        Self {
+            data: FoilRust::new_from_string(&string)
         }
     }
 

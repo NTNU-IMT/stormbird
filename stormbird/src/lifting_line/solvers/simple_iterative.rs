@@ -25,7 +25,7 @@ pub struct SimpleIterative {
 
 impl SimpleIterative {
     pub fn default_max_iterations_per_time_step() -> usize {1000}
-    pub fn default_damping_factor() -> f64 {0.02}
+    pub fn default_damping_factor() -> f64 {0.04}
     pub fn default_tolerance_absolute() -> f64 {1e-4}
 
     pub fn do_step(

@@ -9,11 +9,6 @@ use crate::lifting_line::simulation_builder::{
     UnsteadySettings,
 };
 
-use crate::line_force_model::prescribed_circulations::{
-    PrescribedCirculation,
-    shape::PrescribedCirculationShape,
-};
-
 #[test]
 /// This tests whether the lift and drag coefficients are correct for a steady simulation of two 
 /// sails when the "neglect_self_induced_velocity" flag is set to true. The sails are placed far
@@ -33,7 +28,7 @@ fn no_self_induced_velocity() {
 
     let mut line_force_model_builder = LineForceModelBuilder::new(nr_strips);
     
-    line_force_model_builder.prescribed_circulation = Some(
+    /*line_force_model_builder.prescribed_circulation = Some(
         PrescribedCirculation{
             shape: PrescribedCirculationShape{
                 outer_power: 0.25,
@@ -41,7 +36,7 @@ fn no_self_induced_velocity() {
             },
             ..Default::default()
         }
-    );
+    );*/
 
     let chord_vector = SpatialVector([diameter, 0.0, 0.0]);
 

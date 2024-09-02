@@ -23,8 +23,6 @@ pub struct LineForceModelBuilder {
     #[serde(default)]
     pub smoothing_settings: Option<SmoothingSettings>,
     #[serde(default)]
-    pub prescribed_circulation: Option<PrescribedCirculation>,
-    #[serde(default)]
     pub ctrl_point_chord_factor: f64,
 }
 
@@ -35,7 +33,6 @@ impl LineForceModelBuilder {
             nr_sections,
             density: LineForceModel::default_density(),
             smoothing_settings: None,
-            prescribed_circulation: None,
             ctrl_point_chord_factor: 0.0,
         }
     }
@@ -62,7 +59,6 @@ impl LineForceModelBuilder {
         }
 
         line_force_model.smoothing_settings = self.smoothing_settings.clone();
-        line_force_model.prescribed_circulation = self.prescribed_circulation.clone();
         line_force_model.ctrl_point_chord_factor = self.ctrl_point_chord_factor;
 
         line_force_model

@@ -137,7 +137,7 @@ if __name__ == "__main__":
     simulation = Simulation(
         setup_string = setup_string,
         initial_time_step = dt,
-        wake_initial_velocity = wind_model.get_velocity(
+        initialization_velocity = wind_model.get_velocity(
             SpatialVector(0.0, 0.0, start_height + span/2)
         )
     )

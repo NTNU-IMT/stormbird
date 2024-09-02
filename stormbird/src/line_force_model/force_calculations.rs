@@ -39,16 +39,12 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        if self.prescribed_circulation.is_some() {
-            self.prescribed_circulation_strength(velocity)
-        } else {
-            let raw_strength = self.circulation_strength_raw(velocity);
+        let raw_strength = self.circulation_strength_raw(velocity);
 
-            if self.smoothing_settings.is_some() {
-                self.smoothed_strength(&raw_strength, velocity)
-            } else {
-                raw_strength
-            }
+        if self.smoothing_settings.is_some() {
+            self.smoothed_strength(&raw_strength, velocity)
+        } else {
+            raw_strength
         }
     }
 
