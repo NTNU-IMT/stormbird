@@ -4,7 +4,7 @@ import numpy as np
 from pystormbird.lifting_line import Simulation
 from pystormbird import SpatialVector
 
-from section_model import section_model_dict
+from section_model import optimized_model
 
 from dataclasses import dataclass
 from enum import Enum
@@ -37,9 +37,12 @@ class SimulationCase():
 
         chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
 
+        section_model = optimized_model()
+        section_model_dict = json.loads(section_model.to_string())
+
         if self.section_model is None:
             section_model = {
-                "Foil": section_model_dict()
+                "Foil": section_model_dict
             }
         else:
             section_model = self.section_model

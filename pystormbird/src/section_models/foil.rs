@@ -149,4 +149,8 @@ impl Foil {
     pub fn stall_range(&self) -> f64 {
         self.data.stall_range
     }
+
+    pub fn to_string(&self) -> String {
+        self.data.to_string()
+    }
 }

@@ -124,6 +124,10 @@ impl Foil {
     pub fn new_from_string(string: &str) -> Self {
         serde_json::from_str(string).unwrap()
     }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
     
     /// Calculates the lift coefficient for a given angle of attack.
     /// 
