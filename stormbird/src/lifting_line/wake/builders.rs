@@ -12,8 +12,6 @@ use crate::line_force_model::LineForceModel;
 
 use crate::lifting_line::singularity_elements::prelude::*;
 
-use super::velocity_corrections::VelocityCorrectionsBuilder;
-
 use super::{
     Wake,
     WakeSettings,
@@ -101,9 +99,6 @@ pub struct WakeBuilder {
     /// freely), while a value of 1.0 means that the wake points are fixed in space.
     pub shape_damping_factor: f64,
     #[serde(default)]
-    /// Optional corrections for the calculated induced velocity.
-    pub induced_velocity_corrections: VelocityCorrectionsBuilder,
-    #[serde(default)]
     /// Optional viscous core to be used when calculating induced velocities off body.
     pub viscous_core_length_off_body: Option<ViscousCoreLength>,
     #[serde(default)]
@@ -127,8 +122,6 @@ pub struct SteadyWakeBuilder {
     pub symmetry_condition: SymmetryCondition,
     #[serde(default)]
     pub viscous_core_length: ViscousCoreLength,
-    #[serde(default)]
-    pub induced_velocity_corrections: VelocityCorrectionsBuilder
 }
 
 
@@ -232,8 +225,6 @@ impl WakeBuilder {
 
         let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); nr_panels];
 
-        let induced_velocity_corrections = self.induced_velocity_corrections.build(initial_velocity);
-
         let mut wake = Wake {
             wake_points,
             strengths,
@@ -242,7 +233,6 @@ impl WakeBuilder {
             potential_theory_model,
             wing_indices: line_force_model.wing_indices.clone(),
             number_of_time_steps_completed: 0,
-            induced_velocity_corrections
         };
 
         let wake_points_freestream = vec![initial_velocity; wake.wake_points.len()];
@@ -279,7 +269,6 @@ impl Default for WakeBuilder {
             ratio_of_wake_affected_by_induced_velocities: Default::default(),
             far_field_ratio: PotentialTheoryModel::default_far_field_ratio(),
             shape_damping_factor: 0.0,
-            induced_velocity_corrections: Default::default(),
             viscous_core_length_off_body: None,
             neglect_self_induced_velocities: false
         }
@@ -305,7 +294,6 @@ impl SteadyWakeBuilder {
             ratio_of_wake_affected_by_induced_velocities: 0.0,
             far_field_ratio: f64::INFINITY,
             shape_damping_factor: 0.0,
-            induced_velocity_corrections: self.induced_velocity_corrections.clone(),
             viscous_core_length_off_body: None,
             neglect_self_induced_velocities: false
         }.build(time_step, line_force_model, initial_velocity)
@@ -318,7 +306,6 @@ impl Default for SteadyWakeBuilder {
             wake_length_factor: Self::default_wake_length_factor(),
             symmetry_condition: Default::default(),
             viscous_core_length: Default::default(),
-            induced_velocity_corrections: Default::default()
         }
     }
 }

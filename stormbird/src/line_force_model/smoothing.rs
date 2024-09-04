@@ -20,7 +20,6 @@ pub struct SmoothingSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GaussianSmoothingSettings {
     pub length_factor: f64,
-    pub end_corrections: Vec<(bool, bool)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,8 +58,6 @@ impl LineForceModel {
         noisy_values: &[f64],
         settings: &GaussianSmoothingSettings,
     ) -> Vec<f64> {
-        assert_eq!(settings.end_corrections.len(), self.nr_wings());
-
         let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
 
         let wing_span_lengths = self.wing_span_lengths();
@@ -72,12 +69,12 @@ impl LineForceModel {
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let smoothing_length = settings.length_factor * wing_span_lengths[wing_index];
 
-            let end_corrections = settings.end_corrections[wing_index];
+            let non_zero_circulation_at_ends = self.non_zero_circulation_at_ends[wing_index];   
 
             let mut local_span_distance = span_distance[wing_indices.clone()].to_vec();
             let mut local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 
-            let start_index = if end_corrections.0 {
+            let start_index = if !non_zero_circulation_at_ends[0] {
                 let delta_span = local_span_distance[1] - local_span_distance[0];
                 let mut span_to_be_inserted = 0.5 * delta_span;
 
@@ -101,7 +98,7 @@ impl LineForceModel {
                 0
             };
 
-            let end_index = if end_corrections.1 {
+            let end_index = if !non_zero_circulation_at_ends[1] {
                 let delta_span = local_span_distance[local_span_distance.len()-1] - local_span_distance[local_span_distance.len()-2];
                 let mut span_to_be_inserted = 0.5 * delta_span;
 

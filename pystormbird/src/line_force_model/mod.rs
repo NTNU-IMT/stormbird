@@ -54,17 +54,14 @@ impl LineForceModel {
         *,
         noisy_strength, 
         length_factor,
-        end_corrections
     ))]
     pub fn gaussian_smoothed_strength(
         &self, 
         noisy_strength: Vec<f64>, 
         length_factor: f64, 
-        end_corrections: Vec<(bool, bool)>
     ) -> Vec<f64> {
         let settings = GaussianSmoothingSettings {
             length_factor,
-            end_corrections
         };
 
         self.data.gaussian_smoothed_values(&noisy_strength, &settings)

@@ -107,7 +107,8 @@ if __name__ == "__main__":
             ],
             "section_model": {
                 "Foil": {}
-            }
+            },
+            "non_zero_circulation_at_ends": [False, False]
         }
     ]
 

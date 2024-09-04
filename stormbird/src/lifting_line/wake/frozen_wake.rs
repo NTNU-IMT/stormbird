@@ -5,8 +5,6 @@ use ndarray::prelude::*;
 
 use rayon::prelude::*;
 
-use super::velocity_corrections::VelocityCorrections;
-
 use crate::lifting_line::wake::Wake;
 use crate::line_force_model::LineForceModel;
 
@@ -34,12 +32,6 @@ pub struct FrozenWake {
     /// induced velocity can therefore be calculated as the dot product of the row and the 
     /// circulation strength.
     pub variable_velocity_factors: Array2<SpatialVector<3>>,
-    /// Corrections for the induced velocity, such as max magnitude and correction factor.
-    /// 
-    /// By default, this is not used. However, it can be used on cases where the simulation is known
-    /// to create unstable and too large induced velocities. The original use case is for rotor 
-    /// sails.
-    pub induced_velocity_corrections: VelocityCorrections
 }
 
 impl FrozenWake {
@@ -89,7 +81,6 @@ impl FrozenWake {
         FrozenWake {
             fixed_velocities,
             variable_velocity_factors,
-            induced_velocity_corrections: wake.induced_velocity_corrections.clone()
         }
     }
 
@@ -102,21 +93,17 @@ impl FrozenWake {
         &self,
         circulation_strength: &[f64],
     ) -> Vec<SpatialVector<3>> {
-        let mut induced_velocities = vec![SpatialVector::<3>::default(); self.fixed_velocities.len()];
+        self.fixed_velocities.par_iter().enumerate().map(
+            |(i_row, u_fixed)| {
+                let mut induced_velocity = *u_fixed;
 
-        induced_velocities.par_iter_mut().enumerate().for_each(|(i_row, induced_velocity)| {
-            *induced_velocity = self.fixed_velocities[i_row];
+                for i_col in 0..self.variable_velocity_factors.shape()[1] {
+                    induced_velocity += 
+                        self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
+                }
 
-            for i_col in 0..self.variable_velocity_factors.shape()[1] {
-                *induced_velocity += 
-                    self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
+                induced_velocity
             }
-        });
-
-        if self.induced_velocity_corrections.any_active_corrections() {
-            self.induced_velocity_corrections.correct(&mut induced_velocities)
-        }
-
-        induced_velocities
+        ).collect()
     }
 }

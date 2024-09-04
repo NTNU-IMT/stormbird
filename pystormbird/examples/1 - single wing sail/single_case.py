@@ -3,14 +3,12 @@ import matplotlib.pyplot as plt
 
 import argparse
 
-from simulation import SimulationCase
+from simulation import SimulationCase, SimulationMode
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a single case")
     parser.add_argument("--angle-of-attack", type=float, default = 0.0, help="Angle of attack in degrees")
-    parser.add_argument("--start-angle-of-attack", type=float, default = None, help="Start angle of attack in degrees")
     parser.add_argument("--smoothing-length", type=float, default = None, help="Use smoothing length")
-    parser.add_argument("--circulation-viscosity", type=float, default = None, help="Use circulation viscosity")
     parser.add_argument("--dynamic", action="store_true", help="Use dynamic model")
     
     parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
@@ -18,13 +16,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    simulation_type = "dynamic" if args.dynamic else "static"
+    simulation_mode = SimulationMode.DYNAMIC if args.dynamic else SimulationMode.STATIC
 
     sim_case = SimulationCase(
         angle_of_attack = args.angle_of_attack,
-        start_angle_of_attack = args.start_angle_of_attack,
         smoothing_length = args.smoothing_length,
-        circulation_viscosity = args.circulation_viscosity,
+        simulation_mode = simulation_mode,
         write_wake_files=args.write_wake_files
     )
 
@@ -36,11 +33,14 @@ if __name__ == "__main__":
     for i in range(len(result_history)):
         force = result_history[i].integrated_forces[0].total
 
-        cd[i] = force.x
-        cl[i] = force.y
+        cd[i] = force.x / sim_case.force_factor
+        cl[i] = force.y / sim_case.force_factor
+
+    print('Last lift coefficient:', cl[-1])
+    print('Last drag coefficient:', cd[-1])
 
     circulation_strength = np.array(result_history[-1].force_input.circulation_strength)
-    angles_of_attack = np.array(result_history[-1].force_input.angles_of_attack)
+    angles_of_attack     = np.array(result_history[-1].force_input.angles_of_attack)
 
     w_plot = 16
     fig = plt.figure(figsize=(w_plot, w_plot/3.0))
@@ -49,12 +49,15 @@ if __name__ == "__main__":
     ax3 = fig.add_subplot(133)
 
     plt.sca(ax1)
-    plt.plot(cl)
+    if len(cl) > 1:
+        plt.plot(cl)
+    else:
+        plt.plot([0, 1], [cl[0], cl[0]])
 
     plt.sca(ax2)
     plt.plot(-circulation_strength)
 
     plt.sca(ax3)
-    plt.plot(angles_of_attack)
+    plt.plot(np.degrees(angles_of_attack))
 
     plt.show()

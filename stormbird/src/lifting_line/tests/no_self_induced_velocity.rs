@@ -73,6 +73,8 @@ fn no_self_induced_velocity() {
                     ..Default::default()
                 }
             ),
+            non_zero_circulation_at_ends: [false, false],
+            ..Default::default()
         };
     
         line_force_model_builder.add_wing(wing_builder);

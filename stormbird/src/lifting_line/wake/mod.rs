@@ -5,7 +5,6 @@
 //! Implementations of wake models used to calculate induced velocities in lifting line simulations
 
 pub mod builders;
-pub mod velocity_corrections;
 pub mod file_export;
 pub mod prelude;
 
@@ -20,8 +19,6 @@ use rayon::iter::ParallelIterator;
 use std::ops::Range;
 
 use crate::lifting_line::singularity_elements::prelude::*;
-
-use velocity_corrections::VelocityCorrections;
 
 #[derive(Debug, Clone)]
 /// Settings for the wake
@@ -74,12 +71,6 @@ pub struct Wake {
     pub wing_indices: Vec<Range<usize>>,
     /// Counter to keep track of the number of time steps that have been completed
     pub number_of_time_steps_completed: usize,
-    /// Corrections for the induced velocity, such as max magnitude and correction factor.
-    /// 
-    /// By default, this is not used. However, it can be used on cases where the simulation is known
-    /// to create unstable and too large induced velocities. The original use case is for rotor 
-    /// sails.
-    pub induced_velocity_corrections: VelocityCorrections
 }
 
 impl Wake {
@@ -214,7 +205,7 @@ impl Wake {
         off_body: bool,
         neglect_self_induced: bool
     ) -> Vec<SpatialVector<3>> {
-        let mut induced_velocities: Vec<SpatialVector<3>> = points.par_iter()
+        points.par_iter()
             .enumerate()
             .map(|(point_index, point)| {
                 (start_index..end_index).into_iter().map(|i_panel| {
@@ -234,13 +225,7 @@ impl Wake {
                         self.induced_velocity_from_panel(i_panel, *point, off_body)
                     }
                 }).sum()
-            }).collect();
-
-        if self.induced_velocity_corrections.any_active_corrections() {
-            self.induced_velocity_corrections.correct(&mut induced_velocities)
-        }
-
-        induced_velocities
+            }).collect()
     }
 
 

@@ -16,12 +16,11 @@ class SimulationMode(Enum):
 @dataclass(frozen=True, kw_only=True)
 class SimulationCase():
     angle_of_attack: float
-    start_angle_of_attack: float | None = None
     chord_length: float = 1.0
     span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 64
+    nr_sections: int = 32
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
     section_model: dict | None = None
@@ -40,12 +39,9 @@ class SimulationCase():
         section_model = optimized_model()
         section_model_dict = json.loads(section_model.to_string())
 
-        if self.section_model is None:
-            section_model = {
-                "Foil": section_model_dict
-            }
-        else:
-            section_model = self.section_model
+        section_model = {
+            "Foil": section_model_dict
+        }
 
         wing_builder = {
             "section_points": [
@@ -56,7 +52,8 @@ class SimulationCase():
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
             ],
-            "section_model": section_model
+            "section_model": section_model,
+            "non_zero_circulation_at_ends": [False, False]
         }
 
         line_force_model = {
@@ -66,36 +63,31 @@ class SimulationCase():
         }
 
         gaussian_smoothing_settings = None
-        artificial_viscosity = None
         if self.smoothing_length is not None:
-            end_corrections = [(False, True)] if self.z_symmetry else [(True, True)]
-
             gaussian_smoothing_settings = {
                 "length_factor": self.smoothing_length,
-                "end_corrections": end_corrections
             }
-            
 
-        if gaussian_smoothing_settings is not None or artificial_viscosity is not None:
             smoothing_settings = {}
+            smoothing_settings["gaussian"] = gaussian_smoothing_settings
 
-            if gaussian_smoothing_settings is not None:
-                smoothing_settings["gaussian"] = gaussian_smoothing_settings
-            
-            if artificial_viscosity is not None:
-                smoothing_settings["artificial_viscosity"] = artificial_viscosity
-        
             line_force_model["smoothing_settings"] = smoothing_settings
+            
 
         solver = {
             "SimpleIterative": {
                 "max_iterations_per_time_step": 10,
+                "damping_factor": 0.1
+            }
+        } if self.simulation_mode == SimulationMode.DYNAMIC else {
+            "SimpleIterative": {
+                "max_iterations_per_time_step": 1000,
                 "damping_factor": 0.05
             }
-        }
+        }   
 
-        end_time = 20 * self.chord_length / self.freestream_velocity
-        dt = end_time / 500
+        end_time = 10 * self.chord_length / self.freestream_velocity
+        dt = end_time / 1000
 
         wake = {}
 
@@ -104,19 +96,6 @@ class SimulationCase():
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
-                wake["ratio_of_wake_affected_by_induced_velocities"] = 0.75
-                wake["first_panel_relative_length"] = 0.75
-                wake["last_panel_relative_length"] = 50.0
-                wake["use_chord_direction"] = True
-
-                wake["wake_length"] = {
-                    "NrPanels": 60
-                }
-
-                wake["viscous_core_length_off_body"] = {
-                    "Absolute": 0.25 * self.chord_length
-                }
-
                 sim_settings = {
                     "Dynamic": {
                         "solver": solver,
@@ -142,8 +121,6 @@ class SimulationCase():
 
         setup_string = json.dumps(setup)
 
-        angle_speed = 10 / (0.5 * end_time)
-
         simulation = Simulation(
             setup_string = setup_string,
             initial_time_step = dt,
@@ -162,29 +139,29 @@ class SimulationCase():
 
         result_history = []
 
-        current_angle_deg = (
-            self.angle_of_attack if self.start_angle_of_attack is None 
-            else self.start_angle_of_attack
-        )
+        simulation.set_local_wing_angles([-np.radians(self.angle_of_attack)])
 
-        while current_time < end_time:
-            simulation.set_local_wing_angles([-np.radians(current_angle_deg)])
+        if self.simulation_mode == SimulationMode.DYNAMIC:
+            while current_time < end_time:
+                result = simulation.do_step(
+                    time = current_time, 
+                    time_step = dt, 
+                    freestream_velocity = freestream_velocity_list
+                )
+
+                current_time += dt
+
+                result_history.append(result)
+        else:
+            simulation.set_local_wing_angles([-np.radians(self.angle_of_attack)])
 
             result = simulation.do_step(
                 time = current_time, 
-                time_step = dt, 
+                time_step = end_time, 
                 freestream_velocity = freestream_velocity_list
             )
 
-            current_time += dt
-
             result_history.append(result)
-
-            if current_angle_deg < self.angle_of_attack:
-                current_angle_deg += angle_speed * dt
-
-            if current_angle_deg > self.angle_of_attack:
-                current_angle_deg = self.angle_of_attack
 
         return result_history
 

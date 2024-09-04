@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-from rotor_simulation import run_simulation, RotorSimulationCase, SimulationMode
+from rotor_simulation import RotorSimulationCase, SimulationMode
 
 import argparse
 
@@ -20,7 +20,7 @@ if __name__ == "__main__":
         simulation_mode=simulation_mode
     )
 
-    result_history = run_simulation(sim_case)
+    result_history = sim_case.run()
 
     cd = np.zeros(len(result_history))
     cl = np.zeros(len(result_history))

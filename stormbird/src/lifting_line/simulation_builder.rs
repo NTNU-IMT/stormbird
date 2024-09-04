@@ -10,14 +10,14 @@ use crate::lifting_line::prelude::*;
 
 use super::simulation::Simulation;
 
-use crate::line_force_model::prescribed_circulations::PrescribedCirculation;
+use crate::line_force_model::prescribed_circulation::PrescribedCirculationShape;
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
 pub struct SteadySettings {
     #[serde(default)]
-    pub solver: SolverBuilder,
+    pub solver: SteadySolverBuilder,
     #[serde(default)]
     pub wake: SteadyWakeBuilder,
 }
@@ -126,11 +126,11 @@ impl SimulationBuilder {
             }
         };
 
-        let initial_prescribed_circulation = PrescribedCirculation::default();
+        let initial_circulation_shape = PrescribedCirculationShape::default();
 
         let previous_circulation_strength = line_force_model.prescribed_circulation_strength(
             &vec![initialization_velocity; nr_of_lines], 
-            &initial_prescribed_circulation
+            &initial_circulation_shape
         );
 
         Simulation {

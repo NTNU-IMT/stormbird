@@ -6,33 +6,32 @@
 //! lift-induced velocities are estimated. In other words, this part is common for all methods 
 //! available in the library, and therefore the foundation of all simulations. 
 
-use std::f64::consts::PI;
+use std::{
+    f64::consts::PI,
+    ops::Range,
+};
+
+use math_utils::{
+    spatial_vector::SpatialVector,
+    statistics::mean,
+    finite_difference
+};
 
 pub mod force_calculations;
 pub mod derivatives;
 pub mod smoothing;
 pub mod span_line;
 pub mod builder;
-pub mod prescribed_circulations;
+pub mod prescribed_circulation;
 pub mod prelude;
-
-use std::ops::Range;
-
-use math_utils::statistics::mean;
-use math_utils::finite_difference;
+pub mod single_wing;
 
 use crate::io_structs::prelude::*;
-use math_utils::spatial_vector::SpatialVector;
 use crate::section_models::SectionModel;
+
 use span_line::*;
 use smoothing::SmoothingSettings;
-
-/// Input struct to add a single wing to a line force model
-pub struct SingleWing {
-    pub span_lines_local: Vec<SpanLine>,
-    pub chord_vectors_local: Vec<SpatialVector<3>>,
-    pub section_model: SectionModel,
-}
+use single_wing::SingleWing;
 
 #[derive(Clone, Debug)]
 /// The struct holds variables for a model that calculate the forces on wings, under the assumption
@@ -56,12 +55,29 @@ pub struct LineForceModel {
     /// the span axis during a dynamic simulation. The typical example is changing the angle of 
     /// attack on a wing sail due to changing apparent wind conditions.
     pub local_wing_angles: Vec<f64>,
+    /// A vector that contains booleans that indicate whether the circulation should be zero at the
+    /// ends or not. The variables are used both when initializing the circulation before a 
+    /// simulation and in cases where smoothing is applied to the circulation.
+    /// The vector is structured as follows:
+    /// - The first index is the wing index
+    /// - The second index is the end index, where 0 means that start of the wind and 1 means the ¨
+    /// end
+    /// - When the boolean is false, the circulation is set to zero at the end, and when it is true,
+    ///  the circulation is assumed to be non-zero.
+    pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
+    /// A vector containing information about whether or not a wing is 'virtual' or real. Virtual 
+    /// wings are included in the simulations like non-virtual wings, except that the forces are not
+    /// included in the total force calculations. The primary use case is modelling end plates. 
+    /// Adding a virtual wing at the tip of another wing will reduce the tip losses, similar to how
+    /// an end plate would work in reality.
+    pub virtual_wings: Vec<bool>,
     /// Density used in force calculations
     pub density: f64,
     /// Optional model for calculation motion and flow derivatives
     pub derivatives: Option<Derivatives>,
     /// Optional smoothing settings
     pub smoothing_settings: Option<SmoothingSettings>,
+    /// Optional variables to 
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
 }
@@ -85,6 +101,8 @@ impl LineForceModel {
             translation: SpatialVector::<3>::default(),
             rotation: SpatialVector::<3>::default(),
             local_wing_angles: Vec::new(),
+            non_zero_circulation_at_ends: Vec::new(),
+            virtual_wings: Vec::new(),
             density,
             derivatives: None,
             smoothing_settings: None,
@@ -117,6 +135,8 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
+        self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
+        self.virtual_wings.push(wing.virtual_wing);
     }
 
     /// Short hand for querying for the number of wings in the model

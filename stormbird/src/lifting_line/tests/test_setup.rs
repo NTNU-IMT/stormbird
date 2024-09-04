@@ -63,6 +63,8 @@ impl RectangularWing {
                 mean_negative_stall_angle: 45.0_f64.to_radians(),
                 ..Default::default()
             }),
+            non_zero_circulation_at_ends: [false, false],
+            ..Default::default()
         };
 
         line_force_model_builder.add_wing(wing_builder);

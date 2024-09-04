@@ -11,6 +11,37 @@ use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::prelude::*;
 use crate::io_structs::prelude::*;
 use crate::lifting_line::wake::prelude::*;
+use super::velocity_corrections::VelocityCorrections;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SteadySimpleIterativeBuilder {
+    #[serde(default="SteadySimpleIterativeBuilder::default_max_iterations_per_time_step")]
+    pub max_iterations_per_time_step: usize,
+    #[serde(default="SteadySimpleIterativeBuilder::default_damping_factor")]
+    pub damping_factor: f64,
+    #[serde(default="SimpleIterative::default_residual_tolerance_absolute")]
+    pub residual_tolerance_absolute: f64,
+    #[serde(default="SimpleIterative::default_strength_difference_tolerance")]
+    pub strength_difference_tolerance: f64,
+    #[serde(default)]
+    pub velocity_corrections: VelocityCorrections,
+}
+
+impl SteadySimpleIterativeBuilder {
+    pub fn default_max_iterations_per_time_step() -> usize {1000}
+    pub fn default_damping_factor() -> f64 {0.04}
+
+    pub fn build(&self) -> SimpleIterative {
+        SimpleIterative {
+            max_iterations_per_time_step: self.max_iterations_per_time_step,
+            damping_factor: self.damping_factor,
+            residual_tolerance_absolute: self.residual_tolerance_absolute,
+            strength_difference_tolerance: self.strength_difference_tolerance,
+            velocity_corrections: self.velocity_corrections.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,14 +50,19 @@ pub struct SimpleIterative {
     pub max_iterations_per_time_step: usize,
     #[serde(default="SimpleIterative::default_damping_factor")]
     pub damping_factor: f64,
-    #[serde(default="SimpleIterative::default_tolerance_absolute")]
-    pub tolerance_absolute: f64,
+    #[serde(default="SimpleIterative::default_residual_tolerance_absolute")]
+    pub residual_tolerance_absolute: f64,
+    #[serde(default="SimpleIterative::default_strength_difference_tolerance")]
+    pub strength_difference_tolerance: f64,
+    #[serde(default)]
+    pub velocity_corrections: VelocityCorrections,
 }
 
 impl SimpleIterative {
-    pub fn default_max_iterations_per_time_step() -> usize {1000}
+    pub fn default_max_iterations_per_time_step() -> usize {10}
     pub fn default_damping_factor() -> f64 {0.04}
-    pub fn default_tolerance_absolute() -> f64 {1e-4}
+    pub fn default_residual_tolerance_absolute() -> f64 {1e-4}
+    pub fn default_strength_difference_tolerance() -> f64 {1e-6}
 
     pub fn do_step(
         &self,
@@ -49,14 +85,28 @@ impl SimpleIterative {
         while iterations < self.max_iterations_per_time_step && !converged {
             iterations += 1;
     
-            let induced_velocities = frozen_wake.induced_velocities_at_control_points(&circulation_strength);
+            let mut induced_velocities = frozen_wake.induced_velocities_at_control_points(&circulation_strength);
+
+            if let VelocityCorrections::MaxInducedVelocityMagnitudeRatio(ratio) = self.velocity_corrections {
+                VelocityCorrections::max_induced_velocity_magnitude_ratio(
+                    ratio, 
+                    felt_ctrl_points_freestream, 
+                    &mut induced_velocities
+                )
+            };
     
             for i in 0..ctrl_points.len() {
                 ctrl_point_velocity[i] = felt_ctrl_points_freestream[i] + induced_velocities[i];
             }
     
             ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity);
-    
+
+            if let VelocityCorrections::FixedMagnitudeEqualToFreestream = self.velocity_corrections {
+                VelocityCorrections::fixed_magnitude_equal_to_freestream(
+                    felt_ctrl_points_freestream, 
+                    &mut ctrl_point_velocity
+                )
+            };
     
             let new_estimated_strength = line_force_model.circulation_strength(&ctrl_point_velocity);
     
@@ -65,15 +115,26 @@ impl SimpleIterative {
                 &ctrl_point_velocity
             );
     
-            if residual < self.tolerance_absolute {
+            if residual < self.residual_tolerance_absolute {
                 converged = true;
             }
     
             let damping_factor = self.damping_factor;
+
+            let mut max_strength_difference = 0.0;
     
             for i in 0..ctrl_points.len() {
                 let strength_difference = new_estimated_strength[i] - circulation_strength[i];
+
+                if strength_difference.abs() > max_strength_difference {
+                    max_strength_difference = strength_difference.abs();
+                }
+
                 circulation_strength[i] += damping_factor * strength_difference;
+            }
+
+            if max_strength_difference < self.strength_difference_tolerance {
+                converged = true;
             }
         }
     
@@ -91,7 +152,21 @@ impl Default for SimpleIterative {
         SimpleIterative {
             max_iterations_per_time_step: SimpleIterative::default_max_iterations_per_time_step(),
             damping_factor: SimpleIterative::default_damping_factor(),
-            tolerance_absolute: SimpleIterative::default_tolerance_absolute(),
+            residual_tolerance_absolute: SimpleIterative::default_residual_tolerance_absolute(),
+            strength_difference_tolerance: SimpleIterative::default_strength_difference_tolerance(),
+            velocity_corrections: VelocityCorrections::default(),
+        }
+    }
+}
+
+impl Default for SteadySimpleIterativeBuilder {
+    fn default() -> Self {
+        SteadySimpleIterativeBuilder {
+            max_iterations_per_time_step: SteadySimpleIterativeBuilder::default_max_iterations_per_time_step(),
+            damping_factor: SteadySimpleIterativeBuilder::default_damping_factor(),
+            residual_tolerance_absolute: SimpleIterative::default_residual_tolerance_absolute(),
+            strength_difference_tolerance: SimpleIterative::default_strength_difference_tolerance(),
+            velocity_corrections: VelocityCorrections::default(),
         }
     }
 }

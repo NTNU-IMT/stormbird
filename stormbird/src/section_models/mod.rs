@@ -36,5 +36,11 @@ impl SectionModel {
     }
 }
 
+impl Default for SectionModel {
+    fn default() -> Self {
+        SectionModel::Foil(Foil::default())
+    }
+}
+
 #[cfg(test)]
 mod tests;

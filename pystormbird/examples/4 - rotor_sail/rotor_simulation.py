@@ -18,15 +18,13 @@ class RotorSimulationCase():
     height: float = 30.0
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 25
+    nr_sections: int = 32
     smoothing_length: float | None = None
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
-    circulation_viscosity: float | None = None
     z_symmetry: bool = True
-    virtual_end_disks: (bool, bool) = (False, True)
+    virtual_end_disks: tuple[bool, bool] = (False, True)
     virtual_end_disk_height_factor: float = 0.5
-    only_consider_change_in_angle: bool = False
     write_wake_files: bool = False
     spin_ratio_data: list | None = None
     cd_data: list | None = None
@@ -61,6 +59,15 @@ class RotorSimulationCase():
             section_model["RotatingCylinder"]["spin_ratio_data"] = self.spin_ratio_data
             section_model["RotatingCylinder"]["cl_data"] = self.cl_data
             section_model["RotatingCylinder"]["cd_data"] = self.cd_data
+
+        if self.virtual_end_disks[0] and self.virtual_end_disks[1]:
+            non_zero_circulation_at_ends = [True, True]
+        elif self.virtual_end_disks[0]:
+            non_zero_circulation_at_ends = [True, False]
+        elif self.virtual_end_disks[1]:
+            non_zero_circulation_at_ends = [False, True]
+        else:
+            non_zero_circulation_at_ends = [False, False]
         
         rotor_builder = {
             "section_points": [
@@ -71,10 +78,17 @@ class RotorSimulationCase():
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
             ],
-            "section_model": section_model
+            "section_model": section_model,
+            "non_zero_circulation_at_ends": non_zero_circulation_at_ends
         }
 
         wing_builders = [rotor_builder]
+
+        span_virtual_end_disks = self.virtual_end_disk_height_factor * self.diameter
+
+        nr_sections_virtual_end_disks = int(self.nr_sections * span_virtual_end_disks / self.height)
+
+        nr_sections_virtual_end_disks = max(2, nr_sections_virtual_end_disks)
 
         if self.virtual_end_disks[0]:
             virtual_end_sections = {
@@ -86,7 +100,9 @@ class RotorSimulationCase():
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
                 ],
-                "section_model": section_model
+                "section_model": section_model,
+                "non_zero_circulation_at_ends": [False, True],
+                "nr_sections": nr_sections_virtual_end_disks
             }
 
             wing_builders.append(virtual_end_sections)
@@ -101,7 +117,9 @@ class RotorSimulationCase():
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
                     {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
                 ],
-                "section_model": section_model
+                "section_model": section_model,
+                "non_zero_circulation_at_ends": [True, False],
+                "nr_sections": nr_sections_virtual_end_disks
             }
 
             wing_builders.append(virtual_end_sections)
@@ -113,11 +131,8 @@ class RotorSimulationCase():
         }
 
         if self.smoothing_length is not None:
-            end_corrections = [(False, False), (False, True)] if self.z_symmetry else [(True, False), (False, True)]
-
             gaussian_smoothing_settings = {
                 "length_factor": self.smoothing_length,
-                "end_corrections": end_corrections
             }
 
             smoothing_settings = {
@@ -133,48 +148,22 @@ class RotorSimulationCase():
         freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
         line_force_model = self.get_line_force_model()
 
-        solver = {
-            "SimpleIterative": {
-                "damping_factor": 0.05,
-                "max_iterations_per_time_step": 10,
-            }
-        }
-
-        #"only_consider_change_in_angle": self.only_consider_change_in_angle
-
-        end_time = 50 * self.diameter / self.freestream_velocity
-        dt = end_time / 200
-
         wake = {}
+        solver = {}
 
         if self.z_symmetry:
             wake["symmetry_condition"] = "Z"
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
-                wake["ratio_of_wake_affected_by_induced_velocities"] = 0.75
-                wake["first_panel_relative_length"] = 0.75
-                wake["last_panel_relative_length"] = 50.0
-                wake["use_chord_direction"] = True
-
-                wake["wake_length"] = {
-                    "NrPanels": 60
-                }
-
-                wake["viscous_core_length_off_body"] = {
-                    "Absolute": 0.25 * self.diameter
-                }
-
                 sim_settings = {
                     "Dynamic": {
-                        "solver": solver,
                         "wake": wake,
                     }
                 }
             case SimulationMode.STATIC:
                 sim_settings = {
                     "QuasiSteady": {
-                        "solver": solver,
                         "wake": wake
                     }
                 }
@@ -192,7 +181,7 @@ class RotorSimulationCase():
 
         simulation = Simulation(
             setup_string = setup_string,
-            initial_time_step = dt,
+            initial_time_step = 1,
             initialization_velocity = freestream_velocity
         )
 
@@ -208,14 +197,26 @@ class RotorSimulationCase():
 
         result_history = []
 
-        while current_time < end_time:
+        if self.simulation_mode == SimulationMode.DYNAMIC:
+            end_time = 20 * self.diameter / self.freestream_velocity
+            dt = end_time / 200
+
+            while current_time < end_time:
+                result = simulation.do_step(
+                    time = current_time, 
+                    time_step = dt, 
+                    freestream_velocity = freestream_velocity_list
+                )
+
+                current_time += dt
+
+                result_history.append(result)
+        else:
             result = simulation.do_step(
                 time = current_time, 
-                time_step = dt, 
+                time_step = 1, 
                 freestream_velocity = freestream_velocity_list
             )
-
-            current_time += dt
 
             result_history.append(result)
 

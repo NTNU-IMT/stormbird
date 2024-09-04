@@ -47,7 +47,7 @@ pub struct SectionalForces {
     pub circulatory: Vec<SpatialVector<3>>,
     /// Forces due to the two dimensional drag on a line element. 
     /// 
-    /// **Note**: this is often the viscous drag, but not always. In can also include three 
+    /// **Note**: this is often the viscous drag, but not always. In can also include three- 
     /// dimensional effects on the drag, if the model is executed with a simplified approach, for 
     /// instance when neglecting the *self-induced* velocities.
     pub sectional_drag: Vec<SpatialVector<3>>,
