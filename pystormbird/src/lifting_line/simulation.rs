@@ -108,4 +108,29 @@ impl Simulation {
             |v| SpatialVector::new(v[0], v[1], v[2])
         ).collect()
     }
+
+    #[pyo3(signature=(
+        *,
+        time, 
+        time_step,
+        freestream_velocity,
+    ))]
+    pub fn initialize_with_elliptic_distribution(
+        &mut self, 
+        time: f64, 
+        time_step: f64,
+        freestream_velocity: Vec<SpatialVector>,
+    ) {
+
+        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
+            |v| v.data
+        ).collect();
+
+        
+        self.data.initialize_with_elliptic_distribution(
+            time, 
+            time_step,
+            &rust_freestream_velocity
+        );
+    }
 }

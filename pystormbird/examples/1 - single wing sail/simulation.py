@@ -20,12 +20,14 @@ class SimulationCase():
     span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 32
+    nr_sections: int = 64
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
     section_model: dict | None = None
     z_symmetry: bool = False
     write_wake_files: bool = False
+    prescribed_circulation: bool = False
+    prescribed_initialization: bool = False
 
     @property
     def force_factor(self) -> float:
@@ -62,13 +64,18 @@ class SimulationCase():
             "density": self.density,
         }
 
-        if self.smoothing_length is not None:
+        if self.smoothing_length is not None and not(self.prescribed_circulation):
             gaussian_smoothing = {
                 "length_factor": self.smoothing_length,
             }
 
             line_force_model["circulation_corrections"] = {
                 "GaussianSmoothing": gaussian_smoothing
+            }
+
+        if self.prescribed_circulation:
+            line_force_model["circulation_corrections"] = {
+                "PrescribedCirculation": {}
             }
             
 
@@ -148,6 +155,13 @@ class SimulationCase():
                 result_history.append(result)
         else:
             simulation.set_local_wing_angles([-np.radians(self.angle_of_attack)])
+
+            if self.prescribed_initialization:
+                simulation.initialize_with_elliptic_distribution(
+                    time = current_time,
+                    time_step = end_time,
+                    freestream_velocity = freestream_velocity_list
+                )
 
             result = simulation.do_step(
                 time = current_time, 

@@ -9,6 +9,7 @@
 
 use crate::lifting_line::prelude::*;
 use crate::io_structs::derivatives::Derivatives;
+use crate::line_force_model::circulation_corrections::CirculationCorrection;
 
 use super::simulation_builder::SimulationBuilder;
 
@@ -149,5 +150,20 @@ impl Simulation {
         off_body: bool
     ) -> Vec<SpatialVector<3>> {
         self.wake.induced_velocities(points, off_body)
+    }
+
+    pub fn initialize_with_elliptic_distribution(
+        &mut self, 
+        time: f64,
+        time_step: f64,
+        freestream_velocity: &[SpatialVector<3>],
+    ) {
+        let old_circulation_correction = self.line_force_model.circulation_corrections.clone();
+
+        self.line_force_model.circulation_corrections =CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
+
+        let _ = self.do_step(time, time_step, freestream_velocity);
+
+        self.line_force_model.circulation_corrections = old_circulation_correction;
     }
 }

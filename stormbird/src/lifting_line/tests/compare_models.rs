@@ -14,6 +14,7 @@ use crate::lifting_line::simulation_builder::{
     SteadySettings,
     UnsteadySettings,
 };
+use crate::line_force_model::circulation_corrections::CirculationCorrection;
 
 use super::test_setup::RectangularWing;
 use super::elliptic_wing_theory::EllipticWingTheory;
@@ -40,6 +41,9 @@ fn steady_lift() {
         ..Default::default()
     }.build();
 
+    let mut prescribed_wing_builder = wing_builder.clone();
+    prescribed_wing_builder.circulation_corrections = CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
+
     let steady_settings  = SteadySettings::default();
     let dynamic_settings = UnsteadySettings::default();
 
@@ -51,6 +55,11 @@ fn steady_lift() {
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
+        SimulationMode::QuasiSteady(steady_settings.clone())
+    ).build(time_step, velocity);
+
+    let mut prescribed_sim = SimulationBuilder::new(
+        prescribed_wing_builder.clone(),
         SimulationMode::QuasiSteady(steady_settings)
     ).build(time_step, velocity);
 
@@ -80,6 +89,20 @@ fn steady_lift() {
     let cd_steady = result_steady.integrated_forces_sum()[0] / force_factor;
     let cl_steady = result_steady.integrated_forces_sum()[1] / force_factor;
 
+    let start = Instant::now();
+    let result_prescribed = prescribed_sim.do_step(
+        0.0, 
+        time_step, 
+        &static_velocity_freestream
+    );
+
+    println!("Time to run prescribed simulation: {} secs", start.elapsed().as_secs_f64());
+    println!("Number of prescribed iterations: {}", result_prescribed.iterations);
+    println!("Residual for prescribed simulation: {}", result_prescribed.residual);
+
+    let cd_prescribed = result_prescribed.integrated_forces_sum()[0] / force_factor;
+    let cl_prescribed = result_prescribed.integrated_forces_sum()[1] / force_factor;
+
     let mut cd_dynamic = 0.0;
     let mut cl_dynamic = 0.0;
 
@@ -107,11 +130,16 @@ fn steady_lift() {
     dbg!(cd_theory, cl_theory);
     println!("Steady");
     dbg!(cd_steady, cl_steady);
+    println!("Prescribed");
+    dbg!(cd_prescribed, cl_prescribed);
     println!("Dynamic");
     dbg!(cd_dynamic, cl_dynamic);
 
     let steady_cl_error = (cl_theory - cl_steady).abs() / cl_theory.abs();
     let steady_cd_error = (cd_theory - cd_steady).abs() / cd_theory.abs();
+
+    let prescribed_cl_error = (cl_theory - cl_prescribed).abs() / cl_theory.abs();
+    let prescribed_cd_error = (cd_theory - cd_prescribed).abs() / cd_theory.abs();
 
     let dynamic_cl_error = (cl_theory - cl_dynamic).abs() / cl_theory.abs();
     let dynamic_cd_error = (cd_theory - cd_dynamic).abs() / cd_theory.abs();
@@ -121,6 +149,8 @@ fn steady_lift() {
 
     assert!(steady_cl_error < allowable_cl_error, "Steady cl error: {}", steady_cl_error);
     assert!(steady_cd_error < allowable_cd_error, "Steady cd error: {}", steady_cd_error);
+    assert!(prescribed_cl_error < allowable_cl_error, "Prescribed cl error: {}", prescribed_cl_error);
+    assert!(prescribed_cd_error < allowable_cd_error, "Prescribed cd error: {}", prescribed_cd_error);
     assert!(dynamic_cl_error < allowable_cl_error, "Dynamic cl error: {}", dynamic_cl_error);
-    assert!(dynamic_cd_error < allowable_cd_error, "Dynamic cd error: {}", dynamic_cd_error);   
+    assert!(dynamic_cd_error < allowable_cd_error, "Dynamic cd error: {}", dynamic_cd_error);
 }
