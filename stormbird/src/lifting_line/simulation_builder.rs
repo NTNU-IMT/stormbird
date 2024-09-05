@@ -10,14 +10,14 @@ use crate::lifting_line::prelude::*;
 
 use super::simulation::Simulation;
 
-use crate::line_force_model::prescribed_circulation::PrescribedCirculationShape;
+use crate::line_force_model::circulation_corrections::prescribed_circulation::PrescribedCirculationShape;
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
 pub struct SteadySettings {
     #[serde(default)]
-    pub solver: SteadySolverBuilder,
+    pub solver: SteadySimpleIterativeBuilder,
     #[serde(default)]
     pub wake: SteadyWakeBuilder,
 }
@@ -27,7 +27,7 @@ pub struct SteadySettings {
 /// Settings for a dynamic simulation.
 pub struct UnsteadySettings {
     #[serde(default)]
-    pub solver: SolverBuilder,
+    pub solver: SimpleIterative,
     #[serde(default)]
     pub wake: WakeBuilder,
 }
@@ -119,10 +119,10 @@ impl SimulationBuilder {
 
         let solver = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
-                settings.solver.build(nr_of_lines)
+                settings.solver.clone()
             },
             SimulationMode::QuasiSteady(settings) => {
-                settings.solver.build(nr_of_lines)
+                settings.solver.build()
             }
         };
 

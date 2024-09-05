@@ -39,12 +39,15 @@ impl LineForceModel {
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        let raw_strength = self.circulation_strength_raw(velocity);
+        match &self.circulation_corrections {
+            CirculationCorrection::None => self.circulation_strength_raw(velocity),
+            CirculationCorrection::PrescribedCirculation(shape) => 
+                self.prescribed_circulation_strength(&velocity,&shape),
+            CirculationCorrection::GaussianSmoothing(settings) => {
+                let raw_strength = self.circulation_strength_raw(velocity);
 
-        if self.smoothing_settings.is_some() {
-            self.smoothed_strength(&raw_strength, velocity)
-        } else {
-            raw_strength
+                self.gaussian_smoothed_values(&raw_strength, &settings)
+            }
         }
     }
 

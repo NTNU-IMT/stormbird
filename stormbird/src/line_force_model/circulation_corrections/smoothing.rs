@@ -6,63 +6,26 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::{
-    spatial_vector::SpatialVector,
-    smoothing,
-    finite_difference
-};
+use math_utils::smoothing;
 
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SmoothingSettings {
-    #[serde(default)]
-    pub gaussian: Option<GaussianSmoothingSettings>,
-    #[serde(default)]
-    pub artificial_viscosity: Option<ArtificialViscositySettings>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GaussianSmoothingSettings {
+pub struct GaussianSmoothing {
     pub length_factor: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArtificialViscositySettings {
-    pub viscosity: f64,
-    pub solver_iterations: usize,
-    pub solver_damping: f64,
-}
-
 impl LineForceModel {
-    pub fn smoothed_strength(&self, input_strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        let mut strength = input_strength.to_vec();
-
-        if let Some(settings) = &self.smoothing_settings {
-            if let Some(gaussian) = &settings.gaussian {
-                if gaussian.length_factor > 0.0 {
-                    strength = self.gaussian_smoothed_values(&strength, gaussian);
-                }
-            }
-
-            if let Some(artificial_viscosity) = &settings.artificial_viscosity {
-                strength = self.circulation_strength_with_viscosity(
-                    &strength,
-                    velocity,
-                    artificial_viscosity
-                );
-            }
-        }
-
-        strength
-    }
-
     /// Function that applies a Gaussian smoothing to the supplied strength vector.
     pub fn gaussian_smoothed_values(
         &self, 
         noisy_values: &[f64],
-        settings: &GaussianSmoothingSettings,
+        settings: &GaussianSmoothing,
     ) -> Vec<f64> {
+        if settings.length_factor <= 0.0 {
+            return noisy_values.to_vec();
+        }
+
         let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
 
         let wing_span_lengths = self.wing_span_lengths();
@@ -140,66 +103,4 @@ impl LineForceModel {
 
         smoothed_values
     }
-
-    pub fn circulation_strength_with_viscosity(
-        &self, 
-        input_strength: &[f64],
-        velocity: &[SpatialVector<3>],
-        settings: &ArtificialViscositySettings
-    ) -> Vec<f64> {
-        let mut new_estimated_strength = input_strength.to_vec();
-
-        for _ in 0..settings.solver_iterations {
-            let circulation_strength_second_derivative = self.circulation_strength_second_derivative(
-                &new_estimated_strength
-            );
-
-            for i in 0..new_estimated_strength.len() {
-                let scaling_factor = 0.5 * self.chord_vectors_local[i].length() * velocity[i].length();
-                
-                let viscosity_term = settings.viscosity * scaling_factor * circulation_strength_second_derivative[i];
-                
-                new_estimated_strength[i] = input_strength[i] + settings.solver_damping * viscosity_term;
-            }
-        }
-
-        new_estimated_strength
-    }
-
-    /// Calculates the second derivative of the circulation strength on each line element. This can 
-    /// be used to calculate artificial viscosity damping when estimating the circulation strength
-    pub fn circulation_strength_second_derivative(&self, circulation_strength: &[f64]) -> Vec<f64> {
-        let span_distance = self.span_distance_in_local_coordinates();
-
-        let mut first_derivative = Vec::with_capacity(circulation_strength.len());
-
-        for wing_index in 0..self.wing_indices.len() {
-            let local_span_distance = &span_distance[self.wing_indices[wing_index].clone()];
-            let local_circulation_strength = &circulation_strength[self.wing_indices[wing_index].clone()];
-
-            let local_circulation_derivative = finite_difference::derivative_spatial_arrays(
-                local_span_distance, 
-                local_circulation_strength
-            );
-
-            first_derivative.extend(local_circulation_derivative);
-        }
-
-        let mut second_derivative = Vec::with_capacity(circulation_strength.len());
-
-        for wing_index in 0..self.wing_indices.len() {
-            let local_span_distance = &span_distance[self.wing_indices[wing_index].clone()];
-            let local_circulation_derivative = &first_derivative[self.wing_indices[wing_index].clone()];
-
-            let local_circulation_derivative = finite_difference::derivative_spatial_arrays(
-                local_span_distance, 
-                local_circulation_derivative
-            );
-
-            second_derivative.extend(local_circulation_derivative);
-        }
-
-        second_derivative
-    }
-
 }

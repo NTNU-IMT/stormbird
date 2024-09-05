@@ -62,28 +62,22 @@ class SimulationCase():
             "density": self.density,
         }
 
-        gaussian_smoothing_settings = None
         if self.smoothing_length is not None:
-            gaussian_smoothing_settings = {
+            gaussian_smoothing = {
                 "length_factor": self.smoothing_length,
             }
 
-            smoothing_settings = {}
-            smoothing_settings["gaussian"] = gaussian_smoothing_settings
-
-            line_force_model["smoothing_settings"] = smoothing_settings
+            line_force_model["circulation_corrections"] = {
+                "GaussianSmoothing": gaussian_smoothing
+            }
             
 
         solver = {
-            "SimpleIterative": {
-                "max_iterations_per_time_step": 10,
-                "damping_factor": 0.1
-            }
+            "max_iterations_per_time_step": 10,
+            "damping_factor": 0.1
         } if self.simulation_mode == SimulationMode.DYNAMIC else {
-            "SimpleIterative": {
-                "max_iterations_per_time_step": 1000,
-                "damping_factor": 0.05
-            }
+            "max_iterations_per_time_step": 1000,
+            "damping_factor": 0.05
         }   
 
         end_time = 10 * self.chord_length / self.freestream_velocity

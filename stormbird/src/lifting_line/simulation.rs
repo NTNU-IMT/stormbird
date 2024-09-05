@@ -17,7 +17,7 @@ use super::simulation_builder::SimulationBuilder;
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     pub wake: Wake,
-    pub solver: Solver,
+    pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
     pub derivatives: Option<Derivatives>,
     pub write_wake_data_to_file: bool,

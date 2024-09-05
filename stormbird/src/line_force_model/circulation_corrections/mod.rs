@@ -8,17 +8,13 @@ pub mod smoothing;
 use serde::{Serialize, Deserialize};
 
 use prescribed_circulation::PrescribedCirculationShape;
-use smoothing::SmoothingSettings;
+use smoothing::GaussianSmoothing;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CirculationCorrection {
     None,
     PrescribedCirculation(PrescribedCirculationShape),
-    Smoothing(SmoothingSettings),
-}
-
-impl CirculationCorrection {
-    
+    GaussianSmoothing(GaussianSmoothing),
 }
 
 impl Default for CirculationCorrection {

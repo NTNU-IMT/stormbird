@@ -85,28 +85,30 @@ impl SimpleIterative {
         while iterations < self.max_iterations_per_time_step && !converged {
             iterations += 1;
     
-            let mut induced_velocities = frozen_wake.induced_velocities_at_control_points(&circulation_strength);
+            let induced_velocities = frozen_wake.induced_velocities_at_control_points(&circulation_strength);
 
-            if let VelocityCorrections::MaxInducedVelocityMagnitudeRatio(ratio) = self.velocity_corrections {
-                VelocityCorrections::max_induced_velocity_magnitude_ratio(
-                    ratio, 
-                    felt_ctrl_points_freestream, 
-                    &mut induced_velocities
-                )
-            };
-    
-            for i in 0..ctrl_points.len() {
-                ctrl_point_velocity[i] = felt_ctrl_points_freestream[i] + induced_velocities[i];
+            match &self.velocity_corrections {
+                VelocityCorrections::None => {
+                    for i in 0..ctrl_points.len() {
+                        ctrl_point_velocity[i] = felt_ctrl_points_freestream[i] + induced_velocities[i];
+                    }
+                },
+                VelocityCorrections::MaxInducedVelocityMagnitudeRatio(ratio) => {
+                    ctrl_point_velocity = VelocityCorrections::max_induced_velocity_magnitude_ratio(
+                        *ratio, 
+                        felt_ctrl_points_freestream, 
+                        &induced_velocities
+                    );
+                },
+                VelocityCorrections::FixedMagnitudeEqualToFreestream => {
+                    ctrl_point_velocity = VelocityCorrections::fixed_magnitude_equal_to_freestream(
+                        felt_ctrl_points_freestream, 
+                        &induced_velocities
+                    );
+                },
             }
-    
-            ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity);
 
-            if let VelocityCorrections::FixedMagnitudeEqualToFreestream = self.velocity_corrections {
-                VelocityCorrections::fixed_magnitude_equal_to_freestream(
-                    felt_ctrl_points_freestream, 
-                    &mut ctrl_point_velocity
-                )
-            };
+            ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity);
     
             let new_estimated_strength = line_force_model.circulation_strength(&ctrl_point_velocity);
     

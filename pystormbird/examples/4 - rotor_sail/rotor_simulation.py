@@ -23,7 +23,7 @@ class RotorSimulationCase():
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
     z_symmetry: bool = True
-    virtual_end_disks: tuple[bool, bool] = (False, True)
+    virtual_end_disks: tuple[bool, bool] = (False, False)
     virtual_end_disk_height_factor: float = 0.5
     write_wake_files: bool = False
     spin_ratio_data: list | None = None
@@ -131,15 +131,13 @@ class RotorSimulationCase():
         }
 
         if self.smoothing_length is not None:
-            gaussian_smoothing_settings = {
+            gaussian_smoothing = {
                 "length_factor": self.smoothing_length,
             }
 
-            smoothing_settings = {
-                "gaussian": gaussian_smoothing_settings
+            line_force_model["circulation_corrections"] = {
+                "GaussianSmoothing": gaussian_smoothing
             }
-
-            line_force_model["smoothing_settings"] = smoothing_settings
 
         return line_force_model
 
@@ -149,7 +147,11 @@ class RotorSimulationCase():
         line_force_model = self.get_line_force_model()
 
         wake = {}
-        solver = {}
+        solver = {
+            "velocity_corrections": {
+                "MaxInducedVelocityMagnitudeRatio": 1.0
+            }#"FixedMagnitudeEqualToFreestream"
+        }
 
         if self.z_symmetry:
             wake["symmetry_condition"] = "Z"
@@ -158,12 +160,14 @@ class RotorSimulationCase():
             case SimulationMode.DYNAMIC:
                 sim_settings = {
                     "Dynamic": {
+                        "solver": solver,
                         "wake": wake,
                     }
                 }
             case SimulationMode.STATIC:
                 sim_settings = {
                     "QuasiSteady": {
+                        "solver": solver,
                         "wake": wake
                     }
                 }
@@ -219,5 +223,7 @@ class RotorSimulationCase():
             )
 
             result_history.append(result)
+
+        print("Last number of iterations: ", result_history[-1].iterations)
 
         return result_history

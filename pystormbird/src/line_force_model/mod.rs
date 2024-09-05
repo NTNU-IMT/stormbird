@@ -13,10 +13,7 @@ use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
-use stormbird::line_force_model::smoothing::{
-    GaussianSmoothingSettings,
-    ArtificialViscositySettings
-};
+use stormbird::line_force_model::circulation_corrections::smoothing::GaussianSmoothing;
 
 #[pyclass]
 #[derive(Clone)]
@@ -60,31 +57,11 @@ impl LineForceModel {
         noisy_strength: Vec<f64>, 
         length_factor: f64, 
     ) -> Vec<f64> {
-        let settings = GaussianSmoothingSettings {
+        let settings = GaussianSmoothing {
             length_factor,
         };
 
         self.data.gaussian_smoothed_values(&noisy_strength, &settings)
-    }
-
-    #[pyo3(signature = (
-        *,
-        noisy_strength,
-        velocity,
-        viscosity,
-        solver_iterations,
-        solver_damping
-    ))]
-    pub fn circulation_strength_with_viscosity(&self, noisy_strength: Vec<f64>, velocity: Vec<SpatialVector>, viscosity: f64, solver_iterations: usize, solver_damping: f64) -> Vec<f64> {
-        let settings = ArtificialViscositySettings {
-            viscosity,
-            solver_iterations,
-            solver_damping
-        };
-
-        let rust_velocity: Vec<SpatialVectorRust<3>> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
-        
-        self.data.circulation_strength_with_viscosity(&noisy_strength, &rust_velocity, &settings)
     }
 
     #[getter]

@@ -27,9 +27,9 @@ impl VelocityCorrections {
     pub fn max_induced_velocity_magnitude_ratio(
         ratio: f64,
         freestream_velocities: &[SpatialVector<3>],
-        induced_velocities: &mut [SpatialVector<3>],
-    ) {
-        induced_velocities.iter_mut().zip(freestream_velocities.iter()).for_each(
+        induced_velocities: &[SpatialVector<3>],
+    ) -> Vec<SpatialVector<3>> {
+        let u_i_corrected: Vec<SpatialVector<3>> = induced_velocities.iter().zip(freestream_velocities.iter()).map(
             |(induced_velocity, freestream_velocity)| {
                 let induced_velocity_magnitude = induced_velocity.length();
                 let freestream_velocity_magnitude = freestream_velocity.length();
@@ -37,20 +37,37 @@ impl VelocityCorrections {
                 let max_induced_velocity_magnitude = ratio * freestream_velocity_magnitude;
 
                 if induced_velocity_magnitude > max_induced_velocity_magnitude {
-                    *induced_velocity = induced_velocity.normalize() * max_induced_velocity_magnitude;
+                    induced_velocity.normalize() * max_induced_velocity_magnitude
+                } else {
+                    induced_velocity.clone()
                 }
             }
-        );
+        ).collect();
+
+        u_i_corrected.iter().zip(freestream_velocities.iter()).map(
+            |(induced_velocity, freestream_velocity)| {
+                *freestream_velocity + *induced_velocity
+            }
+        ).collect()
     }
 
     pub fn fixed_magnitude_equal_to_freestream(
         freestream_velocities: &[SpatialVector<3>],
-        total_velocities: &mut [SpatialVector<3>],
-    ) {
-        total_velocities.iter_mut().zip(freestream_velocities.iter()).for_each(
+        induced_velocities: &[SpatialVector<3>],
+    ) -> Vec<SpatialVector<3>> {
+        let mut u_total: Vec<SpatialVector<3>> = induced_velocities.iter().zip(freestream_velocities.iter()).map(
+            |(induced_velocity, freestream_velocity)| {
+                *freestream_velocity + *induced_velocity
+            }
+        ).collect();
+
+
+        u_total.iter_mut().zip(freestream_velocities.iter()).for_each(
             |(total_velocity, freestream_velocity)| {
                 *total_velocity = total_velocity.normalize() * freestream_velocity.length();
             }
         );
+
+        u_total
     }
 }
