@@ -14,23 +14,22 @@ use std::{
 use math_utils::{
     spatial_vector::SpatialVector,
     statistics::mean,
-    finite_difference
 };
 
 pub mod force_calculations;
 pub mod derivatives;
-pub mod smoothing;
 pub mod span_line;
 pub mod builder;
-pub mod prescribed_circulation;
+
 pub mod prelude;
 pub mod single_wing;
+pub mod circulation_corrections;
 
 use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
 
 use span_line::*;
-use smoothing::SmoothingSettings;
+use circulation_corrections::CirculationCorrection;
 use single_wing::SingleWing;
 
 #[derive(Clone, Debug)]
@@ -76,7 +75,7 @@ pub struct LineForceModel {
     /// Optional model for calculation motion and flow derivatives
     pub derivatives: Option<Derivatives>,
     /// Optional smoothing settings
-    pub smoothing_settings: Option<SmoothingSettings>,
+    pub circulation_corrections: CirculationCorrection,
     /// Optional variables to 
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
@@ -105,7 +104,7 @@ impl LineForceModel {
             virtual_wings: Vec::new(),
             density,
             derivatives: None,
-            smoothing_settings: None,
+            circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
         }
     }

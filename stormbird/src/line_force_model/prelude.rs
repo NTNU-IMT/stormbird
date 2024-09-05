@@ -6,8 +6,9 @@ pub use super::LineForceModel;
 pub use super::builder::LineForceModelBuilder;
 pub use super::single_wing::{SingleWing, WingBuilder};
 pub use super::span_line::SpanLine;
-pub use super::smoothing::{
-    SmoothingSettings,
-    GaussianSmoothingSettings,
-    ArtificialViscositySettings,
+pub use super::circulation_corrections::{
+    smoothing::SmoothingSettings,
+    smoothing::GaussianSmoothingSettings,
+    smoothing::ArtificialViscositySettings,
+    prescribed_circulation::PrescribedCirculationShape,
 };

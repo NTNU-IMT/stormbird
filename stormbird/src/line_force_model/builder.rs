@@ -19,7 +19,7 @@ pub struct LineForceModelBuilder {
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,
     #[serde(default)]
-    pub smoothing_settings: Option<SmoothingSettings>,
+    pub circulation_corrections: CirculationCorrection,
     #[serde(default)]
     pub ctrl_point_chord_factor: f64,
 }
@@ -30,7 +30,7 @@ impl LineForceModelBuilder {
             wing_builders: Vec::new(),
             nr_sections,
             density: LineForceModel::default_density(),
-            smoothing_settings: None,
+            circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
         }
     }
@@ -56,7 +56,7 @@ impl LineForceModelBuilder {
             line_force_model.add_wing(&wing);
         }
 
-        line_force_model.smoothing_settings = self.smoothing_settings.clone();
+        line_force_model.circulation_corrections = self.circulation_corrections.clone();
         line_force_model.ctrl_point_chord_factor = self.ctrl_point_chord_factor;
 
         line_force_model

@@ -4,10 +4,15 @@
 
 /// Functionality to be used in solvers, for instance a lifting line simulation
 
-use super::*;
 use serde::{Serialize, Deserialize};
 
-use math_utils::smoothing;
+use math_utils::{
+    spatial_vector::SpatialVector,
+    smoothing,
+    finite_difference
+};
+
+use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SmoothingSettings {
