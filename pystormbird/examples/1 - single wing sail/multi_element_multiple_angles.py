@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import json
 
 from simulation import SimulationCase, SimulationMode
-from section_model import optimized_model
+from multi_element_foil_section import get_foil_model
 
 from enum import Enum
 
@@ -29,21 +29,25 @@ class TestCases(Enum):
         return self.name.replace("_", " ").lower()
 
 if __name__ == "__main__":
-    comparison_data = json.load(open("graf_2014_data.json", "r"))
-
     theoretical_aspect_ratio = 2 * 4.5
 
-    angles_of_attack = np.arange(0.0, 16.0, 0.5)
+    angles_of_attack = np.arange(0.0, 25.0, 0.5)
     n_angles = len(angles_of_attack)
 
-    section_model = optimized_model()
+    foil_model = get_foil_model()
+
+    foil_model.set_internal_state(np.radians(15.0))
+
+    section_model_dict = {
+        "VaryingFoil": foil_model.__dict__
+    }
 
     cl_2d = np.zeros(n_angles)
     cd_2d = np.zeros(n_angles)
 
     for i in range(n_angles):
-        cd_2d[i] = section_model.drag_coefficient(np.radians(angles_of_attack[i]))
-        cl_2d[i] = section_model.lift_coefficient(np.radians(angles_of_attack[i]))
+        cd_2d[i] = foil_model.drag_coefficient(np.radians(angles_of_attack[i]))
+        cl_2d[i] = foil_model.lift_coefficient(np.radians(angles_of_attack[i]))
 
     cases = [TestCases.RAW_SIMULATION, TestCases.PRESCRIBED_CIRCULATION, TestCases.INITIALIZED_SIMULATION]
 
@@ -79,7 +83,9 @@ if __name__ == "__main__":
 
             sim_case = SimulationCase(
                 angle_of_attack = angles_of_attack[angle_index],
+                section_model_dict = section_model_dict,
                 simulation_mode = SimulationMode.STATIC,
+                smoothing_length=0.1,
                 prescribed_circulation = prescribed_circulation,
                 prescribed_initialization = prescribed_initialization,
                 z_symmetry=True
@@ -100,27 +106,11 @@ if __name__ == "__main__":
         ax1.plot(angles_of_attack, cl, label='Stormbird lifting line, ' + case.to_string())
         ax2.plot(angles_of_attack, cd, label='Stormbird lifting line, ' + case.to_string())
     
-    # --------------- Comparison data ------------------------
-    ax1.plot(
-        comparison_data["experimental"]["angles_of_attack"], 
-        comparison_data["experimental"]["lift_coefficients"], 
-        "-o",
-        label="Graf et al. (2014), experimental"
-    )
+    ax1.plot(angles_of_attack, cl_2d, label='Section model', color='grey', linestyle='--')
+    ax2.plot(angles_of_attack, cd_2d, label='Section model', color='grey', linestyle='--')
 
-    #ax1.plot(angles_of_attack, cl_theory, label='Section model + elliptic wing theory')
-    
-    ax2.plot(
-        comparison_data["experimental"]["angles_of_attack"], 
-        comparison_data["experimental"]["drag_coefficients"], 
-        "-o",
-        label="Graf et al. (2014), experimental"
-    )
-
-    #ax2.plot(angles_of_attack, cd_theory, label='Elliptic wing theory')
-
-    ax1.set_ylim(0, 1.2)
-    ax2.set_ylim(0, 0.25)
+    ax1.set_ylim(0, 3.0)
+    ax2.set_ylim(0, 0.5)
     
     ax1.set_xlabel("Angle of attack [deg]")
     ax1.set_ylabel("Lift coefficient")

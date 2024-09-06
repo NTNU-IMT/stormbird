@@ -34,6 +34,10 @@ impl SectionModel {
             SectionModel::RotatingCylinder(_) => 1.0,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
 }
 
 impl Default for SectionModel {

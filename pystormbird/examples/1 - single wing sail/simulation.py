@@ -4,8 +4,6 @@ import numpy as np
 from pystormbird.lifting_line import Simulation
 from pystormbird import SpatialVector
 
-from section_model import optimized_model
-
 from dataclasses import dataclass
 from enum import Enum
 
@@ -15,15 +13,21 @@ class SimulationMode(Enum):
 
 @dataclass(frozen=True, kw_only=True)
 class SimulationCase():
+    '''
+    This class is responsible for setting up and running a simulation case.
+
+    As input, it requires choices about which "mode" to run the simulation in, as well as the 
+    parameters of the wing.
+    '''
     angle_of_attack: float
+    section_model_dict: dict
     chord_length: float = 1.0
     span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 64
+    nr_sections: int = 32
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
-    section_model: dict | None = None
     z_symmetry: bool = False
     write_wake_files: bool = False
     prescribed_circulation: bool = False
@@ -32,18 +36,11 @@ class SimulationCase():
     @property
     def force_factor(self) -> float:
         return 0.5 * self.chord_length * self.span * self.density * self.freestream_velocity**2
-
+    
     def run(self):
         freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
 
         chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
-
-        section_model = optimized_model()
-        section_model_dict = json.loads(section_model.to_string())
-
-        section_model = {
-            "Foil": section_model_dict
-        }
 
         wing_builder = {
             "section_points": [
@@ -54,7 +51,7 @@ class SimulationCase():
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
             ],
-            "section_model": section_model,
+            "section_model": self.section_model_dict,
             "non_zero_circulation_at_ends": [False, False]
         }
 

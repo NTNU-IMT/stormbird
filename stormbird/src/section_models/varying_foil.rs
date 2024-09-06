@@ -27,6 +27,10 @@ impl VaryingFoil {
         data
     }
 
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
     pub fn get_foil(&self) -> Foil {
         let cl_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
         let cl_initial_slope_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
