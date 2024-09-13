@@ -159,11 +159,14 @@ impl Simulation {
         freestream_velocity: &[SpatialVector<3>],
     ) {
         let old_circulation_correction = self.line_force_model.circulation_corrections.clone();
+        let old_damping_factor = self.solver.damping_factor;
 
         self.line_force_model.circulation_corrections =CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
+        self.solver.damping_factor = 0.25_f64.max(old_damping_factor);
 
         let _ = self.do_step(time, time_step, freestream_velocity);
 
         self.line_force_model.circulation_corrections = old_circulation_correction;
+        self.solver.damping_factor = old_damping_factor;
     }
 }

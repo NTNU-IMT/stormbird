@@ -25,7 +25,7 @@ class SimulationCase():
     span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 32
+    nr_sections: int = 64
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
     z_symmetry: bool = False
@@ -42,6 +42,8 @@ class SimulationCase():
 
         chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
 
+        non_zero_circulation_at_ends = [True, False] if self.z_symmetry else [False, False]
+
         wing_builder = {
             "section_points": [
                 {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -52,7 +54,7 @@ class SimulationCase():
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
             ],
             "section_model": self.section_model_dict,
-            "non_zero_circulation_at_ends": [False, False]
+            "non_zero_circulation_at_ends": non_zero_circulation_at_ends
         }
 
         line_force_model = {
@@ -72,7 +74,9 @@ class SimulationCase():
 
         if self.prescribed_circulation:
             line_force_model["circulation_corrections"] = {
-                "PrescribedCirculation": {}
+                "PrescribedCirculation": {
+                    "outer_power": 0.2
+                }
             }
             
 

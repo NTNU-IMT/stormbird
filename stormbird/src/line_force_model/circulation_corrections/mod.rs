@@ -10,10 +10,16 @@ use serde::{Serialize, Deserialize};
 use prescribed_circulation::PrescribedCirculationShape;
 use smoothing::GaussianSmoothing;
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Enum for controlling what type of correction to apply to the estimated circulation distribution.
 pub enum CirculationCorrection {
+    /// Default, which is no correction.
     None,
+    /// The circulation distribution will be set to a prescribed shape, which will be scaled based
+    /// on the estimated circulation.
     PrescribedCirculation(PrescribedCirculationShape),
+    /// The raw estimated circulation distribution will be smoothed using a Gaussian kernel.
     GaussianSmoothing(GaussianSmoothing),
 }
 

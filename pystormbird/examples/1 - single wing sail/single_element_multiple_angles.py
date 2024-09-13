@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
             sim_case = SimulationCase(
                 angle_of_attack = angles_of_attack[angle_index],
-                foil_model_dict = foil_model.__dict__,
+                section_model_dict = section_model_dict,
                 simulation_mode = SimulationMode.STATIC,
                 prescribed_circulation = prescribed_circulation,
                 prescribed_initialization = prescribed_initialization,
