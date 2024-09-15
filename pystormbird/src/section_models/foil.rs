@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use stormbird::section_models::foil::Foil as FoilRust;
 
@@ -68,6 +69,13 @@ impl Foil {
         }
     }
 
+    #[classmethod]
+    pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
+        Self {
+            data: FoilRust::new_from_string(&string)
+        }
+    }
+
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
         self.data.lift_coefficient(angle_of_attack)
     }
@@ -83,62 +91,140 @@ impl Foil {
     }
 
     #[getter]
-    pub fn cl_zero_angle(&self) -> f64 {
+    pub fn get_cl_zero_angle(&self) -> f64 {
         self.data.cl_zero_angle
     }
 
+    #[setter]
+    pub fn set_cl_zero_angle(&mut self, value: f64) {
+        self.data.cl_zero_angle = value;
+    }
+
     #[getter]
-    pub fn cl_initial_slope(&self) -> f64 {
+    pub fn get_cl_initial_slope(&self) -> f64 {
         self.data.cl_initial_slope
     }
 
+    #[setter]
+    pub fn set_cl_initial_slope(&mut self, value: f64) {
+        self.data.cl_initial_slope = value;
+    }
+
     #[getter]
-    pub fn cl_high_order_factor(&self) -> f64 {
+    pub fn get_cl_high_order_factor(&self) -> f64 {
         self.data.cl_high_order_factor
     }
 
+    #[setter]
+    pub fn set_cl_high_order_factor(&mut self, value: f64) {
+        self.data.cl_high_order_factor = value;
+    }
+
     #[getter]
-    pub fn cl_high_order_power(&self) -> f64 {
+    pub fn get_cl_high_order_power(&self) -> f64 {
         self.data.cl_high_order_power
     }
 
+    #[setter]
+    pub fn set_cl_high_order_power(&mut self, value: f64) {
+        self.data.cl_high_order_power = value;
+    }
+
     #[getter]
-    pub fn cl_max_after_stall(&self) -> f64 {
+    pub fn get_cl_max_after_stall(&self) -> f64 {
         self.data.cl_max_after_stall
     }
 
+    #[setter]
+    pub fn set_cl_max_after_stall(&mut self, value: f64) {
+        self.data.cl_max_after_stall = value;
+    }
+
     #[getter]
-    pub fn cd_zero_angle(&self) -> f64 {
+    pub fn get_cd_zero_angle(&self) -> f64 {
         self.data.cd_zero_angle
     }
 
+    #[setter]
+    pub fn set_cd_zero_angle(&mut self, value: f64) {
+        self.data.cd_zero_angle = value;
+    }
+
     #[getter]
-    pub fn cd_second_order_factor(&self) -> f64 {
+    pub fn get_cd_second_order_factor(&self) -> f64 {
         self.data.cd_second_order_factor
     }
 
+    #[setter]
+    pub fn set_cd_second_order_factor(&mut self, value: f64) {
+        self.data.cd_second_order_factor = value;
+    }
+
     #[getter]
-    pub fn cd_max_after_stall(&self) -> f64 {
+    pub fn get_cd_max_after_stall(&self) -> f64 {
         self.data.cd_max_after_stall
     }
 
+    #[setter]
+    pub fn set_cd_max_after_stall(&mut self, value: f64) {
+        self.data.cd_max_after_stall = value;
+    }
+
     #[getter]
-    pub fn cd_power_after_stall(&self) -> f64 {
+    pub fn get_cd_power_after_stall(&self) -> f64 {
         self.data.cd_power_after_stall
     }
 
+    #[setter]
+    pub fn set_cd_power_after_stall(&mut self, value: f64) {
+        self.data.cd_power_after_stall = value;
+    }
+
     #[getter]
-    pub fn mean_positive_stall_angle(&self) -> f64 {
+    pub fn get_mean_positive_stall_angle(&self) -> f64 {
         self.data.mean_positive_stall_angle
     }
 
-    #[getter]
-    pub fn mean_negative_stall_angle(&self) -> f64 {
-        self.data.mean_negative_stall_angle
+    #[setter]
+    pub fn set_mean_positive_stall_angle(&mut self, value: f64) {
+        self.data.mean_positive_stall_angle = value;
     }
 
     #[getter]
-    pub fn stall_range(&self) -> f64 {
+    pub fn get_mean_negative_stall_angle(&self) -> f64 {
+        self.data.mean_negative_stall_angle
+    }
+
+    #[setter]
+    pub fn set_mean_negative_stall_angle(&mut self, value: f64) {
+        self.data.mean_negative_stall_angle = value;
+    }
+
+    #[getter]
+    pub fn get_stall_range(&self) -> f64 {
         self.data.stall_range
+    }
+
+    #[setter]
+    pub fn set_stall_range(&mut self, value: f64) {
+        self.data.stall_range = value;
+    }
+
+    pub fn __str__(&self) -> String {
+        self.data.to_string()
+    }
+
+    #[getter]
+    /// Uses the built in json module to convert the string to a dictionary
+    pub fn __dict__(&self) -> PyResult<PyObject> {
+        let json_string = self.__str__();
+        
+        Python::with_gil(|py| {
+            let json_module = PyModule::import_bound(py, "json")?;
+
+            let dict = json_module.call_method1("loads", (json_string,))?;
+
+            Ok(dict.into())
+        })
     }
 }

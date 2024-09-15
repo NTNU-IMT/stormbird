@@ -6,10 +6,10 @@ use pyo3::prelude::*;
 
 use pyo3::types::PyType;
 
-use stormbird::line_force_model::builder::WingBuilder as WingBuilderRust;
+use stormbird::line_force_model::single_wing::WingBuilder as WingBuilderRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
-use crate::vec3::Vec3;
+use crate::spatial_vector::SpatialVector;
 use crate::section_models::SectionModel;
 use super::LineForceModel;
 
@@ -22,12 +22,22 @@ pub struct WingBuilder {
 #[pymethods]
 impl WingBuilder {
     #[new]
-    pub fn new(section_points: Vec<Vec3>, chord_vectors: Vec<Vec3>, section_model: SectionModel) -> Self {
+    pub fn new(
+        section_points: Vec<SpatialVector>, 
+        chord_vectors: Vec<SpatialVector>, 
+        section_model: SectionModel,
+        non_zero_circulation_at_ends: [bool; 2],
+        virtual_wing: bool,
+        nr_sections: usize
+    ) -> Self {
         WingBuilder {
-            data: WingBuilderRust{
+            data: WingBuilderRust {
                 section_points: section_points.iter().map(|v| v.data).collect(),
                 chord_vectors: chord_vectors.iter().map(|v| v.data).collect(),
                 section_model: section_model.data,
+                non_zero_circulation_at_ends,
+                virtual_wing,
+                nr_sections: Some(nr_sections),
             }
         }
     }
@@ -49,7 +59,7 @@ impl LineForceModelBuilder {
     }
 
     #[classmethod]
-    pub fn new_from_string(_cls: &PyType, string: String) -> Self {
+    pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
         Self {
             data: LineForceModelBuilderRust::new_from_string(&string),
         }

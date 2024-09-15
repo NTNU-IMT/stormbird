@@ -7,9 +7,9 @@
 use pyo3::prelude::*;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
-use stormbird::vec3::Vec3 as Vec3Rust;
+use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
 
-use crate::vec3::Vec3;
+use crate::spatial_vector::SpatialVector;
 use crate::result_structs::SimulationResult;
 
 #[pyclass]
@@ -25,28 +25,28 @@ impl Simulation {
             *,
             setup_string, 
             initial_time_step,
-            wake_initial_velocity
+            initialization_velocity
         )
     )]
     pub fn new(
         setup_string: String, 
         initial_time_step: f64, 
-        wake_initial_velocity: Vec3
+        initialization_velocity: SpatialVector
     ) -> Self {
         Self {
             data: SimulationRust::new_from_string(
                 &setup_string, 
                 initial_time_step, 
-                wake_initial_velocity.data
+                initialization_velocity.data
             ).unwrap()
         }
     }
 
-    pub fn set_translation(&mut self, translation: Vec3) {
+    pub fn set_translation(&mut self, translation: SpatialVector) {
         self.data.line_force_model.translation = translation.data;
     }
 
-    pub fn set_rotation(&mut self, rotation: Vec3) {
+    pub fn set_rotation(&mut self, rotation: SpatialVector) {
         self.data.line_force_model.rotation = rotation.data;
     }
 
@@ -59,11 +59,11 @@ impl Simulation {
         self.data.line_force_model.local_wing_angles = local_wing_angles;
     }
 
-    pub fn get_freestream_velocity_points(&self) -> Vec<Vec3> {
+    pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector> {
         let rust_vec = self.data.get_freestream_velocity_points();
 
         rust_vec.iter().map(
-            |v| Vec3::new(v.x, v.y, v.z)
+            |v| SpatialVector::new(v[0], v[1], v[2])
         ).collect()
     }
 
@@ -77,10 +77,10 @@ impl Simulation {
         &mut self, 
         time: f64, 
         time_step: f64,
-        freestream_velocity: Vec<Vec3>,
+        freestream_velocity: Vec<SpatialVector>,
     ) -> SimulationResult {
 
-        let rust_freestream_velocity: Vec<Vec3Rust> = freestream_velocity.iter().map(
+        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
             |v| v.data
         ).collect();
 
@@ -97,15 +97,40 @@ impl Simulation {
         points,
         off_body = true
     ))]
-    pub fn induced_velocities(&self, points: Vec<Vec3>, off_body: bool) -> Vec<Vec3> {
-        let rust_points: Vec<Vec3Rust> = points.iter().map(
+    pub fn induced_velocities(&self, points: Vec<SpatialVector>, off_body: bool) -> Vec<SpatialVector> {
+        let rust_points: Vec<SpatialVectorRust<3>> = points.iter().map(
             |v| v.data
         ).collect();
 
         let rust_induced_velocities = self.data.induced_velocities(&rust_points, off_body);
 
         rust_induced_velocities.iter().map(
-            |v| Vec3::new(v.x, v.y, v.z)
+            |v| SpatialVector::new(v[0], v[1], v[2])
         ).collect()
+    }
+
+    #[pyo3(signature=(
+        *,
+        time, 
+        time_step,
+        freestream_velocity,
+    ))]
+    pub fn initialize_with_elliptic_distribution(
+        &mut self, 
+        time: f64, 
+        time_step: f64,
+        freestream_velocity: Vec<SpatialVector>,
+    ) {
+
+        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
+            |v| v.data
+        ).collect();
+
+        
+        self.data.initialize_with_elliptic_distribution(
+            time, 
+            time_step,
+            &rust_freestream_velocity
+        );
     }
 }

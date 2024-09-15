@@ -1,0 +1,64 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+#include      "../dimensions.txt";
+
+scale   1;
+
+front  #calc "2*$span";
+side   #calc "2*$span";
+height #calc "2*$span";
+back   #calc "4*$span";
+
+vertices
+(
+    (-$front -$side -$height)
+    ( $back  -$side -$height)
+    ( $back   $side -$height)
+    (-$front  $side -$height)
+    (-$front -$side  $height)
+    ( $back  -$side  $height)
+    ( $back   $side  $height)
+    (-$front  $side  $height)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (48 32 32) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces ( (0 4 7 3) );
+    }
+
+    outlet
+    {
+        type patch;
+        faces ( (1 2 6 5) );
+    }
+
+    sides
+    {
+        type patch;
+        faces 
+        (
+            (0 1 5 4)
+            (0 3 2 1)
+            (2 3 7 6)
+            (4 5 6 7)
+        );
+    }
+);

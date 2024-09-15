@@ -15,7 +15,7 @@ pub struct SimulationBuilder {
 }
 ```
 
-The only input that is absolutely necessary to specify is the [builder for a line force model](./../line_model/building_line_model.md). The other variables have default settings. The fields `write_wake_data_to_file` and `wake_files_folder_path` are only used in dynamic simulations at the moment, but are intended to also be implemented for quasi-steady simulations at a later stage. They control whether wake data should be exported to `.vtp` files during a simulation. The point of this is to allow the wake shape and strength to be visualized, which is useful for debugging purposes, or to make illustrations of the simulation process.
+The only input that is absolutely necessary to specify is the [builder for a line force model](./../line_model/building_line_model.md). The other variables have default settings. The fields `write_wake_data_to_file` and `wake_files_folder_path` are to control whether wake data should be exported to `.vtp` files during a simulation. The point of this is to allow the wake shape and strength to be visualized, which is useful for debugging purposes, or to make illustrations of the simulation process.
 
 Simulations in Python are created through a `Simulation` class that takes a JSON string containing the  data for the `SimulationBuilder` plus an initial time step and velocity vector. The initial time step and velocity is used for initializing the wake structure for the simulation. A Python example is shown below
 

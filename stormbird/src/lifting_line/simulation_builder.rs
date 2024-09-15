@@ -10,12 +10,14 @@ use crate::lifting_line::prelude::*;
 
 use super::simulation::Simulation;
 
+use crate::line_force_model::circulation_corrections::prescribed_circulation::PrescribedCirculationShape;
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
 pub struct SteadySettings {
     #[serde(default)]
-    pub solver: SteadySolverSettings,
+    pub solver: SteadySimpleIterativeBuilder,
     #[serde(default)]
     pub wake: SteadyWakeBuilder,
 }
@@ -25,9 +27,9 @@ pub struct SteadySettings {
 /// Settings for a dynamic simulation.
 pub struct UnsteadySettings {
     #[serde(default)]
-    pub solver: UnsteadySolverSettings,
+    pub solver: SimpleIterative,
     #[serde(default)]
-    pub wake: UnsteadyWakeBuilder,
+    pub wake: WakeBuilder,
 }
 
 
@@ -94,46 +96,49 @@ impl SimulationBuilder {
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.
-    pub fn build(&self, initial_time_step: f64, wake_initial_velocity: Vec3) -> Simulation {
+    pub fn build(&self, initial_time_step: f64, initialization_velocity: SpatialVector<3>) -> Simulation {
         let line_force_model = self.line_force_model.build();
         let nr_of_lines = line_force_model.nr_span_lines();
 
-        let wake_model = match &self.simulation_mode {
+        let wake = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
-                WakeModel::Unsteady(
-                    settings.wake.build(
-                        initial_time_step,
-                        &line_force_model,
-                        wake_initial_velocity,
-                    )
+                settings.wake.build(
+                    initial_time_step,
+                    &line_force_model,
+                    initialization_velocity,
                 )
             },
             SimulationMode::QuasiSteady(settings) => {
-                let ctrl_points_freestream = vec![wake_initial_velocity; nr_of_lines];
-
-                let wake = settings.wake.build(
+                settings.wake.build(
+                    initial_time_step,
                     &line_force_model,
-                    &ctrl_points_freestream,
-                );
-                WakeModel::Steady((settings.wake.clone(), wake))
+                    initialization_velocity,
+                )
             }
         };
 
-        let solver_settings = match &self.simulation_mode {
+        let solver = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
-                settings.solver.to_solver_settings()
+                settings.solver.clone()
             },
             SimulationMode::QuasiSteady(settings) => {
-                settings.solver.to_solver_settings()
+                settings.solver.build()
             }
         };
+
+        let initial_circulation_shape = PrescribedCirculationShape::default();
+
+        let previous_circulation_strength = line_force_model.prescribed_circulation_strength(
+            &vec![initialization_velocity; nr_of_lines], 
+            &initial_circulation_shape
+        );
 
         Simulation {
             line_force_model,
-            wake_model,
-            solver_settings,
+            wake,
+            solver,
             derivatives: None,
-            previous_circulation_strength: vec![0.0; nr_of_lines],
+            previous_circulation_strength,
             write_wake_data_to_file: self.write_wake_data_to_file,
             wake_files_folder_path: self.wake_files_folder_path.clone()
         }

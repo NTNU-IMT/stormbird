@@ -1,0 +1,30 @@
+pub fn sigmoid_zero_to_one(x: f64, x0: f64, transition_range: f64) -> f64 {
+    
+    // The slope constant is set such that this function returns 0.01 at x = x0 - transition_range
+    // and 0.99 at x = x0 + transition_range
+    let slope = 4.5951212 / transition_range;
+
+    let x_prime = slope * (x - x0);
+
+    1.0 / ( 1.0 + f64::exp(-x_prime))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_sigmoid() {
+        let x0 = 2.4;
+        let transition_range = 1.2;
+
+        let f0 = super::sigmoid_zero_to_one(x0, x0, transition_range);
+
+        let f_n = super::sigmoid_zero_to_one(x0 - transition_range, x0, transition_range);
+        let f_p = super::sigmoid_zero_to_one(x0 + transition_range, x0, transition_range);
+
+        dbg!(f0, f_n, f_p);
+
+        assert!((f0 - 0.5).abs() < 1e-9, "f0 = {}", f0);
+        assert!((f_n - 0.01).abs() < 1e-6, "f_n = {}", f_n);
+        assert!((f_p - 0.99).abs() < 1e-6, "f_p = {}", f_p);
+    }
+}

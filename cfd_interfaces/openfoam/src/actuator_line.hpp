@@ -5,7 +5,6 @@
 #ifndef ACTUATOR_LINE_H
 #define ACTUATOR_LINE_H
 
-#include <vector>
 #include "cellSetOption.H"
 #include "cpp_actuator_line.hpp"
 
@@ -15,25 +14,77 @@ namespace Foam {
         public:
             TypeName("actuatorLine")
 
-            stormbird_interface::CppActuatorLine* model;
+            ActuatorLine(
+                const word& name, 
+                const word& modelType, 
+                const dictionary& dict, 
+                const fvMesh& mesh
+            );
 
-            ActuatorLine(const word& name, const word& modelType, const dictionary& dict, const fvMesh& mesh);
             virtual ~ActuatorLine() = default;
 
-            virtual void addSup(fvMatrix<vector>& eqn, const label fieldi);
-            virtual void addSup(const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi);
-            virtual void addSup(const volScalarField& alpha, const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi);
+            virtual void addSup(
+                fvMatrix<vector>& eqn, 
+                const label fieldi
+            );
+            
+            virtual void addSup(
+                const volScalarField& rho, 
+                fvMatrix<vector>& eqn, 
+                const label fieldi
+            );
+
+            virtual void addSup(
+                const volScalarField& alpha, 
+                const volScalarField& rho, 
+                fvMatrix<vector>& eqn, 
+                const label fieldi
+            );
 
         private:
+            // Actuator line model
+            stormbird_interface::CppActuatorLine* model;
+            
+            // Fields
             volVectorField* body_force_field;
             volScalarField* body_force_field_weight;
 
-            void add(const volVectorField& U, fvMatrix<vector>& eqn);
-            void add_cell_information_to_model(const volVectorField& velocity);
-            void add_interpolated_velocity(const volVectorField& velocity);
+            // Mesh to actuator line data
+            // TODO: make these parameters available in the input file
+            bool use_integral_velocity_sampling = true;
+            bool only_use_dominating_line_element_when_sampling = true;
+            bool only_use_dominating_line_element_when_projecting = true;
             
-            double measure_average_cell_length(const std::vector<stormbird_interface::Vec3>& points);
+            bool velocity_sampling_data_is_set = false;
+            bool projection_data_is_set = false;
 
+            double projection_limit = 0.1;
+            double sampling_integral_limit = 0.1;
+
+            // Store all relevant data
+            std::vector<label> interpolation_cells;
+            std::vector<vector> ctrl_points;
+
+            labelList relevant_cells_for_projection;
+            labelList dominating_line_element_index_projection;
+
+            labelList relevant_cells_for_velocity_sampling;
+            labelList dominating_line_element_index_sampling;
+
+
+            // Custom add function
+            void add(const volVectorField& velocity, fvMatrix<vector>& eqn);
+
+            // Check which cells are relevant
+            void set_projection_data();
+            void set_velocity_sampling_data_interpolation();
+            void set_velocity_sampling_data_integral();
+
+            // Ways to estimate the velocity
+            void set_integrated_weighted_velocity(const volVectorField& velocity);
+            void set_interpolated_velocity(const volVectorField& velocity);
+
+            // Copy constructor and assignment operator
             ActuatorLine(const ActuatorLine&) = delete;
             void operator=(const ActuatorLine&) = delete;
         };

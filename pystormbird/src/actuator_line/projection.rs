@@ -23,7 +23,7 @@ pub struct Projection {
 #[pymethods]
 impl Projection {
     #[classmethod]
-    pub fn gaussian(_cls: &PyType, chord_factor: f64, thickness_factor: f64) -> Self {
+    pub fn gaussian(_cls: &Bound<'_, PyType>, chord_factor: f64, thickness_factor: f64) -> Self {
         Self {
             data: ProjectionRust::Gaussian(
                 Gaussian {
@@ -35,7 +35,7 @@ impl Projection {
     }
 
     #[classmethod]
-    pub fn elliptic(_cls: &PyType, chord_factor: f64, thickness_factor: f64) -> Self {
+    pub fn elliptic(_cls: &Bound<'_, PyType>, chord_factor: f64, thickness_factor: f64) -> Self {
         Self {
             data: ProjectionRust::Elliptic(
                 Elliptic {
@@ -47,7 +47,7 @@ impl Projection {
     }
 
     #[classmethod]
-    pub fn harmonic(_cls: &PyType, chord_factor: f64, thickness_factor: f64) -> Self {
+    pub fn harmonic(_cls: &Bound<'_, PyType>, chord_factor: f64, thickness_factor: f64) -> Self {
         Self {
             data: ProjectionRust::Harmonic(
                 Harmonic {
@@ -68,7 +68,7 @@ impl Projection {
             value_data
         )
     )]
-    pub fn chord_variation_from_data(_cls: &PyType, chord_factor: f64, thickness_factor: f64, chord_factor_data: Vec<f64>, value_data: Vec<f64>) -> Self {
+    pub fn chord_variation_from_data(_cls: &Bound<'_, PyType>, chord_factor: f64, thickness_factor: f64, chord_factor_data: Vec<f64>, value_data: Vec<f64>) -> Self {
         Self {
             data: ProjectionRust::ChordVariationFromData(
                 ChordVariationFromData {

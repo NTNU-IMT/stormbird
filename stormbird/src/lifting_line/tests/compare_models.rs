@@ -5,6 +5,7 @@
 //! Compare the result from different solvers
 
 use std::f64::consts::PI;
+use std::time::Instant;
 
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
@@ -13,6 +14,7 @@ use crate::lifting_line::simulation_builder::{
     SteadySettings,
     UnsteadySettings,
 };
+use crate::line_force_model::circulation_corrections::CirculationCorrection;
 
 use super::test_setup::RectangularWing;
 use super::elliptic_wing_theory::EllipticWingTheory;
@@ -39,37 +41,25 @@ fn steady_lift() {
         ..Default::default()
     }.build();
 
-    let steady_settings  = SteadySettings{
-        solver: SteadySolverSettings {
-            damping_factor_start: 0.01,
-            damping_factor_end: Some(0.1),
-            print_log: true,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let mut prescribed_wing_builder = wing_builder.clone();
+    prescribed_wing_builder.circulation_corrections = CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
 
-    let dynamic_settings = UnsteadySettings {
-        solver: UnsteadySolverSettings {
-            damping_factor_start: 0.01,
-            damping_factor_end: Some(0.1),
-            print_log: true,
-            ..Default::default()
-        },
-        wake: UnsteadyWakeBuilder {
-            ratio_of_wake_affected_by_induced_velocities: Some(0.0),
-            ..Default::default()
-        }
-    };
+    let steady_settings  = SteadySettings::default();
+    let dynamic_settings = UnsteadySettings::default();
 
     let nr_time_steps = 200;
 
     let time_step = 0.25;
 
-    let velocity = Vec3::new(1.2, 0.0, 0.0);
+    let velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
+        SimulationMode::QuasiSteady(steady_settings.clone())
+    ).build(time_step, velocity);
+
+    let mut prescribed_sim = SimulationBuilder::new(
+        prescribed_wing_builder.clone(),
         SimulationMode::QuasiSteady(steady_settings)
     ).build(time_step, velocity);
 
@@ -83,35 +73,73 @@ fn steady_lift() {
     let dynamic_velocity_points = dynamic_sim.get_freestream_velocity_points();
     let static_velocity_points = steady_sim.get_freestream_velocity_points();
 
-    let dynamic_velocity_freestream: Vec<Vec3> = vec![velocity; dynamic_velocity_points.len()];
-    let static_velocity_freestream: Vec<Vec3> = vec![velocity; static_velocity_points.len()];
+    let dynamic_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; dynamic_velocity_points.len()];
+    let static_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; static_velocity_points.len()];
 
-    let result_steady  = steady_sim.do_step(0.0, time_step, &static_velocity_freestream);
+    let start = Instant::now();
+    let result_steady  = steady_sim.do_step(
+        0.0, 
+        time_step, 
+        &static_velocity_freestream
+    );
+    println!("Time to run steady simulation: {} secs", start.elapsed().as_secs_f64());
+    println!("Number of steady iterations: {}", result_steady.iterations);
+    println!("Residual for steady simulation: {}", result_steady.residual);
 
-    let cd_steady = result_steady.integrated_forces_sum().x / force_factor;
-    let cl_steady = result_steady.integrated_forces_sum().y / force_factor;
+    let cd_steady = result_steady.integrated_forces_sum()[0] / force_factor;
+    let cl_steady = result_steady.integrated_forces_sum()[1] / force_factor;
+
+    let start = Instant::now();
+    let result_prescribed = prescribed_sim.do_step(
+        0.0, 
+        time_step, 
+        &static_velocity_freestream
+    );
+
+    println!("Time to run prescribed simulation: {} secs", start.elapsed().as_secs_f64());
+    println!("Number of prescribed iterations: {}", result_prescribed.iterations);
+    println!("Residual for prescribed simulation: {}", result_prescribed.residual);
+
+    let cd_prescribed = result_prescribed.integrated_forces_sum()[0] / force_factor;
+    let cl_prescribed = result_prescribed.integrated_forces_sum()[1] / force_factor;
 
     let mut cd_dynamic = 0.0;
     let mut cl_dynamic = 0.0;
 
+    let mut result_dynamic = SimulationResult::default();
+    let start = Instant::now();
     for i in 0..nr_time_steps {
         let time = (i as f64) * time_step;
         
-        let result_dynamic = dynamic_sim.do_step(time, time_step, &dynamic_velocity_freestream);
+        result_dynamic = dynamic_sim.do_step(
+            time, 
+            time_step, 
+            &dynamic_velocity_freestream
+        );
 
-        cd_dynamic = result_dynamic.integrated_forces_sum().x / force_factor;
-        cl_dynamic = result_dynamic.integrated_forces_sum().y / force_factor;   
+        cd_dynamic = result_dynamic.integrated_forces_sum()[0] / force_factor;
+        cl_dynamic = result_dynamic.integrated_forces_sum()[1] / force_factor;         
     }
+
+    println!("Time to run dynamic simulation: {} secs", start.elapsed().as_secs_f64());
+    println!("Number of dynamic iterations on last time step: {}", result_dynamic.iterations);
+    println!("Residual for dynamic simulation: {}", result_dynamic.residual);
+    
 
     println!("Theory");
     dbg!(cd_theory, cl_theory);
     println!("Steady");
     dbg!(cd_steady, cl_steady);
+    println!("Prescribed");
+    dbg!(cd_prescribed, cl_prescribed);
     println!("Dynamic");
     dbg!(cd_dynamic, cl_dynamic);
 
     let steady_cl_error = (cl_theory - cl_steady).abs() / cl_theory.abs();
     let steady_cd_error = (cd_theory - cd_steady).abs() / cd_theory.abs();
+
+    let prescribed_cl_error = (cl_theory - cl_prescribed).abs() / cl_theory.abs();
+    let prescribed_cd_error = (cd_theory - cd_prescribed).abs() / cd_theory.abs();
 
     let dynamic_cl_error = (cl_theory - cl_dynamic).abs() / cl_theory.abs();
     let dynamic_cd_error = (cd_theory - cd_dynamic).abs() / cd_theory.abs();
@@ -121,6 +149,8 @@ fn steady_lift() {
 
     assert!(steady_cl_error < allowable_cl_error, "Steady cl error: {}", steady_cl_error);
     assert!(steady_cd_error < allowable_cd_error, "Steady cd error: {}", steady_cd_error);
+    assert!(prescribed_cl_error < allowable_cl_error, "Prescribed cl error: {}", prescribed_cl_error);
+    assert!(prescribed_cd_error < allowable_cd_error, "Prescribed cd error: {}", prescribed_cd_error);
     assert!(dynamic_cl_error < allowable_cl_error, "Dynamic cl error: {}", dynamic_cl_error);
-    assert!(dynamic_cd_error < allowable_cd_error, "Dynamic cd error: {}", dynamic_cd_error);   
+    assert!(dynamic_cd_error < allowable_cd_error, "Dynamic cd error: {}", dynamic_cd_error);
 }

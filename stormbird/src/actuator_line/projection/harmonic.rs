@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 
 use serde::{Serialize, Deserialize};
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 use crate::line_force_model::span_line::SpanLine;
 
@@ -27,7 +27,7 @@ impl Default for Harmonic {
 }
 
 impl Harmonic {
-    pub fn projection_value_at_point(&self, point: Vec3, chord_vector: Vec3, span_line: &SpanLine) -> f64 {
+    pub fn projection_value_at_point(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>, span_line: &SpanLine) -> f64 {
         let line_length = span_line.length();
         let point_lc = span_line.line_coordinates(point, chord_vector);
 

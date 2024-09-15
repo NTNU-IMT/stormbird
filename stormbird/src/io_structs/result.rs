@@ -4,7 +4,7 @@
 
 //! Results from simulations.
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use serde::{Serialize, Deserialize};
 
 use super::forces_and_moments::{
@@ -17,22 +17,33 @@ use super::forces_and_moments::{
 /// Results from a lifting line solver, which will be further used to generate SimulationResults
 pub struct SolverResult {
     pub circulation_strength: Vec<f64>,
-    pub ctrl_point_velocity: Vec<Vec3>,
+    pub ctrl_point_velocity: Vec<SpatialVector<3>>,
+    pub iterations: usize,
+    pub residual: f64,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
-    pub ctrl_points: Vec<Vec3>,
+    pub ctrl_points: Vec<SpatialVector<3>>,
     pub force_input: SectionalForcesInput,
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
     pub integrated_moments: Vec<IntegratedValues>,
+    pub iterations: usize,
+    pub residual: f64,
 }
 
 impl SimulationResult {
-    pub fn integrated_forces_sum(&self) -> Vec3 {
-        let mut sum = Vec3::default();
+    pub fn result_history_from_file(file_path: &str) -> Vec<SimulationResult> {
+        let file = std::fs::File::open(file_path).unwrap();
+        let reader = std::io::BufReader::new(file);
+
+        serde_json::from_reader(reader).unwrap()
+    }
+
+    pub fn integrated_forces_sum(&self) -> SpatialVector<3> {
+        let mut sum = SpatialVector::<3>::default();
 
         for i in 0..self.integrated_forces.len() {
             sum += self.integrated_forces[i].total;
@@ -41,8 +52,8 @@ impl SimulationResult {
         sum
     }
 
-    pub fn integrated_moments_sum(&self) -> Vec3 {
-        let mut sum = Vec3::default();
+    pub fn integrated_moments_sum(&self) -> SpatialVector<3> {
+        let mut sum = SpatialVector::<3>::default();
 
         for i in 0..self.integrated_moments.len() {
             sum += self.integrated_moments[i].total;

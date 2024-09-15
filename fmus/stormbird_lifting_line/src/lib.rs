@@ -4,13 +4,11 @@
 
 use fmu_from_struct::prelude::*;
 
-use stormbird::lifting_line::prelude::*;
-use stormbird::lifting_line::simulation::{Simulation, SimulationBuilder};
-use stormbird::io_structs::input_state::InputState;
-use stormbird::io_structs::freestream::Freestream;
+use math_utils::spatial_vector::SpatialVector;
+use stormbird::lifting_line::simulation::Simulation;
+use stormbird::lifting_line::simulation_builder::SimulationBuilder;
 
 use std::f64::consts::PI;
-
 
 #[derive(Debug, Default, Clone, Fmu)]
 #[fmi_version = 2]
@@ -20,10 +18,6 @@ pub struct StormbirdLiftingLine {
     pub angles_in_degrees: bool,
     pub use_relative_angle: bool,
     pub max_wing_rotation_velocity: f64,
-    pub use_abl_model: bool,
-    pub wind_power_factor: f64,
-    pub wind_reference_height: f64,
-    pub wind_water_plane_height: f64,
     pub write_stormbird_results: bool,
     pub stormbird_results_path: String,
     #[input]
@@ -48,49 +42,56 @@ pub struct StormbirdLiftingLine {
     pub moment_y: f64,
     pub moment_z: f64,
 
-    up_direction: Vec3,
+    up_direction: SpatialVector<3>,
     stormbird_model: Option<Simulation>,
+    nr_freestream_velocity_points: usize,
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
-    fn exit_initialization_mode(&mut self) {
-        if self.wind_power_factor == 0.0 {
-            self.wind_power_factor = 1.0/9.0;
-        }
-
-        if self.wind_reference_height == 0.0 {
-            self.wind_reference_height = 10.0;
-        }
-
-        let stormbird_model_builder = SimulationBuilder::new_from_file(&self.setup_file_path).unwrap();
-
-        self.stormbird_model = Some(stormbird_model_builder.build());
-
-        if let Some(model) = &mut self.stormbird_model {
-            let span_lines = model.line_force_model.span_lines();
-            
-            self.up_direction = span_lines[0].relative_vector().normalize();
-        }
-        
-    }
-
     fn do_step(&mut self, current_time: f64, time_step: f64) {
-        let input_state = self.input_state();
+        let freestream_velocity = SpatialVector([
+            self.reference_wind_velocity_x,
+            self.reference_wind_velocity_y,
+            self.reference_wind_velocity_z
+        ]);
+
+        if let None = self.stormbird_model {
+            self.initialize_model(time_step, freestream_velocity);
+        }
+
+        let translation = SpatialVector([
+            self.translation_x, 
+            self.translation_y, 
+            self.translation_z
+        ]);
+
+        let rotation = if self.angles_in_degrees {
+            SpatialVector([
+                self.rotation_x.to_radians(), 
+                self.rotation_y.to_radians(), 
+                self.rotation_z.to_radians()
+            ])
+        } else {
+            SpatialVector([
+                self.rotation_x, 
+                self.rotation_y, 
+                self.rotation_z
+            ])
+        };
 
         if self.use_relative_angle {
-            let ctrl_points = self.stormbird_model.as_ref().unwrap().line_force_model.ctrl_points();
-
-            let freestream_velocity = input_state.freestream.velocity_at_locations(
-                &ctrl_points
-            );
-
-            let average_freestream_velocity = freestream_velocity.iter().sum::<Vec3>() / freestream_velocity.len() as f64;
-
-            self.apply_relative_angle(average_freestream_velocity, time_step);
+            self.apply_relative_angle(freestream_velocity, time_step);
         }
         
         if let Some(model) = &mut self.stormbird_model {
-            let result = model.do_step(current_time, time_step, input_state);
+            model.line_force_model.translation = translation;
+            model.line_force_model.rotation = rotation;
+
+            let result = model.do_step(
+                current_time, 
+                time_step, 
+                &vec![freestream_velocity; self.nr_freestream_velocity_points]
+            );
 
             if self.write_stormbird_results {
                 result.write_to_file(&self.stormbird_results_path).unwrap();
@@ -99,78 +100,37 @@ impl FmuFunctions for StormbirdLiftingLine {
             let integrated_forces  = result.integrated_forces_sum();
             let integrated_moments = result.integrated_moments_sum();
 
-            self.force_x = integrated_forces.x;
-            self.force_y = integrated_forces.y;
-            self.force_z = integrated_forces.z;
+            self.force_x = integrated_forces[0];
+            self.force_y = integrated_forces[1];
+            self.force_z = integrated_forces[2];
 
-            self.moment_x = integrated_moments.x;
-            self.moment_y = integrated_moments.y;
-            self.moment_z = integrated_moments.z;
+            self.moment_x = integrated_moments[0];
+            self.moment_y = integrated_moments[1];
+            self.moment_z = integrated_moments[2];
         }
     }
 }
 
 impl StormbirdLiftingLine {
-    fn input_state(&self) -> InputState {
-        let translation = Vec3::new(
-            self.translation_x, 
-            self.translation_y, 
-            self.translation_z
-        );
+    fn initialize_model(&mut self, time_step: f64, freestream_velocity: SpatialVector<3>) {
+        let stormbird_model_builder = SimulationBuilder::new_from_file(
+            &self.setup_file_path
+        ).unwrap();
 
-        let rotation = if self.angles_in_degrees {
-            Vec3::new(
-                self.rotation_x.to_radians(), 
-                self.rotation_y.to_radians(), 
-                self.rotation_z.to_radians()
-            )
-        } else {
-            Vec3::new(
-                self.rotation_x, 
-                self.rotation_y, 
-                self.rotation_z
-            )
-        };
+        self.stormbird_model = Some(stormbird_model_builder.build(time_step, freestream_velocity));
 
-        let freestream = if self.use_abl_model {
-            Freestream::PowerModelABL(
-                PowerModelABL {
-                    constant_velocity: Vec3::new(
-                        self.constant_velocity_x, 
-                        self.constant_velocity_y, 
-                        self.constant_velocity_z
-                    ),
-                    reference_wind_velocity: Vec3::new(
-                        self.reference_wind_velocity_x,
-                        self.reference_wind_velocity_y,
-                        self.reference_wind_velocity_z
-                    ),
-                    reference_height: self.wind_reference_height,
-                    power_factor: self.wind_power_factor,
-                    up_direction: self.up_direction,
-                    water_plane_height: self.wind_water_plane_height,
-                }
-            )
-        } else {
-            Freestream::Constant(
-                Vec3::new(
-                    self.constant_velocity_x + self.reference_wind_velocity_x, 
-                    self.constant_velocity_y + self.reference_wind_velocity_y, 
-                    self.constant_velocity_z + self.reference_wind_velocity_z
-                )
-            )
-        };
+        if let Some(model) = &mut self.stormbird_model {
+            let span_lines = model.line_force_model.span_lines();
+            
+            self.up_direction = span_lines[0].relative_vector().normalize();
 
-        InputState {
-            freestream,
-            translation,
-            rotation,
+            let freestream_velocity_points = model.get_freestream_velocity_points();
+
+            self.nr_freestream_velocity_points = freestream_velocity_points.len();
         }
     }
-
-
     /// Applies the relative angle to the model
-    fn apply_relative_angle(&mut self, freestream_velocity: Vec3, time_step: f64) {
+    fn apply_relative_angle(&mut self, freestream_velocity: SpatialVector<3>, time_step: f64) {
         if let Some(model) = &mut self.stormbird_model{
             let relative_angle = if self.angles_in_degrees {
                 self.relative_angle.to_radians()

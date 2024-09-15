@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use serde::{Serialize, Deserialize};
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,21 +24,21 @@ impl Default for SymmetryCondition {
 }
 
 impl SymmetryCondition {
-    pub fn mirrored_point(&self, point: Vec3) -> Option<Vec3> {
+    pub fn mirrored_point(&self, point: SpatialVector<3>) -> Option<SpatialVector<3>> {
         match self {
             SymmetryCondition::NoSymmetry => None,
-            SymmetryCondition::X => Some(Vec3{x: -point.x, y:  point.y, z:  point.z}),
-            SymmetryCondition::Y => Some(Vec3{x:  point.x, y: -point.y, z:  point.z}),
-            SymmetryCondition::Z => Some(Vec3{x:  point.x, y:  point.y, z: -point.z}),
+            SymmetryCondition::X => Some(SpatialVector::<3>::new(-point[0], point[1], point[2])),
+            SymmetryCondition::Y => Some(SpatialVector::<3>::new(point[0], -point[1], point[2])),
+            SymmetryCondition::Z => Some(SpatialVector::<3>::new(point[0], point[1], -point[2])),
         }
     }
 
-    pub fn corrected_velocity(&self, u_i: Vec3, u_i_m: Vec3) -> Vec3 {
+    pub fn corrected_velocity(&self, u_i: SpatialVector<3>, u_i_m: SpatialVector<3>) -> SpatialVector<3> {
         match self {
             SymmetryCondition::NoSymmetry => u_i,
-            SymmetryCondition::X => Vec3{x: u_i.x - u_i_m.x, y: u_i.y + u_i_m.y, z: u_i.z + u_i_m.z},
-            SymmetryCondition::Y => Vec3{x: u_i.x + u_i_m.x, y: u_i.y - u_i_m.y, z: u_i.z + u_i_m.z},
-            SymmetryCondition::Z => Vec3{x: u_i.x + u_i_m.x, y: u_i.y + u_i_m.y, z: u_i.z - u_i_m.z},
+            SymmetryCondition::X => SpatialVector::<3>::new(u_i[0] - u_i_m[0], u_i[1] + u_i_m[1], u_i[2] + u_i_m[2]),
+            SymmetryCondition::Y => SpatialVector::<3>::new(u_i[0] + u_i_m[0], u_i[1] - u_i_m[1], u_i[2] + u_i_m[2]),
+            SymmetryCondition::Z => SpatialVector::<3>::new(u_i[0] + u_i_m[0], u_i[1] + u_i_m[1], u_i[2] - u_i_m[2]),
         }
     }
 }

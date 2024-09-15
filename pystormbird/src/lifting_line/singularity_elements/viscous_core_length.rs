@@ -16,14 +16,14 @@ pub struct ViscousCoreLength {
 #[pymethods]
 impl ViscousCoreLength {
     #[classmethod]
-    pub fn relative(_cls: &PyType, relative_length: f64) -> Self {
+    pub fn relative(_cls: &Bound<'_, PyType>, relative_length: f64) -> Self {
         Self {
             data: ViscousCoreLengthRust::Relative(relative_length)
         }
     }
 
     #[classmethod]
-    pub fn absolute(_cls: &PyType, absolute_length: f64) -> Self {
+    pub fn absolute(_cls: &Bound<'_, PyType>, absolute_length: f64) -> Self {
         Self {
             data: ViscousCoreLengthRust::Absolute(absolute_length)
         }

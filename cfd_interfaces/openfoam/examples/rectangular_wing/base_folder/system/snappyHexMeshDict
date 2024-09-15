@@ -1,0 +1,113 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+
+#include "../dimensions.txt";
+
+castellatedMesh true;
+snap            false;
+addLayers       false;
+
+wing_box_z #calc "0.5 * 1.1 * $span";
+wing_box_r #calc "0.5 * $chord";
+
+wake_box_z #calc "0.5 * 1.25 * $span";
+wake_box_r #calc "1.0 * $chord";
+wake_box_x #calc "3.0 * $chord";
+
+geometry
+{
+    wingBox
+    {
+        type box;
+        min  (-$wing_box_r -$wing_box_r -$wing_box_z);
+        max  ( $wing_box_r  $wing_box_r $wing_box_z);
+    }
+
+    wakeBox
+    {
+        type box;
+        min  (-$wake_box_r -$wake_box_r -$wake_box_z);
+        max  ( $wake_box_x  $wake_box_r $wake_box_z);
+    }
+}
+
+castellatedMeshControls
+{
+    maxLocalCells 100000;
+    maxGlobalCells 2000000;
+    minRefinementCells 10;
+    maxLoadUnbalance 0.10;
+    nCellsBetweenLevels 10;
+
+    features ();
+
+    refinementSurfaces{}
+
+    resolveFeatureAngle 30;
+
+    refinementRegions
+    {
+        wingBox
+        {
+            mode inside;
+            levels ((1.0 3));
+        }
+
+        wakeBox
+        {
+            mode inside;
+            levels ((1.0 3));
+        }
+    }
+
+    locationInMesh (0.25 0 0.0);
+
+    allowFreeStandingZoneFaces true;
+}
+
+snapControls
+{
+    nSmoothPatch 3;
+    tolerance 2.0;
+    nSolveIter 30;
+    nRelaxIter 5;
+    nFeatureSnapIter 10;
+    implicitFeatureSnap false;
+    explicitFeatureSnap false;
+    multiRegionFeatureSnap false;
+}
+
+addLayersControls
+{
+    relativeSizes true;
+
+    layers{}
+
+    expansionRatio 1.0;
+    finalLayerThickness 0.3;
+    minThickness 0.1;
+    nGrow 0;
+    featureAngle 60;
+    slipFeatureAngle 30;
+    nRelaxIter 3;
+    nSmoothSurfaceNormals 1;
+    nSmoothNormals 3;
+    nSmoothThickness 10;
+    maxFaceThicknessRatio 0.5;
+    maxThicknessToMedialRatio 0.3;
+    minMedialAxisAngle 90;
+    nBufferCellsNoExtrude 0;
+    nLayerIter 50;
+}
+
+meshQualityControls
+{
+    #includeEtc "caseDicts/meshQualityDict"
+}
+
+mergeTolerance 1e-6;

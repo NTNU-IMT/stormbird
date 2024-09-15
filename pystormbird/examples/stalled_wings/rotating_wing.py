@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pystormbird.lifting_line import Simulation
-from pystormbird import Vec3
+from pystormbird import SpatialVector
 import json
 
 import argparse
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    wind_velocity_vector = Vec3(args.wind_velocity, 0.0, 0.0)
+    wind_velocity_vector = SpatialVector(args.wind_velocity, 0.0, 0.0)
 
     chord_length = 9.8
     span = 37.0
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     x_positions = np.array([0.0])
     y_positions = np.array([0.0])
 
-    chord_vector = Vec3(chord_length, 0.0, 0.0)
+    chord_vector = SpatialVector(chord_length, 0.0, 0.0)
 
     wings = []
     for i in range(len(x_positions)):

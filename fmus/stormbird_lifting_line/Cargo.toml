@@ -1,6 +1,6 @@
 [package]
 name = "stormbird_lifting_line"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
 
 [lib]
@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 fmu_from_struct = { version = "0.1.1" }
 
 stormbird = { path = "../../stormbird"}
+math_utils = { path = "../../math_utils"}

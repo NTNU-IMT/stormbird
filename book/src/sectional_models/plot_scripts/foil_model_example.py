@@ -7,7 +7,7 @@ from pystormbird.section_models import Foil
 if __name__ == '__main__':
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
-    y_min = -1.5
+    y_min = -2.0
     y_max = 2.3
 
     foil = Foil(
@@ -16,12 +16,13 @@ if __name__ == '__main__':
         cl_high_order_power = 4.0,
         cl_max_after_stall = 0.95,
         cd_max_after_stall = 1.2,
-        mean_stall_angle = np.radians(20),
+        mean_positive_stall_angle = np.radians(20),
+        mean_negative_stall_angle = np.radians(25),
         stall_range = np.radians(10),
     )
 
     n_plot = 200
-    angles_of_attack_deg = np.linspace(-30, 95, n_plot)
+    angles_of_attack_deg = np.linspace(-35, 95, n_plot)
     angles_of_attack = np.radians(angles_of_attack_deg)
 
     cl = np.zeros(n_plot)
@@ -35,21 +36,21 @@ if __name__ == '__main__':
     plt.plot(angles_of_attack_deg, cd, color=default_colors[1], label='Drag')
 
     plt.fill_between(
-        np.degrees([foil.mean_stall_angle - foil.stall_range/2, foil.mean_stall_angle + foil.stall_range/2]), 
+        np.degrees([foil.mean_positive_stall_angle - foil.stall_range/2, foil.mean_positive_stall_angle + foil.stall_range/2]), 
         [y_max, y_max], 
         [y_min, y_min], 
         color='grey', alpha=0.1, label='Stall range'
     )
 
     plt.fill_between(
-        np.degrees([-foil.mean_stall_angle - foil.stall_range/2, -foil.mean_stall_angle + foil.stall_range/2]), 
+        np.degrees([-foil.mean_negative_stall_angle - foil.stall_range/2, -foil.mean_negative_stall_angle + foil.stall_range/2]), 
         [y_max, y_max], 
         [y_min, y_min], 
         color='grey', alpha=0.1
     )
     
-    plt.plot(np.degrees([foil.mean_stall_angle]*2), [y_min, y_max], '--', color = 'grey', label='Mean stall angle')
-    plt.plot(np.degrees([-foil.mean_stall_angle]*2), [y_min, y_max], '--', color = 'grey')
+    plt.plot(np.degrees([foil.mean_positive_stall_angle]*2), [y_min, y_max], '--', color = 'grey', label='Mean stall angle')
+    plt.plot(np.degrees([-foil.mean_negative_stall_angle]*2), [y_min, y_max], '--', color = 'grey')
 
     plt.scatter(0.0, foil.cl_zero_angle, color=default_colors[0])
     plt.text(

@@ -4,7 +4,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,7 +28,7 @@ impl Default for ViscousCoreLength {
 
 impl ViscousCoreLength {
     /// Calculates the distance between the point and the line
-    pub fn distance(&self, line_points: &[Vec3; 2], ctrl_point: Vec3) -> f64 {
+    pub fn distance(&self, line_points: &[SpatialVector<3>; 2], ctrl_point: SpatialVector<3>) -> f64 {
         let relative_line  = line_points[1] - line_points[0];
         let relative_point = ctrl_point - line_points[0];
 
@@ -62,7 +62,7 @@ impl ViscousCoreLength {
     /// Viscous core term. Based on expressions from:
     /// J. T. Reid (2020) - A general approach to lifting-line theory, applied to wings with sweep
     /// Link: <https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=8982&context=etd>
-    pub fn viscous_core_term(&self, line_points: &[Vec3; 2], ctrl_point: Vec3) -> f64 {
+    pub fn viscous_core_term(&self, line_points: &[SpatialVector<3>; 2], ctrl_point: SpatialVector<3>) -> f64 {
         let distance = self.distance(line_points, ctrl_point);
 
         let line_length = (line_points[1] - line_points[0]).length();

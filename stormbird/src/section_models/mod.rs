@@ -5,9 +5,6 @@
 //! Models of two dimensional lift and drag on wing sections, such as foil profiles and rotating 
 //! cylinders. 
 
-
-/// Collection of functions that are useful for multiple section models.
-pub mod common_functions;
 /// Section model of a foil profile
 pub mod foil;
 /// Section model of a foil profile where the parameters can vary depending on an internal state
@@ -36,6 +33,16 @@ impl SectionModel {
             SectionModel::VaryingFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
             SectionModel::RotatingCylinder(_) => 1.0,
         }
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+}
+
+impl Default for SectionModel {
+    fn default() -> Self {
+        SectionModel::Foil(Foil::default())
     }
 }
 

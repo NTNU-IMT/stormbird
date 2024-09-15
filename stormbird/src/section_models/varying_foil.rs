@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use crate::math_utils::interpolation::linear_interpolation;
+use math_utils::interpolation::linear_interpolation;
 
 use super::*;
 
@@ -25,6 +25,10 @@ impl VaryingFoil {
         let data: VaryingFoil = serde_json::from_str(input_str).unwrap();
         
         data
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 
     pub fn get_foil(&self) -> Foil {

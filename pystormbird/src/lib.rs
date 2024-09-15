@@ -11,33 +11,35 @@ use pyo3::{
     types::PyDict
 };
 
-mod vec3;
+mod spatial_vector;
 mod section_models;
 mod result_structs;
 mod line_force_model;
 mod lifting_line;
-mod actuator_line;
+//mod actuator_line;
 
 #[pymodule]
-fn pystormbird(py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<vec3::Vec3>()?;
+fn pystormbird(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<spatial_vector::SpatialVector>()?;
     m.add_class::<result_structs::SimulationResult>()?;
+    m.add_class::<result_structs::SectionalForcesInput>()?;
     
     m.add_wrapped(wrap_pymodule!(section_models::section_models))?;
     m.add_wrapped(wrap_pymodule!(line_force_model::line_force_model))?;
     m.add_wrapped(wrap_pymodule!(lifting_line::lifting_line))?;
-    m.add_wrapped(wrap_pymodule!(actuator_line::actuator_line))?;
     
     // Trick to make the module visible to Python. Taken from:
     // <https://medium.com/@kudryavtsev_ia/how-i-design-and-develop-real-world-python-extensions-in-rust-2abfe2377182>
-    let sys = PyModule::import(py, "sys")?;
-    let sys_modules: &PyDict = sys.getattr("modules")?.downcast()?;
+    Python::with_gil(|py| {
+        let sys = PyModule::import_bound(py, "sys")?;
+        let sys_modules: &PyDict = sys
+            .getattr("modules")?
+            .extract()?;
 
-    sys_modules.set_item("pystormbird.section_models",   m.getattr("section_models")?)?;
-    sys_modules.set_item("pystormbird.line_force_model", m.getattr("line_force_model")?)?;
-    sys_modules.set_item("pystormbird.lifting_line",     m.getattr("lifting_line")?)?;
-    sys_modules.set_item("pystormbird.actuator_line",    m.getattr("actuator_line")?)?;
-    
-    
-    Ok(())
+        sys_modules.set_item("pystormbird.section_models",   m.getattr("section_models")?)?;
+        sys_modules.set_item("pystormbird.line_force_model", m.getattr("line_force_model")?)?;
+        sys_modules.set_item("pystormbird.lifting_line",     m.getattr("lifting_line")?)?;
+
+        Ok(())
+    })
 }

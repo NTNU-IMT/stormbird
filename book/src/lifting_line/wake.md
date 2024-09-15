@@ -6,13 +6,6 @@ The vortex wakes from the wings are the most important part of a lifting line si
 This section gives an overview of sub-structures used in the setup of wake structures. They are relevant for both quasi-steady and dynamic simulations.
 
 ```rust
-pub struct VelocityCorrectionsBuilder {
-    pub max_magnitude_ratio: Option<f64>,
-    pub correction_factor: Option<f64>,
-}
-```
-
-```rust
 pub enum SymmetryCondition {
     NoSymmetry,
     X,
@@ -35,7 +28,6 @@ pub struct SteadyWakeBuilder {
     pub wake_length_factor: f64,
     pub symmetry_condition: SymmetryCondition,
     pub viscous_core_length: ViscousCoreLength,
-    pub induced_velocity_corrections: VelocityCorrectionsBuilder
 }
 ```
 
@@ -47,12 +39,13 @@ pub struct UnsteadyWakeBuilder {
     pub wake_length: WakeLength,
     pub viscous_core_length: ViscousCoreLength,
     pub first_panel_relative_length: f64,
+    pub last_panel_relative_length: f64,
+    pub use_chord_direction: bool,
     pub strength_damping_last_panel_ratio: f64,
     pub symmetry_condition: SymmetryCondition,
-    pub ratio_of_wake_affected_by_induced_velocities: Option<f64>,
+    pub ratio_of_wake_affected_by_induced_velocities: f64,
     pub far_field_ratio: f64,
     pub shape_damping_factor: f64,
-    pub induced_velocity_corrections: VelocityCorrectionsBuilder,
     pub viscous_core_length_off_body: Option<ViscousCoreLength>,
     pub neglect_self_induced_velocities: bool
 }

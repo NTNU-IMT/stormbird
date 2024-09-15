@@ -19,7 +19,7 @@ Generating the right velocity input consists of two steps. First, the user must 
 
 ```python
 from pystormbird.lifting_line import Simulation
-from pystormbird import Vec3
+from pystormbird import SpatialVector
 
 # ----- code to set up the simulation first -----
 

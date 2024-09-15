@@ -32,4 +32,23 @@ impl VaryingFoil {
     pub fn drag_coefficient(&self, angle_of_attack: f64) -> f64 {
         self.data.drag_coefficient(angle_of_attack)
     }
+
+    pub fn __str__(&self) -> String {
+        self.data.to_string()
+    }
+
+    #[getter]
+    /// Uses the built in json module to convert the string to a dictionary
+    pub fn __dict__(&self) -> PyResult<PyObject> {
+        let json_string = self.__str__();
+        
+        Python::with_gil(|py| {
+            let json_module = PyModule::import_bound(py, "json")?;
+
+            let dict = json_module.call_method1("loads", (json_string,))?;
+
+            Ok(dict.into())
+        })
+    }
+
 }

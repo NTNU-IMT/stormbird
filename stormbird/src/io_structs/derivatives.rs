@@ -5,8 +5,8 @@
 //! Functionality to compute derivatives of different quantities relevant or the output from the 
 //! line force model.
 
-use crate::vec3::Vec3;
-use crate::math_utils::finite_difference;
+use math_utils::spatial_vector::SpatialVector;
+use math_utils::finite_difference;
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub struct Derivatives {
 }
 
 impl Derivatives {
-    pub fn new(line_force_model: &LineForceModel, initial_velocity: &[Vec3], initial_angles: &[f64]) -> Self {
+    pub fn new(line_force_model: &LineForceModel, initial_velocity: &[SpatialVector<3>], initial_angles: &[f64]) -> Self {
         Self {
             motion: MotionDerivatives::new(line_force_model),
             flow: FlowDerivatives::new(initial_velocity, initial_angles),
@@ -29,9 +29,9 @@ impl Derivatives {
 /// finite difference.
 pub struct MotionDerivatives {
     /// Previous positions of the control points
-    ctrl_points_history: [Vec<Vec3>; 2],
+    ctrl_points_history: [Vec<SpatialVector<3>>; 2],
     /// Previous values for the chord vector
-    rotation_history: [Vec3; 2],
+    rotation_history: [SpatialVector<3>; 2],
     update_count: usize,
 }
 
@@ -46,7 +46,7 @@ impl MotionDerivatives {
         }
     }
 
-    pub fn ctrl_point_velocity(&self, line_force_model: &LineForceModel, time_step: f64) -> Vec<Vec3> {
+    pub fn ctrl_point_velocity(&self, line_force_model: &LineForceModel, time_step: f64) -> Vec<SpatialVector<3>> {
         if line_force_model.nr_span_lines() != self.ctrl_points_history[0].len() {
             panic!(
                 "The number of span lines in the line force model does not match the number of span lines in the force input calculator"
@@ -54,12 +54,12 @@ impl MotionDerivatives {
         }
 
         if self.update_count < 2 {
-            return vec![Vec3::default(); line_force_model.nr_span_lines()];
+            return vec![SpatialVector::<3>::default(); line_force_model.nr_span_lines()];
         }
 
         let current_ctrl_points = line_force_model.ctrl_points();
 
-        let mut ctrl_point_velocity: Vec<Vec3> = Vec::with_capacity(line_force_model.nr_span_lines());
+        let mut ctrl_point_velocity: Vec<SpatialVector<3>> = Vec::with_capacity(line_force_model.nr_span_lines());
         
         for i in 0..line_force_model.nr_span_lines() {
             let position_history = [
@@ -78,7 +78,7 @@ impl MotionDerivatives {
         ctrl_point_velocity
     }
 
-    pub fn rotation_velocity(&self, line_force_model: &LineForceModel, time_step: f64) -> Vec3 {
+    pub fn rotation_velocity(&self, line_force_model: &LineForceModel, time_step: f64) -> SpatialVector<3> {
         let rotation_history = [
             self.rotation_history[0],
             self.rotation_history[1],
@@ -90,7 +90,7 @@ impl MotionDerivatives {
         )
     }
 
-    pub fn update(&mut self, current_ctrl_points: &[Vec3], current_rotation: Vec3) {
+    pub fn update(&mut self, current_ctrl_points: &[SpatialVector<3>], current_rotation: SpatialVector<3>) {
         for i in 0..current_ctrl_points.len() {
             self.ctrl_points_history[0][i] = self.ctrl_points_history[1][i];
             self.ctrl_points_history[1][i] = current_ctrl_points[i];
@@ -106,14 +106,14 @@ impl MotionDerivatives {
 #[derive(Debug, Clone)]
 /// Structure used to calculate the derivatives of flow quantities in a line force model
 pub struct FlowDerivatives {
-    pub velocity_history: [Vec<Vec3>; 2],
+    pub velocity_history: [Vec<SpatialVector<3>>; 2],
     pub angles_of_attack_history: [Vec<f64>; 2],
     update_count: usize,
 }
 
 impl FlowDerivatives {
     /// Create a new FlowDerivativesCalculator
-    pub fn new(initial_velocity: &[Vec3], initial_angles: &[f64]) -> Self {
+    pub fn new(initial_velocity: &[SpatialVector<3>], initial_angles: &[f64]) -> Self {
         if initial_velocity.len() != initial_angles.len() {
             panic!("The length of the initial velocity and initial angles must be the same");
         }
@@ -125,9 +125,9 @@ impl FlowDerivatives {
         }
     }
 
-    pub fn acceleration(&self, current_velocity: &[Vec3], time_step: f64) -> Vec<Vec3> {
+    pub fn acceleration(&self, current_velocity: &[SpatialVector<3>], time_step: f64) -> Vec<SpatialVector<3>> {
         if self.update_count < 2 {
-            return vec![Vec3::default(); current_velocity.len()];
+            return vec![SpatialVector::<3>::default(); current_velocity.len()];
         }
 
         let mut acceleration = Vec::with_capacity(current_velocity.len());
@@ -175,7 +175,7 @@ impl FlowDerivatives {
         angles_of_attack_derivative
     }
 
-    pub fn update(&mut self, current_velocity: &[Vec3], current_angles_of_attack: &[f64]) {
+    pub fn update(&mut self, current_velocity: &[SpatialVector<3>], current_angles_of_attack: &[f64]) {
         self.velocity_history[0] = self.velocity_history[1].clone();
         self.velocity_history[1] = current_velocity.to_vec();
 

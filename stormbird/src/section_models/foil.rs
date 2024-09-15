@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use super::*;
-use super::common_functions;
+use math_utils::special_functions;
 
 use std::f64::consts::PI;
 
@@ -120,6 +120,14 @@ impl Foil {
     pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
     pub fn default_cd_power_after_stall() -> f64 {1.6}
+
+    pub fn new_from_string(string: &str) -> Self {
+        serde_json::from_str(string).unwrap()
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
     
     /// Calculates the lift coefficient for a given angle of attack.
     /// 
@@ -196,7 +204,7 @@ impl Foil {
             self.mean_negative_stall_angle.abs()
         };
 
-        common_functions::sigmoid_function(
+        special_functions::sigmoid_zero_to_one(
             angle_of_attack.abs(), 
             mean_stall_angle, 
             self.stall_range

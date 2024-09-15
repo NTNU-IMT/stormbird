@@ -29,3 +29,8 @@ For a test build, cargo can be used as normal:
 ```
 cargo build
 ```
+
+To generate a package to distribute:
+```
+maturin build --release
+```

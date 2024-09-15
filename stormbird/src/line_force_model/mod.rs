@@ -6,34 +6,31 @@
 //! lift-induced velocities are estimated. In other words, this part is common for all methods 
 //! available in the library, and therefore the foundation of all simulations. 
 
-use std::f64::consts::PI;
+use std::{
+    f64::consts::PI,
+    ops::Range,
+};
+
+use math_utils::{
+    spatial_vector::SpatialVector,
+    statistics::mean,
+};
 
 pub mod force_calculations;
 pub mod derivatives;
-pub mod smoothing;
 pub mod span_line;
 pub mod builder;
-pub mod prescribed_circulations;
+
 pub mod prelude;
-
-use std::ops::Range;
-
-use crate::math_utils::statistics::mean;
-use crate::math_utils::finite_difference;
+pub mod single_wing;
+pub mod circulation_corrections;
 
 use crate::io_structs::prelude::*;
-use crate::vec3::Vec3;
 use crate::section_models::SectionModel;
-use span_line::*;
-use prescribed_circulations::PrescribedCirculation;
-use smoothing::SmoothingSettings;
 
-/// Input struct to add a single wing to a line force model
-pub struct SingleWing {
-    pub span_lines_local: Vec<SpanLine>,
-    pub chord_vectors_local: Vec<Vec3>,
-    pub section_model: SectionModel,
-}
+use span_line::*;
+use circulation_corrections::CirculationCorrection;
+use single_wing::SingleWing;
 
 #[derive(Clone, Debug)]
 /// The struct holds variables for a model that calculate the forces on wings, under the assumption
@@ -44,27 +41,42 @@ pub struct LineForceModel {
     /// and end point, to allow for uncoupled analysis
     pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
-    pub chord_vectors_local:  Vec<Vec3>,
+    pub chord_vectors_local:  Vec<SpatialVector<3>>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
     pub wing_indices:   Vec<Range<usize>>,
     /// Translation from local to global coordinates
-    pub translation: Vec3,
+    pub translation: SpatialVector<3>,
     /// Rotation from local to global coordinates
-    pub rotation: Vec3,
+    pub rotation: SpatialVector<3>,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along 
     /// the span axis during a dynamic simulation. The typical example is changing the angle of 
     /// attack on a wing sail due to changing apparent wind conditions.
     pub local_wing_angles: Vec<f64>,
+    /// A vector that contains booleans that indicate whether the circulation should be zero at the
+    /// ends or not. The variables are used both when initializing the circulation before a 
+    /// simulation and in cases where smoothing is applied to the circulation.
+    /// The vector is structured as follows:
+    /// - The first index is the wing index
+    /// - The second index is the end index, where 0 means that start of the wind and 1 means the ¨
+    /// end
+    /// - When the boolean is false, the circulation is set to zero at the end, and when it is true,
+    ///  the circulation is assumed to be non-zero.
+    pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
+    /// A vector containing information about whether or not a wing is 'virtual' or real. Virtual 
+    /// wings are included in the simulations like non-virtual wings, except that the forces are not
+    /// included in the total force calculations. The primary use case is modelling end plates. 
+    /// Adding a virtual wing at the tip of another wing will reduce the tip losses, similar to how
+    /// an end plate would work in reality.
+    pub virtual_wings: Vec<bool>,
     /// Density used in force calculations
     pub density: f64,
     /// Optional model for calculation motion and flow derivatives
     pub derivatives: Option<Derivatives>,
-    /// Optional smoothing settings
-    pub smoothing_settings: Option<SmoothingSettings>,
-    /// Optional prescribed circulation shape
-    pub prescribed_circulation: Option<PrescribedCirculation>,
+    /// Optional corrections that can be applied to the estimated circulation strength.
+    pub circulation_corrections: CirculationCorrection,
+    /// Optional variables to 
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
 }
@@ -85,13 +97,14 @@ impl LineForceModel {
             chord_vectors_local:  Vec::new(),
             section_models: Vec::new(),
             wing_indices:  Vec::new(),
-            translation: Vec3::default(),
-            rotation: Vec3::default(),
+            translation: SpatialVector::<3>::default(),
+            rotation: SpatialVector::<3>::default(),
             local_wing_angles: Vec::new(),
+            non_zero_circulation_at_ends: Vec::new(),
+            virtual_wings: Vec::new(),
             density,
             derivatives: None,
-            smoothing_settings: None,
-            prescribed_circulation: None,
+            circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
         }
     }
@@ -121,6 +134,8 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
+        self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
+        self.virtual_wings.push(wing.virtual_wing);
     }
 
     /// Short hand for querying for the number of wings in the model
@@ -159,25 +174,25 @@ impl LineForceModel {
     }
 
     /// Returns the axis of rotation for the wing at the input index.
-    pub fn wing_rotation_axis(&self, wing_index: usize) -> Vec3 {
+    pub fn wing_rotation_axis(&self, wing_index: usize) -> SpatialVector<3> {
         self.span_lines_local[self.wing_indices[wing_index].start].relative_vector()
     }
 
-    pub fn wing_rotation_axis_from_global(&self, global_index: usize) -> Vec3 {
+    pub fn wing_rotation_axis_from_global(&self, global_index: usize) -> SpatialVector<3> {
         let wing_index = self.wing_index_from_global(global_index);
         
         self.wing_rotation_axis(wing_index)
     }
 
     /// Returns both angle and axis of rotation for the wing at the input index.
-    pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, Vec3) {
+    pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, SpatialVector<3>) {
         let axis = self.wing_rotation_axis(wing_index);
         let angle = self.local_wing_angles[wing_index];
 
         (angle, axis)
     }
 
-    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (f64, Vec3) {
+    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (f64, SpatialVector<3>) {
         let wing_index = self.wing_index_from_global(global_index);
         
         self.wing_rotation_data(wing_index)
@@ -188,6 +203,14 @@ impl LineForceModel {
         for angle in self.local_wing_angles.iter_mut() {
             *angle = 0.0;
         }
+    }
+
+    pub fn span_line_at_index(&self, index: usize) -> SpanLine {
+        let (angle, axis) = self.wing_rotation_data_from_global(index);
+
+        self.span_lines_local[index].rotate_around_axis(angle, axis)
+            .rotate(self.rotation)
+            .translate(self.translation)
     }
 
     /// Returns the span lines in global coordinates.
@@ -203,8 +226,14 @@ impl LineForceModel {
         ).collect()
     }
 
+    pub fn chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+        let (angle, axis) = self.wing_rotation_data_from_global(index);
+
+        self.chord_vectors_local[index].rotate_around_axis(angle, axis).rotate(self.rotation)
+    }
+
     /// Returns the chord vectors in global coordinates.
-    pub fn chord_vectors(&self) -> Vec<Vec3> {
+    pub fn chord_vectors(&self) -> Vec<SpatialVector<3>> {
         self.chord_vectors_local.iter().enumerate().map(
             |(global_index, chord_vector)| {
                 let (angle, axis) = self.wing_rotation_data_from_global(global_index);
@@ -216,7 +245,7 @@ impl LineForceModel {
 
     /// Returns the control points of each line element. This is calculated as the midpoint of each
     /// span line
-    pub fn ctrl_points(&self) -> Vec<Vec3> {
+    pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
         let span_lines = self.span_lines();
         let chord_vectors = self.chord_vectors();
 
@@ -227,15 +256,15 @@ impl LineForceModel {
 
     /// Returns the control points of each line element in local coordinates. This is calculated as
     /// the midpoint of each span line
-    pub fn ctrl_points_local(&self) -> Vec<Vec3> {
+    pub fn ctrl_points_local(&self) -> Vec<SpatialVector<3>> {
         self.span_lines_local.iter().map(|line| line.ctrl_point()).collect()
     }    
 
     /// Returns the points making up the line geometry of the wings as a vector of spatial vectors,
     /// as opposed to a vector of span lines.
-    pub fn span_points(&self) -> Vec<Vec3> {
+    pub fn span_points(&self) -> Vec<SpatialVector<3>> {
         let span_lines = self.span_lines();
-        let mut span_points: Vec<Vec3> = Vec::new();
+        let mut span_points: Vec<SpatialVector<3>> = Vec::new();
 
         for wing_index in 0..self.wing_indices.len() {
             for i in self.wing_indices[wing_index].clone() {
@@ -251,7 +280,7 @@ impl LineForceModel {
     }
 
     /// Removes the velocity in the span direction from the input velocity vector.
-    pub fn remove_span_velocity(&self, velocity: &[Vec3]) -> Vec<Vec3> {
+    pub fn remove_span_velocity(&self, velocity: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
         let span_lines = self.span_lines();
 
         velocity.iter().zip(span_lines.iter()).map(
@@ -270,7 +299,7 @@ impl LineForceModel {
     ///
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
-    pub fn angles_of_attack(&self, velocity: &[Vec3]) -> Vec<f64> {
+    pub fn angles_of_attack(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
         let velocity_corrected = self.remove_span_velocity(velocity);
 
         let chord_vectors = self.chord_vectors();
@@ -287,7 +316,7 @@ impl LineForceModel {
     }
 
     /// Calculates the wake angle behind each line element.
-    pub fn wake_angles(&self, velocity: &[Vec3]) -> Vec<f64> {
+    pub fn wake_angles(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);

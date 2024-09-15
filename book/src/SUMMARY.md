@@ -20,6 +20,3 @@
     - [Wake](./lifting_line/wake.md)
     - [Velocity input](./lifting_line/velocity_input.md)
 - [Tutorials](./tutorials/tutorials.md)
-    - [Wing sail close to stall](./tutorials/wing_sail_close_to_stall.md)
-    - [Rotor sail](./tutorials/rotor_sail.md)
-    

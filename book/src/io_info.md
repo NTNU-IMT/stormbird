@@ -11,19 +11,17 @@ Working with Stormbird is therefor a matter of setting up the right input in a J
 
 Throughout this book there will often be examples of data structures shown as Rust code. This is generally to show the available fields in a structure, to give an impression of which variables it is possible to set. A simple example of how a generic Rust structure is converted to a JSON string from Serde is shown below. 
 
-The Rust version first:
+An example of a Rust struct first:
 
 ```rust
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Vec3 {
+pub struct SpatialVector {
     pub x: f64,
     pub y: f64,
     pub z: f64,
 }
 ```
 
-Then the corresponding JSON version with some input data
+Then the corresponding JSON version with the input data
 
 ```json
 {
@@ -42,12 +40,12 @@ An example of a complete input string to Stormbird can be seen below. More expla
         "wing_builders": [
             {
                 "section_points": [
-                    [125.0, 0.0, -20.0],
-                    [125.0, 0.0, -60.0]
+                    {"x": 125.0, "y": 0.0, "z":-20.0},
+                    {"x": 125.0, "y": 0.0, "z":-60.0}
                 ],
                 "chord_vectors": [
-                    [-8.0, 0.0, 0.0],
-                    [-8.0, 0.0, 0.0]
+                    {"x": -8.0, "y": 0.0, "z": 0.0},
+                    {"x": -8.0, "y": 0.0, "z": 0.0}
                 ],
                 "section_model": {
                     "Foil": {}
@@ -55,12 +53,12 @@ An example of a complete input string to Stormbird can be seen below. More expla
             },
             {
                 "section_points": [
-                    [45.0, 0.0, -20.0],
-                    [45.0, 0.0, -60.0]
+                    {"x": 45.0, "y": 0.0, "z": -20.0},
+                    {"x": 45.0, "y": 0.0, "z": -60.0}
                 ],
                 "chord_vectors": [
-                    [-8.0, 0.0, 0.0],
-                    [-8.0, 0.0, 0.0]
+                    {"x": -8.0, "y": 0.0, "z": 0.0},
+                    {"x": -8.0, "y": 0.0, "z": 0.0}
                 ],
                 "section_model": {
                     "Foil": {}
@@ -72,7 +70,7 @@ An example of a complete input string to Stormbird can be seen below. More expla
     "simulation_mode": {
         "Dynamic": {
             "wake": {
-                "ratio_of_wake_affected_by_induced_velocities": 0.0
+                "ratio_of_wake_affected_by_induced_velocities": 0.25
             },
             "solver": {
                 "damping_factor": 0.2,
@@ -86,14 +84,14 @@ An example of a complete input string to Stormbird can be seen below. More expla
 ```
 
 ## Default values
-Default values are often given for structures representing settings or models. This means that is often not necessary to specify every field in a structure in the input. For instance, in the example above, the `"wake"` structure only has one specified variable. However, the complete wake structure has 11 fields, where some are other structures with more sub fields. The reason only the `"ratio_of_wake_affected_by_induced_velocities"` is given above is that this was the only setting where a different value than the default was wanted.
+Default values are often given for structures representing settings or models. This means that is often not necessary to specify every field in a structure in the input. For instance, in the example above, the `"wake"` structure only has one specified variable. However, the complete wake structure has 12 fields, where some are other structures with more sub fields. The reason only the `"ratio_of_wake_affected_by_induced_velocities"` is given above is that this was the only setting where a different value than the default was wanted.
 
 The goal is to implement reasonable default values on as many variables as possible.
 
 ## Python interface
 The Python interface to Stormbird is made using a Rust library called [PyO3](https://pyo3.rs/). Although it is possible (and not that difficult) to create interfaces that look and feel like Python code, much of the Python interface still relies on JSON strings as both input and output. This choice is made because it avoids having to update the Python interface when there is change to the Rust code. This is particularly practical when the library is evolving. 
 
-As such, even when using the Python interface to Stomrbird, the task is generally to create and pass in JSON strings. This is, however, not a big problem as Python has excellent support for converting dictionaries into JSON strings. 
+As such, even when using the Python interface to Stormbird, the task is generally to create and pass in JSON strings. This is, however, not a big problem as Python has excellent support for converting dictionaries into JSON strings. 
 
 An example of how to create a multi-element foil model for a Stormbird simulation in Python is seen below:
 

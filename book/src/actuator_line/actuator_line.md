@@ -1,28 +1,6 @@
 # Actuator line
-## Velocity sampling
-To calculate the forces on each line element in the model, the local velocity needs to be estimated
-from the CFD solver. The way the velocity is estimated can have an effect on the result, and 
-different methods are in use the scientific litterature.
+An actuator line model is essentially the same as a lifting line model, except that the velocity field is entirely modeled using a CFD solver. There are t least two benefits with this approach. The first is that most of the complexity related to how model the velocity field is can be moved to an external solver. As CFD solvers are grid-based, they naturally handle dynamic effects in the wake. The second, and most important benefit, is that it becomes possible to combine a simplified model of a lifting surface with other *models* in the CFD solver. This can, for instance, be other geometric structures that are represented directly in the mesh, as usual for CFD solvers. 
 
-The classical approach simply interpolates the velocity at the control points directly. If the 
-mesh resolution is suffcient and the body force projection method is symmetric in space, this should
-give the right values.
+However, the new challenge with an actuator becomes how to connect the simplified line force model of a lifting surface to the actual simulated fluid in the CFD solver. 
 
-However, there can be uncertanties when the mesh is coarse (remember: allowing for coarse mesh is 
-the entire point of an actuator line method), and mistakes if the projection is non-symmetric.
-
-Stormbird therefore uses a variant known as "integral sampling", taken from Churchfield et. al 
-(2017)
-
-## Force projection
-To couple the line force model to a CFD solver, the forces estimated from the model needs to be
-projected as volume forces in the momentum equation.
-
-How this projection is done can have a large effect on the result, and this therefore requires some
-care.
-
-
-## References
-- Churchfield, M., Schreck, S., Martines-Tossas, L. A., Meneveau, C., Spalart, P. R., 2017, An 
-Advanced Actuator Line Method for Wind Energy Applications and Beyond, URL: 
-<https://www.nrel.gov/docs/fy17osti/67611.pdf>
+The genera principle in an actuator line method is to project forces estimated from the line force model as *body forces* in the CFD domain. If the shape and magnitude of this body force distribution is correct, the flow field will be affected approximately in the same manner 

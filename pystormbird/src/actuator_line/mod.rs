@@ -41,7 +41,7 @@ impl ActuatorLine {
 }
 
 #[pymodule]
-pub fn actuator_line(_py: Python, m: &PyModule) -> PyResult<()> {    
+pub fn actuator_line(m: &Bound<'_, PyModule>) -> PyResult<()> {    
     m.add_class::<ActuatorLine>()?;
     m.add_class::<projection::Projection>()?;
 

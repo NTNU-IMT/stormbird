@@ -7,16 +7,13 @@ use pyo3::prelude::*;
 pub mod span_line;
 pub mod builder;
 
-use crate::vec3::Vec3;
-use stormbird::vec3::Vec3 as Vec3Rust;
+use crate::spatial_vector::SpatialVector;
+use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
 
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
-use stormbird::line_force_model::smoothing::{
-    GaussianSmoothingSettings,
-    ArtificialViscositySettings
-};
+use stormbird::line_force_model::circulation_corrections::smoothing::GaussianSmoothing;
 
 #[pyclass]
 #[derive(Clone)]
@@ -39,13 +36,13 @@ impl LineForceModel {
         self.data.relative_span_distance()
     }
 
-    pub fn circulation_strength(&self, velocity: Vec<Vec3>) -> Vec<f64> {
-        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+    pub fn circulation_strength(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
+        let rust_velocity: Vec<SpatialVectorRust<3>> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
         self.data.circulation_strength(&rust_velocity)
     }
 
-    pub fn angles_of_attack(&self, velocity: Vec<Vec3>) -> Vec<f64> {
-        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
+    pub fn angles_of_attack(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
+        let rust_velocity: Vec<SpatialVectorRust<3>> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
         
         self.data.angles_of_attack(&rust_velocity)
     }
@@ -54,50 +51,28 @@ impl LineForceModel {
         *,
         noisy_strength, 
         length_factor,
-        end_corrections
     ))]
     pub fn gaussian_smoothed_strength(
         &self, 
         noisy_strength: Vec<f64>, 
         length_factor: f64, 
-        end_corrections: Vec<(bool, bool)>
     ) -> Vec<f64> {
-        let settings = GaussianSmoothingSettings {
+        let settings = GaussianSmoothing {
             length_factor,
-            end_corrections
+            ..Default::default()
         };
 
         self.data.gaussian_smoothed_values(&noisy_strength, &settings)
     }
 
-    #[pyo3(signature = (
-        *,
-        noisy_strength,
-        velocity,
-        viscosity,
-        solver_iterations,
-        solver_damping
-    ))]
-    pub fn circulation_strength_with_viscosity(&self, noisy_strength: Vec<f64>, velocity: Vec<Vec3>, viscosity: f64, solver_iterations: usize, solver_damping: f64) -> Vec<f64> {
-        let settings = ArtificialViscositySettings {
-            viscosity,
-            solver_iterations,
-            solver_damping
-        };
-
-        let rust_velocity: Vec<Vec3Rust> = velocity.iter().map(|v| Vec3Rust::from(v.data)).collect();
-        
-        self.data.circulation_strength_with_viscosity(&noisy_strength, &rust_velocity, &settings)
-    }
-
     #[getter]
-    pub fn ctrl_points(&self) -> Vec<Vec3> {
-        self.data.ctrl_points().iter().map(|v| Vec3::from(v.clone())).collect()
+    pub fn ctrl_points(&self) -> Vec<SpatialVector> {
+        self.data.ctrl_points().iter().map(|v| SpatialVector::from(v.clone())).collect()
     }
 }
 
 #[pymodule]
-pub fn line_force_model(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn line_force_model(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<span_line::SpanLine>()?;
     m.add_class::<builder::WingBuilder>()?;
     m.add_class::<builder::LineForceModelBuilder>()?;

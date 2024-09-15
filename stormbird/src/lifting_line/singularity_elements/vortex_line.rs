@@ -5,7 +5,7 @@
 //! Funtctionality for vortex lines and their induced velocities.
 use std::f64::consts::PI;
 
-use crate::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 use super::PotentialTheoryModel;
 use super::viscous_core_length::ViscousCoreLength;
 
@@ -13,11 +13,11 @@ impl PotentialTheoryModel {
     /// Implementation of induced velocity function based on the user manual for VSAERO
     /// Link: <https://ntrs.nasa.gov/api/citations/19900004884/downloads/19900004884.pdf>
     pub fn induced_velocity_from_line_with_unit_strength(
-        line_points: &[Vec3; 2], 
-        ctrl_point: Vec3, 
+        line_points: &[SpatialVector<3>; 2], 
+        ctrl_point: SpatialVector<3>, 
         viscous_core_length: ViscousCoreLength,
         closeness_error: f64,
-    ) -> Vec3 {
+    ) -> SpatialVector<3> {
         let r_1 = ctrl_point - line_points[0];
         let r_2 = ctrl_point - line_points[1];
 
@@ -40,7 +40,7 @@ impl PotentialTheoryModel {
             viscous_core_term * r_1.cross(r_2) * (k / (4.0 * PI))
         }
         else {
-            Vec3::default()
+            SpatialVector::<3>::default()
         }
     }
 }

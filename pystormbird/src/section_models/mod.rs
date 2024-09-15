@@ -16,8 +16,29 @@ pub struct SectionModel{
     pub data: SectionModelRust,   
 }
 
+#[pymethods]
+impl SectionModel {
+    pub fn __str__(&self) -> String {
+        self.data.to_string()
+    }
+
+    #[getter]
+    /// Uses the built in json module to convert the string to a dictionary
+    pub fn __dict__(&self) -> PyResult<PyObject> {
+        let json_string = self.__str__();
+        
+        Python::with_gil(|py| {
+            let json_module = PyModule::import_bound(py, "json")?;
+
+            let dict = json_module.call_method1("loads", (json_string,))?;
+
+            Ok(dict.into())
+        })
+    }
+}
+
 #[pymodule]
-pub fn section_models(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn section_models(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SectionModel>()?;
     m.add_class::<foil::Foil>()?;
     m.add_class::<varying_foil::VaryingFoil>()?;
