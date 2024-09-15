@@ -74,7 +74,7 @@ pub struct LineForceModel {
     pub density: f64,
     /// Optional model for calculation motion and flow derivatives
     pub derivatives: Option<Derivatives>,
-    /// Optional smoothing settings
+    /// Optional corrections that can be applied to the estimated circulation strength.
     pub circulation_corrections: CirculationCorrection,
     /// Optional variables to 
     /// Factor used to control the control point location

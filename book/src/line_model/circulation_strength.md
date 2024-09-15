@@ -35,20 +35,21 @@ pub fn circulation_strength_raw(&self, velocity: &[Vec3]) -> Vec<f64> {
 }
 ```
 
-## Optional smoothing for difficult cases
+## Optional corrections
 
-Sometimes, there might be noise in the estimated circulation strength, which might cause instabilities and errors in the estimated forces. Typical examples are lifting line simulations of stalled wings - at least when the wake is quasi-static - and actuator line simulations with very large lift-coefficients - such as for rotor sails.
+Sometimes, there might be noise in the estimated circulation strength, which might cause instabilities and errors in the estimated forces. A typical examples is lifting line simulations of stalled wings - especially when the lift coefficient is very large.
 
-To handle such cases in a practical manner, there are optional *smoothing methods* that can be used when estimating the circulation strength. These methods are controlled through a `SmoothingSettings` structure that is specified for the line force model. The fields in the complete structure is given below:
+To handle such cases in a practical manner, there are optional *corrections methods* that can be used when estimating the circulation strength. These methods are controlled through a `CirculationCorrection` enum that is specified for the line force model. The variants in the enum is given below:
 
 ```rust
-pub struct SmoothingSettings {
-    pub gaussian: Option<GaussianSmoothingSettings>
-    pub artificial_viscosity: Option<ArtificialViscositySettings>,
+pub enum CirculationCorrection {
+    None, // The default
+    PrescribedCirculation(PrescribedCirculationShape),
+    GaussianSmoothing(GaussianSmoothing),
 }
 ```
 
-These fields control two different smoothing methods, which are further explained below. All parameters are optional and set to `None` by default, meaning that none of the methods are used unless they are activated by the user. 
+The default variant is `None`, which means that no corrections are applied. The effect of the other variants are explained below. 
 
 ### Gaussian smoothing
 
@@ -57,56 +58,27 @@ The `GaussianSmoothingSettings` contains parameters used to apply a [Gaussian sm
 ```rust
 pub struct GaussianSmoothingSettings {
     pub length_factor: f64,
-    pub end_corrections: Vec<(bool, bool)>,
 }
 ```
 
-The `length_factor` gives a factor used to calculated the smoothing length from the span of each wing in the line force model. That is, if the value is set to 0.01, the smoothing length will be 1% of the totla span of each wing, independent of the value of the wing span or the number of sections.
+The `length_factor` gives a factor used to calculated the smoothing length from the span of each wing in the line force model. That is, if the value is set to 0.01, the smoothing length will be 1% of the total span of each wing, independent of the value of the wing span or the number of sections.
 
-The `end_corrections` contains a vector - that must be equal in length to the number of wings - with a tuple of booleans that specifies whether or not the circulation distribution on the ends of the wing should be corrected for the fact that the ends typically have zero circulations. The correction happens by artificially inserting zero values at both ends of the input vector to the Gaussian smoothing method.
 
-An example of how this smoothing method affects the circulation distribution is illustrated in the figure below. **Note**: the example is with an excessive amount of noise, and is not representative of actual numerical noise from a lifting line simulation. Rather, it shows an example where an artificial elliptic circulation distribution was first generated, and then modified by adding random numerical noise. The plot then shows how the noise is reduced when the noisy circulation distribution is corrected using the Gaussian smoothing filer, with different values for the `gaussian_length_factor`. The end corrections are set to `true` in this case, as the circulation distribution is supposed to be zero at the ends. 
+An example of how this smoothing method affects the circulation distribution is illustrated in the figure below. **Note**: the example is with an excessive amount of noise, and is not representative of actual numerical noise from a lifting line simulation. Rather, it shows an example where an artificial elliptic circulation distribution was first generated, and then modified by adding random numerical noise. The plot then shows how the noise is reduced when the noisy circulation distribution is corrected using the Gaussian smoothing filer, with different values for the `gaussian_length_factor`.
 
 ![Gaussian smoothing example](figures/gaussian_smoothing_example.png)
 
 As can bee seen, simple Gaussian smoothing introduces some errors towards the end of the wings if the smoothing length is too large, although the random noise is effectively reduced. It is therefore generally recommended to only apply as little smoothing as necessary to stabilize a solution. 
 
-### Artificial viscosity
-This concept is Based on the work first presented in Chattot (2004), but also used in other papers such as in Gallay et al. (2015) and Simonet et al. (2024). 
+## Prescribed distribution
 
-It is found that it is possible to stabilize the solution of the circulation distribution in non-linear cases by adding an *artificial viscosity term* that is dependent on the second derivative of the distribution. 
+Predetermined circulation distributions are a special mode where the circulation is forces to always follow a simple mathematical shape. For instance, it is possible to force the distribution to always be elliptical. This gives very stable simulations, and sometimes results that are very close a *full simulation*. It is particular useful if the goal is only to estimate interaction effects between wings, but where the lift and drag for a single wing is already known from, for instance, experimental or CFD results. **more on this to come**.
 
-That is, if the raw circulation strength from the original lifting line theory at line element i is called \\(\Gamma_{i, 0} \\) and the span distance of element i is labeled \\(s\\), then we can calculate a corrected circulation strength, \\( \Gamma_i \\), using an artificial viscosity parameter \\(\mu\\), as follows:
-
-\\[
-    \Gamma_i = \Gamma_{i,0} + \mu \frac{\partial^2\Gamma_i}{\partial s^2}
-\\]
-
-The double derivative of the circulation distribution can be calculated using finite difference. 
-
-However, a challenge is that the solution of \\(\Gamma_i \\) also depends on the second derivative of itself. A solver is therefore necessary to find the correction term. 
-
-At the moment, this is handled using the same type on dampened iterative solver as for the raw circulation strength[^solver_note]. 
-
-The available fields for this solver is given below:
+A view of the `PrescribedCirculationShape` structure: 
 
 ```rust
-pub struct ArtificialViscositySettings {
-    pub viscosity: f64,
-    pub solver_iterations: usize,
-    pub solver_damping: f64
+pub struct PrescribedCirculationShape {
+    pub inner_power: f64,
+    pub outer_power: f64,
 }
 ```
-
-[^solver_note]: It seems like there should be a more elegant solution to this solver. However, this has not been prioritized yet.
-
-## Predetermined distributions
-
-Predetermined circulation distributions are a solution that allow the simulation to directly use lift and drag data from some external source for a single wing - e.g., CFD or experimental data - but still be able to model interaction effects between several wings in a simplified manner. This solution is particularly useful for rotor sails (see the rotor sail tutorial for more), or for any other cases with complex flow around the wings that are not modelled accurately directly by the lifting line method.
-
-More to come!
-
-## References
-- Chattot, J., 2004. Analysis and design of wings and wing/winglet combinations at low speeds. Computational Fluid Dynamics. Available [here](https://arc.aiaa.org/doi/10.2514/6.2004-220)
-- Gallay, S., Laurendeau, E., 2015. Nonlinear Generalized Lifting-Line Coupling Algorithms for Pre/Poststall Flows. AiAA Journal. Available [here](https://www.researchgate.net/publication/276123891_Nonlinear_Generalized_Lifting-Line_Coupling_Algorithms_for_PrePoststall_Flows)
-- Simonet, T., Roncin, K., Faure, T. M., Daridon, L., 2024. An efficient 3D non-linear lifting-line method with correction for post-stall regime. Preprint. Available [here](https://www.researchsquare.com/article/rs-3955527/v1)

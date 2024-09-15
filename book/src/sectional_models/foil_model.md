@@ -9,7 +9,7 @@ A data based approach is often fine, and does have some benefits. For instance, 
 
 First, it becomes easier to use a parametric model as a building block for more complex foil models, where the behavior depends on some internal state, such as flap angle or suction rate. This is because the model parameters can be allowed to depend on the internal state through interpolation. See the [varying foil sub chapter](./varying_foil_model.md) for more on this.
 
-Second, a parametric model ensures smoothness, which is beneficial when using the model together with gradient based optimization algorithms. For instance, such a method might be used to optimize the angle of attack for wing sails at a given wind direction. The smoothness is in particular practical when the expected optimal point is close to the stall angle - which ot often is.
+Second, a parametric model ensures smoothness, which is beneficial when using the model together with gradient based optimization algorithms. For instance, such a method might be used to optimize the angle of attack for wing sails at a given wind direction. The smoothness is in particular practical when the expected optimal point is close to the stall angle - which it often is.
 
 The downside of a parametric model is believed to be small, as long as the model can represent typical foil section behavior without too many simplifications. The design of the `Foil` model is intended to achieve this as best as possible[^update_to_model_note].
 
@@ -35,13 +35,14 @@ pub struct Foil {
     pub cl_zero_angle: f64,
     pub cl_initial_slope: f64,
     pub cl_high_order_factor: f64,
-    pub cl_high_order_power: f64,
+    pub cl_high_order_power: f64, 
     pub cl_max_after_stall: f64,
     pub cd_zero_angle: f64,
     pub cd_second_order_factor: f64,
     pub cd_max_after_stall: f64,
     pub cd_power_after_stall: f64,
-    pub mean_stall_angle: f64,
+    pub mean_positive_stall_angle: f64,.
+    pub mean_negative_stall_angle: f64,
     pub stall_range: f64,
     pub cl_changing_aoa_factor: f64,
     pub added_mass_factor: f64,
@@ -59,7 +60,8 @@ An explanation of the parameters are given below:
 - `cd_second_order_factor`: Factor to give the drag coefficient a second order term. This is zero by default.
 - `cd_max_after_stall`: The maximum drag coefficient after stall.
 - `cd_power_after_stall`: Power factor for the harmonic dependency of the drag coefficient after stall. Set to 1.6 by default.
-- `mean_stall_angle`: The mean stall angle, which is the mean angle where the model transitions from pre-stall to post-stall behavior. The default value is 20 degrees.
+- `mean_positive_stall_angle`: The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to post-stall behavior. The default value is 20 degrees.
+- `mean_negative_stall_angle`: The mean stall angle for negative angles of attack, which is the mean angle where the model transitions from pre-stall to post-stall behavior. The default value is 20 degrees.
 - `stall_range`: The range of the stall transition. The default value is 6 degrees.
 - `cl_changing_aoa_factor`: Factor to model lift due to the time derivative of the angle of attack. This is zero by default, and therefore not used.
 - `added_mass_factor`: Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
@@ -73,7 +75,8 @@ let foil = Foil {
     cl_zero_angle = 0.5,
     cl_max_after_stall = 0.9,
     cd_max_after_stall = 1.2,
-    mean_stall_angle = 20.0_f64.to_radians(),
+    mean_positive_stall_angle = 20.0_f64.to_radians(),
+    mean_negative_stall_angle = 25.0_f64.to_radians(),
     stall_range = 10.0_f64.to_radians(),
     ..Default::default()
 }

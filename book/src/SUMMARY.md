@@ -19,8 +19,4 @@
     - [Solver](./lifting_line/solver.md)
     - [Wake](./lifting_line/wake.md)
     - [Velocity input](./lifting_line/velocity_input.md)
-- [Actuator line simulations](./actuator_line/actuator_line.md)
-    - [Velocity sampling](./actuator_line/velocity_sampling.md)
 - [Tutorials](./tutorials/tutorials.md)
-    - [Wing sail close to stall](./tutorials/wing_sail_close_to_stall/wing_sail_close_to_stall.md)
-    - [Rotor sail](./tutorials/rotor_sail.md)
