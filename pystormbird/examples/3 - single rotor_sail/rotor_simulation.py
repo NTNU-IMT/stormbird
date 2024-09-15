@@ -11,6 +11,49 @@ class SimulationMode(Enum):
     DYNAMIC = 0
     STATIC = 1
 
+class TestCase(Enum):
+    RAW_SIMULATION = 0
+    FIXED_VELOCITY_MAGNITUDE = 1
+    LIMIT_ON_INDUCED_VELOCITY = 2
+    VIRTUAL_END_DISK = 3
+
+    def to_string(self):
+        return self.name.replace("_", " ").lower()
+
+    @property
+    def virtual_end_disk(self) -> bool:
+        match self:
+            case TestCase.VIRTUAL_END_DISK:
+                return True
+            case _:
+                return False
+            
+    def non_zero_circulation_at_ends(self, z_symmetry: bool) -> tuple[bool, bool]:
+        match self:
+            case TestCase.VIRTUAL_END_DISK:
+                if z_symmetry:
+                    return (True, True)
+                else:
+                    return (False, True)
+            case _:
+                if z_symmetry:
+                    return (True, False)
+                else:
+                    return (False, False)
+            
+    @property
+    def velocity_corrections(self) -> dict | None:
+        match self:
+            case TestCase.FIXED_VELOCITY_MAGNITUDE:
+                return "FixedMagnitudeEqualToFreestream"
+            case TestCase.LIMIT_ON_INDUCED_VELOCITY:
+                return {
+                    "MaxInducedVelocityMagnitudeRatio": 1.0
+                }
+            case _:
+                return None
+
+
 @dataclass(frozen=True, kw_only=True)
 class RotorSimulationCase():
     spin_ratio: float
@@ -19,16 +62,11 @@ class RotorSimulationCase():
     freestream_velocity: float = 8.0
     density: float = 1.225
     nr_sections: int = 32
-    smoothing_length: float | None = None
     simulation_mode: SimulationMode = SimulationMode.STATIC
-    smoothing_length: float | None = None
     z_symmetry: bool = True
-    virtual_end_disks: tuple[bool, bool] = (False, False)
-    virtual_end_disk_height_factor: float = 0.5
+    test_case: TestCase = TestCase.RAW_SIMULATION
+    virtual_end_disk_height_factor: float = 0.35
     write_wake_files: bool = False
-    spin_ratio_data: list | None = None
-    cd_data: list | None = None
-    cl_data: list | None = None
 
     @property
     def force_factor(self) -> float:
@@ -52,23 +90,6 @@ class RotorSimulationCase():
             }
         }
 
-        if self.spin_ratio_data is not None and self.cl_data is not None and self.cd_data is not None:
-            if len(self.spin_ratio_data) != len(self.cl_data):
-                raise ValueError("Section data input does not have the same length")
-            
-            section_model["RotatingCylinder"]["spin_ratio_data"] = self.spin_ratio_data
-            section_model["RotatingCylinder"]["cl_data"] = self.cl_data
-            section_model["RotatingCylinder"]["cd_data"] = self.cd_data
-
-        if self.virtual_end_disks[0] and self.virtual_end_disks[1]:
-            non_zero_circulation_at_ends = [True, True]
-        elif self.virtual_end_disks[0]:
-            non_zero_circulation_at_ends = [True, False]
-        elif self.virtual_end_disks[1]:
-            non_zero_circulation_at_ends = [False, True]
-        else:
-            non_zero_circulation_at_ends = [False, False]
-        
         rotor_builder = {
             "section_points": [
                 {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -79,35 +100,17 @@ class RotorSimulationCase():
                 {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
             ],
             "section_model": section_model,
-            "non_zero_circulation_at_ends": non_zero_circulation_at_ends
+            "non_zero_circulation_at_ends": self.test_case.non_zero_circulation_at_ends(self.z_symmetry)
         }
 
         wing_builders = [rotor_builder]
 
-        span_virtual_end_disks = self.virtual_end_disk_height_factor * self.diameter
+        if self.test_case.virtual_end_disk:
+            span_virtual_end_disks = self.virtual_end_disk_height_factor * self.diameter
+            nr_sections_virtual_end_disks = int(self.nr_sections * span_virtual_end_disks / self.height)
 
-        nr_sections_virtual_end_disks = int(self.nr_sections * span_virtual_end_disks / self.height)
-
-        nr_sections_virtual_end_disks = max(2, nr_sections_virtual_end_disks)
-
-        if self.virtual_end_disks[0]:
-            virtual_end_sections = {
-                "section_points": [
-                    {"x": 0.0, "y": 0.0, "z": -self.virtual_end_disk_height_factor * self.diameter},
-                    {"x": 0.0, "y": 0.0, "z": 0.0}
-                ],
-                "chord_vectors": [
-                    {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
-                    {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
-                ],
-                "section_model": section_model,
-                "non_zero_circulation_at_ends": [False, True],
-                "nr_sections": nr_sections_virtual_end_disks
-            }
-
-            wing_builders.append(virtual_end_sections)
-
-        if self.virtual_end_disks[1]:
+            nr_sections_virtual_end_disks = max(4, nr_sections_virtual_end_disks)
+            
             virtual_end_sections = {
                 "section_points": [
                     {"x": 0.0, "y": 0.0, "z": self.height},
@@ -130,15 +133,6 @@ class RotorSimulationCase():
             "density": self.density
         }
 
-        if self.smoothing_length is not None:
-            gaussian_smoothing = {
-                "length_factor": self.smoothing_length,
-            }
-
-            line_force_model["circulation_corrections"] = {
-                "GaussianSmoothing": gaussian_smoothing
-            }
-
         return line_force_model
 
     
@@ -147,11 +141,15 @@ class RotorSimulationCase():
         line_force_model = self.get_line_force_model()
 
         wake = {}
-        solver = {
-            "velocity_corrections": {
-                "MaxInducedVelocityMagnitudeRatio": 1.0
-            }#"FixedMagnitudeEqualToFreestream"
-        }
+
+        velocity_corrections = self.test_case.velocity_corrections
+
+        if velocity_corrections is not None:
+            solver = {
+                "velocity_corrections": velocity_corrections
+            }
+        else:
+            solver = {}
 
         if self.z_symmetry:
             wake["symmetry_condition"] = "Z"

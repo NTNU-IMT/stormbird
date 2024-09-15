@@ -1,45 +1,36 @@
 '''
 This script runs simulations for multiple angles of attack and compares the results to experimental 
 data.
-
-The case is a single element rectangular wing sail.
-
-The simulation is executed in three different modes for comparison:
-    1. Raw simulation - meaning no smoothing or prescribed circulation is applied
-    2. Prescribed circulation - the circulation is prescribed to follow an elliptic distribution
-    3. Gaussian smoothing - the circulation is smoothed using a Gaussian kernel
 '''
+
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 import json
 
-from simulation import SimulationCase, SimulationMode
-from multi_element_foil_section import get_foil_model
+from simulation import SimulationCase, SimulationMode, TestCase
 
-from enum import Enum
+section_model_path = '../1 - section models'
 
-class TestCases(Enum):
-    RAW_SIMULATION = 0
-    PRESCRIBED_CIRCULATION = 1
-    INITIALIZED_SIMULATION = 2
+if section_model_path not in sys.path:
+    sys.path.append(section_model_path)
 
-    def to_string(self):
-        return self.name.replace("_", " ").lower()
+import naca_0012_Graf2014
 
 if __name__ == "__main__":
+    comparison_data = json.load(open("../comparison_data/graf_2014_data.json", "r"))
+
     theoretical_aspect_ratio = 2 * 4.5
 
-    angles_of_attack = np.arange(0.0, 25.0, 0.5)
+    angles_of_attack = np.arange(0.0, 16.0, 0.5)
     n_angles = len(angles_of_attack)
 
-    foil_model = get_foil_model()
-
-    foil_model.set_internal_state(np.radians(15.0))
+    foil_model = naca_0012_Graf2014.get_foil_model()
 
     section_model_dict = {
-        "VaryingFoil": foil_model.__dict__
+        "Foil": foil_model.__dict__
     }
 
     cl_2d = np.zeros(n_angles)
@@ -49,7 +40,12 @@ if __name__ == "__main__":
         cd_2d[i] = foil_model.drag_coefficient(np.radians(angles_of_attack[i]))
         cl_2d[i] = foil_model.lift_coefficient(np.radians(angles_of_attack[i]))
 
-    cases = [TestCases.RAW_SIMULATION, TestCases.PRESCRIBED_CIRCULATION, TestCases.INITIALIZED_SIMULATION]
+    cases = [
+        TestCase.RAW_SIMULATION, 
+        TestCase.PRESCRIBED_CIRCULATION, 
+        TestCase.INITIALIZED_SIMULATION,
+        TestCase.INITIALIZED_AND_SMOOTHED
+    ]
 
     w_plot = 18
     h_plot = w_plot / 2.35
@@ -62,19 +58,6 @@ if __name__ == "__main__":
         print()
         print(case.to_string())
 
-        match case:
-            case TestCases.RAW_SIMULATION:
-                prescribed_circulation = False
-                prescribed_initialization = False
-            case TestCases.PRESCRIBED_CIRCULATION:
-                prescribed_circulation = True
-                prescribed_initialization = False
-            case TestCases.INITIALIZED_SIMULATION:
-                prescribed_circulation = False
-                prescribed_initialization = True
-            case _:
-                raise ValueError("Invalid case")
-
         cl = np.zeros(n_angles)
         cd = np.zeros(n_angles)
 
@@ -85,9 +68,9 @@ if __name__ == "__main__":
                 angle_of_attack = angles_of_attack[angle_index],
                 section_model_dict = section_model_dict,
                 simulation_mode = SimulationMode.STATIC,
-                smoothing_length=0.1,
-                prescribed_circulation = prescribed_circulation,
-                prescribed_initialization = prescribed_initialization,
+                prescribed_circulation = case.prescribed_circulation,
+                prescribed_initialization = case.prescribed_initialization,
+                smoothing_length = case.smoothing_length,
                 z_symmetry=True
             )
 
@@ -106,11 +89,27 @@ if __name__ == "__main__":
         ax1.plot(angles_of_attack, cl, label='Stormbird lifting line, ' + case.to_string())
         ax2.plot(angles_of_attack, cd, label='Stormbird lifting line, ' + case.to_string())
     
+    # --------------- Comparison data ------------------------
+    ax1.plot(
+        comparison_data["experimental"]["angles_of_attack"], 
+        comparison_data["experimental"]["lift_coefficients"], 
+        "-o",
+        label="Graf et al. (2014), experimental"
+    )
+
     ax1.plot(angles_of_attack, cl_2d, label='Section model', color='grey', linestyle='--')
+    
+    ax2.plot(
+        comparison_data["experimental"]["angles_of_attack"], 
+        comparison_data["experimental"]["drag_coefficients"], 
+        "-o",
+        label="Graf et al. (2014), experimental"
+    )
+
     ax2.plot(angles_of_attack, cd_2d, label='Section model', color='grey', linestyle='--')
 
-    ax1.set_ylim(0, 3.0)
-    ax2.set_ylim(0, 0.5)
+    ax1.set_ylim(0, 1.2)
+    ax2.set_ylim(0, 0.25)
     
     ax1.set_xlabel("Angle of attack [deg]")
     ax1.set_ylabel("Lift coefficient")

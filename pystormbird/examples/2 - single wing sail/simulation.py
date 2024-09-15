@@ -8,8 +8,58 @@ from dataclasses import dataclass
 from enum import Enum
 
 class SimulationMode(Enum):
+    '''
+    Enum used to choose between dynamic and static simulations.
+    '''
     DYNAMIC = 0
     STATIC = 1
+
+class TestCase(Enum):
+    '''
+    Enum used to predefine settings for different test cases.
+    '''
+    RAW_SIMULATION = 0           # No corrections applied to the estimated circulation distribution
+    PRESCRIBED_CIRCULATION = 1   # Circulation is prescribed to a fixed mathematical shape
+    INITIALIZED_SIMULATION = 2   # Simulation is initialized with a prescribed circulation distribution, but then simulated without any corrections
+    INITIALIZED_AND_SMOOTHED = 3 # Simulation is initialized with a prescribed circulation distribution, and then smoothed using a Gaussian kernel
+
+    def to_string(self):
+        return self.name.replace("_", " ").lower()
+    
+    @property
+    def prescribed_circulation(self) -> bool:
+        '''
+        Returns True if the test case is prescribed circulation, False otherwise.
+        '''
+        match self:
+            case TestCase.PRESCRIBED_CIRCULATION:
+                return True
+            case _:
+                return False
+    
+    @property
+    def prescribed_initialization(self) -> bool:
+        '''
+        Returns True if the test case is prescribed initialization, False otherwise.
+        '''
+        match self:
+            case TestCase.INITIALIZED_SIMULATION:
+                return True
+            case TestCase.INITIALIZED_AND_SMOOTHED:
+                return True
+            case _:
+                return False
+            
+    @property
+    def smoothing_length(self) -> float | None:
+        '''
+        Returns the smoothing length for the test case, or None if no smoothing is applied.
+        '''
+        match self:
+            case TestCase.INITIALIZED_AND_SMOOTHED:
+                return 0.05
+            case _:
+                return None
 
 @dataclass(frozen=True, kw_only=True)
 class SimulationCase():
@@ -25,7 +75,7 @@ class SimulationCase():
     span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
-    nr_sections: int = 64
+    nr_sections: int = 32
     simulation_mode: SimulationMode = SimulationMode.STATIC
     smoothing_length: float | None = None
     z_symmetry: bool = False
@@ -37,9 +87,7 @@ class SimulationCase():
     def force_factor(self) -> float:
         return 0.5 * self.chord_length * self.span * self.density * self.freestream_velocity**2
     
-    def run(self):
-        freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
-
+    def get_line_force_model(self) -> dict:
         chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
 
         non_zero_circulation_at_ends = [True, False] if self.z_symmetry else [False, False]
@@ -66,6 +114,8 @@ class SimulationCase():
         if self.smoothing_length is not None and not(self.prescribed_circulation):
             gaussian_smoothing = {
                 "length_factor": self.smoothing_length,
+                "end_corrections_delta_span_factor": 1.0,
+                "end_corrections_number_of_insertions": 3
             }
 
             line_force_model["circulation_corrections"] = {
@@ -75,11 +125,18 @@ class SimulationCase():
         if self.prescribed_circulation:
             line_force_model["circulation_corrections"] = {
                 "PrescribedCirculation": {
-                    "outer_power": 0.2
+                    "outer_power": 0.2 # Note: The default also works ok. This Factor is tuned manually, based on manual comparison with a 'raw' simulation below stall.
                 }
             }
-            
 
+        return line_force_model
+
+    
+    def run(self):
+        freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
+
+        line_force_model = self.get_line_force_model()
+            
         solver = {
             "max_iterations_per_time_step": 10,
             "damping_factor": 0.1

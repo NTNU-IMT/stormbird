@@ -59,6 +59,7 @@ impl LineForceModel {
     ) -> Vec<f64> {
         let settings = GaussianSmoothing {
             length_factor,
+            ..Default::default()
         };
 
         self.data.gaussian_smoothed_values(&noisy_strength, &settings)

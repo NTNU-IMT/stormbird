@@ -10,9 +10,37 @@ use math_utils::smoothing;
 
 use crate::line_force_model::LineForceModel;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GaussianSmoothing {
+    #[serde(default="GaussianSmoothing::default_length_factor")]
+    /// A non dimensional factor used to calculate the length in Gaussian smoothing kernel. 
+    /// The actual smoothing length is calculated as the length factor times the wing span.
     pub length_factor: f64,
+    #[serde(default="GaussianSmoothing::default_end_corrections_delta_span_factor")]
+    /// A factor used to calculate the span distance to be added to the ends of the wing when
+    /// adding end corrections. The actual span distance to be added is calculated as the 
+    /// geometric length of each line segment times the end corrections delta span factor.
+    pub end_corrections_delta_span_factor: f64,
+    #[serde(default="GaussianSmoothing::default_end_corrections_number_of_insertions")]
+    /// The number of span distance points to be added to the ends of the wing when adding end 
+    /// corrections.
+    pub end_corrections_number_of_insertions: usize,
+}
+
+impl GaussianSmoothing {
+    fn default_length_factor() -> f64 {0.1}
+    fn default_end_corrections_delta_span_factor() -> f64 {1.0}
+    fn default_end_corrections_number_of_insertions() -> usize {3}
+}
+
+impl Default for GaussianSmoothing {
+    fn default() -> Self {
+        Self {
+            length_factor: Self::default_length_factor(),
+            end_corrections_delta_span_factor: Self::default_end_corrections_delta_span_factor(),
+            end_corrections_number_of_insertions: Self::default_end_corrections_number_of_insertions(),
+        }
+    }
 }
 
 impl LineForceModel {
@@ -32,8 +60,6 @@ impl LineForceModel {
         
         let span_distance = self.span_distance_in_local_coordinates();
 
-        let end_corrections_distance_factor = 2.0;
-
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let smoothing_length = settings.length_factor * wing_span_lengths[wing_index];
 
@@ -43,49 +69,36 @@ impl LineForceModel {
             let mut local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 
             let start_index = if !non_zero_circulation_at_ends[0] {
-                let delta_span = local_span_distance[1] - local_span_distance[0];
-                let mut span_to_be_inserted = 0.5 * delta_span;
-
-                let mut number_of_insertions = 0;
-
-                while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
-                    local_span_distance.insert(0, local_span_distance[0] - span_to_be_inserted);
-                    local_noisy_values.insert(0, 0.0);
+                let delta_span_geometric = local_span_distance[1] - local_span_distance[0];
+                let delta_span_corrections = delta_span_geometric * settings.end_corrections_delta_span_factor;
+                
+                for i_insert in 0..settings.end_corrections_number_of_insertions {
+                    local_span_distance.insert(
+                        0, 
+                        local_span_distance[0] - delta_span_corrections * (i_insert as f64 + 1.0)
+                    );
                     
-                    span_to_be_inserted += if number_of_insertions == 0 {
-                        0.5 * delta_span
-                    } else {
-                        delta_span
-                    };
-
-                    number_of_insertions += 1;
+                    local_noisy_values.insert(0, 0.0);
                 }
                 
-                number_of_insertions
+                settings.end_corrections_number_of_insertions
             } else {
                 0
             };
 
             let end_index = if !non_zero_circulation_at_ends[1] {
-                let delta_span = local_span_distance[local_span_distance.len()-1] - local_span_distance[local_span_distance.len()-2];
-                let mut span_to_be_inserted = 0.5 * delta_span;
+                let delta_span_geometric = local_span_distance[local_span_distance.len()-1] - local_span_distance[local_span_distance.len()-2];
+                let delta_span_corrections = delta_span_geometric * settings.end_corrections_delta_span_factor;
 
-                let mut number_of_insertions = 0;
-
-                while span_to_be_inserted <= end_corrections_distance_factor * smoothing_length {
-                    local_span_distance.push(local_span_distance[local_span_distance.len()-1] + span_to_be_inserted);
-                    local_noisy_values.push(0.0);
+                for i_insert in 0..settings.end_corrections_number_of_insertions {
+                    local_span_distance.push(
+                        local_span_distance[local_span_distance.len()-1] + delta_span_corrections * (i_insert as f64 + 1.0)
+                    );
                     
-                    span_to_be_inserted += if number_of_insertions == 0 {
-                        0.5 * delta_span
-                    } else {
-                        delta_span
-                    };
-
-                    number_of_insertions += 1;
+                    local_noisy_values.push(0.0);
                 }
 
-                local_span_distance.len() - number_of_insertions
+                local_span_distance.len() - settings.end_corrections_number_of_insertions
             } else {
                 local_span_distance.len()
             };

@@ -7,11 +7,10 @@ from pystormbird.section_models import VaryingFoil
 
 def get_foil_dict(flap_angle: float = 0.0):
     '''
-    Simplified setup of a multi-element foil model. Currently, the data is only rough values. It is 
-    just a placeholder for the real data that will be used in the future. In practice, the parameters
-    in the foil model must be "fitted" to the input data, for instance by using a optimization 
-    framework and least squares fitting. This available in SciPy. Will set this up when we have real
-    data available.
+    Simplified setup of a multi-element foil model, to show how it can be generated manually. 
+    Usually, the parameters in the foil model should be "fitted" to some externally generated data, 
+    for instance by using a optimization framework and least squares fitting. See the FoilTuner 
+    class in the same folder as this file for an example of how this can be done.
     '''
 
     flap_angles = np.radians([0, 5, 10, 15])
@@ -71,8 +70,6 @@ if __name__ == '__main__':
     flap_angles_to_test = np.radians([0, 5, 10, 15])
 
     for flap_angle in flap_angles_to_test:
-       
-
         foil.set_internal_state(flap_angle)
 
         n_test = 100
