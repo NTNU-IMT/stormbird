@@ -15,6 +15,8 @@ use crate::lifting_line::singularity_elements::prelude::*;
 use super::{
     Wake,
     WakeSettings,
+    WakeIndices,
+    line_force_model_data::LineForceModelData,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +132,45 @@ impl WakeBuilder {
     fn default_first_panel_relative_length() -> f64 {0.75}
     fn default_last_panel_relative_length() -> f64 {25.0}
 
+    pub fn get_wake_indices(
+        &self,
+        time_step: f64,
+        line_force_model: &LineForceModel, 
+        initial_velocity: SpatialVector<3>
+    ) -> WakeIndices {
+        let span_points   = line_force_model.span_points();
+        let chord_vectors = line_force_model.chord_vectors();
+        
+        let nr_panels_along_span = line_force_model.nr_span_lines();
+        let nr_points_along_span = span_points.len();
+
+        let mean_chord_length: f64 = chord_vectors.iter()
+            .map(|chord| chord.length())
+            .sum::<f64>() / chord_vectors.len() as f64;
+        
+        let nr_panels_per_line_element = match self.wake_length {
+            WakeLength::NrPanels(nr_panels) => nr_panels,
+            WakeLength::TargetLengthFactor(_) => {
+                if initial_velocity.length() == 0.0 {
+                    panic!("Freestream velocity is zero. Cannot calculate wake length.");
+                }
+
+                self.wake_length.nr_wake_panels_from_target_length_factor(
+                    mean_chord_length, initial_velocity.length(), time_step
+                ).unwrap()
+            }
+        };
+
+        let nr_points_per_line_element = nr_panels_per_line_element + 1;
+
+        WakeIndices {
+            nr_points_along_span,
+            nr_panels_along_span,
+            nr_panels_per_line_element,
+            nr_points_per_line_element,
+        }
+    }
+
     pub fn build(
         &self,
         time_step: f64, 
@@ -143,30 +184,10 @@ impl WakeBuilder {
             &chord_vectors, true
         );
         
-        let nr_wake_panels_along_span = line_force_model.nr_span_lines();
-        let nr_wake_points_along_span = span_points.len();
-
-        let mean_chord_length: f64 = chord_vectors.iter()
-            .map(|chord| chord.length())
-            .sum::<f64>() / chord_vectors.len() as f64;
-        
-        let nr_wake_panels_per_line_element = match self.wake_length {
-            WakeLength::NrPanels(nr_panels) => nr_panels,
-            WakeLength::TargetLengthFactor(_) => {
-                if initial_velocity.length() == 0.0 {
-                    panic!("Freestream velocity is zero. Cannot calculate wake length.");
-                }
-
-                self.wake_length.nr_wake_panels_from_target_length_factor(
-                    mean_chord_length, initial_velocity.length(), time_step
-                ).unwrap()
-            }
-        };
-
-        let nr_wake_points_per_line_element = nr_wake_panels_per_line_element + 1;
+        let indices = self.get_wake_indices(time_step, line_force_model, initial_velocity);
 
         let mut wake_points: Vec<SpatialVector<3>> = Vec::with_capacity(
-            nr_wake_points_per_line_element * nr_wake_points_along_span
+            indices.nr_points_per_line_element * indices.nr_points_along_span
         );
 
         let wake_building_velocity = if initial_velocity.length() == 0.0 {
@@ -175,7 +196,7 @@ impl WakeBuilder {
             initial_velocity
         };
 
-        for i_stream in 0..nr_wake_points_per_line_element {
+        for i_stream in 0..indices.nr_points_per_line_element {
             for i_span in 0..span_points.len() {
                 let start_point = span_points[i_span];
 
@@ -193,19 +214,17 @@ impl WakeBuilder {
 
         let end_index_induced_velocities_on_wake = (
             self.ratio_of_wake_affected_by_induced_velocities * 
-            nr_wake_panels_per_line_element as f64
+            indices.nr_panels_per_line_element as f64
         ).ceil() as usize;
 
-        let strength_damping_factor =self.strength_damping_factor(nr_wake_panels_per_line_element);
+        let strength_damping_factor =self.strength_damping_factor(indices.nr_panels_per_line_element);
 
         let settings = WakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
             last_panel_relative_length: self.last_panel_relative_length,
             use_chord_direction: self.use_chord_direction,
             strength_damping_factor,
-            nr_wake_points_along_span,
-            nr_wake_panels_along_span,
-            nr_wake_panels_per_line_element,
+            strength_damping_factor_separated: None,
             end_index_induced_velocities_on_wake,
             shape_damping_factor: self.shape_damping_factor,
             neglect_self_induced_velocities: self.neglect_self_induced_velocities
@@ -219,19 +238,27 @@ impl WakeBuilder {
             ..Default::default()
         };
 
-        let nr_panels = nr_wake_panels_per_line_element * nr_wake_panels_along_span;
+        let nr_panels = indices.nr_panels();
 
+        let undamped_strengths: Vec<f64> = vec![0.0; nr_panels];
         let strengths: Vec<f64> = vec![0.0; nr_panels];
+        let panel_lifetime: Vec<f64> = vec![0.0; nr_panels];
+        let panel_strength_damping_factor: Vec<f64> = vec![0.0; nr_panels];
 
-        let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); nr_panels];
+        let panel_geometry: Vec<PanelGeometry> = vec![PanelGeometry::default(); indices.nr_panels()];
 
         let mut wake = Wake {
+            indices,
             wake_points,
+            undamped_strengths,
             strengths,
             panel_geometry,
             settings,
+            panel_lifetime,
+            panel_strength_damping_factor,
             potential_theory_model,
             wing_indices: line_force_model.wing_indices.clone(),
+            line_force_model_data: LineForceModelData::new(&line_force_model),
             number_of_time_steps_completed: 0,
         };
 

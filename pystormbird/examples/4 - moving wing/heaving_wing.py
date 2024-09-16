@@ -3,6 +3,7 @@ Script that simulates a heaving wing with both dynamic and quasi-static lifting 
 result are compared against each other and against a theoretical (simplified) model.
 '''
 
+import time as time_func
 import json
 from pathlib import Path
 
@@ -155,7 +156,6 @@ if __name__ == "__main__":
         }
     ]
 
-    
     line_force_model_list = [line_force_model_dyn, line_force_model_stat]
 
     label_list = ["Dynamic", "Quasi-steady"]
@@ -178,7 +178,7 @@ if __name__ == "__main__":
         setup = {
             "line_force_model": line_force_model,
             "simulation_mode": simulation_settings,
-            "write_wake_data_to_file": args.write_wake_files,
+            "write_wake_data_to_file": args.write_wake_files if label == "Dynamic" else False,
             "wake_files_folder_path": str(wake_files_folder_path)
         }
 
@@ -208,6 +208,7 @@ if __name__ == "__main__":
         for point in freestream_velocity_points:
             freestream_velocity.append(SpatialVector(velocity, 0.0, 0.0))
 
+        start_time = time_func.time()
         while t < final_time:
             print("Running sim at time = ", t)
             simulation.set_translation(SpatialVector(0.0, position_func(t), 0.0))
@@ -228,6 +229,10 @@ if __name__ == "__main__":
             print("Number of iterations: ", result.iterations)
 
             t += dt
+
+        end_time = time_func.time()
+
+        print("Time taken: ", end_time - start_time)
 
         plt.plot(time, lift, label=label, color=color)
 

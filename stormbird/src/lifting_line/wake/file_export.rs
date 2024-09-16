@@ -26,7 +26,7 @@ impl Wake {
         };
 
         for panel_index in 0..self.strengths.len() {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
+            let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
 
             let indices = self.panel_wake_point_indices(stream_index, span_index);
 
@@ -89,7 +89,7 @@ impl Wake {
         write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n")?;
 
         for panel_index in 0..self.strengths.len() {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
+            let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
 
             let indices = self.panel_wake_point_indices(stream_index, span_index);
 
