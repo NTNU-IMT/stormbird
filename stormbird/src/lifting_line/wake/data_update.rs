@@ -40,8 +40,21 @@ impl Wake {
         }
     }
 
-    fn update_panel_strength_damping_first_panels(&mut self, line_force_model: &LineForceModel) {
-        todo!()
+    fn update_panel_strength_damping_first_panels(&mut self) {
+        for i_span in 0..self.indices.nr_panels_along_span {
+            let current_index = self.indices.panel_index(0, i_span);
+
+            let amount_of_flow_separation = self.line_force_model_data.amount_of_flow_separation[i_span];
+
+            let damping_strength = if let Some(strength_damping_factor_separated) = self.settings.strength_damping_factor_separated {
+                self.settings.strength_damping_factor * (1.0 - amount_of_flow_separation) +
+                strength_damping_factor_separated * amount_of_flow_separation
+            } else {
+                self.settings.strength_damping_factor
+            };
+
+            self.panel_strength_damping_factor[current_index] = damping_strength;
+        }
     }
 
     fn update_panel_strength_damping_factor(&mut self) {
@@ -53,6 +66,8 @@ impl Wake {
                 self.panel_strength_damping_factor[current_index] = self.panel_strength_damping_factor[previous_index];
             }
         }
+
+        self.update_panel_strength_damping_first_panels();
     }
 
     /// Update the wake geometry and strength based on the final solution at a time step.

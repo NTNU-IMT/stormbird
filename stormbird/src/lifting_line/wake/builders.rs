@@ -84,6 +84,8 @@ pub struct WakeBuilder {
     /// be on the last panel. The actual damping factor also depends on the number of wake panels.
     pub strength_damping_last_panel_ratio: f64,
     #[serde(default)]
+    pub strength_damping_factor_separated: Option<f64>,
+    #[serde(default)]
     /// Symmetry condition
     pub symmetry_condition: SymmetryCondition,
     #[serde(default)]
@@ -224,7 +226,7 @@ impl WakeBuilder {
             last_panel_relative_length: self.last_panel_relative_length,
             use_chord_direction: self.use_chord_direction,
             strength_damping_factor,
-            strength_damping_factor_separated: None,
+            strength_damping_factor_separated: self.strength_damping_factor_separated,
             end_index_induced_velocities_on_wake,
             shape_damping_factor: self.shape_damping_factor,
             neglect_self_induced_velocities: self.neglect_self_induced_velocities
@@ -292,6 +294,7 @@ impl Default for WakeBuilder {
             last_panel_relative_length: Self::default_last_panel_relative_length(),
             use_chord_direction: false,
             strength_damping_last_panel_ratio: Self::default_strength_damping_last_panel_ratio(),
+            strength_damping_factor_separated: Default::default(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: Default::default(),
             far_field_ratio: PotentialTheoryModel::default_far_field_ratio(),
@@ -317,6 +320,7 @@ impl SteadyWakeBuilder {
             last_panel_relative_length: self.wake_length_factor,
             use_chord_direction: false,
             strength_damping_last_panel_ratio: WakeBuilder::default_strength_damping_last_panel_ratio(),
+            strength_damping_factor_separated: None,
             symmetry_condition: self.symmetry_condition.clone(),
             ratio_of_wake_affected_by_induced_velocities: 0.0,
             far_field_ratio: f64::INFINITY,

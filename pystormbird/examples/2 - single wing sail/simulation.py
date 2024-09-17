@@ -146,7 +146,7 @@ class SimulationCase():
         }   
 
         end_time = 10 * self.chord_length / self.freestream_velocity
-        dt = end_time / 1000
+        dt = end_time / 500
 
         wake = {}
 
@@ -155,6 +155,9 @@ class SimulationCase():
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
+                wake["strength_damping_factor_separated"] = 5.0
+                wake["last_panel_relative_length"] = 50.0
+
                 sim_settings = {
                     "Dynamic": {
                         "solver": solver,
