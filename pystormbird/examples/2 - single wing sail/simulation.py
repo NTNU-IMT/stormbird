@@ -14,6 +14,9 @@ class SimulationMode(Enum):
     DYNAMIC = 0
     STATIC = 1
 
+    def to_string(self):
+        return self.name.replace("_", " ").lower()
+
 class TestCase(Enum):
     '''
     Enum used to predefine settings for different test cases.
@@ -21,7 +24,7 @@ class TestCase(Enum):
     RAW_SIMULATION = 0           # No corrections applied to the estimated circulation distribution
     PRESCRIBED_CIRCULATION = 1   # Circulation is prescribed to a fixed mathematical shape
     INITIALIZED_SIMULATION = 2   # Simulation is initialized with a prescribed circulation distribution, but then simulated without any corrections
-    INITIALIZED_AND_SMOOTHED = 3 # Simulation is initialized with a prescribed circulation distribution, and then smoothed using a Gaussian kernel
+    SMOOTHED = 3                 # Simulation is smoothed using a Gaussian kernel
 
     def to_string(self):
         return self.name.replace("_", " ").lower()
@@ -45,8 +48,6 @@ class TestCase(Enum):
         match self:
             case TestCase.INITIALIZED_SIMULATION:
                 return True
-            case TestCase.INITIALIZED_AND_SMOOTHED:
-                return True
             case _:
                 return False
             
@@ -56,7 +57,7 @@ class TestCase(Enum):
         Returns the smoothing length for the test case, or None if no smoothing is applied.
         '''
         match self:
-            case TestCase.INITIALIZED_AND_SMOOTHED:
+            case TestCase.SMOOTHED:
                 return 0.05
             case _:
                 return None
@@ -138,15 +139,15 @@ class SimulationCase():
         line_force_model = self.get_line_force_model()
             
         solver = {
-            "max_iterations_per_time_step": 10,
+            "max_iterations_per_time_step": 20,
             "damping_factor": 0.1
         } if self.simulation_mode == SimulationMode.DYNAMIC else {
             "max_iterations_per_time_step": 1000,
             "damping_factor": 0.05
         }   
 
-        end_time = 10 * self.chord_length / self.freestream_velocity
-        dt = end_time / 500
+        end_time = 40 * self.chord_length / self.freestream_velocity
+        dt = 0.25 * self.chord_length / self.freestream_velocity
 
         wake = {}
 
@@ -155,8 +156,16 @@ class SimulationCase():
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
-                wake["strength_damping_factor_separated"] = 5.0
-                wake["last_panel_relative_length"] = 50.0
+                wake["strength_damping_factor_separated"] = 0.5
+                wake["wake_length"] = {
+                    "NrPanels": 200
+                }
+                wake["use_chord_direction"] = False
+                wake["first_panel_relative_length"] = dt * self.freestream_velocity / self.chord_length
+                #wake["ratio_of_wake_affected_by_induced_velocities"] = 0.25
+                wake["viscous_core_length_end"] = {
+                    "Absolute": 1.0 * self.chord_length
+                }
 
                 sim_settings = {
                     "Dynamic": {

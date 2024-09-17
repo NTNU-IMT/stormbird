@@ -46,8 +46,8 @@ impl Simulation {
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
         let mut points = self.line_force_model.ctrl_points();
 
-        for i in 0..self.wake.wake_points.len() {
-            points.push(self.wake.wake_points[i]);
+        for i in 0..self.wake.points.len() {
+            points.push(self.wake.points[i]);
         }
 
         points
@@ -78,7 +78,7 @@ impl Simulation {
             &ctrl_points_freestream, time_step
         );
 
-        self.wake.synchronize_wing_geometry(&self.line_force_model);
+        self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
 
         let frozen_wake = FrozenWake::from_wake(
             &self.line_force_model, 
@@ -147,9 +147,8 @@ impl Simulation {
     pub fn induced_velocities(
         &self, 
         points: &[SpatialVector<3>], 
-        off_body: bool
     ) -> Vec<SpatialVector<3>> {
-        self.wake.induced_velocities(points, off_body)
+        self.wake.induced_velocities(points)
     }
 
     pub fn initialize_with_elliptic_distribution(

@@ -31,7 +31,7 @@ impl Wake {
 
         // Compute the induced velocities at the control points
         let induced_velocities = if self.settings.end_index_induced_velocities_on_wake > 0 {
-            self.induced_velocities(&ctrl_points, true)
+            self.induced_velocities(&ctrl_points)
         } else {
             vec![SpatialVector::<3>::default(); ctrl_points.len()]
         };

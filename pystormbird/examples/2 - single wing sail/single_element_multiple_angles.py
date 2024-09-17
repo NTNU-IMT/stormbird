@@ -44,8 +44,8 @@ if __name__ == "__main__":
         TestCase.RAW_SIMULATION, 
         TestCase.PRESCRIBED_CIRCULATION, 
         TestCase.INITIALIZED_SIMULATION,
-        TestCase.INITIALIZED_AND_SMOOTHED,
-        TestCase.RAW_SIMULATION
+        TestCase.SMOOTHED,
+        TestCase.SMOOTHED
     ]
 
     modes = [
@@ -95,8 +95,8 @@ if __name__ == "__main__":
         cl_theory = cl_2d / (1 + 2/theoretical_aspect_ratio)
         cd_theory = cd_2d + cl_theory**2 / (np.pi * theoretical_aspect_ratio)
 
-        ax1.plot(angles_of_attack, cl, label='Stormbird lifting line, ' + case.to_string())
-        ax2.plot(angles_of_attack, cd, label='Stormbird lifting line, ' + case.to_string())
+        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
+        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
     
     # --------------- Comparison data ------------------------
     ax1.plot(

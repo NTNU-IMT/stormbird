@@ -34,8 +34,8 @@ fn compare_wake_models() {
 
     let points_to_check = line_force_model.ctrl_points();
 
-    let u_i_steady  = steady_wake.induced_velocities(&points_to_check, false);
-    let u_i_dynamic = dynamic_wake.induced_velocities(&points_to_check, false);
+    let u_i_steady  = steady_wake.induced_velocities(&points_to_check);
+    let u_i_dynamic = dynamic_wake.induced_velocities(&points_to_check);
 
     dbg!(&u_i_steady);
     dbg!(&u_i_dynamic);

@@ -41,7 +41,7 @@ impl FrozenWake {
 
         let nr_span_lines = ctrl_points.len();
 
-        let fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points, false);
+        let fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
 
         let mut variable_velocity_factors: Array2<SpatialVector<3>> = Array2::from_elem(
             (nr_span_lines, nr_span_lines), SpatialVector::<3>::default()
@@ -65,8 +65,7 @@ impl FrozenWake {
                         *induced_velocity = wake.unit_strength_induced_velocity_from_panel(
                             0, 
                             panel_index, 
-                            ctrl_points[ctrl_point_index], 
-                            false
+                            ctrl_points[ctrl_point_index]
                         );
                     }
                 }

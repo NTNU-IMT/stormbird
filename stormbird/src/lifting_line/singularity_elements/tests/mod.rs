@@ -5,4 +5,3 @@
 use super::*;
 
 mod vortex_panel;
-mod horseshoe_vortex;

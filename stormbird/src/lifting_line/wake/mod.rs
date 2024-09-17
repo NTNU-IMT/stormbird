@@ -108,20 +108,19 @@ pub struct Wake {
     /// The indices for the wake
     pub indices: WakeIndices,
     /// The points making up the vortex wake
-    pub wake_points: Vec<SpatialVector<3>>,
-    /// The strengths of the vortex lines without damping applied
+    pub points: Vec<SpatialVector<3>>,
+    /// The area of the panels
     pub undamped_strengths: Vec<f64>,
     /// The strengths of the vortex lines
     pub strengths: Vec<f64>,
-    /// Panel geometry data used to determine what method to use for calculating the induced 
-    /// velocities, and in the far field methods for the same purpose
-    pub panel_geometry: Vec<PanelGeometry>,
+    /// The life-time of the panels in the wake
+    pub panels_lifetime: Vec<f64>,
+    /// 'Viscosity' of each panel
+    pub panels_strength_damping_factor: Vec<f64>,
+    /// The viscous core length of each panel
+    pub panels_viscous_core_length: Vec<f64>,
     /// Settings for the wake behavior
     pub settings: WakeSettings,
-    /// The life-time of the panels in the wake
-    pub panel_lifetime: Vec<f64>,
-    /// 'Viscosity' of each panel
-    pub panel_strength_damping_factor: Vec<f64>,
     /// The model used to calculate induced velocities from vortex lines
     pub potential_theory_model: PotentialTheoryModel,
     /// To determine which wing the wake points belong to. Copied directly from the line force model
@@ -148,26 +147,26 @@ impl Wake {
     /// 
     /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom 
     /// left corner when viewing the panel from above.
-    fn panel_wake_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
+    fn panel_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
         let wing_index = self.wing_index(panel_span_index);
         
         [
-            self.indices.point_index(panel_stream_index,     panel_span_index + wing_index),
-            self.indices.point_index(panel_stream_index,     panel_span_index + 1 + wing_index),
+            self.indices.point_index(panel_stream_index, panel_span_index + wing_index),
+            self.indices.point_index(panel_stream_index, panel_span_index + 1 + wing_index),
             self.indices.point_index(panel_stream_index + 1, panel_span_index + 1 + wing_index),
             self.indices.point_index(panel_stream_index + 1, panel_span_index + wing_index),
         ]
     }
 
     /// Returns the four points that make up a panel at the given indices
-    fn panel_wake_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector<3>; 4] {
-        let point_indices = self.panel_wake_point_indices(panel_stream_index, panel_span_index);
+    fn panel_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector<3>; 4] {
+        let point_indices = self.panel_point_indices(panel_stream_index, panel_span_index);
 
         [
-            self.wake_points[point_indices[0]],
-            self.wake_points[point_indices[1]],
-            self.wake_points[point_indices[2]],
-            self.wake_points[point_indices[3]],
+            self.points[point_indices[0]],
+            self.points[point_indices[1]],
+            self.points[point_indices[2]],
+            self.points[point_indices[3]],
         ]
     }
 }

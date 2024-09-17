@@ -9,65 +9,12 @@ impl Wake {
     ///
     /// # Argument
     /// * `line_force_model` - The line force model that the wake is based on
-    pub fn synchronize_wing_geometry(&mut self, line_force_model: &LineForceModel) {
+    pub fn synchronize_wing_geometry_before_time_step(&mut self, line_force_model: &LineForceModel) {
         let span_points = line_force_model.span_points();
 
         for i in 0..span_points.len() {
-            self.wake_points[i] = span_points[i];
+            self.points[i] = span_points[i];
         }
-
-        self.update_panel_geometry_from_wake_points();
-    }
-
-    /// Update the strength of the wake panels closest to the wing geometry.
-    /// 
-    /// This is the same as updating the circulation strength on the first panels in the wake.
-    pub fn update_wing_strength(&mut self, new_circulation_strength: &[f64]) {
-        for i in 0..new_circulation_strength.len() {
-            self.undamped_strengths[i] = new_circulation_strength[i];
-        }
-    }
-
-    /// Update the lifetime of the panels in the wake.
-    fn update_panel_lifetime(&mut self, time_step: f64) {
-        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
-            for i_span in 0..self.indices.nr_panels_along_span {
-                let current_index  = self.indices.panel_index(i_stream, i_span);
-                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
-
-                self.panel_lifetime[current_index] = self.panel_lifetime[previous_index] + time_step;
-            }
-        }
-    }
-
-    fn update_panel_strength_damping_first_panels(&mut self) {
-        for i_span in 0..self.indices.nr_panels_along_span {
-            let current_index = self.indices.panel_index(0, i_span);
-
-            let amount_of_flow_separation = self.line_force_model_data.amount_of_flow_separation[i_span];
-
-            let damping_strength = if let Some(strength_damping_factor_separated) = self.settings.strength_damping_factor_separated {
-                self.settings.strength_damping_factor * (1.0 - amount_of_flow_separation) +
-                strength_damping_factor_separated * amount_of_flow_separation
-            } else {
-                self.settings.strength_damping_factor
-            };
-
-            self.panel_strength_damping_factor[current_index] = damping_strength;
-        }
-    }
-
-    fn update_panel_strength_damping_factor(&mut self) {
-        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
-            for i_span in 0..self.indices.nr_panels_along_span {
-                let current_index  = self.indices.panel_index(i_stream, i_span);
-                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
-
-                self.panel_strength_damping_factor[current_index] = self.panel_strength_damping_factor[previous_index];
-            }
-        }
-
-        self.update_panel_strength_damping_first_panels();
     }
 
     /// Update the wake geometry and strength based on the final solution at a time step.
@@ -99,15 +46,57 @@ impl Wake {
         self.number_of_time_steps_completed += 1;
     }
 
-    /// Update the panel geometry based on the current wake points
-    pub fn update_panel_geometry_from_wake_points(&mut self) {
-        (0..self.indices.nr_panels()).into_iter().for_each(|i| {
-            let (stream_index, span_index) = self.indices.reverse_panel_index(i);
+    
 
-            let panel_points = self.panel_wake_points(stream_index, span_index);
+    /// Update the strength of the wake panels closest to the wing geometry.
+    /// 
+    /// This is the same as updating the circulation strength on the first panels in the wake.
+    pub fn update_wing_strength(&mut self, new_circulation_strength: &[f64]) {
+        for i in 0..new_circulation_strength.len() {
+            self.undamped_strengths[i] = new_circulation_strength[i];
+        }
+    }
 
-            self.panel_geometry[i] = PanelGeometry::new(panel_points);
-        });
+    /// Update the lifetime of the panels in the wake.
+    fn update_panel_lifetime(&mut self, time_step: f64) {
+        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
+            for i_span in 0..self.indices.nr_panels_along_span {
+                let current_index  = self.indices.panel_index(i_stream, i_span);
+                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
+
+                self.panels_lifetime[current_index] = self.panels_lifetime[previous_index] + time_step;
+            }
+        }
+    }
+
+    fn update_panel_strength_damping_first_panels(&mut self) {
+        for i_span in 0..self.indices.nr_panels_along_span {
+            let current_index = self.indices.panel_index(0, i_span);
+
+            let amount_of_flow_separation = self.line_force_model_data.amount_of_flow_separation[i_span];
+
+            let damping_strength = if let Some(strength_damping_factor_separated) = self.settings.strength_damping_factor_separated {
+                self.settings.strength_damping_factor * (1.0 - amount_of_flow_separation) +
+                strength_damping_factor_separated * amount_of_flow_separation
+            } else {
+                self.settings.strength_damping_factor
+            };
+
+            self.panels_strength_damping_factor[current_index] = damping_strength;
+        }
+    }
+
+    fn update_panel_strength_damping_factor(&mut self) {
+        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
+            for i_span in 0..self.indices.nr_panels_along_span {
+                let current_index  = self.indices.panel_index(i_stream, i_span);
+                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
+
+                self.panels_strength_damping_factor[current_index] = self.panels_strength_damping_factor[previous_index];
+            }
+        }
+
+        self.update_panel_strength_damping_first_panels();
     }
 
     /// Moves the first wake points after the wing geometry itself.
@@ -164,12 +153,12 @@ impl Wake {
         let old_start_index = self.indices.nr_points_along_span;
         let old_end_index   = 2 * self.indices.nr_points_along_span;
 
-        let old_wake_points = self.wake_points[old_start_index..old_end_index].to_vec();
+        let old_wake_points = self.points[old_start_index..old_end_index].to_vec();
 
         for i in 0..self.indices.nr_points_along_span {
-            let estimated_new_wake_point = self.wake_points[i] + span_points_change_vector[i];
+            let estimated_new_wake_point = self.points[i] + span_points_change_vector[i];
             
-            self.wake_points[i + self.indices.nr_points_along_span] = 
+            self.points[i + self.indices.nr_points_along_span] = 
                 old_wake_points[i] * self.settings.shape_damping_factor + 
                 estimated_new_wake_point * (1.0 - self.settings.shape_damping_factor);
         }
@@ -201,7 +190,7 @@ impl Wake {
         line_force_model: &LineForceModel,
         wake_points_freestream: &[SpatialVector<3>]
     ) {
-        let start_index_last = self.wake_points.len() - self.indices.nr_points_along_span;
+        let start_index_last = self.points.len() - self.indices.nr_points_along_span;
         let start_index_previous = start_index_last - self.indices.nr_points_along_span;
 
         let chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
@@ -212,7 +201,7 @@ impl Wake {
             let current_velocity = wake_points_freestream[start_index_last + i];
             let change_vector = self.settings.last_panel_relative_length * chord_vectors[i].length() * current_velocity.normalize();
 
-            self.wake_points[start_index_last + i] = self.wake_points[start_index_previous + i] + change_vector;
+            self.points[start_index_last + i] = self.points[start_index_previous + i] + change_vector;
         }
     }
 
@@ -225,18 +214,18 @@ impl Wake {
                 let previous_flat_index = self.indices.point_index(i_stream - 1, i_span);
                 let current_flat_index  = self.indices.point_index(i_stream, i_span);
                 
-                let previous_wake_point = self.wake_points[previous_flat_index];
+                let previous_wake_point = self.points[previous_flat_index];
                 let previous_velocity = velocity[previous_flat_index];
 
                 let integrated_point = previous_wake_point + time_step * previous_velocity;
 
                 if self.settings.shape_damping_factor > 0.0 {
-                    let current_wake_point = self.wake_points[current_flat_index];
+                    let current_wake_point = self.points[current_flat_index];
     
-                    self.wake_points[current_flat_index] = current_wake_point * self.settings.shape_damping_factor + 
+                    self.points[current_flat_index] = current_wake_point * self.settings.shape_damping_factor + 
                         integrated_point * (1.0 - self.settings.shape_damping_factor);
                 } else {
-                    self.wake_points[current_flat_index] = integrated_point;
+                    self.points[current_flat_index] = integrated_point;
                 }
             }
         }
@@ -269,7 +258,7 @@ impl Wake {
 
     fn appply_damping_to_strength(&mut self) {
         for i in 0..self.indices.nr_panels() {
-            let damping_factor = (-self.panel_lifetime[i] * self.panel_strength_damping_factor[i]).exp();
+            let damping_factor = (-self.panels_lifetime[i] * self.panels_strength_damping_factor[i]).exp();
 
             self.strengths[i] = self.undamped_strengths[i] * damping_factor;
         }

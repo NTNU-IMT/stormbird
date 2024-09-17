@@ -37,8 +37,8 @@ if __name__ == "__main__":
         TestCase.RAW_SIMULATION, 
         TestCase.PRESCRIBED_CIRCULATION, 
         TestCase.INITIALIZED_SIMULATION,
-        TestCase.INITIALIZED_AND_SMOOTHED,
-        TestCase.RAW_SIMULATION
+        TestCase.SMOOTHED,
+        TestCase.SMOOTHED
     ]
 
     modes = [
@@ -80,16 +80,28 @@ if __name__ == "__main__":
 
             print("Number of iterations", result_history[-1].iterations)
 
-            force = result_history[-1].integrated_forces[0].total
+            lift_forces = []
+            drag_forces = []
 
-            cd[angle_index] = force.x / sim_case.force_factor
-            cl[angle_index] = force.y / sim_case.force_factor
+            for res in result_history:
+                lift_forces.append(res.integrated_forces[0].total.y)
+                drag_forces.append(res.integrated_forces[0].total.x)
+
+            lift_forces = np.array(lift_forces)
+            drag_forces = np.array(drag_forces)
+
+            t_non_dim = np.linspace(0, 1.0, len(lift_forces))
+
+            mean_indices = np.where(t_non_dim > 0.5) if mode == SimulationMode.DYNAMIC else -1
+
+            cd[angle_index] = np.mean(drag_forces[mean_indices]) / sim_case.force_factor
+            cl[angle_index] = np.mean(lift_forces[mean_indices]) / sim_case.force_factor
 
         cl_theory = cl_2d / (1 + 2/theoretical_aspect_ratio)
         cd_theory = cd_2d + cl_theory**2 / (np.pi * theoretical_aspect_ratio)
 
-        ax1.plot(angles_of_attack, cl, label='Stormbird lifting line, ' + case.to_string())
-        ax2.plot(angles_of_attack, cd, label='Stormbird lifting line, ' + case.to_string())
+        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
+        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
     
     ax1.plot(angles_of_attack, cl_2d, label='Section model', color='grey', linestyle='--')
     ax2.plot(angles_of_attack, cd_2d, label='Section model', color='grey', linestyle='--')

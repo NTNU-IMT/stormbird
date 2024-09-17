@@ -129,7 +129,7 @@ if __name__ == "__main__":
         "damping_factor": 0.25,
     }
 
-    dt = period / 128
+    dt = 0.25 * chord_length / velocity
     final_time = 5.0 * period
 
     relative_panel_length = dt * velocity / chord_length

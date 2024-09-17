@@ -5,7 +5,9 @@
 use super::*;
 
 use math_utils::spatial_vector::SpatialVector;
-use crate::lifting_line::singularity_elements::prelude::*;
+use math_utils::spatial_vector::geometry_functions;
+
+
 
 #[test]
 fn compare_near_and_far_field() {
@@ -38,19 +40,21 @@ fn compare_near_and_far_field() {
 
     let ctrl_point = ctrl_point_0.rotate(rotation);
 
-    let panel = PanelGeometry::new(panel_points);
-    
-    assert!(panel.area - 1.0 < 1e-10);
+    let panel_center = 0.25 * (panel_points[0] + panel_points[1] + panel_points[2] + panel_points[3]);
+    let panel_area = geometry_functions::area_of_quadrilateral(&panel_points);
+    let panel_normal = geometry_functions::normal_of_quadrilateral(&panel_points);
+
+    assert!(panel_area - 1.0 < 1e-10);
 
     // Compare velcoity calculations
-    let u_i_near = model.induced_velocity_from_panel_as_vortex_lines_with_unit_strength(&panel_points, ctrl_point, false);
-    let u_i_far  = model.induced_velocity_from_panel_as_point_doublet_with_unit_strength(&panel, ctrl_point);
+    let u_i_near = model.induced_velocity_from_panel_as_vortex_lines_with_unit_strength(&panel_points, ctrl_point, 0.01);
+    let u_i_far  = model.induced_velocity_from_panel_as_point_doublet_with_unit_strength(panel_area, panel_normal, panel_center, ctrl_point);
 
     let difference = (u_i_near - u_i_far).length();
 
     dbg!(u_i_near);
     dbg!(u_i_far);
-    dbg!(panel.area);
+    dbg!(panel_area);
 
     let relative_error = difference / u_i_near.length();
 
