@@ -16,3 +16,4 @@ pub mod finite_difference;
 pub mod spatial_vector;
 pub mod special_functions;
 pub mod multi_dimensional_indices;
+pub mod float_trait;
