@@ -20,13 +20,12 @@ pub struct StormbirdLiftingLine {
     pub max_wing_rotation_velocity: f64,
     pub write_stormbird_results: bool,
     pub stormbird_results_path: String,
+    pub use_wind_environment: bool,
     #[input]
-    pub constant_velocity_x: f64,
-    pub constant_velocity_y: f64,
-    pub constant_velocity_z: f64,
-    pub reference_wind_velocity_x: f64,
-    pub reference_wind_velocity_y: f64,
-    pub reference_wind_velocity_z: f64,
+    pub velocity_x: f64,
+    pub velocity_y: f64,
+    pub velocity_z: f64,
+    pub wind_environment_velocities: String
     pub translation_x: f64,
     pub translation_y: f64,
     pub translation_z: f64,
@@ -41,6 +40,7 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
+    pub freestream_velocity_points: String,
 
     up_direction: SpatialVector<3>,
     stormbird_model: Option<Simulation>,
@@ -48,11 +48,26 @@ pub struct StormbirdLiftingLine {
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
+    fn exit_initialization_mode(&mut self) {
+        todo!()
+    }
+        
     fn do_step(&mut self, current_time: f64, time_step: f64) {
+        let freestream_velocity: Vec<SpatialVector> = if self.use_wind_environment {
+            serde_json::from_str(&self.wind_environment_velocities).unwrap()
+        } else {
+            vec![
+                SpatialVector{[self.velocity_x, self.velocity_y, self.velocity_z]}; 
+                self.nr_freestream_velocity_points
+            ]
+        };
+
+        assert!(freestream_velocity.len() == self.nr_freestream_velocity_points);
+
         let freestream_velocity = SpatialVector([
-            self.reference_wind_velocity_x,
-            self.reference_wind_velocity_y,
-            self.reference_wind_velocity_z
+            self.velocity_x,
+            self.velocity_y,
+            self.velocity_z
         ]);
 
         if let None = self.stormbird_model {
@@ -90,7 +105,7 @@ impl FmuFunctions for StormbirdLiftingLine {
             let result = model.do_step(
                 current_time, 
                 time_step, 
-                &vec![freestream_velocity; self.nr_freestream_velocity_points]
+                freestream_velocity
             );
 
             if self.write_stormbird_results {

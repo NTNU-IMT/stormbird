@@ -2,7 +2,7 @@
 
 [Introduction](./introduction.md)
 
-- [Publications overview](./publications_overview.md)
+
 - [Input/output format](./io_info.md)
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
@@ -20,3 +20,6 @@
     - [Wake](./lifting_line/wake.md)
     - [Velocity input](./lifting_line/velocity_input.md)
 - [Tutorials](./tutorials/tutorials.md)
+- [Publications](./publications/publications_intro.md)
+    - [Similar simulation methods](./publications/similar_simulation_methods.md)
+    - [Validation data](./publications/validation_data.md)
