@@ -19,11 +19,11 @@ pub struct WindEnvironment {
     pub use_list_1: bool,
     pub use_list_2: bool,
     #[input]
-    pub points_list_json_1: String,
-    pub points_list_json_2: String,
+    pub points_list_1: String,
+    pub points_list_2: String,
     #[output]
-    pub velocity_list_json_1: String,
-    pub velocity_list_json_2: String,
+    pub velocity_list_1: String,
+    pub velocity_list_2: String,
 
     power_model: Option<PowerModelABL>,
 }
@@ -35,7 +35,7 @@ impl FmuFunctions for WindEnvironment {
         }
 
         if let Some(power_model) = &self.power_model {
-            let points_list_1: Vec<SpatialVector> = serde_json::from_str(&self.points_list_json_1).unwrap();
+            let points_list_1: Vec<SpatialVector> = serde_json::from_str(&self.points_list_1).unwrap();
 
             let velocity_list_1: Vec<SpatialVector> = points_list_1.iter().map(|point| 
                 power_model.velocity_at_location(point)

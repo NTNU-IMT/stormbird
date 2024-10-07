@@ -1,6 +1,7 @@
 use super::*;
 
 #[derive(Debug, Clone, Default)]
+/// Structure for storing relevant data from the line force model that is needed for several methods in the wake model.
 pub struct LineForceModelData {
     pub chord_vectors: Vec<SpatialVector<3>>,
     pub ctrl_points_velocity: Vec<SpatialVector<3>>,

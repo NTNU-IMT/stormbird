@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
+    
+    <StartTime>0.0</StartTime>
+    <BaseStepSize>0.1</BaseStepSize>
+    <Algorithm>fixedStep</Algorithm>
+    
+    <Simulators>
+        <Simulator name="wing_sails" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
+            <InitialValues>
+                <InitialValue variable = "setup_file_path"> <String value="stormbird_setup.json"/> </InitialValue>
+                
+                <InitialValue variable = "velocity_x"> <Real value="7.07"/> </InitialValue>
+                <InitialValue variable = "velocity_y"> <Real value="7.07"/> </InitialValue>
+
+            </InitialValues>
+        </Simulator>
+
+    </Simulators>
+
+    <Connections>
+    </Connections>
+
+</OspSystemStructure>

@@ -160,17 +160,8 @@ impl WakeBuilder {
         initial_velocity: SpatialVector<3>, 
     ) -> Wake {                
         let span_points   = line_force_model.span_points();
-        let chord_vectors = line_force_model.chord_vectors();
 
-        let span_points_chord_vectors = line_force_model.span_point_values_from_ctrl_point_values(
-            &chord_vectors, true
-        );
-        
         let indices = self.get_wake_indices(time_step, line_force_model, initial_velocity);
-
-        let mut points: Vec<SpatialVector<3>> = Vec::with_capacity(
-            indices.nr_points_per_line_element * indices.nr_points_along_span
-        );
 
         let wake_building_velocity = if initial_velocity.length() == 0.0 {
             SpatialVector::<3>::new(1e-6, 1e-6, 1e-6)
@@ -178,19 +169,13 @@ impl WakeBuilder {
             initial_velocity
         };
 
+        let mut points = vec![SpatialVector::<3>::default(); indices.nr_points()];
+
         for i_stream in 0..indices.nr_points_per_line_element {
             for i_span in 0..span_points.len() {
-                let start_point = span_points[i_span];
+                let flat_index = indices.point_index(i_stream, i_span);
 
-                if i_stream == 0 {
-                    points.push(start_point);
-                } else {
-                    points.push(
-                        start_point + 
-                        self.first_panel_relative_length * span_points_chord_vectors[i_span] +
-                        ((i_stream-1) as f64) * time_step * wake_building_velocity
-                    );
-                }
+                points[flat_index] = span_points[i_span];
             }
         }
 
@@ -227,7 +212,6 @@ impl WakeBuilder {
             line_force_model, 
             &indices
         );
-
       
         let mut wake = Wake {
             indices,
@@ -244,12 +228,7 @@ impl WakeBuilder {
             number_of_time_steps_completed: 0,
         };
 
-        let wake_points_freestream = vec![initial_velocity; wake.points.len()];
-
-        wake.move_last_wake_points(
-            line_force_model, 
-            &wake_points_freestream
-        );
+        wake.initialize(line_force_model, wake_building_velocity, time_step);
 
         wake
     }

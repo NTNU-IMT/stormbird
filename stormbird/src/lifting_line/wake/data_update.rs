@@ -46,7 +46,26 @@ impl Wake {
         self.number_of_time_steps_completed += 1;
     }
 
-    
+    /// Function to initialize shape and strength of the wake. This is to be used at the beginning of a simulation. It 
+    /// can also be used to reset a simulation.
+    pub fn initialize(&mut self, line_force_model: &LineForceModel, wake_building_velocity: SpatialVector<3>, time_step: f64) {
+        self.strengths = vec![0.0; self.indices.nr_panels()];
+        self.undamped_strengths = vec![0.0; self.indices.nr_panels()];
+        self.panels_lifetime = vec![0.0; self.indices.nr_panels()];
+        self.panels_strength_damping_factor = vec![0.0; self.indices.nr_panels()];
+
+        let ctrl_points_freestream = vec![wake_building_velocity; line_force_model.nr_span_lines()];
+        let wake_points_freestream = vec![wake_building_velocity; self.points.len()];
+
+        self.synchronize_wing_geometry_before_time_step(line_force_model);
+        self.update_line_force_model_data(line_force_model, &ctrl_points_freestream);
+
+        let nr_initial_time_steps = self.indices.nr_points_per_line_element;
+
+        for _ in 0..nr_initial_time_steps {
+            self.update_wake_points_after_completed_time_step(time_step, line_force_model, &wake_points_freestream);
+        }
+    }
 
     /// Update the strength of the wake panels closest to the wing geometry.
     /// 
@@ -99,6 +118,21 @@ impl Wake {
         self.update_panel_strength_damping_first_panels();
     }
 
+    /// Update the wake points by streaming them downstream.
+    /// 
+    /// The first and second "rows" - meaning the wing geometries and the first row of wake points -
+    /// are treaded as special cases. The rest are moved based on the euler method
+    pub fn update_wake_points_after_completed_time_step(
+        &mut self, 
+        time_step: f64,
+        line_force_model: &LineForceModel,
+        wake_points_freestream: &[SpatialVector<3>]
+    ) {
+        self.move_first_free_wake_points(line_force_model);
+        self.stream_free_wake_points(time_step, wake_points_freestream);
+        self.move_last_wake_points(line_force_model, wake_points_freestream);
+    }
+
     /// Moves the first wake points after the wing geometry itself.
     /// 
     /// How the points are moved depends on both the sectional force model for each wing and - in 
@@ -119,7 +153,7 @@ impl Wake {
         for i in 0..self.indices.nr_panels_along_span {
             let amount_of_flow_separation = self.line_force_model_data.amount_of_flow_separation[i];
             
-            // Little flow separation means that the ctrl point should move in the direction of the
+            // Small flow separation means that the ctrl point should move in the direction of the
             // chord vector. Large flow separation means that the ctrl point should move in the
             // direction of the velocity vector, but with an optional rotation around the axis of
             // the span line.
@@ -144,7 +178,7 @@ impl Wake {
             );
         }
 
-        // Transfer ctrl point data to span lines
+        // Transfer ctrl point data to span point data
         let span_points_change_vector = line_force_model.span_point_values_from_ctrl_point_values(
             &ctrl_points_change_vector, true
         );
@@ -164,20 +198,7 @@ impl Wake {
         }
     }
 
-    /// Update the wake points by streaming them downstream.
-    /// 
-    /// The first and second "rows" - meaning the wing geometries and the first row of wake points -
-    /// are treaded as special cases. The rest are moved based on the euler method
-    fn update_wake_points_after_completed_time_step(
-        &mut self, 
-        time_step: f64,
-        line_force_model: &LineForceModel,
-        wake_points_freestream: &[SpatialVector<3>]
-    ) {
-        self.move_first_free_wake_points(line_force_model);
-        self.stream_free_wake_points(time_step, wake_points_freestream);
-        self.move_last_wake_points(line_force_model, wake_points_freestream);
-    }
+    
 
 
     /// Moves the last points in the wake based on the chord length and the freestream velocity
