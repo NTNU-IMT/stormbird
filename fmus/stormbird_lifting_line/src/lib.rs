@@ -19,7 +19,7 @@ pub struct StormbirdLiftingLine {
     pub setup_file_path: String,
     pub angles_in_degrees: bool,
     pub use_wind_environment: bool,
-    pub use_local_wing_angle_input: bool,
+    pub use_local_wing_angles: bool,
     pub write_stormbird_results: bool,
     pub stormbird_results_path: String,
     #[input]
@@ -78,6 +78,10 @@ impl FmuFunctions for StormbirdLiftingLine {
         let average_freestream_velocity = freestream_velocity.iter().sum::<SpatialVector<3>>() / freestream_velocity.len() as f64;
 
         let result = if let Some(model) = &mut self.stormbird_model {        
+            model.line_force_model.translation = translation;
+            model.line_force_model.rotation = rotation;
+            model.line_force_model.local_wing_angles = local_wing_angles;
+            
             if !self.initialized_wake_points {
                 model.wake.initialize(
                     &model.line_force_model,
@@ -88,10 +92,6 @@ impl FmuFunctions for StormbirdLiftingLine {
                 self.initialized_wake_points = true;
             }
     
-            model.line_force_model.translation = translation;
-            model.line_force_model.rotation = rotation;
-            model.line_force_model.local_wing_angles = local_wing_angles;
-
             if self.use_wind_environment {
                 let freestream_velocity_points = model.get_freestream_velocity_points();
     
@@ -152,7 +152,7 @@ impl StormbirdLiftingLine {
     }
 
     fn local_wing_angles(&self) -> Vec<f64> {
-        let mut local_wing_angles: Vec<f64> = if self.use_local_wing_angle_input {
+        let mut local_wing_angles: Vec<f64> = if self.use_local_wing_angles {
             serde_json::from_str(&self.local_wing_angles).unwrap()
         } else {
             vec![0.0; self.nr_wings]

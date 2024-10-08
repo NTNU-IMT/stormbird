@@ -25,6 +25,9 @@ pub mod prelude;
 pub mod single_wing;
 pub mod circulation_corrections;
 
+#[cfg(test)]
+mod tests;
+
 use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
 
@@ -216,11 +219,8 @@ impl LineForceModel {
     /// Returns the span lines in global coordinates.
     pub fn span_lines(&self) -> Vec<SpanLine> {
         self.span_lines_local.iter().enumerate().map(
-            |(global_index, line)| {
-                let (angle, axis) = self.wing_rotation_data_from_global(global_index);
-
-                line.rotate_around_axis(angle, axis)
-                    .rotate(self.rotation)
+            |(_, line)| {
+                line.rotate(self.rotation)
                     .translate(self.translation)
             }
         ).collect()

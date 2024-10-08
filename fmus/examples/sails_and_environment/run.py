@@ -57,7 +57,7 @@ if __name__ == '__main__':
             'run', '.', 
             '--end-time', str(args.end_time), 
             '--output-dir', str(output_path)
-        ]
+        ],
     )
     end_time = time.time()
 

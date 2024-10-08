@@ -5,7 +5,7 @@ import json
 
 
 def make_stormbird_setup_file():
-    model_scale_factor = 32.0
+    model_scale_factor = 18.13
     
     chord = 11.0 / model_scale_factor
     span = 33.0 / model_scale_factor
@@ -19,7 +19,13 @@ def make_stormbird_setup_file():
     out_dict = OrderedDict()
 
     chord_vector = {"x": chord, "y": 0.0, "z": 0.0}
-    section_model = {"Foil": {"cl_zero_angle": 0.0}}
+    section_model = {
+        "Foil": {
+            "cl_zero_angle": 0.0,
+            "mean_positive_stall_angle": np.radians(20),
+            "mean_negative_stall_angle": np.radians(20)
+        }
+    }
     non_zero_circulation_at_ends = [False, False]
 
     wing_builders = []

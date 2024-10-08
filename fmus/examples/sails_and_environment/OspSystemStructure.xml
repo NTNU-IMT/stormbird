@@ -13,7 +13,8 @@
                 <InitialValue variable = "velocity_x"> <Real value="7.07"/> </InitialValue>
                 <InitialValue variable = "velocity_y"> <Real value="7.07"/> </InitialValue>
                 <InitialValue variable = "angles_in_degrees"> <Boolean value="true"/> </InitialValue>
-                <InitialValue variable = "local_wing_angles"> <String value="{[45.0, 45.0, 45.0]}"/> </InitialValue>
+                <InitialValue variable = "use_local_wing_angles"> <Boolean value="true"/> </InitialValue>
+                <InitialValue variable = "local_wing_angles"> <String value="[35.0, 35.0, 35.0]"/> </InitialValue>
 
             </InitialValues>
         </Simulator>
