@@ -9,7 +9,7 @@ import shutil
 
 import argparse
 
-from stormbird_setup import make_stormbird_setup_file
+from stormbird_setup import make_stormbird_setup_file, make_sail_controller_setup_file
 
 def delete_old_output_files(output_path: Path):
     current_output_files = os.listdir(output_path)
@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--end-time', type=float, default=5.0, help='End time of simulation.')
 
     make_stormbird_setup_file()
+    make_sail_controller_setup_file()
 
     args = parser.parse_args()
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
             str(cosim_path), 
             'run', '.', 
             '--end-time', str(args.end_time), 
-            '--output-dir', str(output_path)
+            '--output-dir', str(output_path),
         ],
     )
     end_time = time.time()

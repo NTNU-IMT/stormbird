@@ -1,5 +1,5 @@
 [package]
-name = "wind_environment"
+name = "sail_controller"
 version = "0.1.0"
 edition = "2021"
 

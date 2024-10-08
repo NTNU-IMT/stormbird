@@ -42,7 +42,6 @@ pub struct StormbirdLiftingLine {
     pub moment_y: f64,
     pub moment_z: f64,
     pub freestream_velocity_points: String,
-    pub ctrl_points_velocities: String,
 
     stormbird_model: Option<Simulation>,
     nr_wings: usize,
@@ -141,7 +140,7 @@ impl StormbirdLiftingLine {
     }
 
     fn freestream_velocity(&self) -> Vec<SpatialVector<3>> {
-        if self.use_wind_environment {
+        if self.use_wind_environment && !self.wind_environment_velocities.is_empty() {
             serde_json::from_str(&self.wind_environment_velocities).unwrap()
         } else {
             vec![
@@ -152,7 +151,7 @@ impl StormbirdLiftingLine {
     }
 
     fn local_wing_angles(&self) -> Vec<f64> {
-        let mut local_wing_angles: Vec<f64> = if self.use_local_wing_angles {
+        let mut local_wing_angles: Vec<f64> = if self.use_local_wing_angles && !self.local_wing_angles.is_empty() {
             serde_json::from_str(&self.local_wing_angles).unwrap()
         } else {
             vec![0.0; self.nr_wings]
@@ -182,7 +181,5 @@ impl StormbirdLiftingLine {
         self.moment_x = integrated_moments[0];
         self.moment_y = integrated_moments[1];
         self.moment_z = integrated_moments[2];
-
-        self.ctrl_points_velocities = serde_json::to_string(&result.force_input.velocity).unwrap();
     }
 }

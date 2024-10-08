@@ -44,7 +44,11 @@ impl Simulation {
     /// dynamic simulation, the points are the control points of the line force model and the 
     /// points in the wake.
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
-        let mut points = self.line_force_model.ctrl_points();
+        let total_nr_popints = self.line_force_model.nr_span_lines() + self.wake.points.len();
+
+        let mut points = Vec::with_capacity(total_nr_popints);
+
+        points.extend(self.line_force_model.ctrl_points());
 
         for i in 0..self.wake.points.len() {
             points.push(self.wake.points[i]);

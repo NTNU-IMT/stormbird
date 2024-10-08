@@ -3,16 +3,47 @@ from collections import OrderedDict
 
 import json
 
+model_scale_factor = 18.13
+
+def make_sail_controller_setup_file():
+    wind_direction_data = np.array([-180, -20.0, -10.0, 0.0, 10.0, 20.0, 180])
+    angle_of_attack_data = np.array([-15, -15, 0.0, 0.0, 0.0, 15.0, 15.0])
+
+    wing_angles_data = wind_direction_data - angle_of_attack_data
+
+    nr_sails = 3
+
+    controllers = []
+
+    reference_direction = {"x": 1.0, "y": 0.0, "z": 0.0}
+    measurement_point   = {"x": 0.0, "y": 0.0, "z": 10.0 / model_scale_factor}
+    rotation_axis       = {"x": 0.0, "y": 0.0, "z": 1.0}
+
+    for i in range(nr_sails):
+        controllers.append(
+            {
+                "reference_direction": reference_direction,
+                "measurement_point": measurement_point,
+                "rotation_axis": rotation_axis,
+                "wind_direction_data": wind_direction_data.tolist(),
+                "wing_angles_data": wing_angles_data.tolist(),
+                "use_degrees": True
+            }
+        )
+
+    with open("sail_controller_setup.json", "w") as f:
+        json.dump(controllers, f, indent=4)
+        
 
 def make_stormbird_setup_file():
-    model_scale_factor = 18.13
-    
     chord = 11.0 / model_scale_factor
     span = 33.0 / model_scale_factor
 
+    start_height = 10.0 / model_scale_factor
+
     x_locations = np.array([-60, 0.0, 60]) / model_scale_factor
     y_locations = np.array([0.0, 0.0, 0.0]) / model_scale_factor
-    z_locations = np.array([0.0, 0.0, 0.0]) / model_scale_factor
+    z_locations = np.array([start_height, start_height, start_height])
 
     nr_sails = len(x_locations)
 
@@ -52,10 +83,11 @@ def make_stormbird_setup_file():
         "Dynamic": {
             "wake": {
                 "wake_length": {
-                    "NrPanels": 50
+                    "NrPanels": 25
                 },
-                "ratio_of_wake_affected_by_induced_velocities": 0.1,
-                "use_chord_direction": True
+                "ratio_of_wake_affected_by_induced_velocities": 0.0,
+                "use_chord_direction": True,
+                "symmetry_condition": "Z"
             }
         }
     }

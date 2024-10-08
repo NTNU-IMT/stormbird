@@ -31,6 +31,8 @@ mod tests;
 use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
 
+use crate::controllers::sail_controller::SailControllerResult;
+
 use span_line::*;
 use circulation_corrections::CirculationCorrection;
 use single_wing::SingleWing;
@@ -442,6 +444,22 @@ impl LineForceModel {
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)
     pub fn total_force_factor(&self, freestream_velocity: f64) -> f64 {
         0.5 * self.density * freestream_velocity.powi(2) * self.total_projected_area()
+    }
+
+    pub fn set_sail_controller_results(&mut self, results: &[SailControllerResult]) {
+        for wing_index in 0..self.nr_wings() {
+            self.local_wing_angles[wing_index] = results[wing_index].wing_angle;
+            
+            match self.section_models[wing_index] {
+                SectionModel::VaryingFoil(ref mut foil) => {
+                    foil.current_internal_state = results[wing_index].internal_state;
+                },
+                SectionModel::RotatingCylinder(ref mut cylinder) => {
+                    cylinder.revolutions_per_second = results[wing_index].internal_state;
+                },
+                _ => {}
+            }
+        }
     }
     
 
