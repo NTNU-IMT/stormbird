@@ -2,7 +2,7 @@
 <OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
     
     <StartTime>0.0</StartTime>
-    <BaseStepSize>0.1</BaseStepSize>
+    <BaseStepSize>0.005</BaseStepSize>
     <Algorithm>fixedStep</Algorithm>
     
     <Simulators>
@@ -12,6 +12,8 @@
                 
                 <InitialValue variable = "velocity_x"> <Real value="7.07"/> </InitialValue>
                 <InitialValue variable = "velocity_y"> <Real value="7.07"/> </InitialValue>
+                <InitialValue variable = "angles_in_degrees"> <Boolean value="true"/> </InitialValue>
+                <InitialValue variable = "local_wing_angles"> <String value="{[45.0, 45.0, 45.0]}"/> </InitialValue>
 
             </InitialValues>
         </Simulator>

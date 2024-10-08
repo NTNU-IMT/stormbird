@@ -9,6 +9,8 @@ import shutil
 
 import argparse
 
+from stormbird_setup import make_stormbird_setup_file
+
 def delete_old_output_files(output_path: Path):
     current_output_files = os.listdir(output_path)
 
@@ -35,7 +37,9 @@ def delete_old_wake_files():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run simulation.')
-    parser.add_argument('--end-time', type=float, default=20.0, help='End time of simulation.')
+    parser.add_argument('--end-time', type=float, default=5.0, help='End time of simulation.')
+
+    make_stormbird_setup_file()
 
     args = parser.parse_args()
 
@@ -60,4 +64,4 @@ if __name__ == '__main__':
     simulation_time = end_time - start_time
 
     print('Total time: {}s'.format(simulation_time))
-    print("Simulation time / real time: {}s".format(args.end_time / simulation_time))
+    print("Real time / simulation time: {}s".format(args.end_time / simulation_time))
