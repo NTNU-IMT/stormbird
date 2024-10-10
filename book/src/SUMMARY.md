@@ -22,5 +22,5 @@
     - [Velocity input](./lifting_line/velocity_input.md)
 - [Tutorials](./tutorials/tutorials.md)
 - [Literature](./literature/literature_intro.md)
-    - [Similar simulation methods](./literature/similar_simulation_methods.md)
+    - [Simulation methods](./literature/similar_simulation_methods.md)
     - [Validation data](./literature/validation_data.md)

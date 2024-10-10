@@ -25,6 +25,7 @@ pub struct StormbirdLiftingLine {
     pub wind_angle_relative_measurement_height: f64,
     pub include_induced_velocities_in_wind_angle_measurements: bool,
     pub negative_z_is_up: bool,
+    pub export_stormbird_result: bool,
     #[input]
     pub surge_velocity: f64,
     pub sway_velocity: f64,
@@ -213,5 +214,10 @@ impl StormbirdLiftingLine {
         self.moment_x = integrated_moments[0];
         self.moment_y = integrated_moments[1];
         self.moment_z = integrated_moments[2];
+
+        if self.export_stormbird_result {
+            self.stormbird_result = serde_json::to_string(&result).unwrap();
+        }
+        
     }
 }

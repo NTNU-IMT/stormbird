@@ -8,7 +8,7 @@ import os
 
 import argparse
 
-from stormbird_setup import make_stormbird_setup_file, make_sail_controller_setup_file
+from stormbird_setup import make_stormbird_setup_file, make_sail_controller_setup_file, WindEnvironment
 
 def delete_old_output_files(output_path: Path):
     current_output_files = os.listdir(output_path)
@@ -37,6 +37,9 @@ def delete_old_wake_files():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run simulation.')
     parser.add_argument('--end-time', type=float, default=5.0, help='End time of simulation.')
+
+    wind_environment = WindEnvironment()
+    wind_environment.to_json_file('wind_environment_setup.json')
 
     make_stormbird_setup_file()
     make_sail_controller_setup_file()

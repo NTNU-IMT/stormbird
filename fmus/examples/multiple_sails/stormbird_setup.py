@@ -1,9 +1,30 @@
 import numpy as np
 from collections import OrderedDict
 
+from dataclasses import dataclass
+
 import json
 
 model_scale_factor = 18.13
+
+@dataclass
+class WindEnvironment:
+    reference_height: float = 10.0
+    power_factor: float = 1.0 / 9.0
+
+    def to_dict(self):
+        return {
+            "PowerModel": {
+                "reference_height": self.reference_height,
+                "power_factor": self.power_factor
+            }
+        }
+    
+    def to_json_file(self, file_path):
+        with open(file_path, "w") as f:
+            json.dump(self.to_dict(), f, indent=4)
+
+
 
 def make_sail_controller_setup_file():
     wind_direction_data = np.array([-180, -20.0, -10.0, 0.0, 10.0, 20.0, 180])
@@ -19,7 +40,7 @@ def make_sail_controller_setup_file():
     measurement_point   = {"x": 0.0, "y": 0.0, "z": 10.0 / model_scale_factor}
     rotation_axis       = {"x": 0.0, "y": 0.0, "z": 1.0}
 
-    for i in range(nr_sails):
+    for _ in range(nr_sails):
         controllers.append(
             {
                 "reference_direction": reference_direction,

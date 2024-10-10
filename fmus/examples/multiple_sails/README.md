@@ -1,3 +1,3 @@
-# Modelling sails and environment
+# Multiple sails
 
 This example show hos to model sails and
