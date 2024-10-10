@@ -2,8 +2,9 @@
 
 [Introduction](./introduction.md)
 
-
-- [Input/output format](./io_info.md)
+- [Overview of different versions](./different_versions/versions_intro.md)
+    - [Python interface](./different_versions/python_interface.md)
+    - [Functional Mockup Unit](./different_versions/fmu_version.md)
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
     - [Circulation strength](./line_model/circulation_strength.md)
@@ -20,6 +21,6 @@
     - [Wake](./lifting_line/wake.md)
     - [Velocity input](./lifting_line/velocity_input.md)
 - [Tutorials](./tutorials/tutorials.md)
-- [Publications](./publications/publications_intro.md)
-    - [Similar simulation methods](./publications/similar_simulation_methods.md)
-    - [Validation data](./publications/validation_data.md)
+- [Literature](./literature/literature_intro.md)
+    - [Similar simulation methods](./literature/similar_simulation_methods.md)
+    - [Validation data](./literature/validation_data.md)

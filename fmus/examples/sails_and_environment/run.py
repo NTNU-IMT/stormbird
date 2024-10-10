@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 
 import os
-import shutil
 
 import argparse
 
@@ -44,8 +43,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    cosim_path = Path.home() / Path("C:/Program Files/Open Simulation Platform/cosim-v0.7.1-win64/bin/cosim.exe")
-    
     output_path = Path('output')
 
     delete_old_output_files(output_path)
@@ -54,7 +51,7 @@ if __name__ == '__main__':
     start_time = time.time()
     subprocess.run(
         [
-            str(cosim_path), 
+            'cosim', 
             'run', '.', 
             '--end-time', str(args.end_time), 
             '--output-dir', str(output_path),

@@ -42,11 +42,3 @@ The books is intended to give an introduction to the theory and the models avail
 
 To truly learn how to use it, though, it is recommended to look at actual input files and code examples. This should be distributed along with the book. See the [tutorial chapter](./tutorials.md) for more on this 
 
-## Overview of Different Flavors
-Stormbird itself is a [Rust](https://www.rust-lang.org/) library. Rust is a nice programming language that offers a unique combination of high computational speed, and a modern user friendly developer experience. However, there are also three other ways to use the functionality without knowing how to program in Rust, listed below:
-
-- Through a `Python` interface, which is facilitated by a the library `pystormbird`. 
-- Run `FMI/FMU` simulation based on the `StormbirdLiftingLine` `FMU`.
-- For running actuator line simulations, there is an [OpenFOAM](https://www.openfoam.com/) interface. 
-
-The final goal for the book is to cover all approaches as much as possible, as much of the functionality is shared between them. **However**, the `Python` interface is considered the most straight forward to use, and will therefore be prioritized in the beginning. The other two will come later.
