@@ -72,6 +72,12 @@ impl<const N: usize> Default for SpatialVector<N> {
     }
 }
 
+impl<const N: usize> std::fmt::Display for SpatialVector<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
 
 
 

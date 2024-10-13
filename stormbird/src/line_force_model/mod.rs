@@ -25,6 +25,8 @@ pub mod prelude;
 pub mod single_wing;
 pub mod circulation_corrections;
 
+pub mod motion;
+
 #[cfg(test)]
 mod tests;
 
@@ -32,6 +34,8 @@ use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
 
 use crate::controllers::sail_controller::SailControllerResult;
+
+use self::motion::derivatives::Derivatives;
 
 use span_line::*;
 use circulation_corrections::CirculationCorrection;

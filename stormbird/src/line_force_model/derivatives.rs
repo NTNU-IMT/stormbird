@@ -4,7 +4,7 @@
 
 use super::*;
 
-use crate::io_structs::derivatives::Derivatives;
+use self::motion::derivatives::Derivatives;
 
 /// This implementation block contains functionality relevant for calculating velocities and 
 /// accelerations due to motion and changing inflow conditions. This is necessary to generate input

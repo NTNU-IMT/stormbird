@@ -8,7 +8,6 @@
 //! However, the interface is designed to be as unified as possible. 
 
 use crate::lifting_line::prelude::*;
-use crate::io_structs::derivatives::Derivatives;
 use crate::line_force_model::circulation_corrections::CirculationCorrection;
 
 use super::simulation_builder::SimulationBuilder;
@@ -20,7 +19,6 @@ pub struct Simulation {
     pub wake: Wake,
     pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
-    pub derivatives: Option<Derivatives>,
     pub write_wake_data_to_file: bool,
     pub wake_files_folder_path: String,
 }

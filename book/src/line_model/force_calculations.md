@@ -34,3 +34,34 @@ The magnitude of the force is determined by coefficients set in the sectional mo
 This force should only be non-zero for models using the rotating cylinder sectional model.
 
 ## Force results structures
+
+```rust
+pub struct SectionalForces {
+    pub circulatory: Vec<SpatialVector<3>>,
+    pub sectional_drag: Vec<SpatialVector<3>>,
+    pub added_mass: Vec<SpatialVector<3>>,
+    pub gyroscopic: Vec<SpatialVector<3>>,
+    pub total: Vec<SpatialVector<3>>,
+}
+```
+```rust
+pub struct IntegratedValues {
+    pub circulatory: SpatialVector<3>,
+    pub sectional_drag: SpatialVector<3>,
+    pub added_mass: SpatialVector<3>,
+    pub gyroscopic: SpatialVector<3>,
+    pub total: SpatialVector<3>,
+}
+```
+
+```rust
+pub struct SimulationResult {
+    pub ctrl_points: Vec<SpatialVector<3>>,
+    pub force_input: SectionalForcesInput,
+    pub sectional_forces: SectionalForces,
+    pub integrated_forces: Vec<IntegratedValues>,
+    pub integrated_moments: Vec<IntegratedValues>,
+    pub iterations: usize,
+    pub residual: f64,
+}
+```
