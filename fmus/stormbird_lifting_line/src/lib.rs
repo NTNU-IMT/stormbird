@@ -25,16 +25,17 @@ pub struct StormbirdLiftingLine {
     pub wind_angle_relative_measurement_height: f64,
     pub include_induced_velocities_in_wind_angle_measurements: bool,
     pub negative_z_is_up: bool,
+    pub reverse_wind_direction: bool,
     pub export_stormbird_result: bool,
     #[input]
-    pub surge_velocity: f64,
-    pub sway_velocity: f64,
     pub wind_velocity: f64,
-    pub global_wind_direction: f64,
-    pub global_ship_heading: f64,
-    pub heave_position: f64,
+    pub wind_direction_coming_from: f64,
+    pub x_position: f64,
+    pub y_position: f64,
+    pub z_position: f64,
     pub roll_angle: f64,
     pub pitch_angle: f64,
+    pub heading_angle: f64,
     pub local_wing_angles: String,
     #[output]
     pub force_x: f64,
@@ -80,19 +81,21 @@ impl FmuFunctions for StormbirdLiftingLine {
     }
     fn do_step(&mut self, current_time: f64, time_step: f64) {
         let rotation = self.rotation();
-        let freestream_velocity = self.freestream_velocity();
+        let translation = self.translation();
+        let wind_velocities = self.wind_velocities();
         let local_wing_angles = self.local_wing_angles();
-
-        let average_freestream_velocity = freestream_velocity.iter().sum::<SpatialVector<3>>() / freestream_velocity.len() as f64;
 
         let result = if let Some(model) = &mut self.stormbird_model {        
             model.line_force_model.rotation = rotation;
+            model.line_force_model.translation = translation;
             model.line_force_model.local_wing_angles = local_wing_angles;
             
             if !self.initialized_wake_points {
+                let average_wind_velocities = wind_velocities.iter().sum::<SpatialVector<3>>() / wind_velocities.len() as f64;
+
                 model.wake.initialize(
                     &model.line_force_model,
-                    average_freestream_velocity,
+                    average_wind_velocities,
                     time_step
                 );
 
@@ -102,7 +105,7 @@ impl FmuFunctions for StormbirdLiftingLine {
             let result = model.do_step(
                 current_time, 
                 time_step, 
-                &freestream_velocity
+                &wind_velocities
             );
 
             Some(result)
@@ -122,35 +125,38 @@ impl StormbirdLiftingLine {
             SpatialVector([
                 self.roll_angle.to_radians(), 
                 self.pitch_angle.to_radians(), 
-                0.0
+                self.heading_angle.to_radians()
             ])
         } else {
             SpatialVector([
                 self.roll_angle, 
                 self.pitch_angle, 
-                0.0
+                self.heading_angle
             ])
         }
     }
 
-    fn relative_wind_direction(&self) -> f64 {
-        let mut dir = self.global_wind_direction - self.global_ship_heading;
-
-        if self.angles_in_degrees {
-            dir = dir.to_radians();
-        }
-
-        if dir < -PI {
-            dir += 2.0 * PI;
-        } else if dir > PI {
-            dir -= 2.0 * PI;
-        }
-
-        dir
+    fn translation(&self) -> SpatialVector<3> {
+        SpatialVector([self.x_position, self.y_position, self.z_position])
     }
 
-    fn freestream_velocity(&self) -> Vec<SpatialVector<3>> {
-        let wind_direction = self.relative_wind_direction();
+    fn wind_velocities(&self) -> Vec<SpatialVector<3>> {
+        let mut wind_direction = if self.angles_in_degrees {
+            self.wind_direction_coming_from.to_radians()
+        } else {
+            self.wind_direction_coming_from
+        };
+
+        if self.reverse_wind_direction {
+            wind_direction *= -1.0;
+        }
+
+        // Ensure wind direction is within +/- 180 degrees
+        if wind_direction < -PI {
+            wind_direction += 2.0 * PI;
+        } else if wind_direction > PI {
+            wind_direction -= 2.0 * PI;
+        }
 
         let freestream_velocity_points: Vec<SpatialVector<3>> = if let Some(model) = &self.stormbird_model {
             model.get_freestream_velocity_points()
@@ -158,13 +164,13 @@ impl StormbirdLiftingLine {
             vec![]
         };
 
-        let mut freestream_velocity: Vec<SpatialVector<3>> = Vec::with_capacity(freestream_velocity_points.len());
+        let mut wind_velocities: Vec<SpatialVector<3>> = Vec::with_capacity(freestream_velocity_points.len());
 
         for point in freestream_velocity_points {
             let height = if self.negative_z_is_up {
-                -point[2] - self.heave_position
+                -point[2]
             } else {
-                point[2] + self.heave_position
+                point[2]
             };
 
             let increase_factor = if let Some(model) = &self.height_variation_model {
@@ -173,18 +179,18 @@ impl StormbirdLiftingLine {
                 1.0
             };
 
-            let wind_velocity = self.wind_velocity * increase_factor;
+            let local_wind_velocity = self.wind_velocity * increase_factor;
 
-            freestream_velocity.push(
+            wind_velocities.push(
                 SpatialVector([
-                    -self.surge_velocity + wind_velocity * wind_direction.cos(), 
-                    -self.sway_velocity + wind_velocity * wind_direction.sin(), 
+                    -local_wind_velocity * wind_direction.cos(), 
+                    -local_wind_velocity * wind_direction.sin(), 
                     0.0
                 ]) 
             );
         }
 
-        freestream_velocity
+        wind_velocities
     }
 
     fn local_wing_angles(&self) -> Vec<f64> {
