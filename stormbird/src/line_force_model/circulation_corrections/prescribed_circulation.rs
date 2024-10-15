@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::line_force_model::LineForceModel;
+use crate::line_force_model::{CoordinateSystem, LineForceModel};
 use math_utils::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,12 +60,12 @@ impl LineForceModel {
 
     /// Returns a circulation distribution that is forced to follow a specific distribution where 
     /// magnitude and direction is based on the average quantities for each wing.
-    pub fn prescribed_circulation_strength(&self, velocity: &[SpatialVector<3>], prescribed_circulation: &PrescribedCirculationShape) -> Vec<f64> {
+    pub fn prescribed_circulation_strength(&self, velocity: &[SpatialVector<3>], prescribed_circulation: &PrescribedCirculationShape, input_coordinate_system: CoordinateSystem) -> Vec<f64> {
         let wing_averaged_velocity = self.wing_averaged_values(velocity);
 
         let effective_velocity = self.section_values_from_wing_values(&wing_averaged_velocity);
 
-        let raw_circulation_strength = self.circulation_strength_raw(&effective_velocity);
+        let raw_circulation_strength = self.circulation_strength_raw(&effective_velocity, input_coordinate_system);
 
         let effective_span_distance = self.effective_span_distance_for_prescribed_circulations();
 

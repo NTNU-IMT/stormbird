@@ -130,7 +130,8 @@ impl SimulationBuilder {
 
         let previous_circulation_strength = line_force_model.prescribed_circulation_strength(
             &vec![initialization_velocity; nr_of_lines], 
-            &initial_circulation_shape
+            &initial_circulation_shape,
+            CoordinateSystem::Global
         );
 
         Simulation {

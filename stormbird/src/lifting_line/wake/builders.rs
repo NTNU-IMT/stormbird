@@ -290,7 +290,7 @@ impl WakeBuilder {
         initial_velocity: SpatialVector<3>
     ) -> WakeIndices {
         let span_points   = line_force_model.span_points();
-        let chord_vectors = line_force_model.chord_vectors();
+        let chord_vectors = line_force_model.global_chord_vectors();
         
         let nr_panels_along_span = line_force_model.nr_span_lines();
         let nr_points_along_span = span_points.len();

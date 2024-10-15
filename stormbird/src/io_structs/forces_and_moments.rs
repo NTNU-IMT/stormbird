@@ -8,7 +8,14 @@ use crate::line_force_model::LineForceModel;
 
 use math_utils::spatial_vector::SpatialVector;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub enum CoordinateSystem {
+    #[default]
+    Global,
+    Body,
+}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Integrated values representing either forces or moments.
@@ -37,6 +44,8 @@ pub struct SectionalForcesInput {
     pub angles_of_attack_derivative: Vec<f64>,
     /// The rotational velocity of the entire system. Primarily relevant for gyroscopic effects.
     pub rotation_velocity: SpatialVector<3>,
+    /// The coordinate system of the input data.
+    pub coordinate_system: CoordinateSystem,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +66,8 @@ pub struct SectionalForces {
     pub gyroscopic: Vec<SpatialVector<3>>,
     /// Total forces
     pub total: Vec<SpatialVector<3>>,
+    /// The coordinate system of the forces data.
+    pub coordinate_system: CoordinateSystem,
 }
 
 impl SectionalForces {
@@ -73,10 +84,13 @@ impl SectionalForces {
     /// Calculates the moment contribution from each line element.
     /// 
     /// The moments are calculated as the cross product of the control point and the sectional force.
-    pub fn sectional_moments(line_force_model: &LineForceModel, sectional_forces: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
-        let span_lines = line_force_model.span_lines();
+    pub fn sectional_moments(line_force_model: &LineForceModel, sectional_forces: &[SpatialVector<3>], coordinate_system: CoordinateSystem) -> Vec<SpatialVector<3>> {
+        let span_lines = match coordinate_system {
+            CoordinateSystem::Global => line_force_model.span_lines(),
+            CoordinateSystem::Body => line_force_model.span_lines_local.clone(),
+        };
 
-        (0..line_force_model.nr_span_lines()).map(
+        (0..span_lines.len()).map(
             |index| {
                 span_lines[index].ctrl_point().cross(sectional_forces[index])
             }
@@ -104,11 +118,11 @@ impl SectionalForces {
     }
 
     pub fn integrate_moments(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
-        let sectional_circulatory_moments = Self::sectional_moments(line_force_model, &self.circulatory);
-        let sectional_drag_moments = Self::sectional_moments(line_force_model, &self.sectional_drag);
-        let sectional_added_mass_moments = Self::sectional_moments(line_force_model, &self.added_mass);
-        let sectional_gyroscopic_moments = Self::sectional_moments(line_force_model, &self.gyroscopic);
-        let sectional_total_moments = Self::sectional_moments(line_force_model, &self.total);
+        let sectional_circulatory_moments = Self::sectional_moments(line_force_model, &self.circulatory, self.coordinate_system);
+        let sectional_drag_moments = Self::sectional_moments(line_force_model, &self.sectional_drag, self.coordinate_system);
+        let sectional_added_mass_moments = Self::sectional_moments(line_force_model, &self.added_mass, self.coordinate_system);
+        let sectional_gyroscopic_moments = Self::sectional_moments(line_force_model, &self.gyroscopic, self.coordinate_system);
+        let sectional_total_moments = Self::sectional_moments(line_force_model, &self.total, self.coordinate_system);
 
         let mut integrated_values: Vec<IntegratedValues> = Vec::new();
 

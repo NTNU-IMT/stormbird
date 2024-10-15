@@ -104,7 +104,7 @@ impl ActuatorLine {
         cell_volume: f64
     ) -> (SpatialVector<3>, f64) {
         let span_line = self.line_force_model.span_line_at_index(line_index);
-        let chord_vector = self.line_force_model.chord_vector_at_index(line_index);
+        let chord_vector = self.line_force_model.global_chord_vector_at_index(line_index);
 
         let projection_value_org = self.projection.projection_value_at_point(
             cell_center, chord_vector, &span_line
@@ -143,7 +143,7 @@ impl ActuatorLine {
         let ctrl_points = self.line_force_model.ctrl_points();
 
         let new_estimated_circulation_strength = self.line_force_model.circulation_strength(
-            &ctrl_point_velocity
+            &ctrl_point_velocity, CoordinateSystem::Global
         );
 
         let circulation_strength = if self.solver_settings.strength_damping > 0.0 {
@@ -162,7 +162,8 @@ impl ActuatorLine {
 
         let residual = self.line_force_model.average_residual_absolute(
             &circulation_strength, 
-            ctrl_point_velocity
+            ctrl_point_velocity,
+            CoordinateSystem::Global
         );
 
         let solver_result = SolverResult {
@@ -220,7 +221,7 @@ impl ActuatorLine {
     /// Computes the body force weights for each line element at a given point in space.
     pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector<3>) -> Vec<f64> {
         let span_lines = self.line_force_model.span_lines();
-        let chord_vectors = self.line_force_model.chord_vectors();
+        let chord_vectors = self.line_force_model.global_chord_vectors();
 
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 

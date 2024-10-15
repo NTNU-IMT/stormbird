@@ -88,6 +88,8 @@ pub struct LineForceModel {
     /// Optional variables to 
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
+    /// The coordinate system to generate output in
+    pub output_coordinate_system: CoordinateSystem,
 }
 
 impl Default for LineForceModel {
@@ -115,6 +117,7 @@ impl LineForceModel {
             derivatives: None,
             circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
+            output_coordinate_system: CoordinateSystem::Global,
         }
     }
 
@@ -232,20 +235,30 @@ impl LineForceModel {
         ).collect()
     }
 
-    pub fn chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+    pub fn local_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
         let (angle, axis) = self.wing_rotation_data_from_global(index);
 
-        self.chord_vectors_local[index].rotate_around_axis(angle, axis).rotate(self.rotation)
+        self.chord_vectors_local[index].rotate_around_axis(angle, axis)
+    }
+
+    pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+        self.local_chord_vector_at_index(index).rotate(self.rotation)
     }
 
     /// Returns the chord vectors in global coordinates.
-    pub fn chord_vectors(&self) -> Vec<SpatialVector<3>> {
+    pub fn local_chord_vectors(&self) -> Vec<SpatialVector<3>> {
         self.chord_vectors_local.iter().enumerate().map(
             |(global_index, chord_vector)| {
                 let (angle, axis) = self.wing_rotation_data_from_global(global_index);
 
-                chord_vector.rotate_around_axis(angle, axis).rotate(self.rotation)
+                chord_vector.rotate_around_axis(angle, axis)
             }
+        ).collect()
+    }
+
+    pub fn global_chord_vectors(&self) -> Vec<SpatialVector<3>> {
+        self.local_chord_vectors().iter().map(
+            |chord_vector| chord_vector.rotate(self.rotation)
         ).collect()
     }
 
@@ -253,7 +266,7 @@ impl LineForceModel {
     /// span line
     pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
         let span_lines = self.span_lines();
-        let chord_vectors = self.chord_vectors();
+        let chord_vectors = self.global_chord_vectors();
 
         span_lines.iter().zip(chord_vectors.iter()).map(|(line, chord)| {
             line.ctrl_point() + *chord * self.ctrl_point_chord_factor
@@ -286,8 +299,11 @@ impl LineForceModel {
     }
 
     /// Removes the velocity in the span direction from the input velocity vector.
-    pub fn remove_span_velocity(&self, velocity: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
-        let span_lines = self.span_lines();
+    pub fn remove_span_velocity(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<SpatialVector<3>> {
+        let span_lines = match input_coordinate_system {
+            CoordinateSystem::Global => self.span_lines(),
+            CoordinateSystem::Body => self.span_lines_local.clone(),
+        };
 
         velocity.iter().zip(span_lines.iter()).map(
             |(vel, line)| {
@@ -296,29 +312,6 @@ impl LineForceModel {
                 *vel - span_velocity
             }
         ).collect()  
-    }
-
-    /// Return the angle of attack at each control point.
-    /// 
-    /// The angle is defined as the rotation from the chord vector to the velocity vector, using the 
-    /// span line as the axis of rotation, with right handed positive rotation.
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn angles_of_attack(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        let velocity_corrected = self.remove_span_velocity(velocity);
-
-        let chord_vectors = self.chord_vectors();
-        let span_lines    = self.span_lines();
-        
-        let angles_of_attack: Vec<f64> = (0..velocity_corrected.len()).map(|index| {
-            chord_vectors[index].signed_angle_between(
-                velocity_corrected[index], 
-                span_lines[index].direction()
-            )
-        }).collect();
-
-        angles_of_attack
     }
 
     /// Calculates the wake angle behind each line element.

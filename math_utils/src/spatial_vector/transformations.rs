@@ -81,6 +81,20 @@ impl SpatialVector<3> {
     pub fn rotate_around_point(self, rotation: Self, point: Self) -> Self {
         (self - point).rotate(rotation) + point
     }
+
+    /// Expresses the vector in a coordinate system that is rotated by the input rotation, relative
+    /// to the original coordinate system for the vector.
+    pub fn in_rotated_coordinate_system(self, system_rotation: Self) -> Self {
+        let x_axis = SpatialVector::<3>::unit_x().rotate(system_rotation);
+        let y_axis = SpatialVector::<3>::unit_y().rotate(system_rotation);
+        let z_axis = SpatialVector::<3>::unit_z().rotate(system_rotation);
+
+        Self([
+            self.dot(x_axis),
+            self.dot(y_axis),
+            self.dot(z_axis),
+        ])
+    }   
 }
 
 #[cfg(test)]

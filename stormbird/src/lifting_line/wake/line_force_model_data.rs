@@ -1,3 +1,5 @@
+use crate::io_structs::prelude::CoordinateSystem;
+
 use super::*;
 
 #[derive(Debug, Clone, Default)]
@@ -12,7 +14,7 @@ pub struct LineForceModelData {
 impl LineForceModelData {
     pub fn new(line_force_model: &LineForceModel) -> Self {
         Self {
-            chord_vectors: line_force_model.chord_vectors(),
+            chord_vectors: line_force_model.global_chord_vectors(),
             ctrl_points_velocity: vec![SpatialVector::<3>::default(); line_force_model.ctrl_points().len()],
             angles_of_attack: vec![0.0; line_force_model.ctrl_points().len()],
             amount_of_flow_separation: vec![0.0; line_force_model.ctrl_points().len()],
@@ -27,7 +29,7 @@ impl Wake {
         ctrl_points_freestream: &[SpatialVector<3>]
     ) {
         // Extract relevant information from the line force model
-        let chord_vectors = line_force_model.chord_vectors();
+        let chord_vectors = line_force_model.global_chord_vectors();
         let ctrl_points = line_force_model.ctrl_points();
 
         // Compute the induced velocities at the control points
@@ -41,7 +43,7 @@ impl Wake {
             |(u_inf, u_i)| *u_inf + *u_i
         ).collect();
 
-        let angles_of_attack = line_force_model.angles_of_attack(&ctrl_points_velocity);
+        let angles_of_attack = line_force_model.angles_of_attack(&ctrl_points_velocity, CoordinateSystem::Global);
 
 
         let mut amount_of_flow_separation = vec![0.0; ctrl_points.len()];

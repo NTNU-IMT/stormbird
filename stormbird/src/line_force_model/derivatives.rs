@@ -11,7 +11,7 @@ use self::motion::derivatives::Derivatives;
 /// to force calculations in the line force model.
 impl LineForceModel {
     pub fn initialize_derivatives(&mut self, ctrl_points_freestream: &[SpatialVector<3>]) {
-        let initial_angles = self.angles_of_attack(ctrl_points_freestream);
+        let initial_angles = self.angles_of_attack(ctrl_points_freestream, CoordinateSystem::Global);
 
         self.derivatives = Some(
             Derivatives::new(

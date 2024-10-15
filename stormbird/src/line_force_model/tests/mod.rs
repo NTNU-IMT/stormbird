@@ -47,7 +47,7 @@ fn test_wing_angles() {
 
     line_force_model.local_wing_angles = wing_angles.clone();
 
-    let chord_vectors = line_force_model.chord_vectors();
+    let chord_vectors = line_force_model.global_chord_vectors();
     let span_points = line_force_model.span_points();
 
     for i in 0..chord_vectors.len() {
