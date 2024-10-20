@@ -16,48 +16,68 @@ if __name__ == '__main__':
     max_cl = 9.0
 
     w_plot = 10
-    fig = plt.figure(figsize=(w_plot, w_plot / 1.85))
-    ax_cl = fig.add_subplot(121)
-    ax_cd = fig.add_subplot(122)
-
-    ax_list = [ax_cl, ax_cd]
-
-    plot_index = 0
-    for data in rotor_sail_data:
-        ax_cl.plot(data['angles_of_attack'], data['lift_coefficients'], label=data['label'], color=colors[plot_index])
-
-        try:
-            ax_cd.plot(data['drag_coefficients'], data['lift_coefficients'], label=data['label'], color=colors[plot_index])
-        except KeyError:
-            ax_cd.plot([-2, -1], [0.0, 0.0], label=data['label'], color=colors[plot_index])
-
-        plot_index += 1
-
-
-    cl_induced = np.linspace(0, max_cl, 100)
-    asp_effective = 2 * 4.0
-    cd_induced = cl_induced**2 / (np.pi * asp_effective)
-
-    ax_cd.plot(cd_induced, cl_induced, color='grey', linestyle='--', label=f'Elliptic wing theory, asp = {asp_effective}')
-
-    ax_cl.set_xlabel('Angle of attack [deg]')
-
-    ax_cl.set_xlim(0, max_angle_of_attack)
-    ax_cd.set_xlim(0, 2.0)
-
-    ax_cd.legend(loc='lower right', prop={'size': 'small'})
-
-    ax_cd.set_xlabel('Drag coefficient')
+    fig_2d = plt.figure(figsize=(w_plot, w_plot / 1.85))
+    fig_3d = plt.figure(figsize=(w_plot, w_plot / 1.85))
     
+    fig_list = [fig_2d, fig_3d]
 
-    for ax in ax_list:
-        ax.set_ylim(0, max_cl)
-        ax.set_ylabel('Lift coefficient')
-        ax.grid(True)
+    dimensions = [2, 3]
+    
+    for fig, dim in zip(fig_list, dimensions):
+        ax_cl = fig.add_subplot(121)
+        ax_cd = fig.add_subplot(122)
 
-    plt.tight_layout()
+        ax_list = [ax_cl, ax_cd]
 
-    plt.savefig('../figures/suction_sail_forces.png', dpi=300, bbox_inches='tight')
+        plot_index = 0
+        for data in rotor_sail_data:
+            if data['dimensions'] != dim:
+                continue
+
+            ax_cl.plot(data['angles_of_attack'], data['lift_coefficients'], label=data['label'], color=colors[plot_index])
+
+            try:
+                if dim == 2:
+                    ax_cd.plot(data['angles_of_attack'], data['drag_coefficients'], label=data['label'], color=colors[plot_index])
+                else:
+                    ax_cd.plot(data['drag_coefficients'], data['lift_coefficients'], label=data['label'], color=colors[plot_index])
+            except KeyError:
+                ax_cd.plot([-2, -1], [0.0, 0.0], label=data['label'], color=colors[plot_index])
+
+            plot_index += 1
+
+
+        if dim == 3:
+            cl_induced = np.linspace(0, max_cl, 100)
+            asp_effective = 2 * 4.0
+            cd_induced = cl_induced**2 / (np.pi * asp_effective)
+
+            ax_cd.plot(cd_induced, cl_induced, color='grey', linestyle='--', label=f'Elliptic wing theory, asp = {asp_effective}')
+
+        ax_cl.set_xlabel('Angle of attack [deg]')
+        ax_cl.set_ylabel('Lift coefficient')
+        ax_cl.set_ylim(0, max_cl)
+        ax_cl.set_xlim(0, max_angle_of_attack)
+
+        ax_cd.legend(loc='lower right', prop={'size': 'small'})
+
+        if dim == 2:
+            ax_cd.set_ylabel('Drag coefficient')
+            ax_cd.set_xlabel("Angle of attack [deg]")
+            ax_cd.set_xlim(0, max_angle_of_attack)
+            ax_cd.set_ylim(0, 2.0)
+        else:
+            ax_cd.set_xlabel('Drag coefficient')
+            ax_cd.set_ylabel('Lift coefficient')
+            ax_cd.set_xlim(0, 2.0)
+            ax_cd.set_ylim(0, max_cl)
+        
+        for ax in ax_list:            
+            ax.grid(True)
+
+        fig.tight_layout()
+
+        fig.savefig(f'../figures/suction_sail_forces_{dim}d.png', dpi=300, bbox_inches='tight')
 
     plt.show()
 

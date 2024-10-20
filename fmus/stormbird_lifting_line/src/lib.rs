@@ -35,7 +35,7 @@ pub struct StormbirdLiftingLine {
     pub z_position: f64,
     pub roll_angle: f64,
     pub pitch_angle: f64,
-    pub heading_angle: f64,
+    pub yaw_angle: f64,
     pub local_wing_angles: String,
     #[output]
     pub force_x: f64,
@@ -125,13 +125,13 @@ impl StormbirdLiftingLine {
             SpatialVector([
                 self.roll_angle.to_radians(), 
                 self.pitch_angle.to_radians(), 
-                self.heading_angle.to_radians()
+                self.yaw_angle.to_radians()
             ])
         } else {
             SpatialVector([
                 self.roll_angle, 
                 self.pitch_angle, 
-                self.heading_angle
+                self.yaw_angle
             ])
         }
     }

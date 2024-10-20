@@ -39,7 +39,7 @@ impl RectangularWing {
         );
 
         let mut line_force_model_builder = LineForceModelBuilder::new(self.nr_strips);
-        line_force_model_builder.density = 10.0;
+        line_force_model_builder.density = 13.2; // Sets this to a large 'random' value to detect any errors due to incorrect density
 
         
         let last_z = if self.negative_span_orientation {

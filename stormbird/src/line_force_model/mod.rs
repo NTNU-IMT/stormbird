@@ -257,7 +257,9 @@ impl LineForceModel {
     }
 
     pub fn global_chord_vectors(&self) -> Vec<SpatialVector<3>> {
-        self.local_chord_vectors().iter().map(
+        let local_chord_vectors = self.local_chord_vectors();
+        
+        local_chord_vectors.iter().map(
             |chord_vector| chord_vector.rotate(self.rotation)
         ).collect()
     }

@@ -4,7 +4,8 @@ This chapter contains useful references for extracting data about the lift and d
 
 ## Wing sails
 ### Relevant papers
-- **[Comparison of full 3D-RANS simulations with 2D-RANS/lifting line method calculations for the flow analysis of rigid wings for high performance multihulls](https://www.sciencedirect.com/science/article/pii/S0029801814002637?via%3Dihub)** (2014), by K. Graf and more. Paper that contains experimental results for a single element wing sail and CFD results for a two-element wingsail. 
+- **[Comparison of full 3D-RANS simulations with 2D-RANS/lifting line method calculations for the flow analysis of rigid wings for high performance multihulls](https://www.sciencedirect.com/science/article/pii/S0029801814002637?via%3Dihub)** (2014), by K. Graf and more. Paper that contains experimental results for a single element wing sail and CFD results for a two-element wingsail.
+- **[Rapid aerodynamic method for predicting the performance of interacting wing sails](https://www.sciencedirect.com/science/article/pii/S0029801823029803?via%3Dihub)** (2023) by K. Malmek and more. Paper about a lifting line method for wind propulsion devices, that also contains CFD data for validation purposes. The CFD results are particularly useful for validating interaction effects.
 - **[Wind Tunnel Tests of a Two-Element Wingsail with Focus on Near-Stall Aerodynamics](https://onepetro.org/JST/article/9/01/110/569569/Wind-Tunnel-Tests-of-a-Two-Element-Wingsail-with)** (2024), by A. Hillenbrand and more. A paper about an experimental study of a two-element wingsail, with particular focus on how the stall angle is dependent on dynamic situations.
 
 ## Rotor sails
@@ -17,11 +18,16 @@ This chapter contains useful references for extracting data about the lift and d
 - **[Calculation of Flettner rotor forces using lifting line and CFD methods](https://blueoasis.pt/wp-content/uploads/2023/10/Nutts2023_proceedings_v4.pdf)**, by A. Östman and more. A paper that compares lifting line simulations against CFD simulations for rotor sails. As part of this, there is both two- and three-dimensional data for lift and drag. The two-dimensional data from this paper is used as the default values in the rotating cylinder sectional model in Stormbird.
 
 ### Examples of data
-#### Figure 1: Force coefficients for a 2D spinning cylinder
-![Rotor sail data](figures/rotor_sail_forces_2D.png)
 
-#### Figure 1: Force coefficients for a 3D rotor sail
-![Rotor sail data](figures/rotor_sail_forces_3D.png)
+Examples of two-dimensional force coefficients for a spinning cylinder is shown in the plot below:
+
+#### Figure 1: Force coefficients for a 2D spinning cylinder
+![Rotor sail 2D data](figures/rotor_sail_forces_2d.png)
+
+Examples of three-dimensional force coefficients for an actual rotor sail is shown in the plot below. The drag values are also compared against the theoretical induced drag for an elliptic wind, according to simplified lifting line theory, where the effective aspect ratio is set to be similar to the data extracted from the papers. This comparison indicates that lift-induced drag is the dominating drag source for high lift-coefficients. **Note**: the max lift coefficient for a rotor sail varies quite a lot between different sources, even when the aspect ratio and Reynolds numbers are similar. This therefore indicate that this value is somewhat uncertain. 
+
+#### Figure 2: Force coefficients for a 3D rotor sail
+![Rotor sail 3D data](figures/rotor_sail_forces_3d.png)
 
 ## Suction sails
 ### Relevant papers
@@ -30,7 +36,14 @@ This chapter contains useful references for extracting data about the lift and d
 - **[A CFD Study on Wind Assisted Propulsion Technology for Commercial Shipping](https://www.researchgate.net/publication/355675684_A_CFD_Study_on_Wind_Assisted_Propulsion_Technology_for_Commercial_Shipping)** (2021), by W. Hopes and more. A paper about CFD modelling of suction sails, which includes data on lift and drag.
 - **[Levelling the Playing Field: A Numerical Platform for the Fair Comparison of Wind Propulsion Systems](http://data.hiper-conf.info/Hiper2022_Cortona.pdf)** (2022), by F. C. Gerhardt and more. A paper mostly about the need to have independent analysis of wind propulsion devices. As part of explaining the suction sail model, CFD results of lift and drag for different suction rates and angles of attack is presented.
 
-#### Figure 3: Force coefficients for a single suction sail from some of the sources above
-![Rotor sail data](figures/suction_sail_forces.png)
+### Examples of data
+
+Data from the original [Turbosail](https://en.wikipedia.org/wiki/Turbosail) from Charrier et al. (1985) seem to still be the primary data source used in open research. The other papers above typically try to reproduce the same values, only with CFD. That is, the references mentioned do not provide new insight into the performance of the suction sail directly, but attempts reproduce the same values using CFD.  **Important note**: newer producers of suctions sails, such as [Bound4Blue](https://bound4blue.com/) and [Econowind](https://econowind.nl/) uses different designs than the Turbosail, and claim better performance. The Turbosail data should therefore be interpreted as a *lower-estimate* on the performance of a modern suction sail. However, at the moment, we don't know about any *openly available source* that document this directly. 
+
+#### Figure 3: Force coefficients for a 2D suction sail section
+![Suction sail 2D data](figures/suction_sail_forces_2d.png)
+
+#### Figure 4: Force coefficients for a 3D suction sail
+![Suction sail 3D data](figures/suction_sail_forces_3d.png)
 
 

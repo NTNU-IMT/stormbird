@@ -104,12 +104,11 @@ if __name__ == '__main__':
         
 
         for ax in ax_list:
-            
             ax.grid(True)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
-        fig.savefig(f'../figures/rotor_sail_forces_{dim}D.png', dpi=300, bbox_inches='tight')
+        fig.savefig(f'../figures/rotor_sail_forces_{dim}d.png', dpi=300, bbox_inches='tight')
 
     plt.show()
 

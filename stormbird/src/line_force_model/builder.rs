@@ -22,6 +22,8 @@ pub struct LineForceModelBuilder {
     pub circulation_corrections: CirculationCorrection,
     #[serde(default)]
     pub ctrl_point_chord_factor: f64,
+    #[serde(default)]
+    pub output_coordinate_system: CoordinateSystem,
 }
 
 impl LineForceModelBuilder {
@@ -32,6 +34,7 @@ impl LineForceModelBuilder {
             density: LineForceModel::default_density(),
             circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
+            output_coordinate_system: CoordinateSystem::Global,
         }
     }
 
@@ -58,6 +61,7 @@ impl LineForceModelBuilder {
 
         line_force_model.circulation_corrections = self.circulation_corrections.clone();
         line_force_model.ctrl_point_chord_factor = self.ctrl_point_chord_factor;
+        line_force_model.output_coordinate_system = self.output_coordinate_system;
 
         line_force_model
     }    
