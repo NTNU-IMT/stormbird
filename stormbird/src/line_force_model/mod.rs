@@ -445,6 +445,20 @@ impl LineForceModel {
         0.5 * self.density * freestream_velocity.powi(2) * self.total_projected_area()
     }
 
+    pub fn set_section_models_internal_state(&mut self, internal_state: &[f64]) {
+        for wing_index in 0..self.nr_wings() {
+            match self.section_models[wing_index] {
+                SectionModel::VaryingFoil(ref mut foil) => {
+                    foil.current_internal_state = internal_state[wing_index];
+                },
+                SectionModel::RotatingCylinder(ref mut cylinder) => {
+                    cylinder.revolutions_per_second = internal_state[wing_index];
+                },
+                _ => {}
+            }
+        }
+    }
+
     pub fn set_sail_controller_results(&mut self, results: &[SailControllerResult]) {
         for wing_index in 0..self.nr_wings() {
             self.local_wing_angles[wing_index] = results[wing_index].wing_angle;

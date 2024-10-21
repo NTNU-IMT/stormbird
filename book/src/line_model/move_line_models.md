@@ -27,7 +27,7 @@ Each element in the vectors in the `SectionalForceInput` corresponds to a line e
 
 The entire geometry of a line force model can be moved by setting the `rotation` and `translation` vector. The rotation is specified as rotation around the x-axis, y-axis and z-axis respectively, where the rotation operations are performed in the same order: x first, then y, then z. The rotation of the geometry will happen first, then the translation. The rotation is therefore specified as in how the geometry is rotated from the initial configuration.
 
-In the Python interface, both vectors must be updated by using setting methods, as shown in the code snippet below:
+In the Python interface, both vectors must be updated by using setting methods for the main [simulation class](../lifting_line/simulation_overview.md), as shown in the code snippet below:
 
 ```python
 from pystormbird.lifting_line import Simulation
@@ -66,5 +66,15 @@ simulation.set_local_wing_angles(
 
 ## Update the internal state
 
-To come!
+Some of the [section models](../sectional_models/sectional_models_intro.md) have an *internal state* that modifies how the model reacts to varying velocity. This can, for instance, be the rotational speed of a rotor sail, the suction rate of a suction sail, or the flap angle of a multi-element foil. The internal state of the section models can be updated with a set method, similar to how the local wing angles can be updated. This is shown in the code example below:
 
+
+```python
+import numpy as np
+
+# some code to set up the simulation, as above
+
+simulation.set_section_models_internal_state(
+    [np.radians(10), np.radians(12.5), np.radians(15)]
+)
+```

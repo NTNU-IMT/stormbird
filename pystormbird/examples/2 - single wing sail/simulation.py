@@ -126,6 +126,7 @@ class SimulationCase():
         if self.prescribed_circulation:
             line_force_model["circulation_corrections"] = {
                 "PrescribedCirculation": {
+                    "inner_power": 2.5,
                     "outer_power": 0.2 # Note: The default also works ok. This Factor is tuned manually, based on manual comparison with a 'raw' simulation below stall.
                 }
             }
@@ -160,12 +161,9 @@ class SimulationCase():
                 wake["wake_length"] = {
                     "NrPanels": 200
                 }
-                wake["use_chord_direction"] = False
-                wake["first_panel_relative_length"] = dt * self.freestream_velocity / self.chord_length
-                #wake["ratio_of_wake_affected_by_induced_velocities"] = 0.25
-                wake["viscous_core_length_end"] = {
-                    "Absolute": 1.0 * self.chord_length
-                }
+                wake["use_chord_direction"] = True
+                wake["first_panel_relative_length"] = 0.75
+                
 
                 sim_settings = {
                     "Dynamic": {

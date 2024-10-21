@@ -22,8 +22,6 @@ pub struct StormbirdLiftingLine {
     pub lifting_line_setup_file_path: String,
     pub wind_environment_setup_file_path: String,
     pub angles_in_degrees: bool,
-    pub relative_wind_direction_measurement_non_dim_height: f64,
-    pub include_induced_velocities_in_wind_direction_measurements: bool,
     pub negative_z_is_up: bool,
     pub reverse_wind_direction: bool,
     pub export_stormbird_result: bool,
@@ -37,6 +35,7 @@ pub struct StormbirdLiftingLine {
     pub y_rotation: f64,
     pub z_rotation: f64,
     pub local_wing_angles: String,
+    pub section_models_internal_state: String,
     #[output]
     pub force_x: f64,
     pub force_y: f64,
@@ -44,7 +43,6 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
-    pub relative_wind_direction_measurements: String, 
     pub stormbird_result: String,
 
     stormbird_model: Option<Simulation>,
@@ -84,11 +82,16 @@ impl FmuFunctions for StormbirdLiftingLine {
         let translation = self.translation();
         let wind_velocities = self.wind_velocities();
         let local_wing_angles = self.local_wing_angles();
+        let section_models_internal_state = self.section_models_internal_state();
 
         let result = if let Some(model) = &mut self.stormbird_model {        
             model.line_force_model.rotation = rotation;
             model.line_force_model.translation = translation;
             model.line_force_model.local_wing_angles = local_wing_angles;
+
+            model.line_force_model.set_section_models_internal_state(
+                &section_models_internal_state
+            );
             
             if !self.initialized_wake_points {
                 let average_wind_velocities = wind_velocities.iter().sum::<SpatialVector<3>>() / wind_velocities.len() as f64;
@@ -207,6 +210,14 @@ impl StormbirdLiftingLine {
         }
 
         local_wing_angles
+    }
+
+    pub fn section_models_internal_state(&self) -> Vec<f64> {
+        if !self.section_models_internal_state.is_empty() {
+            serde_json::from_str(&self.section_models_internal_state).unwrap()
+        } else {
+            vec![0.0; self.nr_wings]
+        }
     }
 
     fn set_output(&mut self, result: SimulationResult) {

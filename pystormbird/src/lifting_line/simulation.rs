@@ -59,6 +59,10 @@ impl Simulation {
         self.data.line_force_model.local_wing_angles = local_wing_angles;
     }
 
+    pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
+        self.data.line_force_model.set_section_models_internal_state(&internal_state);
+    }
+
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector> {
         let rust_vec = self.data.get_freestream_velocity_points();
 
