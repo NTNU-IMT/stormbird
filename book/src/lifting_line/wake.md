@@ -38,15 +38,16 @@ Main wake builder structure:
 pub struct UnsteadyWakeBuilder {
     pub wake_length: WakeLength,
     pub viscous_core_length: ViscousCoreLength,
+    pub viscous_core_length_end: Option<ViscousCoreLength>,
     pub first_panel_relative_length: f64,
     pub last_panel_relative_length: f64,
     pub use_chord_direction: bool,
-    pub strength_damping_last_panel_ratio: f64,
+    pub strength_damping_factor: f64,
+    pub strength_damping_factor_separated: Option<f64>,
     pub symmetry_condition: SymmetryCondition,
     pub ratio_of_wake_affected_by_induced_velocities: f64,
     pub far_field_ratio: f64,
     pub shape_damping_factor: f64,
-    pub viscous_core_length_off_body: Option<ViscousCoreLength>,
     pub neglect_self_induced_velocities: bool
 }
 ```

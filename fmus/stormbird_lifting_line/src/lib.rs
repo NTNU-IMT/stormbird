@@ -22,8 +22,8 @@ pub struct StormbirdLiftingLine {
     pub lifting_line_setup_file_path: String,
     pub wind_environment_setup_file_path: String,
     pub angles_in_degrees: bool,
-    pub wind_angle_relative_measurement_height: f64,
-    pub include_induced_velocities_in_wind_angle_measurements: bool,
+    pub relative_wind_direction_measurement_non_dim_height: f64,
+    pub include_induced_velocities_in_wind_direction_measurements: bool,
     pub negative_z_is_up: bool,
     pub reverse_wind_direction: bool,
     pub export_stormbird_result: bool,
@@ -33,9 +33,9 @@ pub struct StormbirdLiftingLine {
     pub x_position: f64,
     pub y_position: f64,
     pub z_position: f64,
-    pub roll_angle: f64,
-    pub pitch_angle: f64,
-    pub yaw_angle: f64,
+    pub x_rotation: f64,
+    pub y_rotation: f64,
+    pub z_rotation: f64,
     pub local_wing_angles: String,
     #[output]
     pub force_x: f64,
@@ -44,7 +44,7 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
-    pub wind_angle_measurements: String, 
+    pub relative_wind_direction_measurements: String, 
     pub stormbird_result: String,
 
     stormbird_model: Option<Simulation>,
@@ -123,15 +123,15 @@ impl StormbirdLiftingLine {
     fn rotation(&self) -> SpatialVector<3> {
         if self.angles_in_degrees {
             SpatialVector([
-                self.roll_angle.to_radians(), 
-                self.pitch_angle.to_radians(), 
-                self.yaw_angle.to_radians()
+                self.x_rotation.to_radians(), 
+                self.y_rotation.to_radians(), 
+                self.z_rotation.to_radians()
             ])
         } else {
             SpatialVector([
-                self.roll_angle, 
-                self.pitch_angle, 
-                self.yaw_angle
+                self.x_rotation, 
+                self.y_rotation, 
+                self.z_rotation
             ])
         }
     }

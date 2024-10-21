@@ -3,6 +3,17 @@ The Python interface to Stormbird is made using a Rust library called [PyO3](htt
 
 However, not all of the Rust library has a Python interface. The plan is generally to only implement what is needed when using the library in a *high-level* setting. 
 
+## Installation
+
+At the moment, the Python interface is distributed as a [wheel file](https://pythonwheels.com/). It can be installed in the usual way using pip, by running the following command in a terminal:
+
+```
+pip install [path-to-wheel-file]
+```
+
+## Examples
+Examples of how to use the Python functionality can be found in the [tutorial chapter](./../tutorials/tutorials.md). 
+
 ## Still some JSON input and output
 Some of the Python interface still relies on JSON strings as both input and output. This choice is made because it avoids having to update the Python interface when there is change to the Rust code. This is particularly practical when the library is evolving. Generally speaking, JSON strings are used as alternatives to passing in variables directly in initialization functions for classes.
 

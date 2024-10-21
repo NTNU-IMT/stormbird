@@ -81,15 +81,15 @@ pub struct LineForceModel {
     pub virtual_wings: Vec<bool>,
     /// Density used in force calculations
     pub density: f64,
-    /// Optional model for calculation motion and flow derivatives
-    pub derivatives: Option<Derivatives>,
     /// Optional corrections that can be applied to the estimated circulation strength.
     pub circulation_corrections: CirculationCorrection,
     /// Optional variables to 
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
-    /// The coordinate system to generate output in
+    /// The coordinate system to generate the output in. Variants consists of Global and Body. 
     pub output_coordinate_system: CoordinateSystem,
+    /// Optional model for calculation motion and flow derivatives
+    derivatives: Option<Derivatives>,
 }
 
 impl Default for LineForceModel {
@@ -546,6 +546,10 @@ impl LineForceModel {
         }
 
         span_point_values
+    }
+
+    pub fn need_derivative_initialization(&self) -> bool {
+        self.derivatives.is_none()
     }
     
 }

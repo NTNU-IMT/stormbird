@@ -36,14 +36,6 @@ Examples of three-dimensional force coefficients for an actual rotor sail is sho
 - **[A CFD Study on Wind Assisted Propulsion Technology for Commercial Shipping](https://www.researchgate.net/publication/355675684_A_CFD_Study_on_Wind_Assisted_Propulsion_Technology_for_Commercial_Shipping)** (2021), by W. Hopes and more. A paper about CFD modelling of suction sails, which includes data on lift and drag.
 - **[Levelling the Playing Field: A Numerical Platform for the Fair Comparison of Wind Propulsion Systems](http://data.hiper-conf.info/Hiper2022_Cortona.pdf)** (2022), by F. C. Gerhardt and more. A paper mostly about the need to have independent analysis of wind propulsion devices. As part of explaining the suction sail model, CFD results of lift and drag for different suction rates and angles of attack is presented.
 
-### Examples of data
-
 Data from the original [Turbosail](https://en.wikipedia.org/wiki/Turbosail) from Charrier et al. (1985) seem to still be the primary data source used in open research. The other papers above typically try to reproduce the same values, only with CFD. That is, the references mentioned do not provide new insight into the performance of the suction sail directly, but attempts reproduce the same values using CFD.  **Important note**: newer producers of suctions sails, such as [Bound4Blue](https://bound4blue.com/) and [Econowind](https://econowind.nl/) uses different designs than the Turbosail, and claim better performance. The Turbosail data should therefore be interpreted as a *lower-estimate* on the performance of a modern suction sail. However, at the moment, we don't know about any *openly available source* that document this directly. 
-
-#### Figure 3: Force coefficients for a 2D suction sail section
-![Suction sail 2D data](figures/suction_sail_forces_2d.png)
-
-#### Figure 4: Force coefficients for a 3D suction sail
-![Suction sail 3D data](figures/suction_sail_forces_3d.png)
 
 

@@ -72,7 +72,7 @@ impl Simulation {
         let wake_points_freestream = freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec();
 
         // If the force input calculator has not been initialized, initialize it.
-        if self.line_force_model.derivatives.is_none() {
+        if self.line_force_model.need_derivative_initialization() {
             self.line_force_model.initialize_derivatives(&ctrl_points_freestream);
         }
 

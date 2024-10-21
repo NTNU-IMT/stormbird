@@ -22,7 +22,8 @@ class SimulationCase:
     start_height: float = 8.1
     nr_sections: int = 40
     density = 1.225
-    nr_wake_panels_per_section: int = 2
+    nr_dynamic_wake_panels_per_section: int = 2
+    dynamic: bool = False
     write_wake_files: bool = False
 
     @property
@@ -78,25 +79,32 @@ class SimulationCase:
 
         line_force_model = self.get_line_force_model()
 
-        solver = {
-            "max_iterations_per_time_step": 100,
-            "damping_factor": 0.05,
-        }
+        
 
-        wake = {
-            "wake_length": {
-                "NrPanels": self.nr_wake_panels_per_section
-            },
-            "use_chord_direction": True,
-            "symmetry_condition": "Z"
-        }
-
-        sim_settings = {
-            "Dynamic": {
-                "solver": solver,
-                "wake": wake
+        if self.dynamic:
+            solver = {
+                "max_iterations_per_time_step": 10,
+                "damping_factor": 0.1,
             }
-        }
+                
+            wake = {
+                "wake_length": {
+                    "NrPanels": self.nr_dynamic_wake_panels_per_section
+                },
+                "use_chord_direction": True,
+                "symmetry_condition": "Z"
+            }
+
+            sim_settings = {
+                "Dynamic": {
+                    "solver": solver,
+                    "wake": wake
+                }
+            }
+        else:
+            sim_settings = {
+                "QuasiSteady": {}
+            }
 
         setup = {
             "line_force_model": line_force_model,
@@ -106,7 +114,7 @@ class SimulationCase:
         }
 
         dt = 0.1
-        nr_time_steps = 50
+        nr_time_steps = 100 if self.dynamic else 1
 
         simulation = Simulation(
             setup_string = json.dumps(setup),

@@ -8,8 +8,10 @@ from simulation import SimulationCase
 
 if __name__ == '__main__':
     argument_parser = argparse.ArgumentParser()
-    argument_parser.add_argument("--angle-of-attack", type=float, default = 0.0, help="Angle of attack in degrees")
+    argument_parser.add_argument("--angle-of-attack", type=float, default = 10.0, help="Angle of attack in degrees")
     argument_parser.add_argument("--wind-angle", type=float, default = 45.0, help="Wind angle in degrees")
+    argument_parser.add_argument("--dynamic", action='store_true')
+    argument_parser.add_argument("--write-wake-files", action='store_true')
 
     args = argument_parser.parse_args()
 
@@ -21,7 +23,8 @@ if __name__ == '__main__':
     simulation = SimulationCase(
         angle_of_attack_deg = args.angle_of_attack,
         wind_angle_deg=args.wind_angle,
-        write_wake_files=True
+        dynamic = args.dynamic,
+        write_wake_files=args.write_wake_files,
     )
 
     result = simulation.run()

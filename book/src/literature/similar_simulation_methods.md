@@ -15,5 +15,9 @@ Articles that use the Stormbird library directly is shown in the sub sections be
 ### Papers
 - **[Modern Adaptation of Prandtl's Classic Lifting-Line Theory](https://arc.aiaa.org/doi/abs/10.2514/2.2649?journalCode=ja)** (2000) by W. F. Phillips and more. First known example of a discrete lifting line, as in, capable of modelling multiple wings in the same simulation. 
 - **[Rapid aerodynamic method for predicting the performance of interacting wing sails](https://www.sciencedirect.com/science/article/pii/S0029801823029803?via%3Dihub)** (2023) by K. Malmek and more. About a lifting line method that employs a practical simplification; rather than solving for the vortex strength on the individual line elements, the lift and drag on a single sail is computed directly from the simplified elliptic wing equations for 3D effects, as a function of the local angle of attack. Interaction effects between multiple sails are still computed using a discrete lifting line approach, but with where the circulation distribution is assumed to be elliptic. This allows for a quicker solution, but still with good results. A similar simulation type is possible in Stormbird, by using a "prescribed circulation" with an elliptical shape. 
+- **More to come!**
 
 ## Actuator line
+
+### Papers
+**To come!**

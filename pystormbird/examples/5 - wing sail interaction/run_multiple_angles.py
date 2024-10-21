@@ -2,9 +2,16 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 
+import argparse 
+
 from simulation import SimulationCase
 
 if __name__ == '__main__':
+    argument_parser = argparse.ArgumentParser()
+    argument_parser.add_argument('--dynamic', action='store_true')
+
+    args = argument_parser.parse_args()
+
     angles_of_attack = np.arange(0.0, 16.5, 0.5)
 
     with open('cfd_data.json', 'r') as f:
@@ -19,6 +26,7 @@ if __name__ == '__main__':
         simulation = SimulationCase(
             angle_of_attack_deg = angle,
             wind_angle_deg=45.0,
+            dynamic = args.dynamic
         )
 
         result = simulation.run()

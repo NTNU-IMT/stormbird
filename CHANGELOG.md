@@ -19,3 +19,19 @@ Mostly a restructuring of the internal data, with the goal of either simplifying
 
 ### Changes to the Python library
 - The changes to the interface on the rust side also affects the Python side, as Python still relies on JSON strings to set up models. See the updated examples for how to set up models. The most important change is perhaps the change in the spatial vector name, from `Vec3` to `SpatialVector`. 
+
+## 0.5.0 - 2024-10-21
+
+### Highlights
+- Some internal clean up of methods and structures
+- It is now possible to get forces in *either* a global coordinate system or a body-fixed coordinate system
+- The FMU version was updated, in preparation for more active use in the future. Expect more updates to the FMU version in future releases.
+
+### Bug fixes
+- A bug was discovered related to how local_wing_angles where applied to the line force model. It previously rotated the wings in a global coordinate system, which caused errors when the position of the wings where different than zero.
+
+### Changes to the Rust library
+- The line force model have gotten an additional field which specifies the coordinate system for the force output. This can be specified in the builder input JSON string. See the documentation for more.
+
+### Changes to the Python library
+- No changes directly, as the only change is for the setup of the line force model, which depends on a JSON string.

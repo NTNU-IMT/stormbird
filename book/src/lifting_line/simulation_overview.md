@@ -91,7 +91,7 @@ That is, the python code takes in the same input as the Rust side, but with the 
 
 If the simulation is executed using the quasi-steady approach, the time step will not generally affect the results [^note2]. That means that a steady simulation can be executed by running a quasi-steady simulation only once.
 
-The return from each time step is a [SimulationResult](./../line_model/results.md). This structure has a Python implementation as well, with some minor helper methods to interpret the results. 
+The return from each time step is a [SimulationResult](./../line_model/force_calculations.md). This structure has a Python implementation as well, with some minor helper methods to interpret the results. 
 
 [^note1]: The actual implementation is actually written slightly different as it is written in Rust and uses PyO3 to generate the Python interface. However, the code shown represents how it would have look like if it were written as Python code directly.
 
