@@ -12,3 +12,4 @@ pub mod line_force_model;
 pub mod lifting_line;
 pub mod actuator_line;
 pub mod empirical_models;
+pub mod controllers;

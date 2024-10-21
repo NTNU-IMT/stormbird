@@ -8,7 +8,6 @@
 //! However, the interface is designed to be as unified as possible. 
 
 use crate::lifting_line::prelude::*;
-use crate::io_structs::derivatives::Derivatives;
 use crate::line_force_model::circulation_corrections::CirculationCorrection;
 
 use super::simulation_builder::SimulationBuilder;
@@ -20,7 +19,6 @@ pub struct Simulation {
     pub wake: Wake,
     pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
-    pub derivatives: Option<Derivatives>,
     pub write_wake_data_to_file: bool,
     pub wake_files_folder_path: String,
 }
@@ -44,10 +42,14 @@ impl Simulation {
     /// dynamic simulation, the points are the control points of the line force model and the 
     /// points in the wake.
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
-        let mut points = self.line_force_model.ctrl_points();
+        let total_nr_popints = self.line_force_model.nr_span_lines() + self.wake.points.len();
 
-        for i in 0..self.wake.wake_points.len() {
-            points.push(self.wake.wake_points[i]);
+        let mut points = Vec::with_capacity(total_nr_popints);
+
+        points.extend(self.line_force_model.ctrl_points());
+
+        for i in 0..self.wake.points.len() {
+            points.push(self.wake.points[i]);
         }
 
         points
@@ -70,7 +72,7 @@ impl Simulation {
         let wake_points_freestream = freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec();
 
         // If the force input calculator has not been initialized, initialize it.
-        if self.line_force_model.derivatives.is_none() {
+        if self.line_force_model.need_derivative_initialization() {
             self.line_force_model.initialize_derivatives(&ctrl_points_freestream);
         }
 
@@ -78,7 +80,7 @@ impl Simulation {
             &ctrl_points_freestream, time_step
         );
 
-        self.wake.synchronize_wing_geometry(&self.line_force_model);
+        self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
 
         let frozen_wake = FrozenWake::from_wake(
             &self.line_force_model, 
@@ -147,9 +149,8 @@ impl Simulation {
     pub fn induced_velocities(
         &self, 
         points: &[SpatialVector<3>], 
-        off_body: bool
     ) -> Vec<SpatialVector<3>> {
-        self.wake.induced_velocities(points, off_body)
+        self.wake.induced_velocities(points)
     }
 
     pub fn initialize_with_elliptic_distribution(

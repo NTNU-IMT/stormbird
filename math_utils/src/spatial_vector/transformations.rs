@@ -81,6 +81,46 @@ impl SpatialVector<3> {
     pub fn rotate_around_point(self, rotation: Self, point: Self) -> Self {
         (self - point).rotate(rotation) + point
     }
+
+    /// Expresses the vector in a coordinate system that is rotated by the input rotation, relative
+    /// to the original coordinate system for the vector.
+    pub fn in_rotated_coordinate_system(self, system_rotation: Self) -> Self {
+        let x_axis = SpatialVector::<3>::unit_x().rotate(system_rotation);
+        let y_axis = SpatialVector::<3>::unit_y().rotate(system_rotation);
+        let z_axis = SpatialVector::<3>::unit_z().rotate(system_rotation);
+
+        Self([
+            self.dot(x_axis),
+            self.dot(y_axis),
+            self.dot(z_axis),
+        ])
+    }
+
+    /// Special function for transforming a vector representing a moment to a new coordinate system.
+    /// 
+    /// The transformation consists of two steps:
+    /// 1. Rotate the moment vector to the new coordinate system
+    /// 2. Add the moment created by the force in the new coordinate system
+    pub fn moment_in_new_coordinate_system(
+        self, 
+        system_rotation: Self,
+        system_translation: Self,
+        force_that_created_the_moment: Self,
+    ) -> Self {
+        // Rotation of the moment vector
+        let rotated_moment = self.in_rotated_coordinate_system(system_rotation);
+        
+        // The additional moment created by the force due to translation
+        // The *arm* in the new coordinate system is the negative of the translation vector from old
+        // to new coordinate system. The force is the same in both coordinate systems. However, the
+        // resulting moment must also be rotated.
+        let moment_arm = -system_translation;
+        let moment_due_to_force = moment_arm.cross(force_that_created_the_moment);
+        let rotated_moment_due_to_force = moment_due_to_force.in_rotated_coordinate_system(system_rotation);
+
+        rotated_moment + rotated_moment_due_to_force
+    }
+    
 }
 
 #[cfg(test)]
@@ -108,5 +148,24 @@ mod tests {
         dbg!(rotated_vector_1, rotated_vector_2);
 
         assert_eq!(rotated_vector_1, rotated_vector_2);
+    }
+
+    #[test]
+    fn moment_transformation() {
+        let rotation = SpatialVector::<3>::default();
+        let location = SpatialVector([1.2, 0.0, 0.0]);
+        let force = SpatialVector([0.0, 2.0, 0.0]);
+
+        let moment = location.cross(force);
+
+        let transformed_moment = moment.moment_in_new_coordinate_system(
+            rotation,
+            location,
+            force,
+        );
+
+        dbg!(moment, transformed_moment);
+
+        assert!(transformed_moment.length() < 1e-6)
     }
 }

@@ -13,7 +13,7 @@ use crate::lifting_line::simulation_builder::{
     SteadySettings,
 };
 
-use crate::io_structs::derivatives::MotionDerivatives;
+use crate::line_force_model::motion::derivatives::MotionDerivatives;
 
 use super::test_setup::RectangularWing;
 

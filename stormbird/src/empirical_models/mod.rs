@@ -13,3 +13,4 @@
 
 /// Correction factors that can be applied to a calculated circulation distribution.
 pub mod freestream;
+pub mod wind_environment;

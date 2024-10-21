@@ -130,14 +130,14 @@ impl SimulationBuilder {
 
         let previous_circulation_strength = line_force_model.prescribed_circulation_strength(
             &vec![initialization_velocity; nr_of_lines], 
-            &initial_circulation_shape
+            &initial_circulation_shape,
+            CoordinateSystem::Global
         );
 
         Simulation {
             line_force_model,
             wake,
             solver,
-            derivatives: None,
             previous_circulation_strength,
             write_wake_data_to_file: self.write_wake_data_to_file,
             wake_files_folder_path: self.wake_files_folder_path.clone()

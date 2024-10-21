@@ -77,7 +77,8 @@ impl SimpleIterative {
         let mut ctrl_point_velocity = vec![SpatialVector::<3>::default(); ctrl_points.len()];
         let mut residual = line_force_model.average_residual_absolute(
             &circulation_strength, 
-            &ctrl_point_velocity
+            &ctrl_point_velocity,
+            CoordinateSystem::Global
         );
         
         let mut iterations = 0;
@@ -108,13 +109,14 @@ impl SimpleIterative {
                 },
             }
 
-            ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity);
+            ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity, CoordinateSystem::Global);
     
-            let new_estimated_strength = line_force_model.circulation_strength(&ctrl_point_velocity);
+            let new_estimated_strength = line_force_model.circulation_strength(&ctrl_point_velocity, CoordinateSystem::Global);
     
             residual = line_force_model.average_residual_absolute(
                 &circulation_strength, 
-                &ctrl_point_velocity
+                &ctrl_point_velocity,
+                CoordinateSystem::Global
             );
     
             if residual < self.residual_tolerance_absolute {

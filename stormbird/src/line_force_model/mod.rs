@@ -25,8 +25,17 @@ pub mod prelude;
 pub mod single_wing;
 pub mod circulation_corrections;
 
+pub mod motion;
+
+#[cfg(test)]
+mod tests;
+
 use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
+
+use crate::controllers::sail_controller::SailControllerResult;
+
+use self::motion::derivatives::Derivatives;
 
 use span_line::*;
 use circulation_corrections::CirculationCorrection;
@@ -72,13 +81,15 @@ pub struct LineForceModel {
     pub virtual_wings: Vec<bool>,
     /// Density used in force calculations
     pub density: f64,
-    /// Optional model for calculation motion and flow derivatives
-    pub derivatives: Option<Derivatives>,
     /// Optional corrections that can be applied to the estimated circulation strength.
     pub circulation_corrections: CirculationCorrection,
     /// Optional variables to 
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
+    /// The coordinate system to generate the output in. Variants consists of Global and Body. 
+    pub output_coordinate_system: CoordinateSystem,
+    /// Optional model for calculation motion and flow derivatives
+    derivatives: Option<Derivatives>,
 }
 
 impl Default for LineForceModel {
@@ -106,6 +117,7 @@ impl LineForceModel {
             derivatives: None,
             circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
+            output_coordinate_system: CoordinateSystem::Global,
         }
     }
 
@@ -216,30 +228,39 @@ impl LineForceModel {
     /// Returns the span lines in global coordinates.
     pub fn span_lines(&self) -> Vec<SpanLine> {
         self.span_lines_local.iter().enumerate().map(
-            |(global_index, line)| {
-                let (angle, axis) = self.wing_rotation_data_from_global(global_index);
-
-                line.rotate_around_axis(angle, axis)
-                    .rotate(self.rotation)
+            |(_, line)| {
+                line.rotate(self.rotation)
                     .translate(self.translation)
             }
         ).collect()
     }
 
-    pub fn chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+    pub fn local_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
         let (angle, axis) = self.wing_rotation_data_from_global(index);
 
-        self.chord_vectors_local[index].rotate_around_axis(angle, axis).rotate(self.rotation)
+        self.chord_vectors_local[index].rotate_around_axis(angle, axis)
+    }
+
+    pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+        self.local_chord_vector_at_index(index).rotate(self.rotation)
     }
 
     /// Returns the chord vectors in global coordinates.
-    pub fn chord_vectors(&self) -> Vec<SpatialVector<3>> {
+    pub fn local_chord_vectors(&self) -> Vec<SpatialVector<3>> {
         self.chord_vectors_local.iter().enumerate().map(
             |(global_index, chord_vector)| {
                 let (angle, axis) = self.wing_rotation_data_from_global(global_index);
 
-                chord_vector.rotate_around_axis(angle, axis).rotate(self.rotation)
+                chord_vector.rotate_around_axis(angle, axis)
             }
+        ).collect()
+    }
+
+    pub fn global_chord_vectors(&self) -> Vec<SpatialVector<3>> {
+        let local_chord_vectors = self.local_chord_vectors();
+        
+        local_chord_vectors.iter().map(
+            |chord_vector| chord_vector.rotate(self.rotation)
         ).collect()
     }
 
@@ -247,7 +268,7 @@ impl LineForceModel {
     /// span line
     pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
         let span_lines = self.span_lines();
-        let chord_vectors = self.chord_vectors();
+        let chord_vectors = self.global_chord_vectors();
 
         span_lines.iter().zip(chord_vectors.iter()).map(|(line, chord)| {
             line.ctrl_point() + *chord * self.ctrl_point_chord_factor
@@ -280,8 +301,11 @@ impl LineForceModel {
     }
 
     /// Removes the velocity in the span direction from the input velocity vector.
-    pub fn remove_span_velocity(&self, velocity: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
-        let span_lines = self.span_lines();
+    pub fn remove_span_velocity(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<SpatialVector<3>> {
+        let span_lines = match input_coordinate_system {
+            CoordinateSystem::Global => self.span_lines(),
+            CoordinateSystem::Body => self.span_lines_local.clone(),
+        };
 
         velocity.iter().zip(span_lines.iter()).map(
             |(vel, line)| {
@@ -290,29 +314,6 @@ impl LineForceModel {
                 *vel - span_velocity
             }
         ).collect()  
-    }
-
-    /// Return the angle of attack at each control point.
-    /// 
-    /// The angle is defined as the rotation from the chord vector to the velocity vector, using the 
-    /// span line as the axis of rotation, with right handed positive rotation.
-    ///
-    /// # Argument
-    /// * `velocity` - the velocity vector at each control point
-    pub fn angles_of_attack(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        let velocity_corrected = self.remove_span_velocity(velocity);
-
-        let chord_vectors = self.chord_vectors();
-        let span_lines    = self.span_lines();
-        
-        let angles_of_attack: Vec<f64> = (0..velocity_corrected.len()).map(|index| {
-            chord_vectors[index].signed_angle_between(
-                velocity_corrected[index], 
-                span_lines[index].direction()
-            )
-        }).collect();
-
-        angles_of_attack
     }
 
     /// Calculates the wake angle behind each line element.
@@ -443,6 +444,36 @@ impl LineForceModel {
     pub fn total_force_factor(&self, freestream_velocity: f64) -> f64 {
         0.5 * self.density * freestream_velocity.powi(2) * self.total_projected_area()
     }
+
+    pub fn set_section_models_internal_state(&mut self, internal_state: &[f64]) {
+        for wing_index in 0..self.nr_wings() {
+            match self.section_models[wing_index] {
+                SectionModel::VaryingFoil(ref mut foil) => {
+                    foil.current_internal_state = internal_state[wing_index];
+                },
+                SectionModel::RotatingCylinder(ref mut cylinder) => {
+                    cylinder.revolutions_per_second = internal_state[wing_index];
+                },
+                _ => {}
+            }
+        }
+    }
+
+    pub fn set_sail_controller_results(&mut self, results: &[SailControllerResult]) {
+        for wing_index in 0..self.nr_wings() {
+            self.local_wing_angles[wing_index] = results[wing_index].wing_angle;
+            
+            match self.section_models[wing_index] {
+                SectionModel::VaryingFoil(ref mut foil) => {
+                    foil.current_internal_state = results[wing_index].internal_state;
+                },
+                SectionModel::RotatingCylinder(ref mut cylinder) => {
+                    cylinder.revolutions_per_second = results[wing_index].internal_state;
+                },
+                _ => {}
+            }
+        }
+    }
     
 
     /// General function for calculating wing-averaged values
@@ -529,6 +560,10 @@ impl LineForceModel {
         }
 
         span_point_values
+    }
+
+    pub fn need_derivative_initialization(&self) -> bool {
+        self.derivatives.is_none()
     }
     
 }

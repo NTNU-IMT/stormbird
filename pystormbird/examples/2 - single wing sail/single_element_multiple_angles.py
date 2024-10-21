@@ -44,7 +44,16 @@ if __name__ == "__main__":
         TestCase.RAW_SIMULATION, 
         TestCase.PRESCRIBED_CIRCULATION, 
         TestCase.INITIALIZED_SIMULATION,
-        TestCase.INITIALIZED_AND_SMOOTHED
+        TestCase.SMOOTHED,
+        TestCase.SMOOTHED
+    ]
+
+    modes = [
+        SimulationMode.STATIC,
+        SimulationMode.STATIC,
+        SimulationMode.STATIC,
+        SimulationMode.STATIC,
+        SimulationMode.DYNAMIC
     ]
 
     w_plot = 18
@@ -54,7 +63,7 @@ if __name__ == "__main__":
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
     
-    for case in cases:
+    for case, mode in zip(cases, modes):
         print()
         print(case.to_string())
 
@@ -67,7 +76,7 @@ if __name__ == "__main__":
             sim_case = SimulationCase(
                 angle_of_attack = angles_of_attack[angle_index],
                 section_model_dict = section_model_dict,
-                simulation_mode = SimulationMode.STATIC,
+                simulation_mode = mode,
                 prescribed_circulation = case.prescribed_circulation,
                 prescribed_initialization = case.prescribed_initialization,
                 smoothing_length = case.smoothing_length,
@@ -86,8 +95,8 @@ if __name__ == "__main__":
         cl_theory = cl_2d / (1 + 2/theoretical_aspect_ratio)
         cd_theory = cd_2d + cl_theory**2 / (np.pi * theoretical_aspect_ratio)
 
-        ax1.plot(angles_of_attack, cl, label='Stormbird lifting line, ' + case.to_string())
-        ax2.plot(angles_of_attack, cd, label='Stormbird lifting line, ' + case.to_string())
+        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
+        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
     
     # --------------- Comparison data ------------------------
     ax1.plot(

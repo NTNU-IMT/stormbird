@@ -15,20 +15,20 @@ impl Wake {
 
         write!(writer, "o wake\n")?;
 
-        for i in 0..self.wake_points.len(){
+        for i in 0..self.points.len(){
             write!(
                 writer, 
                 "v {} {} {}\n", 
-                self.wake_points[i][0], 
-                self.wake_points[i][1], 
-                self.wake_points[i][2]
+                self.points[i][0], 
+                self.points[i][1], 
+                self.points[i][2]
             )?;
         };
 
         for panel_index in 0..self.strengths.len() {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
+            let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
 
-            let indices = self.panel_wake_point_indices(stream_index, span_index);
+            let indices = self.panel_point_indices(stream_index, span_index);
 
             write!(
                 writer, 
@@ -54,7 +54,7 @@ impl Wake {
 
         let mut writer = BufWriter::new(f);
 
-        let nr_points = self.wake_points.len();
+        let nr_points = self.points.len();
         let nr_faces  = self.strengths.len();
 
         // Header
@@ -75,9 +75,9 @@ impl Wake {
             write!(
                 writer, 
                 "\t\t\t\t\t{} {} {}\n", 
-                self.wake_points[i][0], 
-                self.wake_points[i][1], 
-                self.wake_points[i][2]
+                self.points[i][0], 
+                self.points[i][1], 
+                self.points[i][2]
             )?;
         }
 
@@ -89,9 +89,9 @@ impl Wake {
         write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n")?;
 
         for panel_index in 0..self.strengths.len() {
-            let (stream_index, span_index) = self.reverse_panel_index(panel_index);
+            let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
 
-            let indices = self.panel_wake_point_indices(stream_index, span_index);
+            let indices = self.panel_point_indices(stream_index, span_index);
 
             write!(
                 writer, 

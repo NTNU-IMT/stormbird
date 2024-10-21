@@ -59,6 +59,10 @@ impl Simulation {
         self.data.line_force_model.local_wing_angles = local_wing_angles;
     }
 
+    pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
+        self.data.line_force_model.set_section_models_internal_state(&internal_state);
+    }
+
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector> {
         let rust_vec = self.data.get_freestream_velocity_points();
 
@@ -94,15 +98,14 @@ impl Simulation {
     }
 
     #[pyo3(signature=(
-        points,
-        off_body = true
+        points
     ))]
-    pub fn induced_velocities(&self, points: Vec<SpatialVector>, off_body: bool) -> Vec<SpatialVector> {
+    pub fn induced_velocities(&self, points: Vec<SpatialVector>) -> Vec<SpatialVector> {
         let rust_points: Vec<SpatialVectorRust<3>> = points.iter().map(
             |v| v.data
         ).collect();
 
-        let rust_induced_velocities = self.data.induced_velocities(&rust_points, off_body);
+        let rust_induced_velocities = self.data.induced_velocities(&rust_points);
 
         rust_induced_velocities.iter().map(
             |v| SpatialVector::new(v[0], v[1], v[2])

@@ -56,11 +56,19 @@ if __name__ == '__main__':
         sobc1_df = pd.read_csv(output_path / Path(sobc_files[0]))
         rudder_df = pd.read_csv(output_path / Path(rudder_files[0]))
 
-        x = sobc1_df['cgShipMotion.nedDisplacement.north'].to_numpy()
-        y = sobc1_df['cgShipMotion.nedDisplacement.east'].to_numpy()
+        east_position = sobc1_df['cgShipMotion.nedDisplacement.east'].to_numpy()
+        north_position = sobc1_df['cgShipMotion.nedDisplacement.north'].to_numpy()
 
         rudder_angle = rudder_df['output_angle'].to_numpy()
         course = sobc1_df['course'].to_numpy()
+        drift_angle = sobc1_df['drift_angle'].to_numpy()
+        yaw_angle = sobc1_df['cgShipMotion.angularDisplacement.yaw'].to_numpy()
+
+        for i in range(len(yaw_angle)):
+            if yaw_angle[i] > 180:
+                yaw_angle[i] -= 360
+            elif yaw_angle[i] < -180:
+                yaw_angle[i] += 360
 
         time = sobc1_df['Time'].to_numpy()
         velocity_surge = sobc1_df['cgShipMotion.linearVelocity.surge'].to_numpy()
@@ -69,10 +77,10 @@ if __name__ == '__main__':
         velocity_mag = np.sqrt(velocity_surge**2 + velocity_sway**2)
 
         plt.sca(ax1)
-        plt.plot(y, x, label=output_label[index])
+        plt.plot(east_position, north_position, label=output_label[index])
 
-        plt.xlim(-0.25*np.max(x), 0.25 * np.max(x))
-        plt.ylim(0, np.max(x))
+        plt.xlim(-1.5*np.max(east_position), 1.5 * np.max(east_position))
+        plt.ylim(0, np.max(north_position))
 
         plt.sca(ax2)
         plt.plot(time, velocity_mag, label=output_label[index])
@@ -81,6 +89,7 @@ if __name__ == '__main__':
 
         plt.sca(ax3)
         plt.plot(time, course, label=output_label[index])    
+        plt.plot(time, yaw_angle, label='yaw angle')
 
         plt.sca(ax4)
         plt.plot(time, rudder_angle, label=output_label[index]) 

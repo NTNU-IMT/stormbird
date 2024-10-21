@@ -20,10 +20,9 @@ if __name__ == "__main__":
     parser.add_argument("--angle-of-attack", type=float, default = 0.0, help="Angle of attack in degrees")
     parser.add_argument("--multi-element", action="store_true", help="Use a multi-element foil model")
     parser.add_argument("--flap-angle", type=float, default = 0.0, help="Flap angle in degrees")
+    parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
     args = parser.parse_args()
-
-    simulation_mode = SimulationMode.STATIC
 
     if args.multi_element:
         foil_model = manual_multi_element_foil.get_foil_model()
@@ -44,7 +43,16 @@ if __name__ == "__main__":
         TestCase.RAW_SIMULATION, 
         TestCase.PRESCRIBED_CIRCULATION, 
         TestCase.INITIALIZED_SIMULATION,
-        TestCase.INITIALIZED_AND_SMOOTHED
+        TestCase.SMOOTHED,
+        TestCase.SMOOTHED
+    ]
+
+    modes = [
+        SimulationMode.STATIC,
+        SimulationMode.STATIC,
+        SimulationMode.STATIC,
+        SimulationMode.STATIC,
+        SimulationMode.DYNAMIC
     ]
 
     w_plot = 16
@@ -53,18 +61,21 @@ if __name__ == "__main__":
     ax2 = fig.add_subplot(132)
     ax3 = fig.add_subplot(133)
 
-    for case in cases:
+    for case, mode in zip(cases, modes):
         print()
         print(case.to_string())
+
+        write_wake_files = args.write_wake_files if mode == SimulationMode.DYNAMIC else False
 
         sim_case = SimulationCase(
             angle_of_attack = args.angle_of_attack,
             section_model_dict = section_model_dict,
-            simulation_mode = SimulationMode.STATIC,
+            simulation_mode = mode,
             prescribed_circulation = case.prescribed_circulation,
             prescribed_initialization = case.prescribed_initialization,
             smoothing_length=case.smoothing_length,
-            z_symmetry=True
+            z_symmetry=True,
+            write_wake_files=write_wake_files
         )
 
         result_history = sim_case.run()
@@ -89,9 +100,9 @@ if __name__ == "__main__":
         else:
             ax1.plot([0, 1], [cl[0], cl[0]])
 
-        ax2.plot(-circulation_strength, label=case.to_string())
+        ax2.plot(-circulation_strength, label=case.to_string() + ', ' + mode.to_string())
 
-        ax3.plot(np.degrees(angles_of_attack), label=case.to_string())
+        ax3.plot(np.degrees(angles_of_attack), label=case.to_string() + ', ' + mode.to_string())
 
     ax3.plot([0, len(angles_of_attack)], [args.angle_of_attack, args.angle_of_attack], 'k--', label='Geometric angle of attack')
 

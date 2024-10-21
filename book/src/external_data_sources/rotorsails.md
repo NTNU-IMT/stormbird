@@ -1,1 +1,0 @@
-# Rotor sails

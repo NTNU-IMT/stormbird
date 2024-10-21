@@ -4,12 +4,9 @@
 
 use pyo3::prelude::*;
 
-pub mod viscous_core_length;
 pub mod symmetry_condition;
 
 use stormbird::lifting_line::singularity_elements::PotentialTheoryModel as PotentialTheoryModelRust;
-
-use crate::lifting_line::singularity_elements::viscous_core_length::ViscousCoreLength;
 
 #[pyclass]
 pub struct PotentialTheoryModel {
@@ -21,15 +18,13 @@ impl PotentialTheoryModel {
     #[new]
     #[pyo3(
         signature = (
-            viscous_core_length = ViscousCoreLength::default(), 
             closeness_error     = f64::MIN_POSITIVE, 
             far_field_ratio     = PotentialTheoryModelRust::default_far_field_ratio()
         )
     )]
-    fn new(viscous_core_length: ViscousCoreLength, closeness_error: f64, far_field_ratio: f64) -> Self {
+    fn new(closeness_error: f64, far_field_ratio: f64) -> Self {
         Self {
             data: PotentialTheoryModelRust {
-                viscous_core_length: viscous_core_length.data,
                 closeness_error,
                 far_field_ratio,
                 ..Default::default()

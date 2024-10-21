@@ -15,14 +15,19 @@ pub struct LineForceModelBuilder {
     pub density: f64,
     pub circulation_corrections: CirculationCorrection,
     pub ctrl_point_chord_factor: f64,
+    pub output_coordinate_system: CoordinateSystem,
 }
 ```
 
-The only required input is the vector containing  `WingBuilder` structures and the `nr_sections` [^nr_sections_note]. The density is set to the air density by default ( which = 1.225 kg / m^3). The circulation corrections is an Enum, where the default value is set to `None`, and therefore not used by default [^prescribed_note]. The nr sections should be tested for each project, and will affect both the accuracy and the computational speed. Typical values range between 10-50.
+The only required input is the vector containing  `WingBuilder` structures and the `nr_sections` [^nr_sections_note]. The nr sections should be tested for each project, and will affect both the accuracy and the computational speed. Typical values range between 10-50. The `density` is set to the [standard air density for 15 degrees Celsius](https://en.wikipedia.org/wiki/Density_of_air) by default ( which = 1.225 kg / m^3). 
+
+The `circulation_corrections` is an enum, where the default variant is `None`, and therefore not used by default. There will be more on the circulation corrections option [later](./circulation_strength.md). This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues. 
+
+The `ctrl_point_chord_factor` specifies where the control point for induced velocities should be. By default, this value is zero, and the control point is located at the middle of each span line. However, it is possible to move it in the same direction as the chord vector, by specifying a ratio of the chord length. This is currently mostly an experimental feature, and not recommended to be used for anything else.
+
+The `output_coordinate_system` is an enum that specifies how the forces and moments from the line force model should be calculated. The default is `Global`, which means all values are in a global coordinate system. That is, the coordinate system for the forces are not moved even if the wings are moved during a simulation. The other option is to set it to `Body`. In this case, the coordinate system of the forces will always follow the wings when they are moved.
 
 [^nr_sections_note]: The number of sections for set in the `LineForceModelBuilder` is used as default, except when another value is defined in the `WingBuilder` below.
-
-[^prescribed_note]: There will be more on the circulation corrections option later. This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues. 
 
 ### Wing builder
 A wing builder contain data to build line segments for a single wing. When a vector (or list) of wing builders are provided, the `LineForceModelBuilder` will automatically keep track of which line segment belong to each wing. The fields in a `WingBuilder` structure is as shown as Rust code below:
@@ -33,7 +38,6 @@ pub struct WingBuilder {
     pub chord_vectors: Vec<SpatialVector<3>>,
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
-    pub virtual_wing: bool,
     pub nr_sections: Option<usize>,
 }
 ```
@@ -44,11 +48,9 @@ For each section point, there also needs to be `chord_vectors`, which specify th
 
 Each wing also needs a [sectional model](./../sectional_models/sectional_models_intro.md). The sectional model can differ between different wings given to the `LineForceModelBuilder`, which is useful for cases where different sail types are installed on the same ship (uncommon today, but might happen in the future).
 
-The `non_zero_circulation_at_ends` is boolean values that specifies the expected behavior of the circulation distribution at the ends of the wing. It is used when initializing the circulation distribution before a simulation, and when applying corrections to the circulation distribution. In most cases, the expected value of the circulation strength at the ends is zero, and the value of this variable should be `[false, false]`. However, if, for instance, the wing is standing directly on a symmetry plane, or is directly coupled to another wing, the circulation distribution will typically not be zero. Whatever end is coupled to *something* that might give non-zero circulation should then get a `true` value. For instance, if the first end is standing on a symmetry plane, the value of this variable should be `[true, false]`.
+The `non_zero_circulation_at_ends` is boolean values that specifies the expected behavior of the circulation distribution at the ends of the wing. It is used when initializing the circulation distribution before a simulation, and when applying corrections to the circulation distribution. In most cases, the expected value of the circulation strength at the ends is zero, and the value of this variable should be `[false, false]`. However, if, for instance, the wing is standing directly on a symmetry plane, or is directly coupled to another wing, the circulation distribution will typically not be zero. If an end is coupled to *something* that might give a non-zero circulation, then that end should then get a `true` value. For instance, if the first end is standing on a symmetry plane, the value of this variable should be `[true, false]`.
 
-The `virtual_wing` variable is set to `false` by default, but can be set to true to mark wings that are added to the simulation which do not represent physical wings. For instance, to model end disks on a rotor sail, one trick is to add additional line segments on the end of the wings. Although the effect of these *virtual* segments should be included when calculating lift-induced velocities, we do not want the forces on these segments to be part of the total force model.
-
-The `nr_sections` variable is optional but can be set for each wing to override the default parameters in the `LineForceModelBuilder`. Typically, it will not be used, as the most common scenario is to have the same number of sections for each wing. However, a possible use case is when using *virtual segments*. 
+The `nr_sections` variable is optional but can be set for each wing to override the default parameters in the `LineForceModelBuilder`. Typically, it will not be used, as the most common scenario is to have the same number of sections for each wing. 
 
 When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note]
 
