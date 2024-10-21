@@ -53,8 +53,9 @@ class SimulationCase:
                     ],
                     "section_model": {
                         "Foil": {
-                            "mean_positive_stall_angle": np.radians(45.0),
-                            "mean_negative_stall_angle": np.radians(45.0),
+                            "cd_zero_angle": 0.01,
+                            "mean_positive_stall_angle": np.radians(45.0), # Set large value to 'turn off' stall
+                            "mean_negative_stall_angle": np.radians(45.0), # Set large value to 'turn off' stall
                         }
                     },
                     "non_zero_circulation_at_ends": non_zero_circulation_at_ends
@@ -69,10 +70,18 @@ class SimulationCase:
 
         return line_force_model
     
+    def angle_of_attack(self):
+        return np.radians(self.wind_angle_deg - self.angle_of_attack_deg)
+    
     def run(self):
         freestream_velocity = SpatialVector(self.wind_speed, 0.0, 0.0)
 
         line_force_model = self.get_line_force_model()
+
+        solver = {
+            "max_iterations_per_time_step": 100,
+            "damping_factor": 0.05,
+        }
 
         wake = {
             "wake_length": {
@@ -84,6 +93,7 @@ class SimulationCase:
 
         sim_settings = {
             "Dynamic": {
+                "solver": solver,
                 "wake": wake
             }
         }
@@ -113,7 +123,7 @@ class SimulationCase:
             )
 
         nr_wings = len(line_force_model["wing_builders"])
-        angles_of_attack = -np.ones(nr_wings) * np.radians(self.angle_of_attack_deg)
+        angles_of_attack = np.ones(nr_wings) * self.angle_of_attack()
 
         simulation.set_local_wing_angles(angles_of_attack.tolist())
         simulation.set_rotation(SpatialVector(0.0, 0.0, -np.radians(self.wind_angle_deg)))

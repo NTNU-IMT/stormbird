@@ -1,11 +1,14 @@
 import numpy as np
-
+import json
 import matplotlib.pyplot as plt
 
 from simulation import SimulationCase
 
 if __name__ == '__main__':
-    angles_of_attack = np.arange(0.0, 16, 0.5)
+    angles_of_attack = np.arange(0.0, 16.5, 0.5)
+
+    with open('cfd_data.json', 'r') as f:
+        cfd_data = json.load(f)
 
     drag_1 = []
     drag_2 = []
@@ -16,7 +19,6 @@ if __name__ == '__main__':
         simulation = SimulationCase(
             angle_of_attack_deg = angle,
             wind_angle_deg=45.0,
-            write_wake_files=True
         )
 
         result = simulation.run()
@@ -34,11 +36,15 @@ if __name__ == '__main__':
     ax_lift = fig.add_subplot(122)
     ax_drag = fig.add_subplot(121)
 
-    ax_lift.plot(angles_of_attack, lift_1, label='Wing 1')
-    ax_lift.plot(angles_of_attack, lift_2, label='Wing 2')
+    ax_lift.plot(angles_of_attack, lift_1, label='Port sail, lifting line')
+    ax_lift.plot(angles_of_attack, lift_2, label='Starboard sail, lifting line')
 
-    ax_drag.plot(angles_of_attack, drag_1, label='Wing 1')
-    ax_drag.plot(angles_of_attack, drag_2, label='Wing 2')
+    ax_drag.plot(angles_of_attack, drag_1, label='Port sail, lifting line')
+    ax_drag.plot(angles_of_attack, drag_2, label='Starboard sail, lifting line')
+
+    for data in cfd_data:
+        ax_lift.scatter(data['angles_of_attack'], data['lift_coefficients'], label=data['label'])
+        ax_drag.scatter(data['angles_of_attack'], data['drag_coefficients'], label=data['label'])
 
     ax_lift.set_xlabel('Angle of attack [deg]')
     ax_drag.set_xlabel('Angle of attack [deg]')
@@ -46,6 +52,8 @@ if __name__ == '__main__':
     ax_lift.set_ylabel('Lift Coefficient')
     ax_drag.set_ylabel('Drag Coefficient')
 
+    ax_drag.set_xlim(0, 16)
+    ax_lift.set_xlim(0, 16)
     ax_drag.set_ylim(0, 0.14)
     ax_lift.set_ylim(0, 1.2)
 

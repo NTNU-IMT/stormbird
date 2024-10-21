@@ -13,8 +13,6 @@ if __name__ == '__main__':
 
     args = argument_parser.parse_args()
 
-    angles_of_attack = np.arange(0.0, 16, 0.5)
-
     drag_1 = []
     drag_2 = []
     lift_1 = []
@@ -49,6 +47,7 @@ if __name__ == '__main__':
 
     ctrl_points_z = np.array(ctrl_points_z)
     circulation_strength = np.array(result.force_input.circulation_strength)
+    effective_angles_of_attack = result.force_input.angles_of_attack
 
     ctrl_points_z_1 = ctrl_points_z[0: len(ctrl_points_z) // 2]
     ctrl_points_z_2 = ctrl_points_z[len(ctrl_points_z) // 2:]
@@ -56,15 +55,21 @@ if __name__ == '__main__':
     circualtion_strength_1 = circulation_strength[0: len(circulation_strength) // 2]
     circualtion_strength_2 = circulation_strength[len(circulation_strength) // 2:]
 
+    angles_of_attack_1 = effective_angles_of_attack[0: len(effective_angles_of_attack) // 2]
+    angles_of_attack_2 = effective_angles_of_attack[len(effective_angles_of_attack) // 2:]
+
     ctrl_points_list = [ctrl_points_z_1, ctrl_points_z_2]
     circulation_strength_list = [circualtion_strength_1, circualtion_strength_2]
+    angles_of_attack_list = [angles_of_attack_1, angles_of_attack_2]
 
     w_plot = 12
-    fig = plt.figure(figsize=(w_plot, w_plot/1.85))
-    ax_circulation = fig.add_subplot(111)
+    fig = plt.figure(figsize=(w_plot, w_plot/2.35))
+    ax_circ = fig.add_subplot(121)
+    ax_alpha = fig.add_subplot(122)
 
-    for z, gamma in zip(ctrl_points_list, circulation_strength_list):
-        ax_circulation.plot(z, -gamma)
+    for z, gamma, alpha in zip(ctrl_points_list, circulation_strength_list, angles_of_attack_list):
+        ax_circ.plot(z, -gamma)
+        ax_alpha.plot(z, np.degrees(alpha))
 
     plt.show()
 
