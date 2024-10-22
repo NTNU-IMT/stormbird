@@ -36,7 +36,7 @@ def delete_old_wake_files():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run simulation.')
-    parser.add_argument('--end-time', type=float, default=5.0, help='End time of simulation.')
+    parser.add_argument('--end-time', type=float, default=40.0, help='End time of simulation.')
 
     wind_environment = WindEnvironment()
     wind_environment.to_json_file('wind_environment_setup.json')
@@ -54,9 +54,9 @@ if __name__ == '__main__':
     start_time = time.time()
     subprocess.run(
         [
-            'cosim', 
-            'run', '.', 
-            '--end-time', str(args.end_time), 
+            'cosim',
+            'run', '.',
+            '--end-time', str(args.end_time),
             '--output-dir', str(output_path),
         ],
     )

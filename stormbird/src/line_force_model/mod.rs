@@ -2,28 +2,22 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality for representing wings as "line objects", without any assumptions about how 
-//! lift-induced velocities are estimated. In other words, this part is common for all methods 
-//! available in the library, and therefore the foundation of all simulations. 
+//! Functionality for representing wings as "line objects", without any assumptions about how
+//! lift-induced velocities are estimated. In other words, this part is common for all methods
+//! available in the library, and therefore the foundation of all simulations.
 
-use std::{
-    f64::consts::PI,
-    ops::Range,
-};
+use std::{f64::consts::PI, ops::Range};
 
-use math_utils::{
-    spatial_vector::SpatialVector,
-    statistics::mean,
-};
+use math_utils::{spatial_vector::SpatialVector, statistics::mean};
 
-pub mod force_calculations;
-pub mod derivatives;
-pub mod span_line;
 pub mod builder;
+pub mod derivatives;
+pub mod force_calculations;
+pub mod span_line;
 
+pub mod circulation_corrections;
 pub mod prelude;
 pub mod single_wing;
-pub mod circulation_corrections;
 
 pub mod motion;
 
@@ -33,38 +27,36 @@ mod tests;
 use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
 
-use crate::controllers::sail_controller::SailControllerResult;
-
 use self::motion::derivatives::Derivatives;
 
-use span_line::*;
 use circulation_corrections::CirculationCorrection;
 use single_wing::SingleWing;
+use span_line::*;
 
 #[derive(Clone, Debug)]
 /// The struct holds variables for a model that calculate the forces on wings, under the assumption
-/// that they can be represented as a set of line elements. The intended use is in lifting line and 
+/// that they can be represented as a set of line elements. The intended use is in lifting line and
 /// actuator line simulations.
 pub struct LineForceModel {
-    /// Vector of line segments that defines the span geometry of the wings. Each have its own start 
+    /// Vector of line segments that defines the span geometry of the wings. Each have its own start
     /// and end point, to allow for uncoupled analysis
     pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
-    pub chord_vectors_local:  Vec<SpatialVector<3>>,
+    pub chord_vectors_local: Vec<SpatialVector<3>>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
-    pub wing_indices:   Vec<Range<usize>>,
+    pub wing_indices: Vec<Range<usize>>,
     /// Translation from local to global coordinates
     pub translation: SpatialVector<3>,
     /// Rotation from local to global coordinates
     pub rotation: SpatialVector<3>,
-    /// Vector used to store local angles for each wing. This can be used to rotate the wing along 
-    /// the span axis during a dynamic simulation. The typical example is changing the angle of 
+    /// Vector used to store local angles for each wing. This can be used to rotate the wing along
+    /// the span axis during a dynamic simulation. The typical example is changing the angle of
     /// attack on a wing sail due to changing apparent wind conditions.
     pub local_wing_angles: Vec<f64>,
     /// A vector that contains booleans that indicate whether the circulation should be zero at the
-    /// ends or not. The variables are used both when initializing the circulation before a 
+    /// ends or not. The variables are used both when initializing the circulation before a
     /// simulation and in cases where smoothing is applied to the circulation.
     /// The vector is structured as follows:
     /// - The first index is the wing index
@@ -73,9 +65,9 @@ pub struct LineForceModel {
     /// - When the boolean is false, the circulation is set to zero at the end, and when it is true,
     ///  the circulation is assumed to be non-zero.
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
-    /// A vector containing information about whether or not a wing is 'virtual' or real. Virtual 
+    /// A vector containing information about whether or not a wing is 'virtual' or real. Virtual
     /// wings are included in the simulations like non-virtual wings, except that the forces are not
-    /// included in the total force calculations. The primary use case is modelling end plates. 
+    /// included in the total force calculations. The primary use case is modelling end plates.
     /// Adding a virtual wing at the tip of another wing will reduce the tip losses, similar to how
     /// an end plate would work in reality.
     pub virtual_wings: Vec<bool>,
@@ -83,10 +75,10 @@ pub struct LineForceModel {
     pub density: f64,
     /// Optional corrections that can be applied to the estimated circulation strength.
     pub circulation_corrections: CirculationCorrection,
-    /// Optional variables to 
+    /// Optional variables to
     /// Factor used to control the control point location
     pub ctrl_point_chord_factor: f64,
-    /// The coordinate system to generate the output in. Variants consists of Global and Body. 
+    /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
     /// Optional model for calculation motion and flow derivatives
     derivatives: Option<Derivatives>,
@@ -99,15 +91,17 @@ impl Default for LineForceModel {
 }
 
 impl LineForceModel {
-    pub fn default_density() -> f64 { 1.225 }
+    pub fn default_density() -> f64 {
+        1.225
+    }
 
     /// Creates a new empty line force model. Wings can be added using the [LineForceModel::add_wing] function.
     pub fn new(density: f64) -> LineForceModel {
-        Self{
+        Self {
             span_lines_local: Vec::new(),
-            chord_vectors_local:  Vec::new(),
+            chord_vectors_local: Vec::new(),
             section_models: Vec::new(),
-            wing_indices:  Vec::new(),
+            wing_indices: Vec::new(),
             translation: SpatialVector::<3>::default(),
             rotation: SpatialVector::<3>::default(),
             local_wing_angles: Vec::new(),
@@ -121,7 +115,7 @@ impl LineForceModel {
         }
     }
 
-    /// Adds a new wing to the complete model. This involves appending the span lines, chord vectors, 
+    /// Adds a new wing to the complete model. This involves appending the span lines, chord vectors,
     /// and section models to the existing vectors, and adding the indices of the new wing to the
     /// wing indices vector.
     pub fn add_wing(&mut self, wing: &SingleWing) {
@@ -133,12 +127,15 @@ impl LineForceModel {
 
         let end_index = start_index + wing.span_lines_local.len();
 
-        self.wing_indices.push( Range {start: start_index, end: end_index} );
-        
+        self.wing_indices.push(Range {
+            start: start_index,
+            end: end_index,
+        });
+
         for line in &wing.span_lines_local {
             self.span_lines_local.push(line.clone());
         }
-        
+
         for chord_vector in &wing.chord_vectors_local {
             self.chord_vectors_local.push(*chord_vector);
         }
@@ -146,7 +143,8 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
-        self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
+        self.non_zero_circulation_at_ends
+            .push(wing.non_zero_circulation_at_ends);
         self.virtual_wings.push(wing.virtual_wing);
     }
 
@@ -159,7 +157,7 @@ impl LineForceModel {
     pub fn nr_span_lines(&self) -> usize {
         self.span_lines_local.len()
     }
-    
+
     /// Finds the wing index from the global index of a line element.
     pub fn wing_index_from_global(&self, global_index: usize) -> usize {
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
@@ -172,9 +170,9 @@ impl LineForceModel {
     }
 
     /// Returns the local index of a single wing. For instance, the first line element of each wing
-    /// will have a local index of 0, etc. This function is primarily used to map a global index to 
-    /// a local index used as input to sectional model where the properties vary for each line 
-    /// element. 
+    /// will have a local index of 0, etc. This function is primarily used to map a global index to
+    /// a local index used as input to sectional model where the properties vary for each line
+    /// element.
     pub fn local_index_from_global(&self, global_index: usize) -> usize {
         for wing_indices in &self.wing_indices {
             if wing_indices.contains(&global_index) {
@@ -192,7 +190,7 @@ impl LineForceModel {
 
     pub fn wing_rotation_axis_from_global(&self, global_index: usize) -> SpatialVector<3> {
         let wing_index = self.wing_index_from_global(global_index);
-        
+
         self.wing_rotation_axis(wing_index)
     }
 
@@ -206,7 +204,7 @@ impl LineForceModel {
 
     pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (f64, SpatialVector<3>) {
         let wing_index = self.wing_index_from_global(global_index);
-        
+
         self.wing_rotation_data(wing_index)
     }
 
@@ -220,19 +218,19 @@ impl LineForceModel {
     pub fn span_line_at_index(&self, index: usize) -> SpanLine {
         let (angle, axis) = self.wing_rotation_data_from_global(index);
 
-        self.span_lines_local[index].rotate_around_axis(angle, axis)
+        self.span_lines_local[index]
+            .rotate_around_axis(angle, axis)
             .rotate(self.rotation)
             .translate(self.translation)
     }
 
     /// Returns the span lines in global coordinates.
     pub fn span_lines(&self) -> Vec<SpanLine> {
-        self.span_lines_local.iter().enumerate().map(
-            |(_, line)| {
-                line.rotate(self.rotation)
-                    .translate(self.translation)
-            }
-        ).collect()
+        self.span_lines_local
+            .iter()
+            .enumerate()
+            .map(|(_, line)| line.rotate(self.rotation).translate(self.translation))
+            .collect()
     }
 
     pub fn local_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
@@ -242,26 +240,30 @@ impl LineForceModel {
     }
 
     pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
-        self.local_chord_vector_at_index(index).rotate(self.rotation)
+        self.local_chord_vector_at_index(index)
+            .rotate(self.rotation)
     }
 
     /// Returns the chord vectors in global coordinates.
     pub fn local_chord_vectors(&self) -> Vec<SpatialVector<3>> {
-        self.chord_vectors_local.iter().enumerate().map(
-            |(global_index, chord_vector)| {
+        self.chord_vectors_local
+            .iter()
+            .enumerate()
+            .map(|(global_index, chord_vector)| {
                 let (angle, axis) = self.wing_rotation_data_from_global(global_index);
 
                 chord_vector.rotate_around_axis(angle, axis)
-            }
-        ).collect()
+            })
+            .collect()
     }
 
     pub fn global_chord_vectors(&self) -> Vec<SpatialVector<3>> {
         let local_chord_vectors = self.local_chord_vectors();
-        
-        local_chord_vectors.iter().map(
-            |chord_vector| chord_vector.rotate(self.rotation)
-        ).collect()
+
+        local_chord_vectors
+            .iter()
+            .map(|chord_vector| chord_vector.rotate(self.rotation))
+            .collect()
     }
 
     /// Returns the control points of each line element. This is calculated as the midpoint of each
@@ -270,16 +272,21 @@ impl LineForceModel {
         let span_lines = self.span_lines();
         let chord_vectors = self.global_chord_vectors();
 
-        span_lines.iter().zip(chord_vectors.iter()).map(|(line, chord)| {
-            line.ctrl_point() + *chord * self.ctrl_point_chord_factor
-        }).collect()
+        span_lines
+            .iter()
+            .zip(chord_vectors.iter())
+            .map(|(line, chord)| line.ctrl_point() + *chord * self.ctrl_point_chord_factor)
+            .collect()
     }
 
     /// Returns the control points of each line element in local coordinates. This is calculated as
     /// the midpoint of each span line
     pub fn ctrl_points_local(&self) -> Vec<SpatialVector<3>> {
-        self.span_lines_local.iter().map(|line| line.ctrl_point()).collect()
-    }    
+        self.span_lines_local
+            .iter()
+            .map(|line| line.ctrl_point())
+            .collect()
+    }
 
     /// Returns the points making up the line geometry of the wings as a vector of spatial vectors,
     /// as opposed to a vector of span lines.
@@ -301,47 +308,52 @@ impl LineForceModel {
     }
 
     /// Removes the velocity in the span direction from the input velocity vector.
-    pub fn remove_span_velocity(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<SpatialVector<3>> {
+    pub fn remove_span_velocity(
+        &self,
+        velocity: &[SpatialVector<3>],
+        input_coordinate_system: CoordinateSystem,
+    ) -> Vec<SpatialVector<3>> {
         let span_lines = match input_coordinate_system {
             CoordinateSystem::Global => self.span_lines(),
             CoordinateSystem::Body => self.span_lines_local.clone(),
         };
 
-        velocity.iter().zip(span_lines.iter()).map(
-            |(vel, line)| {
+        velocity
+            .iter()
+            .zip(span_lines.iter())
+            .map(|(vel, line)| {
                 let span_velocity = vel.project(line.relative_vector());
 
                 *vel - span_velocity
-            }
-        ).collect()  
+            })
+            .collect()
     }
 
     /// Calculates the wake angle behind each line element.
     pub fn wake_angles(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
+        (0..self.nr_span_lines())
+            .map(|index| {
+                let wing_index = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(_) => 0.0,
                     SectionModel::VaryingFoil(_) => 0.0,
-                    SectionModel::RotatingCylinder(cylinder) => 
-                        cylinder.wake_angle(
-                            self.chord_vectors_local[index].length(), velocity[index].length()
-                        )
+                    SectionModel::RotatingCylinder(cylinder) => cylinder.wake_angle(
+                        self.chord_vectors_local[index].length(),
+                        velocity[index].length(),
+                    ),
                 }
-            }
-        ).collect()
+            })
+            .collect()
     }
 
     pub fn span_distance_in_local_coordinates(&self) -> Vec<f64> {
         let mut span_distance: Vec<f64> = Vec::new();
 
         for wing_index in 0..self.wing_indices.len() {
-            let start_point = self.span_lines_local[
-                self.wing_indices[wing_index].start
-            ].start_point;
-            
+            let start_point =
+                self.span_lines_local[self.wing_indices[wing_index].start].start_point;
+
             let mut previous_point = start_point;
             let mut previous_distance = 0.0;
 
@@ -354,15 +366,16 @@ impl LineForceModel {
                 previous_point = line.ctrl_point();
 
                 current_wing_span_distance.push(previous_distance + increase_in_distance);
-                
+
                 previous_distance += increase_in_distance;
             }
 
-            let end_point = self.span_lines_local[
-                self.wing_indices[wing_index].clone().last().unwrap()
-            ].end_point;
+            let end_point = self.span_lines_local
+                [self.wing_indices[wing_index].clone().last().unwrap()]
+            .end_point;
 
-            let total_distance = current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
+            let total_distance =
+                current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
 
             for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
                 span_distance.push(current_wing_span_distance[i] - 0.5 * total_distance);
@@ -373,17 +386,15 @@ impl LineForceModel {
     }
 
     /// Calculates the relative distance from the center off each wing for each control point.
-    /// The absolute values are divided with the span of each wing. In other words, the 
+    /// The absolute values are divided with the span of each wing. In other words, the
     /// return value will vary between -0.5 and 0.5, where 0 is the center of the wing.
     pub fn relative_span_distance(&self) -> Vec<f64> {
         let mut relative_span_distance: Vec<f64> = Vec::new();
 
         for wing_index in 0..self.wing_indices.len() {
+            let start_point =
+                self.span_lines_local[self.wing_indices[wing_index].start].start_point;
 
-            let start_point = self.span_lines_local[
-                self.wing_indices[wing_index].start
-            ].start_point;
-            
             let mut previous_point = start_point;
             let mut previous_distance = 0.0;
 
@@ -396,15 +407,16 @@ impl LineForceModel {
                 previous_point = line.ctrl_point();
 
                 current_wing_span_distance.push(previous_distance + increase_in_distance);
-                
+
                 previous_distance += increase_in_distance;
             }
 
-            let end_point = self.span_lines_local[
-                self.wing_indices[wing_index].clone().last().unwrap()
-            ].end_point;
+            let end_point = self.span_lines_local
+                [self.wing_indices[wing_index].clone().last().unwrap()]
+            .end_point;
 
-            let total_distance = current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
+            let total_distance =
+                current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
 
             for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
                 relative_span_distance.push(current_wing_span_distance[i] / total_distance - 0.5);
@@ -439,7 +451,7 @@ impl LineForceModel {
         span_length
     }
 
-    /// Shorthand for quickly calculating the typical force factor used when presenting 
+    /// Shorthand for quickly calculating the typical force factor used when presenting
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)
     pub fn total_force_factor(&self, freestream_velocity: f64) -> f64 {
         0.5 * self.density * freestream_velocity.powi(2) * self.total_projected_area()
@@ -450,53 +462,33 @@ impl LineForceModel {
             match self.section_models[wing_index] {
                 SectionModel::VaryingFoil(ref mut foil) => {
                     foil.current_internal_state = internal_state[wing_index];
-                },
+                }
                 SectionModel::RotatingCylinder(ref mut cylinder) => {
                     cylinder.revolutions_per_second = internal_state[wing_index];
-                },
+                }
                 _ => {}
             }
         }
     }
-
-    pub fn set_sail_controller_results(&mut self, results: &[SailControllerResult]) {
-        for wing_index in 0..self.nr_wings() {
-            self.local_wing_angles[wing_index] = results[wing_index].wing_angle;
-            
-            match self.section_models[wing_index] {
-                SectionModel::VaryingFoil(ref mut foil) => {
-                    foil.current_internal_state = results[wing_index].internal_state;
-                },
-                SectionModel::RotatingCylinder(ref mut cylinder) => {
-                    cylinder.revolutions_per_second = results[wing_index].internal_state;
-                },
-                _ => {}
-            }
-        }
-    }
-    
 
     /// General function for calculating wing-averaged values
-    pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T> 
-    where T: 
-        std::ops::Div<f64, Output = T> + 
-        std::ops::Add<T, Output = T> + 
-        Copy
+    pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T>
+    where
+        T: std::ops::Div<f64, Output = T> + std::ops::Add<T, Output = T> + Copy,
     {
         let mut result: Vec<T> = Vec::new();
 
         for wing_indices in &self.wing_indices {
-            result.push(
-                mean(&sectional_values[wing_indices.clone()])
-            );
+            result.push(mean(&sectional_values[wing_indices.clone()]));
         }
 
         result
     }
 
     /// Maps a vector of values for each wing to a vector of values for each section
-    pub fn section_values_from_wing_values<T>(&self, wing_values: &[T]) -> Vec<T> 
-    where T: Clone
+    pub fn section_values_from_wing_values<T>(&self, wing_values: &[T]) -> Vec<T>
+    where
+        T: Clone,
     {
         let mut result: Vec<T> = Vec::new();
 
@@ -511,33 +503,34 @@ impl LineForceModel {
         result
     }
 
-    /// Maps the values at the control points to the values at the span points using linear 
+    /// Maps the values at the control points to the values at the span points using linear
     /// interpolation.
     pub fn span_point_values_from_ctrl_point_values<T>(
-        &self, 
-        ctrl_point_values: &[T], 
-        extrapolate_ends: bool
-    ) -> Vec<T> 
-    where T: 
-        std::ops::Add<T, Output = T> + 
-        std::ops::Sub<T, Output = T> +
-        std::ops::Mul<f64, Output = T> +
-        Copy
+        &self,
+        ctrl_point_values: &[T],
+        extrapolate_ends: bool,
+    ) -> Vec<T>
+    where
+        T: std::ops::Add<T, Output = T>
+            + std::ops::Sub<T, Output = T>
+            + std::ops::Mul<f64, Output = T>
+            + Copy,
     {
-        let mut span_point_values: Vec<T> = Vec::with_capacity(self.nr_span_lines() + self.nr_wings());
+        let mut span_point_values: Vec<T> =
+            Vec::with_capacity(self.nr_span_lines() + self.nr_wings());
 
         for wing_index in 0..self.wing_indices.len() {
             let first_index = self.wing_indices[wing_index].start;
 
             // First point is extrapolated
             if extrapolate_ends {
-                let first_delta = ctrl_point_values[first_index] - ctrl_point_values[first_index + 1];
-            
+                let first_delta =
+                    ctrl_point_values[first_index] - ctrl_point_values[first_index + 1];
+
                 span_point_values.push(ctrl_point_values[first_index] + first_delta);
             } else {
                 span_point_values.push(ctrl_point_values[first_index]);
             }
-            
 
             // Loop over all span lines in the wing
             for i in self.wing_indices[wing_index].clone() {
@@ -546,16 +539,15 @@ impl LineForceModel {
                 // Last point is extrapolated, all others are interpolated
                 if i == last_index {
                     if extrapolate_ends {
-                        let last_delta = ctrl_point_values[last_index] - ctrl_point_values[last_index - 1];
+                        let last_delta =
+                            ctrl_point_values[last_index] - ctrl_point_values[last_index - 1];
                         span_point_values.push(ctrl_point_values[last_index] + last_delta);
                     } else {
                         span_point_values.push(ctrl_point_values[last_index]);
                     }
                 } else {
-                    span_point_values.push(
-                        (ctrl_point_values[i] + ctrl_point_values[i+1]) * 0.5
-                    );
-                }  
+                    span_point_values.push((ctrl_point_values[i] + ctrl_point_values[i + 1]) * 0.5);
+                }
             }
         }
 
@@ -565,5 +557,4 @@ impl LineForceModel {
     pub fn need_derivative_initialization(&self) -> bool {
         self.derivatives.is_none()
     }
-    
 }

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import json
 
-model_scale_factor = 18.13
+model_scale_factor = 1.0
 
 @dataclass
 class WindEnvironment:
@@ -19,7 +19,7 @@ class WindEnvironment:
                 "power_factor": self.power_factor
             }
         }
-    
+
     def to_json_file(self, file_path):
         with open(file_path, "w") as f:
             json.dump(self.to_dict(), f, indent=4)
@@ -27,34 +27,30 @@ class WindEnvironment:
 
 
 def make_sail_controller_setup_file():
+
+    max_angle = 20.0
     wind_direction_data = np.array([-180, -20.0, -10.0, 0.0, 10.0, 20.0, 180])
-    angle_of_attack_data = np.array([-15, -15, 0.0, 0.0, 0.0, 15.0, 15.0])
+    angle_of_attack_data = np.array([-max_angle, -max_angle, -max_angle, 0.0, max_angle, max_angle, max_angle])
 
-    wing_angles_data = wind_direction_data - angle_of_attack_data
+    wing_angle_data = -wind_direction_data + angle_of_attack_data
 
-    nr_sails = 3
+    nr_sails = 2
 
-    controllers = []
-
-    reference_direction = {"x": 1.0, "y": 0.0, "z": 0.0}
-    measurement_point   = {"x": 0.0, "y": 0.0, "z": 10.0 / model_scale_factor}
-    rotation_axis       = {"x": 0.0, "y": 0.0, "z": 1.0}
+    controller = {
+        "controllers": []
+    }
 
     for _ in range(nr_sails):
-        controllers.append(
+        controller["controllers"].append(
             {
-                "reference_direction": reference_direction,
-                "measurement_point": measurement_point,
-                "rotation_axis": rotation_axis,
                 "wind_direction_data": wind_direction_data.tolist(),
-                "wing_angles_data": wing_angles_data.tolist(),
-                "use_degrees": True
+                "local_wing_angles_data": wing_angle_data.tolist(),
             }
         )
 
     with open("sail_controller_setup.json", "w") as f:
-        json.dump(controllers, f, indent=4)
-        
+        json.dump(controller, f, indent=4)
+
 
 def make_stormbird_setup_file():
     chord = 11.0 / model_scale_factor
@@ -62,20 +58,20 @@ def make_stormbird_setup_file():
 
     start_height = 10.0 / model_scale_factor
 
-    x_locations = np.array([-60, 0.0, 60]) / model_scale_factor
-    y_locations = np.array([0.0, 0.0, 0.0]) / model_scale_factor
+    x_locations = np.array([-60, 60]) / model_scale_factor
+    y_locations = np.array([0.0, 0.0]) / model_scale_factor
     z_locations = np.array([start_height, start_height, start_height])
 
     nr_sails = len(x_locations)
 
     out_dict = OrderedDict()
 
-    chord_vector = {"x": chord, "y": 0.0, "z": 0.0}
+    chord_vector = {"x": -chord, "y": 0.0, "z": 0.0}
     section_model = {
         "Foil": {
             "cl_zero_angle": 0.0,
-            "mean_positive_stall_angle": np.radians(20),
-            "mean_negative_stall_angle": np.radians(20)
+            "mean_positive_stall_angle": np.radians(45),
+            "mean_negative_stall_angle": np.radians(45)
         }
     }
     non_zero_circulation_at_ends = [False, False]
@@ -86,8 +82,8 @@ def make_stormbird_setup_file():
         wing_builders.append(
             {
                 "section_points": [
-                    {"x": x_locations[i], "y": y_locations[i], "z": z_locations[i]},
-                    {"x": x_locations[i], "y": y_locations[i], "z": z_locations[i] + span}
+                    {"x": x_locations[i], "y": y_locations[i], "z": -z_locations[i]},
+                    {"x": x_locations[i], "y": y_locations[i], "z": -(z_locations[i] + span)}
                 ],
                 "chord_vectors": [chord_vector, chord_vector],
                 "section_model": section_model,
@@ -104,7 +100,7 @@ def make_stormbird_setup_file():
         "Dynamic": {
             "wake": {
                 "wake_length": {
-                    "NrPanels": 25
+                    "NrPanels": 50
                 },
                 "ratio_of_wake_affected_by_induced_velocities": 0.0,
                 "use_chord_direction": True,

@@ -1,4 +1,4 @@
-// Copyright (C) 2024, NTNU 
+// Copyright (C) 2024, NTNU
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -7,10 +7,10 @@ use std::f64::consts::PI;
 use fmu_from_struct::prelude::*;
 
 use math_utils::spatial_vector::SpatialVector;
+use stormbird::empirical_models::wind_environment::height_variation::HeightVariationModel;
+use stormbird::io_structs::result::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
-use stormbird::io_structs::result::SimulationResult;
-use stormbird::empirical_models::wind_environment::height_variation::HeightVariationModel;
 
 use serde_json;
 
@@ -52,15 +52,15 @@ pub struct StormbirdLiftingLine {
     initialized_wake_points: bool,
 }
 
-impl FmuFunctions for StormbirdLiftingLine {        
+impl FmuFunctions for StormbirdLiftingLine {
     fn exit_initialization_mode(&mut self) {
         let initial_wake_builder_velocity = SpatialVector([1e-6, 0.0, 0.0]);
 
-        let stormbird_model_builder = SimulationBuilder::new_from_file(
-            &self.lifting_line_setup_file_path
-        ).unwrap();
+        let stormbird_model_builder =
+            SimulationBuilder::new_from_file(&self.lifting_line_setup_file_path).unwrap();
 
-        self.stormbird_model = Some(stormbird_model_builder.build(1.0, initial_wake_builder_velocity));
+        self.stormbird_model =
+            Some(stormbird_model_builder.build(1.0, initial_wake_builder_velocity));
 
         if let Some(model) = &mut self.stormbird_model {
             let freestream_velocity_points = model.get_freestream_velocity_points();
@@ -70,9 +70,8 @@ impl FmuFunctions for StormbirdLiftingLine {
         }
 
         if !self.wind_environment_setup_file_path.is_empty() {
-            let height_variation_model = HeightVariationModel::from_json_file(
-                &self.wind_environment_setup_file_path
-            );
+            let height_variation_model =
+                HeightVariationModel::from_json_file(&self.wind_environment_setup_file_path);
 
             self.height_variation_model = Some(height_variation_model);
         }
@@ -84,32 +83,24 @@ impl FmuFunctions for StormbirdLiftingLine {
         let local_wing_angles = self.local_wing_angles();
         let section_models_internal_state = self.section_models_internal_state();
 
-        let result = if let Some(model) = &mut self.stormbird_model {        
+        let result = if let Some(model) = &mut self.stormbird_model {
             model.line_force_model.rotation = rotation;
             model.line_force_model.translation = translation;
             model.line_force_model.local_wing_angles = local_wing_angles;
 
-            model.line_force_model.set_section_models_internal_state(
-                &section_models_internal_state
-            );
-            
-            if !self.initialized_wake_points {
-                let average_wind_velocities = wind_velocities.iter().sum::<SpatialVector<3>>() / wind_velocities.len() as f64;
+            model.line_force_model
+                .set_section_models_internal_state(&section_models_internal_state);
 
-                model.wake.initialize(
-                    &model.line_force_model,
-                    average_wind_velocities,
-                    time_step
-                );
+            if !self.initialized_wake_points {
+                let average_wind_velocities =
+                    wind_velocities.iter().sum::<SpatialVector<3>>() / wind_velocities.len() as f64;
+
+                model.wake.initialize(&model.line_force_model, average_wind_velocities, time_step);
 
                 self.initialized_wake_points = true;
             }
 
-            let result = model.do_step(
-                current_time, 
-                time_step, 
-                &wind_velocities
-            );
+            let result = model.do_step(current_time, time_step, &wind_velocities);
 
             Some(result)
         } else {
@@ -126,16 +117,12 @@ impl StormbirdLiftingLine {
     fn rotation(&self) -> SpatialVector<3> {
         if self.angles_in_degrees {
             SpatialVector([
-                self.x_rotation.to_radians(), 
-                self.y_rotation.to_radians(), 
-                self.z_rotation.to_radians()
+                self.x_rotation.to_radians(),
+                self.y_rotation.to_radians(),
+                self.z_rotation.to_radians(),
             ])
         } else {
-            SpatialVector([
-                self.x_rotation, 
-                self.y_rotation, 
-                self.z_rotation
-            ])
+            SpatialVector([self.x_rotation, self.y_rotation, self.z_rotation])
         }
     }
 
@@ -161,39 +148,36 @@ impl StormbirdLiftingLine {
             wind_direction -= 2.0 * PI;
         }
 
-        let freestream_velocity_points: Vec<SpatialVector<3>> = if let Some(model) = &self.stormbird_model {
-            model.get_freestream_velocity_points()
-        } else {
-            vec![]
-        };
-
-        let mut wind_velocities: Vec<SpatialVector<3>> = Vec::with_capacity(freestream_velocity_points.len());
-
-        for point in freestream_velocity_points {
-            let height = if self.negative_z_is_up {
-                -point[2]
+        let freestream_velocity_points: Vec<SpatialVector<3>> =
+            if let Some(model) = &self.stormbird_model {
+                model.get_freestream_velocity_points()
             } else {
-                point[2]
+                vec![]
             };
 
-            let increase_factor = if let Some(model) = &self.height_variation_model {
-                model.velocity_increase_factor(height)
-            } else {
-                1.0
-            };
+        freestream_velocity_points.iter().map(
+            |point| {
+                let height = if self.negative_z_is_up {
+                    -point[2]
+                } else {
+                    point[2]
+                };
 
-            let local_wind_velocity = self.wind_velocity * increase_factor;
+                let increase_factor = if let Some(model) = &self.height_variation_model {
+                    model.velocity_increase_factor(height)
+                } else {
+                    1.0
+                };
 
-            wind_velocities.push(
+                let local_wind_velocity = self.wind_velocity * increase_factor;
+
                 SpatialVector([
-                    -local_wind_velocity * wind_direction.cos(), 
-                    -local_wind_velocity * wind_direction.sin(), 
-                    0.0
-                ]) 
-            );
-        }
-
-        wind_velocities
+                    -local_wind_velocity * wind_direction.cos(),
+                    -local_wind_velocity * wind_direction.sin(),
+                    0.0,
+                ])
+            }
+        ).collect()
     }
 
     fn local_wing_angles(&self) -> Vec<f64> {
@@ -221,7 +205,7 @@ impl StormbirdLiftingLine {
     }
 
     fn set_output(&mut self, result: SimulationResult) {
-        let integrated_forces  = result.integrated_forces_sum();
+        let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
         self.force_x = integrated_forces[0];
@@ -235,6 +219,5 @@ impl StormbirdLiftingLine {
         if self.export_stormbird_result {
             self.stormbird_result = serde_json::to_string(&result).unwrap();
         }
-        
     }
 }
