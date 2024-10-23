@@ -32,7 +32,7 @@ def make_sail_controller_setup_file():
     wind_direction_data = np.array([-180, -20.0, -10.0, 0.0, 10.0, 20.0, 180])
     angle_of_attack_data = np.array([-max_angle, -max_angle, -max_angle, 0.0, max_angle, max_angle, max_angle])
 
-    wing_angle_data = -wind_direction_data + angle_of_attack_data
+    wing_angle_data = wind_direction_data + angle_of_attack_data
 
     nr_sails = 2
 
