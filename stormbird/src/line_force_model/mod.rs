@@ -8,7 +8,7 @@
 
 use std::{f64::consts::PI, ops::Range};
 
-use math_utils::{spatial_vector::SpatialVector, statistics::mean};
+use math_utils::{spatial_vector::SpatialVector, statistics::mean, interpolation::linear_interpolation};
 
 pub mod builder;
 pub mod derivatives;
@@ -480,6 +480,32 @@ impl LineForceModel {
 
         for wing_indices in &self.wing_indices {
             result.push(mean(&sectional_values[wing_indices.clone()]));
+        }
+
+        result
+    }
+
+    /// Function for interpolating vector values to a specified relative spanwise distance for each
+    /// wing.
+    pub fn interpolate_values_to_spanwise_location<T>(&self, spanwise_location: f64, sectional_values: &[T]) -> Vec<T>
+    where T:
+        std::ops::Mul<f64, Output = T> +
+        std::ops::Add<T, Output = T> +
+        std::ops::Sub<T, Output = T> +
+        Copy
+    {
+        let mut result: Vec<T> = Vec::new();
+
+        let relative_span_distance = self.relative_span_distance();
+
+        for wing_indices in &self.wing_indices {
+            result.push(
+                linear_interpolation(
+                    spanwise_location,
+                    &relative_span_distance[wing_indices.clone()],
+                    &sectional_values[wing_indices.clone()]
+                )
+            )
         }
 
         result

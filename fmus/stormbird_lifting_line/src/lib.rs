@@ -208,6 +208,35 @@ impl StormbirdLiftingLine {
         }
     }
 
+    /// Function that measures the angle of the velocity vector, with respect to the x-axis, at the
+    /// specified non-dimensional spanwise location of each wing.
+    ///
+    /// That is, this angle can be seen as the felt wind direction at each sail. The .
+    fn measure_felt_wind_direction(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
+        if let Some(model) = &self.stormbird_model {
+            let relevant_velocities = model.line_force_model.interpolate_values_to_spanwise_location(
+                0.0,
+                velocity
+            );
+
+            let reference_vector = SpatialVector([1.0, 0.0, 0.0]);
+
+            let axis = if self.negative_z_is_up {
+                SpatialVector([0.0, 0.0, -1.0])
+            } else {
+                SpatialVector([0.0, 0.0, 1.0])
+            };
+
+            relevant_velocities.iter().map(
+                |velocity| {
+                    reference_vector.signed_angle_between(*velocity, axis)
+                }
+            ).collect()
+        } else {
+            vec![0.0; self.nr_wings]
+        }
+    }
+
     fn set_output(&mut self, result: SimulationResult) {
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
