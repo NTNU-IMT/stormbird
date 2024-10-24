@@ -1,65 +1,112 @@
 use crate::io_structs::prelude::CoordinateSystem;
+use crate::line_force_model::span_line::SpanLine;
 
 use super::*;
 
 #[derive(Debug, Clone, Default)]
-/// Structure for storing relevant data from the line force model that is needed for several methods in the wake model.
+/// Structure for storing relevant data from the line force model that is needed for several methods
+/// in the wake model.
 pub struct LineForceModelData {
+    pub span_lines: Vec<SpanLine>,
     pub chord_vectors: Vec<SpatialVector<3>>,
-    pub ctrl_points_velocity: Vec<SpatialVector<3>>,
+    pub felt_ctrl_points_freestream: Vec<SpatialVector<3>>,
+    pub felt_ctrl_points_velocity: Vec<SpatialVector<3>>,
     pub angles_of_attack: Vec<f64>,
     pub amount_of_flow_separation: Vec<f64>,
+    pub wake_angles: Vec<f64>,
+    pub wing_indices: Vec<Range<usize>>,
 }
 
 impl LineForceModelData {
-    pub fn new(line_force_model: &LineForceModel) -> Self {
-        Self {
-            chord_vectors: line_force_model.global_chord_vectors(),
-            ctrl_points_velocity: vec![SpatialVector::<3>::default(); line_force_model.ctrl_points().len()],
-            angles_of_attack: vec![0.0; line_force_model.ctrl_points().len()],
-            amount_of_flow_separation: vec![0.0; line_force_model.ctrl_points().len()],
-        }
-    }
-}
-
-impl Wake {
-    pub fn update_line_force_model_data(
-        &mut self, 
-        line_force_model: &LineForceModel, 
-        ctrl_points_freestream: &[SpatialVector<3>]
-    ) {
-        // Extract relevant information from the line force model
+    pub fn new(
+        line_force_model: &LineForceModel,
+        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        felt_ctrl_points_velocity: &[SpatialVector<3>]
+    ) -> Self {
+        let span_lines = line_force_model.span_lines();
         let chord_vectors = line_force_model.global_chord_vectors();
-        let ctrl_points = line_force_model.ctrl_points();
 
-        // Compute the induced velocities at the control points
-        let induced_velocities = if self.settings.end_index_induced_velocities_on_wake > 0 {
-            self.induced_velocities(&ctrl_points)
-        } else {
-            vec![SpatialVector::<3>::default(); ctrl_points.len()]
-        };
+        let angles_of_attack = line_force_model.angles_of_attack(
+            &felt_ctrl_points_velocity,
+            CoordinateSystem::Global
+        );
 
-        let ctrl_points_velocity: Vec<SpatialVector<3>> = ctrl_points_freestream.iter().zip(induced_velocities.iter()).map(
-            |(u_inf, u_i)| *u_inf + *u_i
-        ).collect();
+        let amount_of_flow_separation = line_force_model.amount_of_flow_separation(
+            &angles_of_attack
+        );
 
-        let angles_of_attack = line_force_model.angles_of_attack(&ctrl_points_velocity, CoordinateSystem::Global);
+        let wake_angles = line_force_model.wake_angles(
+            &felt_ctrl_points_velocity,
+        );
 
-
-        let mut amount_of_flow_separation = vec![0.0; ctrl_points.len()];
-        for i in 0..self.indices.nr_panels_along_span {
-            let wing_index = self.wing_index(i);
-
-            amount_of_flow_separation[i] = line_force_model
-                .section_models[wing_index]
-                .amount_of_flow_separation(angles_of_attack[i]);
-        }
-
-        self.line_force_model_data = LineForceModelData {
+        Self {
+            span_lines,
             chord_vectors,
-            ctrl_points_velocity,
+            felt_ctrl_points_freestream: felt_ctrl_points_freestream.to_vec(),
+            felt_ctrl_points_velocity: felt_ctrl_points_velocity.to_vec(),
             angles_of_attack,
             amount_of_flow_separation,
-        };
+            wake_angles,
+            wing_indices: line_force_model.wing_indices.clone(),
+        }
+    }
+
+    pub fn nr_span_lines(&self) -> usize {
+        self.chord_vectors.len()
+    }
+
+    pub fn nr_wings(&self) -> usize {
+        self.wing_indices.len()
+    }
+
+    /// Maps the values at the control points to the values at the span points using linear
+    /// interpolation.
+    pub fn span_point_values_from_ctrl_point_values<T>(
+        &self,
+        ctrl_point_values: &[T],
+        extrapolate_ends: bool,
+    ) -> Vec<T>
+    where
+        T: std::ops::Add<T, Output = T>
+            + std::ops::Sub<T, Output = T>
+            + std::ops::Mul<f64, Output = T>
+            + Copy,
+    {
+        let mut span_point_values: Vec<T> =
+            Vec::with_capacity(self.nr_span_lines() + self.nr_wings());
+
+        for wing_index in 0..self.wing_indices.len() {
+            let first_index = self.wing_indices[wing_index].start;
+
+            // First point is extrapolated
+            if extrapolate_ends {
+                let first_delta =
+                    ctrl_point_values[first_index] - ctrl_point_values[first_index + 1];
+
+                span_point_values.push(ctrl_point_values[first_index] + first_delta);
+            } else {
+                span_point_values.push(ctrl_point_values[first_index]);
+            }
+
+            // Loop over all span lines in the wing
+            for i in self.wing_indices[wing_index].clone() {
+                let last_index = self.wing_indices[wing_index].clone().last().unwrap();
+
+                // Last point is extrapolated, all others are interpolated
+                if i == last_index {
+                    if extrapolate_ends {
+                        let last_delta =
+                            ctrl_point_values[last_index] - ctrl_point_values[last_index - 1];
+                        span_point_values.push(ctrl_point_values[last_index] + last_delta);
+                    } else {
+                        span_point_values.push(ctrl_point_values[last_index]);
+                    }
+                } else {
+                    span_point_values.push((ctrl_point_values[i] + ctrl_point_values[i + 1]) * 0.5);
+                }
+            }
+        }
+
+        span_point_values
     }
 }

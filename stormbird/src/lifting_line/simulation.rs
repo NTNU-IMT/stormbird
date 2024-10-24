@@ -3,14 +3,16 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 //! An interface for running simulations using the lifting line models.
-//! 
-//! To support different use cases, both quasi-steady and true dynamic simulations are supported. 
-//! However, the interface is designed to be as unified as possible. 
+//!
+//! To support different use cases, both quasi-steady and true dynamic simulations are supported.
+//! However, the interface is designed to be as unified as possible.
 
 use crate::lifting_line::prelude::*;
 use crate::line_force_model::circulation_corrections::CirculationCorrection;
 
 use super::simulation_builder::SimulationBuilder;
+
+use super::wake::line_force_model_data::LineForceModelData;
 
 #[derive(Debug, Clone)]
 /// Struct that contains the data needed to run a dynamic simulation.
@@ -25,8 +27,8 @@ pub struct Simulation {
 
 impl Simulation {
     pub fn new_from_string(
-        setup_string: &str, 
-        initial_time_step: f64, 
+        setup_string: &str,
+        initial_time_step: f64,
         wake_initial_velocity: SpatialVector<3>
     ) -> Result<Self, String> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
@@ -34,12 +36,12 @@ impl Simulation {
         Ok(builder.build(initial_time_step, wake_initial_velocity))
     }
 
-    /// Returns the points where the freestream velocity must be specified in order to execute a 
-    /// `do_step` call. 
-    /// 
-    /// Which points that are returned depends on the simulation mode. In case of a quasi-steady 
-    /// simulation, the points are only the control points of the line force model. In case of a 
-    /// dynamic simulation, the points are the control points of the line force model and the 
+    /// Returns the points where the freestream velocity must be specified in order to execute a
+    /// `do_step` call.
+    ///
+    /// Which points that are returned depends on the simulation mode. In case of a quasi-steady
+    /// simulation, the points are only the control points of the line force model. In case of a
+    /// dynamic simulation, the points are the control points of the line force model and the
     /// points in the wake.
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
         let total_nr_popints = self.line_force_model.nr_span_lines() + self.wake.points.len();
@@ -55,15 +57,15 @@ impl Simulation {
         points
     }
 
-    /// Steps the simulation forward in time by one time step. 
-    /// 
+    /// Steps the simulation forward in time by one time step.
+    ///
     /// # Arguments
     /// - `time`: The current time of the simulation.
     /// - `time_step`: The time step to use for the simulation.
-    /// - `freestream_velocity`: The freestream velocity at the points returned by 
+    /// - `freestream_velocity`: The freestream velocity at the points returned by
     /// `get_freestream_velocity_points`
     pub fn do_step(
-        &mut self, 
+        &mut self,
         time: f64,
         time_step: f64,
         freestream_velocity: &[SpatialVector<3>],
@@ -83,7 +85,7 @@ impl Simulation {
         self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
 
         let frozen_wake = FrozenWake::from_wake(
-            &self.line_force_model, 
+            &self.line_force_model,
             &self.wake
         );
 
@@ -95,12 +97,17 @@ impl Simulation {
             &self.previous_circulation_strength
         );
 
+        let line_force_model_data = LineForceModelData::new(
+            &self.line_force_model,
+            &felt_ctrl_points_freestream,
+            &solver_result.ctrl_point_velocity,
+        );
+
         // Update the wake model if needed
         self.wake.update_after_completed_time_step(
-            &solver_result.circulation_strength, 
-            time_step, 
-            &self.line_force_model,
-            &ctrl_points_freestream,
+            &solver_result.circulation_strength,
+            &line_force_model_data,
+            time_step,
             &wake_points_freestream,
         );
 
@@ -137,9 +144,9 @@ impl Simulation {
         };
 
         self.previous_circulation_strength = result.force_input.circulation_strength.clone();
-        
+
         self.line_force_model.update_derivatives(
-            &result.force_input.velocity, 
+            &result.force_input.velocity,
             &result.force_input.angles_of_attack
         );
 
@@ -147,14 +154,14 @@ impl Simulation {
     }
 
     pub fn induced_velocities(
-        &self, 
-        points: &[SpatialVector<3>], 
+        &self,
+        points: &[SpatialVector<3>],
     ) -> Vec<SpatialVector<3>> {
         self.wake.induced_velocities(points)
     }
 
     pub fn initialize_with_elliptic_distribution(
-        &mut self, 
+        &mut self,
         time: f64,
         time_step: f64,
         freestream_velocity: &[SpatialVector<3>],

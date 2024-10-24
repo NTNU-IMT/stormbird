@@ -5,12 +5,12 @@
 use super::*;
 
 /// This implementation block contains the functions that calculates the forces on line elements and
-/// on the wings. These are generally used as the last step in a simulation method using the 
+/// on the wings. These are generally used as the last step in a simulation method using the
 /// line force model.
 impl LineForceModel {
     /// Return the angle of attack at each control point.
-    /// 
-    /// The angle is defined as the rotation from the chord vector to the velocity vector, using the 
+    ///
+    /// The angle is defined as the rotation from the chord vector to the velocity vector, using the
     /// span line as the axis of rotation, with right handed positive rotation.
     ///
     /// # Argument
@@ -20,10 +20,10 @@ impl LineForceModel {
             CoordinateSystem::Global => (self.span_lines(), self.global_chord_vectors()),
             CoordinateSystem::Body => (self.span_lines_local.clone(), self.local_chord_vectors()),
         };
-        
+
         let angles_of_attack: Vec<f64> = (0..velocity.len()).map(|index| {
             chord_vectors[index].signed_angle_between(
-                velocity[index], 
+                velocity[index],
                 span_lines[index].direction()
             )
         }).collect();
@@ -43,11 +43,11 @@ impl LineForceModel {
                 let wing_index  = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => 
+                    SectionModel::Foil(foil) =>
                         foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) => 
+                    SectionModel::VaryingFoil(foil) =>
                         foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) => 
+                    SectionModel::RotatingCylinder(cylinder) =>
                         cylinder.lift_coefficient(
                             self.chord_vectors_local[index].length(), velocity[index].length()
                         ),
@@ -56,7 +56,7 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Returns the circulation strength, either directly or based on the prescribed shape, 
+    /// Returns the circulation strength, either directly or based on the prescribed shape,
     /// depending on the fields in self.
     ///
     /// # Argument
@@ -64,7 +64,7 @@ impl LineForceModel {
     pub fn circulation_strength(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<f64> {
         match &self.circulation_corrections {
             CirculationCorrection::None => self.circulation_strength_raw(velocity, input_coordinate_system),
-            CirculationCorrection::PrescribedCirculation(shape) => 
+            CirculationCorrection::PrescribedCirculation(shape) =>
                 self.prescribed_circulation_strength(&velocity,&shape, input_coordinate_system),
             CirculationCorrection::GaussianSmoothing(settings) => {
                 let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
@@ -87,7 +87,7 @@ impl LineForceModel {
     }
 
     /// Returns the viscous drag coefficient on each line element, based on the section model
-    /// and the input velocity. 
+    /// and the input velocity.
     ///
     /// # Argument
     /// * `velocity` - the velocity vector at each control point
@@ -99,11 +99,11 @@ impl LineForceModel {
                 let wing_index  = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => 
+                    SectionModel::Foil(foil) =>
                         foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) => 
+                    SectionModel::VaryingFoil(foil) =>
                         foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) => 
+                    SectionModel::RotatingCylinder(cylinder) =>
                         cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
                 }
             }
@@ -152,7 +152,7 @@ impl LineForceModel {
             acceleration,
             angles_of_attack_derivative,
             rotation_velocity,
-            coordinate_system: self.output_coordinate_system 
+            coordinate_system: self.output_coordinate_system
         }
     }
 
@@ -190,7 +190,7 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Calculates the forces on each line element due to the sectional drag model. This is most 
+    /// Calculates the forces on each line element due to the sectional drag model. This is most
     /// often the viscous drag, but it can also include other physical effects if that is included
     /// in the sectional drag model.
     pub fn sectional_drag_forces(&self, velocity: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
@@ -209,15 +209,15 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Calculates the added mass force on each line element due to the flow acceleration at each 
-    /// control point. 
-    /// 
-    /// **Note**: At the moment, this function only calculates the added mass due to the point 
-    /// acceleration. However, according to, for instance, Theodorsen, the added mass should also 
+    /// Calculates the added mass force on each line element due to the flow acceleration at each
+    /// control point.
+    ///
+    /// **Note**: At the moment, this function only calculates the added mass due to the point
+    /// acceleration. However, according to, for instance, Theodorsen, the added mass should also
     /// depend on the angular velocity and angular acceleration of the wing. Although these effects
     /// are expected to be small, it should be included in the future. This would, however, require
     /// more information about the motion of the wing to be included as arguments.
-    /// 
+    ///
     /// # Argument
     /// * `acceleration` - the acceleration of the flow at each control point. That is, if the only
     /// velocity is due to the motion of the wings, the acceleration will be opposite to the motion
@@ -227,7 +227,7 @@ impl LineForceModel {
             CoordinateSystem::Global => (self.span_lines(), self.global_chord_vectors()),
             CoordinateSystem::Body => (self.span_lines_local.clone(), self.local_chord_vectors())
         };
-        
+
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
@@ -263,8 +263,8 @@ impl LineForceModel {
     }
 
     /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
-    /// 
-    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be 
+    ///
+    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be
     /// significantly larger than the rotational velocity of the sail, for instance due to roll or
     /// pitch motion of the boat.
     pub fn sectional_gyroscopic_force(&self, rotation_velocity: SpatialVector<3>) -> Vec<SpatialVector<3>> {
@@ -272,11 +272,11 @@ impl LineForceModel {
             CoordinateSystem::Global => self.span_lines(),
             CoordinateSystem::Body => self.span_lines_local.clone(),
         };
-        
+
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index = self.wing_index_from_global(index);
-                
+
                 match &self.section_models[wing_index] {
                     SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => SpatialVector::<3>::default(),
                     SectionModel::RotatingCylinder(cylinder) => {
@@ -294,7 +294,7 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Calculates the magnitude of the lift force on each line element based on the given 
+    /// Calculates the magnitude of the lift force on each line element based on the given
     /// circulation and velocity.
     pub fn lift_from_circulation(&self, strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<f64> {
         let force = self.sectional_circulatory_forces(strength, velocity);
@@ -304,7 +304,7 @@ impl LineForceModel {
 
     /// Calculates the magnitude of the lift force on each line element based on the given
     /// coefficients and velocity
-    pub fn lift_from_coefficients(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<f64> {  
+    pub fn lift_from_coefficients(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<f64> {
         let cl = self.lift_coefficients(velocity, input_coordinate_system);
 
         (0..self.nr_span_lines()).map(
@@ -341,5 +341,17 @@ impl LineForceModel {
         let residuals = self.residual_absolute(strength, velocity, input_coordinate_system);
 
         residuals.iter().sum::<f64>() / residuals.len() as f64
+    }
+
+    /// Function that calculates the amount of flow separation, as predicted by the sectional models
+    /// based on the angles of attack on each control point
+    pub fn amount_of_flow_separation(&self, angles_of_attack: &[f64]) -> Vec<f64> {
+        (0..self.nr_span_lines()).map(
+            |i| {
+                let wing_index = self.wing_index_from_global(i);
+
+                self.section_models[wing_index].amount_of_flow_separation(angles_of_attack[i])
+            }
+        ).collect()
     }
 }

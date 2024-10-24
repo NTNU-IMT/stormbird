@@ -494,7 +494,7 @@ impl LineForceModel {
         std::ops::Sub<T, Output = T> +
         Copy
     {
-        let mut result: Vec<T> = Vec::new();
+        let mut result: Vec<T> = Vec::with_capacity(self.nr_wings());
 
         let relative_span_distance = self.relative_span_distance();
 

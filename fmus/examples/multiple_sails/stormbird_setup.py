@@ -70,8 +70,8 @@ def make_stormbird_setup_file():
     section_model = {
         "Foil": {
             "cl_zero_angle": 0.0,
-            "mean_positive_stall_angle": np.radians(45),
-            "mean_negative_stall_angle": np.radians(45)
+            "mean_positive_stall_angle": np.radians(20),
+            "mean_negative_stall_angle": np.radians(20)
         }
     }
     non_zero_circulation_at_ends = [False, False]
@@ -96,6 +96,7 @@ def make_stormbird_setup_file():
         "nr_sections": 20
     }
 
+
     out_dict["simulation_mode"] = {
         "Dynamic": {
             "wake": {
@@ -104,8 +105,8 @@ def make_stormbird_setup_file():
                 },
                 "ratio_of_wake_affected_by_induced_velocities": 0.0,
                 "use_chord_direction": True,
-                "symmetry_condition": "Z"
-            }
+                "symmetry_condition": "Z",
+            },
         }
     }
 
