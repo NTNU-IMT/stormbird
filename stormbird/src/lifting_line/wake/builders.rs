@@ -15,20 +15,19 @@ use crate::lifting_line::singularity_elements::prelude::*;
 use super::{
     Wake,
     WakeSettings,
-    WakeIndices,
-    line_force_model_data::LineForceModelData,
+    WakeIndices
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Enum to choose how to set the length of the wake. 
-/// 
+/// Enum to choose how to set the length of the wake.
+///
 /// # Variants
 /// * `NrPanels` - The wake length is determined by the number of panels in the wake. This makes it
 /// independent of the freestream velocity and the mean chord length.
 /// * `TargetLengthFactor` - The wake length is determined by the freestream velocity and the mean
-/// chord length, multiplied by the given factor. This variant can only be used safely when the 
-/// freestream velocity is properly defined when initializing the wake. This is not always the case, 
+/// chord length, multiplied by the given factor. This variant can only be used safely when the
+/// freestream velocity is properly defined when initializing the wake. This is not always the case,
 /// and the `NrPanels` variant is therefore the default.
 pub enum WakeLength {
     NrPanels(usize),
@@ -43,9 +42,9 @@ impl Default for WakeLength {
 
 impl WakeLength {
     fn nr_wake_panels_from_target_length_factor(
-        &self, 
-        chord_length: f64, 
-        velocity: f64, 
+        &self,
+        chord_length: f64,
+        velocity: f64,
         time_step: f64
     ) -> Result<usize, String> {
         match self {
@@ -61,9 +60,9 @@ impl WakeLength {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Enum to represent different ways a viscous core length can be specified. 
+/// Enum to represent different ways a viscous core length can be specified.
 pub enum ViscousCoreLength {
-    /// Signifies that the viscous core length is a fraction of the length of the vortex line. To 
+    /// Signifies that the viscous core length is a fraction of the length of the vortex line. To
     /// be used, the vortex line geometry must be known.
     Relative(f64),
     /// Signifies that the viscous core length is an absolute value, and that it can be used without
@@ -81,10 +80,10 @@ impl Default for ViscousCoreLength {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Variables used to build a wake model. 
+/// Variables used to build a wake model.
 pub struct WakeBuilder {
     #[serde(default)]
-    /// Data used to determine the length of the wake. 
+    /// Data used to determine the length of the wake.
     pub wake_length: WakeLength,
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
@@ -112,9 +111,9 @@ pub struct WakeBuilder {
     /// Symmetry condition
     pub symmetry_condition: SymmetryCondition,
     #[serde(default)]
-    /// Ratio that determines how much of the wake points that are affected by the induced 
+    /// Ratio that determines how much of the wake points that are affected by the induced
     /// velocities. The default is zero, which means no wake points are affected by the induced
-    /// velocities. A value of 1.0 means that all wake points are affected by the induced 
+    /// velocities. A value of 1.0 means that all wake points are affected by the induced
     /// velocities.
     pub ratio_of_wake_affected_by_induced_velocities: f64,
     #[serde(default="PotentialTheoryModel::default_far_field_ratio")]
@@ -126,19 +125,19 @@ pub struct WakeBuilder {
     /// freely), while a value of 1.0 means that the wake points are fixed in space.
     pub shape_damping_factor: f64,
     #[serde(default)]
-    /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is 
-    /// useful if the effect of self-induced velocities on lift and drag is calculated in another 
-    /// way, for example with CFD, and the only reason for running lifting-line simulations is to 
+    /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is
+    /// useful if the effect of self-induced velocities on lift and drag is calculated in another
+    /// way, for example with CFD, and the only reason for running lifting-line simulations is to
     /// calculate the wing-to-wing interaction.
-    /// 
-    /// **WARNING**: should probably always be used in combination with a prescribed circulation 
+    ///
+    /// **WARNING**: should probably always be used in combination with a prescribed circulation
     /// shape in the line force model to maintain a realistic local shape.
     pub neglect_self_induced_velocities: bool
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Variables used to build a steady wake model. 
+/// Variables used to build a steady wake model.
 pub struct SteadyWakeBuilder {
     #[serde(default="SteadyWakeBuilder::default_wake_length_factor")]
     pub wake_length_factor: f64,
@@ -155,11 +154,11 @@ impl WakeBuilder {
 
     pub fn build(
         &self,
-        time_step: f64, 
-        line_force_model: &LineForceModel, 
-        initial_velocity: SpatialVector<3>, 
-    ) -> Wake {                
-        let span_points   = line_force_model.span_points();
+        time_step: f64,
+        line_force_model: &LineForceModel,
+        initial_velocity: SpatialVector<3>,
+    ) -> Wake {
+        let span_points = line_force_model.span_points();
 
         let indices = self.get_wake_indices(time_step, line_force_model, initial_velocity);
 
@@ -180,7 +179,7 @@ impl WakeBuilder {
         }
 
         let end_index_induced_velocities_on_wake = (
-            self.ratio_of_wake_affected_by_induced_velocities * 
+            self.ratio_of_wake_affected_by_induced_velocities *
             indices.nr_panels_per_line_element as f64
         ).ceil() as usize;
 
@@ -209,10 +208,10 @@ impl WakeBuilder {
         let panels_strength_damping_factor: Vec<f64> = vec![0.0; nr_panels];
 
         let panels_viscous_core_length = self.get_panels_viscous_core_length(
-            line_force_model, 
+            line_force_model,
             &indices
         );
-      
+
         let mut wake = Wake {
             indices,
             points,
@@ -224,7 +223,6 @@ impl WakeBuilder {
             settings,
             potential_theory_model,
             wing_indices: line_force_model.wing_indices.clone(),
-            line_force_model_data: LineForceModelData::new(&line_force_model),
             number_of_time_steps_completed: 0,
         };
 
@@ -269,12 +267,12 @@ impl WakeBuilder {
         if let Some(end_value) = viscous_core_length_end {
             for i_stream in 1..indices.nr_panels_per_line_element {
                 let non_dim_panel_distance = (i_stream as f64) / (indices.nr_panels_per_line_element as f64);
-                
+
                 for i_span in 0..indices.nr_panels_along_span {
                     let flat_index = indices.panel_index(i_stream, i_span);
-    
-                    panels_viscous_core_length[flat_index] = 
-                        viscous_core_length * (1.0 - non_dim_panel_distance) + 
+
+                    panels_viscous_core_length[flat_index] =
+                        viscous_core_length * (1.0 - non_dim_panel_distance) +
                         end_value * non_dim_panel_distance;
                 }
             }
@@ -286,19 +284,19 @@ impl WakeBuilder {
     pub fn get_wake_indices(
         &self,
         time_step: f64,
-        line_force_model: &LineForceModel, 
+        line_force_model: &LineForceModel,
         initial_velocity: SpatialVector<3>
     ) -> WakeIndices {
         let span_points   = line_force_model.span_points();
         let chord_vectors = line_force_model.global_chord_vectors();
-        
+
         let nr_panels_along_span = line_force_model.nr_span_lines();
         let nr_points_along_span = span_points.len();
 
         let mean_chord_length: f64 = chord_vectors.iter()
             .map(|chord| chord.length())
             .sum::<f64>() / chord_vectors.len() as f64;
-        
+
         let nr_panels_per_line_element = match self.wake_length {
             WakeLength::NrPanels(nr_panels) => nr_panels,
             WakeLength::TargetLengthFactor(_) => {
@@ -348,8 +346,8 @@ impl SteadyWakeBuilder {
     pub fn default_wake_length_factor() -> f64 {100.0}
 
     pub fn build(&self,
-        time_step: f64, 
-        line_force_model: &LineForceModel, 
+        time_step: f64,
+        line_force_model: &LineForceModel,
         initial_velocity: SpatialVector<3>
     ) -> Wake {
         WakeBuilder {

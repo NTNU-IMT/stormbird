@@ -6,28 +6,22 @@
     <Algorithm>fixedStep</Algorithm>
 
     <Simulators>
-        <Simulator name="wind_direction_variation" source="../../motion_utils/harmonic_signal/HarmonicSignal.fmu">
-            <InitialValues>
-                <InitialValue variable = "amplitude"> <Real value="45.0"/> </InitialValue>
-                <InitialValue variable = "frequency"> <Real value="0.1"/> </InitialValue>
-            </InitialValues>
-        </Simulator>
-
         <Simulator name="wing_sails" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
             <InitialValues>
                 <InitialValue variable = "lifting_line_setup_file_path"> <String value="stormbird_setup.json"/> </InitialValue>
-                <InitialValue variable = "wind_environment_setup_file_path"> <String value="wind_environment_setup.json"/> </InitialValue>
+                <!--<InitialValue variable = "wind_environment_setup_file_path"> <String value="wind_environment_setup.json"/> </InitialValue> -->
                 <InitialValue variable = "angles_in_degrees"> <Boolean value="true"/> </InitialValue>
                 <InitialValue variable = "negative_z_is_up"> <Boolean value="true"/> </InitialValue>
 
-                <InitialValue variable = "wind_velocity"> <Real value="10.0"/> </InitialValue>
-                <InitialValue variable = "wind_direction_coming_from"> <Real value="0.0"/> </InitialValue>
+                <InitialValue variable = "wind_velocity"> <Real value="6.173333"/> </InitialValue>
+                <InitialValue variable = "wind_direction_coming_from"> <Real value="90.0"/> </InitialValue>
+                <InitialValue variable = "local_wing_angles"> <String value="[0.0, 0.0]"/></InitialValue>
             </InitialValues>
         </Simulator>
 
-        <Simulator name="controller" source="../../sail_controller/SailController.fmu">
+        <Simulator name="motion_driver" source="../../motion_utils/forward_motion/ForwardMotion.fmu">
             <InitialValues>
-                <InitialValue variable = "setup_file_path"> <String value="sail_controller_setup.json"/> </InitialValue>
+                <InitialValue variable = "velocity"> <Real value="6.173333"/> </InitialValue>
             </InitialValues>
         </Simulator>
 
@@ -35,19 +29,9 @@
 
     <Connections>
         <VariableConnection>
-            <Variable simulator="wind_direction_variation" name="signal"/>
-            <Variable simulator="wing_sails" name="wind_direction_coming_from"/>
+            <Variable simulator="motion_driver" name="x_position"/>
+            <Variable simulator="wing_sails" name="x_position"/>
         </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="wind_direction_variation" name="signal"/>
-            <Variable simulator="controller" name="wind_direction"/>
-        </VariableConnection>
-
-        <VariableConnection>
-			<Variable simulator="controller" name="local_wing_angles"/>
-			<Variable simulator="wing_sails" name="local_wing_angles"/>
-		</VariableConnection>
     </Connections>
 
 </OspSystemStructure>

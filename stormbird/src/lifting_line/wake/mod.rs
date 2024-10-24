@@ -38,7 +38,7 @@ pub struct WakeIndices {
 impl WakeIndices {
     #[inline(always)]
     /// Returns a flatten index for the wake panels. The panels are ordered streamwise-major.
-    fn panel_index(&self, stream_index: usize, span_index: usize) -> usize {   
+    fn panel_index(&self, stream_index: usize, span_index: usize) -> usize {
         stream_index * self.nr_panels_along_span + span_index
     }
 
@@ -85,24 +85,24 @@ pub struct WakeSettings {
 
 #[derive(Debug, Clone)]
 /// Model of a wake for lifting line simulations
-/// 
+///
 /// The induced velocities are calculated from vortex panels and their strengths.
-/// 
+///
 /// The wake points and panels are assumed to be organized as a structured surface where indices
-/// are stream wise-major. That means, the first panels right behind the wings are also the first 
+/// are stream wise-major. That means, the first panels right behind the wings are also the first
 /// panels in the vector of panels in the wake.
-/// 
+///
 /// A typical use case is as follows:
-/// - For each time step, the points in the wake lying exactly on the wing lines are updated to 
+/// - For each time step, the points in the wake lying exactly on the wing lines are updated to
 /// match the current wing geometry (which might have moved since the last time step)
 /// - The strength of the first panel is then updated iteratively to solve the lifting line
 /// equations. This happens in whatever solver that use this model. This model is used to calculate
 /// the velocity as a function of the strength.
-/// - When the strength for a time step is solved, the final velocity at the control points are 
+/// - When the strength for a time step is solved, the final velocity at the control points are
 /// calculated.
 /// - Finally, the wake points stream downstream, based on the current velocity field and time step.
-/// 
-/// There are methods to update the strength and the shape of the vortex line for each time step in 
+///
+/// There are methods to update the strength and the shape of the vortex line for each time step in
 /// the simulation.
 pub struct Wake {
     /// The indices for the wake
@@ -125,8 +125,6 @@ pub struct Wake {
     pub potential_theory_model: PotentialTheoryModel,
     /// To determine which wing the wake points belong to. Copied directly from the line force model
     pub wing_indices: Vec<Range<usize>>,
-    /// Structure that stores data from the line force model that is relevant for multiple methods
-    pub line_force_model_data: LineForceModelData,
     /// Counter to keep track of the number of time steps that have been completed
     pub number_of_time_steps_completed: usize,
 }
@@ -144,12 +142,12 @@ impl Wake {
     }
 
     /// Returns the the indices to the four points that make up a panel at the given indices.
-    /// 
-    /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom 
+    ///
+    /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom
     /// left corner when viewing the panel from above.
     fn panel_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
         let wing_index = self.wing_index(panel_span_index);
-        
+
         [
             self.indices.point_index(panel_stream_index, panel_span_index + wing_index),
             self.indices.point_index(panel_stream_index, panel_span_index + 1 + wing_index),

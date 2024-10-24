@@ -32,7 +32,7 @@ def make_sail_controller_setup_file():
     wind_direction_data = np.array([-180, -20.0, -10.0, 0.0, 10.0, 20.0, 180])
     angle_of_attack_data = np.array([-max_angle, -max_angle, -max_angle, 0.0, max_angle, max_angle, max_angle])
 
-    wing_angle_data = -wind_direction_data + angle_of_attack_data
+    wing_angle_data = wind_direction_data + angle_of_attack_data
 
     nr_sails = 2
 
@@ -70,8 +70,8 @@ def make_stormbird_setup_file():
     section_model = {
         "Foil": {
             "cl_zero_angle": 0.0,
-            "mean_positive_stall_angle": np.radians(45),
-            "mean_negative_stall_angle": np.radians(45)
+            "mean_positive_stall_angle": np.radians(20),
+            "mean_negative_stall_angle": np.radians(20)
         }
     }
     non_zero_circulation_at_ends = [False, False]
@@ -96,6 +96,7 @@ def make_stormbird_setup_file():
         "nr_sections": 20
     }
 
+
     out_dict["simulation_mode"] = {
         "Dynamic": {
             "wake": {
@@ -104,8 +105,8 @@ def make_stormbird_setup_file():
                 },
                 "ratio_of_wake_affected_by_induced_velocities": 0.0,
                 "use_chord_direction": True,
-                "symmetry_condition": "Z"
-            }
+                "symmetry_condition": "Z",
+            },
         }
     }
 
