@@ -226,7 +226,7 @@ impl StormbirdLiftingLine {
                 velocity
             );
 
-            let reference_vector = SpatialVector([1.0, 0.0, 0.0]);
+            let reference_vector = SpatialVector([-1.0, 0.0, 0.0]); // Negative x axis, as the angle is assumed to be 'coming from'
 
             // TODO: consider if it makes more sense to use an axis corrected for roll and pitch?
             let axis = if self.negative_z_is_up {
