@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
+
+    <StartTime>0.0</StartTime>
+    <BaseStepSize>0.1</BaseStepSize>
+    <Algorithm>fixedStep</Algorithm>
+
+    <Simulators>
+        <Simulator name="wing_sails" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
+            <InitialValues>
+                <InitialValue variable = "lifting_line_setup_file_path"> <String value="lifting_line_setup.json"/> </InitialValue>
+                <InitialValue variable = "wind_environment_setup_file_path"> <String value="wind_environment_setup.json"/> </InitialValue>
+                <InitialValue variable = "angles_in_degrees"> <Boolean value="true"/> </InitialValue>
+                <InitialValue variable = "negative_z_is_up"> <Boolean value="true"/> </InitialValue>
+
+                <InitialValue variable = "wind_velocity"> <Real value="6.173333"/> </InitialValue>
+                <InitialValue variable = "wind_direction_coming_from"> <Real value="90.0"/> </InitialValue>
+            </InitialValues>
+        </Simulator>
+
+        <Simulator name="forward_motion_driver" source="../../motion_utils/forward_motion/ForwardMotion.fmu">
+            <InitialValues>
+                <InitialValue variable = "velocity"> <Real value="6.173333"/> </InitialValue>
+            </InitialValues>
+        </Simulator>
+
+        <Simulator name="roll_motion_driver" source="../../motion_utils/harmonic_signal/HarmonicSignal.fmu">
+            <InitialValues>
+                <InitialValue variable = "amplitude"> <Real value="10.0"/></InitialValue>
+                <InitialValue variable = "period"> <Real value="10.0"/></InitialValue>
+            </InitialValues>
+        </Simulator>
+
+        <Simulator name="controller" source="../../sail_controller/SailController.fmu">
+            <InitialValues>
+                <InitialValue variable = "setup_file_path"> <String value="sail_controller_setup.json"/></InitialValue>
+            </InitialValues>
+        </Simulator>
+
+    </Simulators>
+
+    <Connections>
+        <VariableConnection>
+            <Variable simulator="forward_motion_driver" name="x_position"/>
+            <Variable simulator="wing_sails" name="x_position"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="roll_motion_driver" name="signal"/>
+            <Variable simulator="wing_sails" name="x_rotation"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="wing_sails" name="angles_of_attack_measurment"/>
+            <Variable simulator="controller" name="angles_of_attack_measurment"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="controller" name="local_wing_angles"/>
+            <Variable simulator="wing_sails" name="local_wing_angles"/>
+        </VariableConnection>
+    </Connections>
+
+</OspSystemStructure>
