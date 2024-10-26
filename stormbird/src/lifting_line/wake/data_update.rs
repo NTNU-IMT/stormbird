@@ -16,6 +16,21 @@ impl Wake {
         }
     }
 
+    pub fn update_panel_data(&mut self) {
+        for i in 0..self.indices.nr_panels() {
+            let (stream_index, span_index) = self.indices.reverse_panel_index(i);
+
+            let panel_points = self.panel_points(stream_index, span_index);
+            
+            self.panels[i] = Panel::new(
+                panel_points,
+                self.potential_theory_settings.far_field_ratio,
+                self.panels_viscous_core_length[i]
+            );
+            
+        }
+    }
+
     /// Update the wake geometry and strength based on the final solution at a time step.
     ///
     /// This will:
@@ -33,6 +48,8 @@ impl Wake {
             line_force_model_data,
             wake_points_freestream
         );
+
+        self.update_panel_data();
 
         self.update_strength_after_completed_time_step(new_circulation_strength);
 
@@ -70,6 +87,8 @@ impl Wake {
                 &wake_points_freestream
             );
         }
+
+        self.update_panel_data();
     }
 
     /// Update the strength of the wake panels closest to the wing geometry.

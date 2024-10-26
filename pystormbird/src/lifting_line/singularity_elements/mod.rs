@@ -6,35 +6,28 @@ use pyo3::prelude::*;
 
 pub mod symmetry_condition;
 
-use stormbird::lifting_line::singularity_elements::PotentialTheoryModel as PotentialTheoryModelRust;
+use stormbird::lifting_line::singularity_elements::PotentialTheorySettings as PotentialTheorySettingsRust;
 
 #[pyclass]
-pub struct PotentialTheoryModel {
-    pub data: PotentialTheoryModelRust
+pub struct PotentialTheorySettings {
+    pub data: PotentialTheorySettingsRust
 }
 
 #[pymethods]
-impl PotentialTheoryModel {
+impl PotentialTheorySettings {
     #[new]
     #[pyo3(
         signature = (
-            closeness_error     = f64::MIN_POSITIVE, 
-            far_field_ratio     = PotentialTheoryModelRust::default_far_field_ratio()
+            far_field_ratio = PotentialTheorySettingsRust::default_far_field_ratio()
         )
     )]
-    fn new(closeness_error: f64, far_field_ratio: f64) -> Self {
+    fn new(far_field_ratio: f64) -> Self {
         Self {
-            data: PotentialTheoryModelRust {
-                closeness_error,
+            data: PotentialTheorySettingsRust {
                 far_field_ratio,
                 ..Default::default()
             }
         }
-    }
-
-    #[getter]
-    fn closeness_error(&self) -> f64 {
-        self.data.closeness_error
     }
 
     #[getter]

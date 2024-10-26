@@ -116,7 +116,7 @@ pub struct WakeBuilder {
     /// velocities. A value of 1.0 means that all wake points are affected by the induced
     /// velocities.
     pub ratio_of_wake_affected_by_induced_velocities: f64,
-    #[serde(default="PotentialTheoryModel::default_far_field_ratio")]
+    #[serde(default="PotentialTheorySettings::default_far_field_ratio")]
     /// Determines how far away from a panel it is necessary to be before the far field method is
     /// used to calculate the induced velocity, rather than the full method.
     pub far_field_ratio: f64,
@@ -194,7 +194,7 @@ impl WakeBuilder {
             neglect_self_induced_velocities: self.neglect_self_induced_velocities
         };
 
-        let potential_theory_model = PotentialTheoryModel {
+        let potential_theory_settings = PotentialTheorySettings {
             symmetry_condition: self.symmetry_condition.clone(),
             far_field_ratio: self.far_field_ratio,
             ..Default::default()
@@ -212,6 +212,8 @@ impl WakeBuilder {
             &indices
         );
 
+        let panels = vec![Panel::default(); nr_panels];
+
         let mut wake = Wake {
             indices,
             points,
@@ -221,9 +223,10 @@ impl WakeBuilder {
             panels_strength_damping_factor,
             panels_viscous_core_length,
             settings,
-            potential_theory_model,
+            potential_theory_settings,
             wing_indices: line_force_model.wing_indices.clone(),
             number_of_time_steps_completed: 0,
+            panels
         };
 
         wake.initialize(line_force_model, wake_building_velocity, time_step);
@@ -335,7 +338,7 @@ impl Default for WakeBuilder {
             strength_damping_factor_separated: Default::default(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: Default::default(),
-            far_field_ratio: PotentialTheoryModel::default_far_field_ratio(),
+            far_field_ratio: PotentialTheorySettings::default_far_field_ratio(),
             shape_damping_factor: 0.0,
             neglect_self_induced_velocities: false
         }

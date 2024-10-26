@@ -12,29 +12,28 @@ pub mod panel;
 
 #[derive(Clone, Debug)]
 /// Settings and functions to calculate induced velocities from vortex lines and vortex panels.
-pub struct PotentialTheoryModel {
-    pub closeness_error: f64,
+pub struct PotentialTheorySettings {
     pub far_field_ratio: f64,
     pub symmetry_condition: SymmetryCondition,
 }
 
-impl Default for PotentialTheoryModel {
+impl Default for PotentialTheorySettings {
     fn default() -> Self {
         Self {
-            closeness_error: f64::MIN_POSITIVE,
             far_field_ratio: Self::default_far_field_ratio(),
             symmetry_condition: SymmetryCondition::default(),
         }
     }
 }
 
-impl PotentialTheoryModel {
+impl PotentialTheorySettings {
     pub fn default_far_field_ratio() -> f64 { 5.0 }
 }
 
 pub mod prelude {
-    pub use super::PotentialTheoryModel;
+    pub use super::PotentialTheorySettings;
     pub use super::symmetry_condition::*;
+    pub use super::panel::Panel;
 }
 
 #[cfg(test)]

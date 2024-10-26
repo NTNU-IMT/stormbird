@@ -92,17 +92,9 @@ impl Wake {
         span_index: usize,
         point: SpatialVector<3>, 
     ) -> SpatialVector<3> {
-        let panel_points = self.panel_points(stream_index, span_index);
-
         let flat_index = self.indices.panel_index(stream_index, span_index);
 
-        let viscous_core_length = self.panels_viscous_core_length[flat_index];
-
-        self.potential_theory_model.induced_velocity_from_panel_with_unit_strength(
-            &panel_points, 
-            point,
-            viscous_core_length
-        )
+        self.unit_strength_induced_velocity_from_panel_flat_index(flat_index, point)
     }
 
     #[inline(always)]
@@ -112,9 +104,17 @@ impl Wake {
         panel_index: usize, 
         point: SpatialVector<3>, 
     ) -> SpatialVector<3> {
-        let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
+        let u_i = self.panels[panel_index].induced_velocity_with_unit_strength(point);
 
-        self.unit_strength_induced_velocity_from_panel(stream_index, span_index, point)
+        let point_mirrored = self.potential_theory_settings.symmetry_condition.mirrored_point(point);
+
+        if let Some(point_mirrored) = point_mirrored {
+            let u_i_m = self.panels[panel_index].induced_velocity_with_unit_strength(point_mirrored);
+
+            self.potential_theory_settings.symmetry_condition.corrected_velocity(u_i, u_i_m)
+        } else {
+            u_i
+        }
     }
 
     #[inline(always)]

@@ -122,11 +122,13 @@ pub struct Wake {
     /// Settings for the wake behavior
     pub settings: WakeSettings,
     /// The model used to calculate induced velocities from vortex lines
-    pub potential_theory_model: PotentialTheoryModel,
+    pub potential_theory_settings: PotentialTheorySettings,
     /// To determine which wing the wake points belong to. Copied directly from the line force model
     pub wing_indices: Vec<Range<usize>>,
     /// Counter to keep track of the number of time steps that have been completed
     pub number_of_time_steps_completed: usize,
+    /// Panel geometry data
+    pub panels: Vec<Panel>,
 }
 
 impl Wake {
