@@ -21,6 +21,8 @@ pub enum CirculationCorrection {
     PrescribedCirculation(PrescribedCirculationShape),
     /// The raw estimated circulation distribution will be smoothed using a Gaussian kernel.
     GaussianSmoothing(GaussianSmoothing),
+    /// Polynomial smoothing of the estimated circulation distribution.
+    PolynomialSmoothing,
 }
 
 impl Default for CirculationCorrection {

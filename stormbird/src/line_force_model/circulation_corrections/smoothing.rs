@@ -116,4 +116,20 @@ impl LineForceModel {
 
         smoothed_values
     }
+
+    pub fn polynomial_smoothed_values(&self, noisy_values: &[f64]) -> Vec<f64> {
+        let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
+
+        for (_, wing_indices) in self.wing_indices.iter().enumerate() {
+            let local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
+
+            let wing_smoothed_values = smoothing::polynomial_smoothing(&local_noisy_values);
+
+            for index in 0..wing_smoothed_values.len() {
+                smoothed_values.push(wing_smoothed_values[index]);
+            }
+        }
+
+        smoothed_values
+    }
 }

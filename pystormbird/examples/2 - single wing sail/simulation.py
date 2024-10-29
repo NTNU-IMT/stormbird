@@ -119,9 +119,13 @@ class SimulationCase():
                 "end_corrections_number_of_insertions": 3
             }
 
-            line_force_model["circulation_corrections"] = {
-                "GaussianSmoothing": gaussian_smoothing
-            }
+            #line_force_model["circulation_corrections"] = {
+            #    "GaussianSmoothing": gaussian_smoothing
+            #}
+
+            line_force_model["circulation_corrections"] = "PolynomialSmoothing"
+
+
 
         if self.prescribed_circulation:
             line_force_model["circulation_corrections"] = {

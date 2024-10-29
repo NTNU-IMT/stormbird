@@ -70,6 +70,11 @@ impl LineForceModel {
                 let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
 
                 self.gaussian_smoothed_values(&raw_strength, &settings)
+            },
+            CirculationCorrection::PolynomialSmoothing => {
+                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+
+                self.polynomial_smoothed_values(&raw_strength)
             }
         }
     }

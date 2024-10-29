@@ -55,6 +55,16 @@ if __name__ == "__main__":
         SimulationMode.DYNAMIC
     ]
 
+    cases = [
+        TestCase.PRESCRIBED_CIRCULATION, 
+        TestCase.SMOOTHED
+    ]
+
+    modes = [
+        SimulationMode.STATIC,
+        SimulationMode.DYNAMIC
+    ]
+
     w_plot = 16
     fig = plt.figure(figsize=(w_plot, w_plot/3.0))
     ax1 = fig.add_subplot(131)

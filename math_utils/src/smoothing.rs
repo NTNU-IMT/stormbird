@@ -66,3 +66,42 @@ where T:
 
     y_smooth
 }
+
+/// Based on the Savitzky-Golay filter, with a cubic polynomial and a window size of 5.
+pub fn polynomial_smoothing<T>(y: &[T]) -> Vec<T>
+where T:
+    std::ops::Mul<f64, Output = T> + 
+    std::ops::Add<T, Output = T> + 
+    std::ops::Sub<T, Output = T> + 
+    std::ops::Div<f64, Output = T> +
+    std::ops::Neg<Output = T> +
+    Default +
+    Copy
+{
+    let n = y.len();
+
+    let weights = [-3.0, 12.0, 17.0, 12.0, -3.0];
+    let normalization = 35.0;
+
+    let window_offset = 2;
+
+    let mut y_smooth: Vec<T> = Vec::with_capacity(n);
+
+    for i in 0..n {
+        if i < window_offset || i >= n - window_offset {
+            y_smooth.push(y[i]);
+            continue;
+        }
+
+        let mut y_smooth_i: T = Default::default();
+
+        for j in 0..weights.len() {
+            y_smooth_i = y_smooth_i + y[i+j-window_offset] * weights[j];
+        }
+
+        y_smooth.push(y_smooth_i / normalization);
+    }
+
+    y_smooth
+    
+}
