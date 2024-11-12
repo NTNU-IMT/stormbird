@@ -7,20 +7,20 @@
 use super::smoothing::gaussian_kernel;
 
 /// Linear interpolation of a target value based on input data.
-/// 
+///
 /// # Arguments
 /// * `x_target` - The x target value to interpolate to.
 /// * `x_data` - The input x data.
 /// * `y_data` - The input y data.
-pub fn linear_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T]) -> T 
-where T: 
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
+pub fn linear_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T]) -> T
+where T:
+    std::ops::Mul<f64, Output = T> +
+    std::ops::Add<T, Output = T> +
+    std::ops::Sub<T, Output = T> +
     Copy
 {
     assert_eq!(x_data.len(), y_data.len(), "x_data and y_data must have the same length");
-    
+
     match x_data.len() {
         0 => panic!("x_data is empty"),
         1 => y_data[0],
@@ -38,21 +38,24 @@ where T:
             } else {
                 let local_x_data = [x_data[index_min], x_data[index_min + 1]];
                 let local_y_data = [y_data[index_min], y_data[index_min + 1]];
-                
+
                 linear_interpolation_two_data_points(x_target, &local_x_data, &local_y_data)
             }
-            
+
         }
     }
 }
 
-/// Binary search for the index of the largest element in a slice that is less than or equal to 
+/// Binary search for the index of the largest element in a slice that is less than or equal to
 /// a target value.
-/// 
+///
 /// # Arguments
 /// * `x_target` - The target value to search for.
 /// * `x_data` - The data to search in.
-pub fn binary_search(x_target: f64, x_data: &[f64]) -> usize {
+pub fn binary_search<T>(x_target: T, x_data: &[T]) -> usize
+where T:
+    PartialOrd
+{
     let mut index_min = 0;
     let mut index_max = x_data.len() - 1;
 
@@ -70,16 +73,16 @@ pub fn binary_search(x_target: f64, x_data: &[f64]) -> usize {
 }
 
 /// Linear interpolation of a target value based on two input data points.
-/// 
+///
 /// # Arguments
 /// * `x_target` - The x target value to interpolate to.
 /// * `x_data` - The input x data.
 /// * `y_data` - The input y data.
-pub fn linear_interpolation_two_data_points<T>(x_target: f64, x_data: &[f64; 2], y_data: &[T; 2]) -> T 
-where T: 
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
+pub fn linear_interpolation_two_data_points<T>(x_target: f64, x_data: &[f64; 2], y_data: &[T; 2]) -> T
+where T:
+    std::ops::Mul<f64, Output = T> +
+    std::ops::Add<T, Output = T> +
+    std::ops::Sub<T, Output = T> +
     Copy
 {
     if x_target <= x_data[0] {
@@ -96,16 +99,16 @@ where T:
 
 
 /// Gaussian interpolation of a target value based on input data.
-/// 
+///
 /// # Arguments
 /// * `x_target` - The x target value to interpolate to.
 /// * `x_data` - The input x data.
 /// * `y_data` - The input y data.
 pub fn gaussian_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T], smoothing_length: f64) -> T
 where T:
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
+    std::ops::Mul<f64, Output = T> +
+    std::ops::Add<T, Output = T> +
+    std::ops::Sub<T, Output = T> +
     std::ops::Div<f64, Output = T> +
     Default +
     Copy
