@@ -14,6 +14,8 @@ use super::simulation_builder::SimulationBuilder;
 
 use super::wake::line_force_model_data::LineForceModelData;
 
+use std::time::Instant;
+
 #[derive(Debug, Clone)]
 /// Struct that contains the data needed to run a dynamic simulation.
 pub struct Simulation {
@@ -89,6 +91,7 @@ impl Simulation {
             &self.wake
         );
 
+   
         // Solve for the circulation strength
         let solver_result = self.solver.do_step(
             &self.line_force_model,
@@ -103,7 +106,6 @@ impl Simulation {
             &solver_result.ctrl_point_velocity,
         );
 
-        // Update the wake model if needed
         self.wake.update_after_completed_time_step(
             &solver_result.circulation_strength,
             &line_force_model_data,

@@ -125,7 +125,7 @@ if __name__ == "__main__":
     }
 
     solver_settings = {
-        "max_iterations_per_time_step": 20,
+        "max_iterations_per_time_step": 10,
         "damping_factor": 0.25,
     }
 
@@ -232,7 +232,9 @@ if __name__ == "__main__":
 
         end_time = time_func.time()
 
-        print("Time taken: ", end_time - start_time)
+        elapsed_time = end_time - start_time    
+        print("Elapsed time: ", elapsed_time)
+        print("Time speed up: ", final_time / elapsed_time)
 
         plt.plot(time, lift, label=label, color=color)
 

@@ -130,8 +130,10 @@ impl SimpleIterative {
             for i in 0..ctrl_points.len() {
                 let strength_difference = new_estimated_strength[i] - circulation_strength[i];
 
-                if strength_difference.abs() > max_strength_difference {
-                    max_strength_difference = strength_difference.abs();
+                let absolute_strength_difference = strength_difference.abs();
+
+                if absolute_strength_difference > max_strength_difference {
+                    max_strength_difference = absolute_strength_difference;
                 }
 
                 circulation_strength[i] += damping_factor * strength_difference;

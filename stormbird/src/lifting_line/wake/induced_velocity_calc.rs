@@ -53,6 +53,46 @@ impl Wake {
         )
     }
 
+    fn induced_velocities_local_include_self_induced(
+        &self, 
+        points: &[SpatialVector<3>], 
+        start_index: usize, 
+        end_index: usize
+    ) -> Vec<SpatialVector<3>> {
+        // Could be par_iter
+        points.par_iter()
+        .map(|point| {
+            (start_index..end_index).into_iter().map(|i_panel| {
+                self.induced_velocity_from_panel(i_panel, *point)
+            }).sum()
+        }).collect()
+    }
+
+    fn induced_velocity_local_neglect_self_induced(
+        &self, 
+        points: &[SpatialVector<3>], 
+        start_index: usize, 
+        end_index: usize, 
+    ) -> Vec<SpatialVector<3>> {
+        // Could be par_iter
+        points.par_iter()
+        .enumerate()
+        .map(|(point_index, point)| {
+            (start_index..end_index).into_iter().map(|i_panel| {
+                let (_stream_index, span_index) = self.indices.reverse_panel_index(i_panel);
+
+                let wing_index_panel = self.wing_index(span_index);
+                let wing_index_point = self.wing_index(point_index);
+
+                if wing_index_panel == wing_index_point {
+                    SpatialVector::<3>::default()
+                } else {
+                    self.induced_velocity_from_panel(i_panel, *point)
+                }
+            }).sum()
+        }).collect()
+    }
+
     /// Calculates induced velocities from the panels starting at start_index and ending at end_index
     fn induced_velocities_local(
         &self, 
@@ -61,27 +101,11 @@ impl Wake {
         end_index: usize, 
         neglect_self_induced: bool
     ) -> Vec<SpatialVector<3>> {
-        points.par_iter()
-            .enumerate()
-            .map(|(point_index, point)| {
-                (start_index..end_index).into_iter().map(|i_panel| {
-                    if neglect_self_induced {
-                        let (_stream_index, span_index) = self.indices.reverse_panel_index(i_panel);
-
-                        let wing_index_panel = self.wing_index(span_index);
-                        let wing_index_point = self.wing_index(point_index);
-
-                        if wing_index_panel == wing_index_point {
-                            SpatialVector::<3>::default()
-                        } else {
-                            self.induced_velocity_from_panel(i_panel, *point)
-                        }
-
-                    } else {
-                        self.induced_velocity_from_panel(i_panel, *point)
-                    }
-                }).sum()
-            }).collect()
+        if neglect_self_induced {
+            self.induced_velocity_local_neglect_self_induced(points, start_index, end_index)
+        } else {
+            self.induced_velocities_local_include_self_induced(points, start_index, end_index)
+        }
     }
 
     #[inline(always)]

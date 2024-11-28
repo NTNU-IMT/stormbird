@@ -25,7 +25,7 @@ pub struct StormbirdLiftingLine {
     pub negative_z_is_up: bool,
     pub reverse_wind_direction: bool,
     pub export_stormbird_result: bool,
-    pub non_dim_spanwise_measurment_position: f64,
+    pub non_dim_spanwise_measurement_position: f64,
     #[input]
     pub wind_velocity: f64,
     pub wind_direction_coming_from: f64,
@@ -44,8 +44,8 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
-    pub wind_directions_measurment: String,
-    pub angles_of_attack_measurment: String,
+    pub wind_directions_measurement: String,
+    pub angles_of_attack_measurement: String,
     pub stormbird_result: String,
 
     stormbird_model: Option<Simulation>,
@@ -216,13 +216,13 @@ impl StormbirdLiftingLine {
     ///
     /// That is, this angle can be seen as the felt wind direction at each sail.
     ///
-    /// A typcail case is that the Stormbird model is set up with a local body-fixed coordinate
+    /// A typical case is that the Stormbird model is set up with a local body-fixed coordinate
     /// system. In that case, the measured wind-direction will also be in the local coordinate
     /// system
     fn measure_felt_wind_direction(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
         let mut wind_directions = if let Some(model) = &self.stormbird_model {
             let relevant_velocities = model.line_force_model.interpolate_values_to_spanwise_location(
-                self.non_dim_spanwise_measurment_position,
+                self.non_dim_spanwise_measurement_position,
                 velocity
             );
 
@@ -257,7 +257,7 @@ impl StormbirdLiftingLine {
     fn measure_angles_of_attack(&self, angles_of_attack: &[f64]) -> Vec<f64> {
         let mut angles_of_attack = if let Some(model) = &self.stormbird_model {
             model.line_force_model.interpolate_values_to_spanwise_location(
-                self.non_dim_spanwise_measurment_position,
+                self.non_dim_spanwise_measurement_position,
                 angles_of_attack
             )
         } else {
@@ -289,10 +289,10 @@ impl StormbirdLiftingLine {
             self.stormbird_result = serde_json::to_string(&result).unwrap();
         }
 
-        let wind_directions_measurment = self.measure_felt_wind_direction(&result.force_input.velocity);
-        let angles_of_attack_measurment = self.measure_angles_of_attack(&result.force_input.angles_of_attack);
+        let wind_directions_measurement = self.measure_felt_wind_direction(&result.force_input.velocity);
+        let angles_of_attack_measurement = self.measure_angles_of_attack(&result.force_input.angles_of_attack);
 
-        self.wind_directions_measurment = serde_json::to_string(&wind_directions_measurment).unwrap();
-        self.angles_of_attack_measurment = serde_json::to_string(&angles_of_attack_measurment).unwrap();
+        self.wind_directions_measurement = serde_json::to_string(&wind_directions_measurement).unwrap();
+        self.angles_of_attack_measurement = serde_json::to_string(&angles_of_attack_measurement).unwrap();
     }
 }

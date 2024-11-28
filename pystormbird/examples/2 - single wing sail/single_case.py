@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import time
+
 import sys
 
 import argparse
@@ -57,7 +59,7 @@ if __name__ == "__main__":
 
     cases = [
         TestCase.PRESCRIBED_CIRCULATION, 
-        TestCase.SMOOTHED
+        TestCase.RAW_SIMULATION
     ]
 
     modes = [
@@ -88,7 +90,16 @@ if __name__ == "__main__":
             write_wake_files=write_wake_files
         )
 
+        start_time = time.time()
+
         result_history = sim_case.run()
+
+        end_time = time.time()
+
+        elapsed_time = end_time - start_time
+
+        print('Elapsed time:', elapsed_time)
+        print('Time speed up', sim_case.end_time / elapsed_time)
 
         cd = np.zeros(len(result_history))
         cl = np.zeros(len(result_history))

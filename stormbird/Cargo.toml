@@ -13,7 +13,5 @@ edition = "2021"
 math_utils = { path = "../math_utils" }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.107"
-rayon = "1.8.1"
-ndarray = "0.15.6"
-ndarray-linalg = {version = "0.16.0", features = ["intel-mkl-static"]}
+rayon = "1.10"
 rand = "0.8.5"

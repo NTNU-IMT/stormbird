@@ -1,7 +1,7 @@
 
 use math_utils::spatial_vector::SpatialVector;
 
-use ndarray::prelude::*;
+use math_utils::array2::Array2;
 
 use rayon::prelude::*;
 
@@ -43,39 +43,34 @@ impl FrozenWake {
 
         let fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
 
-        let mut variable_velocity_factors: Array2<SpatialVector<3>> = Array2::from_elem(
-            (nr_span_lines, nr_span_lines), SpatialVector::<3>::default()
+        let mut variable_velocity_factors: Array2<SpatialVector<3>> = Array2::new_default(
+            [nr_span_lines, nr_span_lines]
         );
 
-        let mut panel_induced_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
+        let array2_handler = Array2 {
+            data: vec![0.0],
+            shape: variable_velocity_factors.shape,
+        };
 
-        for ctrl_point_index in 0..nr_span_lines {
+        variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
+            let indices = array2_handler.indices_from_index(flat_index);
+
+            let ctrl_point_index = indices[0];
+            let panel_index = indices[1];
+
             let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
+            let panel_wing_index      = wake.wing_index(panel_index);
 
-            panel_induced_velocities.par_iter_mut().enumerate().for_each(
-                |(panel_index, induced_velocity)| {
-                    let panel_wing_index = wake.wing_index(panel_index);
-
-                    if 
-                    ctrl_point_wing_index == panel_wing_index && 
-                    wake.settings.neglect_self_induced_velocities 
-                    {
-                        *induced_velocity = SpatialVector::<3>::default();
-                    } else {
-                        *induced_velocity = wake.unit_strength_induced_velocity_from_panel(
-                            0, 
-                            panel_index, 
-                            ctrl_points[ctrl_point_index]
-                        );
-                    }
-                }
-            );
-
-            for panel_index in 0..nr_span_lines {
-                variable_velocity_factors[[ctrl_point_index, panel_index]] = 
-                    panel_induced_velocities[panel_index];
+            if ctrl_point_wing_index == panel_wing_index && wake.settings.neglect_self_induced_velocities {
+                *factor = SpatialVector::<3>::default();
+            } else {
+                *factor = wake.unit_strength_induced_velocity_from_panel(
+                    0, 
+                    panel_index, 
+                    ctrl_points[ctrl_point_index]
+                );
             }
-        }
+        });
 
         FrozenWake {
             fixed_velocities,
@@ -92,11 +87,11 @@ impl FrozenWake {
         &self,
         circulation_strength: &[f64],
     ) -> Vec<SpatialVector<3>> {
-        self.fixed_velocities.par_iter().enumerate().map(
+        self.fixed_velocities.iter().enumerate().map(
             |(i_row, u_fixed)| {
                 let mut induced_velocity = *u_fixed;
 
-                for i_col in 0..self.variable_velocity_factors.shape()[1] {
+                for i_col in 0..self.variable_velocity_factors.shape[1] {
                     induced_velocity += 
                         self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
                 }

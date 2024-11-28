@@ -55,6 +55,7 @@ impl Wake {
 
         self.update_panel_lifetime(time_step);
         self.update_panel_strength_damping_factor(line_force_model_data);
+        self.update_panel_viscous_core_length(line_force_model_data);
 
         self.number_of_time_steps_completed += 1;
     }
@@ -112,21 +113,54 @@ impl Wake {
         }
     }
 
-    fn update_panel_strength_damping_first_panels(&mut self, line_force_model_data: &LineForceModelData) {
+    fn update_panel_viscous_core_length_first_panels(&mut self, line_force_model_data: &LineForceModelData) {
         for i_span in 0..self.indices.nr_panels_along_span {
             let current_index = self.indices.panel_index(0, i_span);
 
             let amount_of_flow_separation = line_force_model_data.amount_of_flow_separation[i_span];
 
-            let damping_strength = if let Some(strength_damping_factor_separated) = self.settings.strength_damping_factor_separated {
-                self.settings.strength_damping_factor * (1.0 - amount_of_flow_separation) +
-                strength_damping_factor_separated * amount_of_flow_separation
-            } else {
-                self.settings.strength_damping_factor
-            };
-
-            self.panels_strength_damping_factor[current_index] = damping_strength;
+            self.panels_viscous_core_length[current_index] = 
+                self.settings.viscous_core_length.get_value(amount_of_flow_separation);
         }
+    }
+
+    fn update_panel_strength_damping_first_panels(&mut self, line_force_model_data: &LineForceModelData) {
+        match self.settings.strength_damping {
+            StrengthDamping::None => {},
+            StrengthDamping::Exponential(separation_dependent_value) => {
+                for i_span in 0..self.indices.nr_panels_along_span {
+                    let current_index = self.indices.panel_index(0, i_span);
+
+                    let amount_of_flow_separation = line_force_model_data.amount_of_flow_separation[i_span];
+
+                    self.panels_strength_damping_factor[current_index] = 
+                        separation_dependent_value.get_value(amount_of_flow_separation);
+                }
+            },
+            StrengthDamping::DirectFromStall => {
+                for i_span in 0..self.indices.nr_panels_along_span {
+                    let current_index = self.indices.panel_index(0, i_span);
+
+                    let amount_of_flow_separation = line_force_model_data.amount_of_flow_separation[i_span];
+
+                    self.panels_strength_damping_factor[current_index] = amount_of_flow_separation;
+                }
+            }
+        }
+    }
+
+    fn update_panel_viscous_core_length(&mut self, line_force_model_data: &LineForceModelData) {
+        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
+            for i_span in 0..self.indices.nr_panels_along_span {
+                let current_index  = self.indices.panel_index(i_stream, i_span);
+                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
+
+                self.panels_viscous_core_length[current_index] = 
+                    self.panels_viscous_core_length[previous_index];
+            }
+        }
+
+        self.update_panel_viscous_core_length_first_panels(line_force_model_data);
     }
 
     fn update_panel_strength_damping_factor(&mut self, line_force_model_data: &LineForceModelData) {
@@ -135,7 +169,8 @@ impl Wake {
                 let current_index  = self.indices.panel_index(i_stream, i_span);
                 let previous_index = self.indices.panel_index(i_stream - 1, i_span);
 
-                self.panels_strength_damping_factor[current_index] = self.panels_strength_damping_factor[previous_index];
+                self.panels_strength_damping_factor[current_index] = 
+                    self.panels_strength_damping_factor[previous_index];
             }
         }
 
@@ -311,14 +346,30 @@ impl Wake {
         self.update_wing_strength(new_circulation_strength);
 
         // Apply damping to the strength
-        self.appply_damping_to_strength();
+        self.apply_damping_to_strength();
     }
 
-    fn appply_damping_to_strength(&mut self) {
-        for i in 0..self.indices.nr_panels() {
-            let damping_factor = (-self.panels_lifetime[i] * self.panels_strength_damping_factor[i]).exp();
+    fn apply_damping_to_strength(&mut self) {
+        match self.settings.strength_damping {
+            StrengthDamping::None => {
+                for i in 0..self.indices.nr_panels() {
+                    self.strengths[i] = self.undamped_strengths[i]
+                }
+            },
+            StrengthDamping::Exponential(_) => {
+                for i in 0..self.indices.nr_panels() {
+                    let damping = (-self.panels_lifetime[i] * self.panels_strength_damping_factor[i]).exp();
 
-            self.strengths[i] = self.undamped_strengths[i] * damping_factor;
+                    self.strengths[i] = self.undamped_strengths[i] * damping;
+                }
+            },
+            StrengthDamping::DirectFromStall => {
+                for i in 0..self.indices.nr_panels() {
+                    let damping = self.panels_strength_damping_factor[i];
+
+                    self.strengths[i] = self.undamped_strengths[i] * (1.0 - damping);
+                }
+            }
         }
     }
 }
