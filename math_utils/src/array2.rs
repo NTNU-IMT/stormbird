@@ -2,9 +2,26 @@ use std::ops::{Index, IndexMut};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
+pub struct Array2Indices {
+    pub shape: [usize; 2],
+}
+
+impl Array2Indices {
+    #[inline(always)]
+    pub fn flat_index(&self, indices: [usize; 2]) -> usize {
+        indices[0] * self.shape[1] + indices[1]
+    }
+
+    #[inline(always)]
+    pub fn indices_from_index(&self, flat_index: usize) -> [usize; 2] {
+        [flat_index / self.shape[1], flat_index % self.shape[1]]
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Array2<T> {
     pub data: Vec<T>,
-    pub shape: [usize; 2],
+    pub indices: Array2Indices,
 }
 
 impl<T> Array2<T> 
@@ -15,7 +32,9 @@ where T: Default + Clone + Copy + Debug,
         
         Self {
             data, 
-            shape
+            indices: Array2Indices {
+                shape
+            }
         }
     }
 
@@ -24,22 +43,20 @@ where T: Default + Clone + Copy + Debug,
         
         Self {
             data, 
-            shape
+            indices: Array2Indices {
+                shape
+            }
         }
     }
 
     #[inline(always)]
     pub fn flat_index(&self, indices: [usize; 2]) -> usize {
-        indices[0] * self.shape[1] + indices[1]
+        self.indices.flat_index(indices)
     }
 
     #[inline(always)]
     pub fn indices_from_index(&self, flat_index: usize) -> [usize; 2] {
-        [flat_index / self.shape[1], flat_index % self.shape[1]]
-    }
-
-    pub fn shape(&self) -> [usize; 2] {
-        self.shape
+        self.indices.indices_from_index(flat_index)
     }
 }
 
