@@ -156,7 +156,8 @@ if __name__ == "__main__":
         }
     ]
 
-    line_force_model_list = [line_force_model_dyn, line_force_model_stat]
+    #line_force_model_list = [line_force_model_dyn, line_force_model_stat]
+    line_force_model_list = [line_force_model_dyn]
 
     label_list = ["Dynamic", "Quasi-steady"]
     color_list = [default_colors[0], default_colors[1]]
@@ -261,7 +262,7 @@ if __name__ == "__main__":
     )
 
     print("Theodorsen ratio", theodorsen_reduction)
-    print("CL ratio", max_cl[0] / max_cl[1])
+    #print("CL ratio", max_cl[0] / max_cl[1])
 
     plt.xlim(1.0 * period, 5 * period)
     plt.ylim(-1.1 * max_cl_theory, 1.1 * max_cl_theory)

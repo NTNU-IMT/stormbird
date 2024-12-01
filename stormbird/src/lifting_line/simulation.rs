@@ -14,13 +14,12 @@ use super::simulation_builder::SimulationBuilder;
 
 use super::wake::line_force_model_data::LineForceModelData;
 
-use std::time::Instant;
-
 #[derive(Debug, Clone)]
 /// Struct that contains the data needed to run a dynamic simulation.
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     pub wake: Wake,
+    pub frozen_wake: FrozenWake,
     pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
     pub write_wake_data_to_file: bool,
@@ -86,17 +85,16 @@ impl Simulation {
 
         self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
 
-        let frozen_wake = FrozenWake::from_wake(
+        self.frozen_wake.update(
             &self.line_force_model,
             &self.wake
         );
-
    
         // Solve for the circulation strength
         let solver_result = self.solver.do_step(
             &self.line_force_model,
             &felt_ctrl_points_freestream,
-            &frozen_wake,
+            &self.frozen_wake,
             &self.previous_circulation_strength
         );
 

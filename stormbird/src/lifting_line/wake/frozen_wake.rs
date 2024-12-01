@@ -35,8 +35,85 @@ pub struct FrozenWake {
 }
 
 impl FrozenWake {
+    pub fn initialize(nr_span_lines: usize) -> Self {
+        let fixed_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
+
+        let variable_velocity_factors = Array2::new_default(
+            [nr_span_lines, nr_span_lines]
+        );
+
+        FrozenWake {
+            fixed_velocities,
+            variable_velocity_factors,
+        }
+    }
+
+    pub fn update(
+        &mut self, 
+        line_force_model: &LineForceModel, 
+        wake: &Wake
+    ) {
+        self.update_fixed_velocities(line_force_model, wake);
+        self.update_variable_velocity_factors(line_force_model, wake);
+    }
+
+    pub fn update_fixed_velocities(
+        &mut self, 
+        line_force_model: &LineForceModel, 
+        wake: &Wake
+    ) {
+        let ctrl_points = line_force_model.ctrl_points();
+
+        self.fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
+    }
+
+    pub fn update_variable_velocity_factors(
+        &mut self, 
+        line_force_model: &LineForceModel, 
+        wake: &Wake
+    ) {
+        let ctrl_points = line_force_model.ctrl_points();
+
+        let indices_logic = self.variable_velocity_factors.indices.clone();
+
+        if wake.settings.neglect_self_induced_velocities {
+            self.variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
+                let indices = indices_logic.indices_from_index(flat_index);
+
+                let ctrl_point_index = indices[0];
+                let panel_index = indices[1];
+    
+                let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
+                let panel_wing_index      = wake.wing_index(panel_index);
+    
+                if ctrl_point_wing_index == panel_wing_index {
+                    *factor = SpatialVector::<3>::default();
+                } else {
+                    *factor = wake.unit_strength_induced_velocity_from_panel(
+                        0, 
+                        panel_index, 
+                        ctrl_points[ctrl_point_index]
+                    );
+                }
+            });
+        } else {
+            self.variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
+                let indices = indices_logic.indices_from_index(flat_index);
+
+                let ctrl_point_index = indices[0];
+                let panel_index = indices[1];
+    
+                *factor = wake.unit_strength_induced_velocity_from_panel(
+                    0, 
+                    panel_index, 
+                    ctrl_points[ctrl_point_index]
+                );
+            });
+        }
+    }
+
     /// Construct a frozen wake from a full dynamic wake. 
-    pub fn from_wake(line_force_model: &LineForceModel, wake: &Wake) -> Self {
+    pub fn new_complete(line_force_model: &LineForceModel, wake: &Wake) -> Self {
         let ctrl_points = line_force_model.ctrl_points();
 
         let nr_span_lines = ctrl_points.len();
@@ -47,16 +124,14 @@ impl FrozenWake {
             [nr_span_lines, nr_span_lines]
         );
 
-        let indices: Vec<[usize; 2]> = variable_velocity_factors.data.iter().enumerate().map(
-            |(flat_index, _)| {
-                variable_velocity_factors.indices_from_index(flat_index)
-            }
-        ).collect();
+        let indices_logic = variable_velocity_factors.indices.clone();
 
         if wake.settings.neglect_self_induced_velocities {
             variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let ctrl_point_index = indices[flat_index][0];
-                let panel_index = indices[flat_index][1];
+                let indices = indices_logic.indices_from_index(flat_index);
+
+                let ctrl_point_index = indices[0];
+                let panel_index = indices[1];
     
                 let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
                 let panel_wing_index      = wake.wing_index(panel_index);
@@ -73,8 +148,10 @@ impl FrozenWake {
             });
         } else {
             variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let ctrl_point_index = indices[flat_index][0];
-                let panel_index = indices[flat_index][1];
+                let indices = indices_logic.indices_from_index(flat_index);
+
+                let ctrl_point_index = indices[0];
+                let panel_index = indices[1];
     
                 *factor = wake.unit_strength_induced_velocity_from_panel(
                     0, 

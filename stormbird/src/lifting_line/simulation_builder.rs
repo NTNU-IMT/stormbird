@@ -7,6 +7,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::prelude::*;
+use crate::lifting_line::wake::frozen_wake::FrozenWake;
 
 use super::simulation::Simulation;
 
@@ -117,6 +118,8 @@ impl SimulationBuilder {
             }
         };
 
+        let frozen_wake = FrozenWake::initialize(nr_of_lines);
+
         let solver = match &self.simulation_mode {
             SimulationMode::Dynamic(settings) => {
                 settings.solver.clone()
@@ -137,6 +140,7 @@ impl SimulationBuilder {
         Simulation {
             line_force_model,
             wake,
+            frozen_wake,
             solver,
             previous_circulation_strength,
             write_wake_data_to_file: self.write_wake_data_to_file,
