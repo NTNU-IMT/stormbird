@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Implementaiton of lifting line functionality. 
+//! Implementation of lifting line functionality. 
 //! 
 //! This mainly consist of functions that can solve for vortex strength and induced velocity on a 
 //! wing based on potential theory and line representation of wings. Uses the 

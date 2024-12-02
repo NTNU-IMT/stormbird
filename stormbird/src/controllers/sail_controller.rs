@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SailControllerBuilder {
     pub target_angles_of_attack: Vec<f64>,
     pub max_rotational_speed: f64,

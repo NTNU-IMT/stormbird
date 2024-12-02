@@ -2,6 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// A basic PID controller with anti-windup.
 ///
 /// Source: <https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller>
