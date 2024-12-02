@@ -17,12 +17,16 @@ if __name__ == '__main__':
     df = pd.read_csv(output_file_path)
 
     time = df['Time']
-    thrust = df['force_x']
+    thrust     = -df['force_x']
     side_force = df['force_y']
 
     nr_rows = len(thrust)
 
-    plt.plot(time, thrust)
-    plt.plot(time, side_force)
+    plt.plot(time, thrust, label='Thrust')
+    plt.plot(time, side_force, label='Side force')
+
+    plt.xlabel('Time [s]')
+    plt.ylabel('Force [N]')
+    plt.legend()
 
     plt.show()

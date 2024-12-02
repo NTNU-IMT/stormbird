@@ -58,7 +58,7 @@ class TestCase(Enum):
         '''
         match self:
             case TestCase.SMOOTHED:
-                return 0.05
+                return 0.1
             case _:
                 return None
 

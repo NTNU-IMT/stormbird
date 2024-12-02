@@ -2,32 +2,23 @@
 <OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
 
     <StartTime>0.0</StartTime>
-    <BaseStepSize>0.1</BaseStepSize>
+    <BaseStepSize>0.05</BaseStepSize>
     <Algorithm>fixedStep</Algorithm>
 
     <Simulators>
         <Simulator name="wing_sails" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
             <InitialValues>
-                <InitialValue variable = "lifting_line_setup_file_path"> <String value="lifting_line_setup.json"/> </InitialValue>
-                <InitialValue variable = "wind_environment_setup_file_path"> <String value="wind_environment_setup.json"/> </InitialValue>
-                <InitialValue variable = "angles_in_degrees"> <Boolean value="true"/> </InitialValue>
-                <InitialValue variable = "negative_z_is_up"> <Boolean value="true"/> </InitialValue>
+                <InitialValue variable = "parameters_path"> <String value="stormbird_parameters.json"/> </InitialValue>
 
-                <InitialValue variable = "wind_velocity"> <Real value="6.173333"/> </InitialValue>
+                <InitialValue variable = "translational_velocity_x"> <Real value="4.0"/> </InitialValue>
+                <InitialValue variable = "wind_velocity"> <Real value="6.0"/> </InitialValue>
                 <InitialValue variable = "wind_direction_coming_from"> <Real value="90.0"/> </InitialValue>
             </InitialValues>
         </Simulator>
 
-        <Simulator name="forward_motion_driver" source="../../motion_utils/forward_motion/ForwardMotion.fmu">
+        <Simulator name="motion" source="../../utils/tabulated_motion/TabulatedMotion.fmu">
             <InitialValues>
-                <InitialValue variable = "velocity"> <Real value="6.173333"/> </InitialValue>
-            </InitialValues>
-        </Simulator>
-
-        <Simulator name="roll_motion_driver" source="../../motion_utils/harmonic_signal/HarmonicSignal.fmu">
-            <InitialValues>
-                <InitialValue variable = "amplitude"> <Real value="10.0"/></InitialValue>
-                <InitialValue variable = "period"> <Real value="10.0"/></InitialValue>
+                <InitialValue variable = "motion_file_path"> <String value="motion.csv"/> </InitialValue>
             </InitialValues>
         </Simulator>
 
@@ -41,24 +32,76 @@
 
     <Connections>
         <VariableConnection>
-            <Variable simulator="forward_motion_driver" name="x_position"/>
+            <Variable simulator="motion" name="x_position"/>
             <Variable simulator="wing_sails" name="x_position"/>
         </VariableConnection>
 
         <VariableConnection>
-            <Variable simulator="roll_motion_driver" name="signal"/>
+            <Variable simulator="motion" name="y_position"/>
+            <Variable simulator="wing_sails" name="y_position"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="motion" name="z_position"/>
+            <Variable simulator="wing_sails" name="z_position"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="motion" name="x_rotation"/>
             <Variable simulator="wing_sails" name="x_rotation"/>
         </VariableConnection>
 
         <VariableConnection>
-            <Variable simulator="wing_sails" name="angles_of_attack_measurment"/>
-            <Variable simulator="controller" name="angles_of_attack_measurment"/>
+            <Variable simulator="motion" name="y_rotation"/>
+            <Variable simulator="wing_sails" name="y_rotation"/>
         </VariableConnection>
 
         <VariableConnection>
-            <Variable simulator="controller" name="local_wing_angles"/>
-            <Variable simulator="wing_sails" name="local_wing_angles"/>
+            <Variable simulator="motion" name="z_rotation"/>
+            <Variable simulator="wing_sails" name="z_rotation"/>
         </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="wing_sails" name="angle_of_attack_measurement_1"/>
+            <Variable simulator="controller" name="angle_of_attack_measurement_1"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="wing_sails" name="angle_of_attack_measurement_2"/>
+            <Variable simulator="controller" name="angle_of_attack_measurement_2"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="wing_sails" name="angle_of_attack_measurement_3"/>
+            <Variable simulator="controller" name="angle_of_attack_measurement_3"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="wing_sails" name="angle_of_attack_measurement_4"/>
+            <Variable simulator="controller" name="angle_of_attack_measurement_4"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="controller" name="local_wing_angle_1"/>
+            <Variable simulator="wing_sails" name="local_wing_angle_1"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="controller" name="local_wing_angle_2"/>
+            <Variable simulator="wing_sails" name="local_wing_angle_2"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="controller" name="local_wing_angle_3"/>
+            <Variable simulator="wing_sails" name="local_wing_angle_3"/>
+        </VariableConnection>
+
+        <VariableConnection>
+            <Variable simulator="controller" name="local_wing_angle_4"/>
+            <Variable simulator="wing_sails" name="local_wing_angle_4"/>
+        </VariableConnection>
+
+
     </Connections>
 
 </OspSystemStructure>

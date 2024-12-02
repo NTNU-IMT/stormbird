@@ -1,5 +1,6 @@
+use std::collections::VecDeque;
 
-
+#[derive(Debug, Default, Clone)]
 pub struct MovingAverage {
     window: VecDeque<f64>,
     window_size: usize,

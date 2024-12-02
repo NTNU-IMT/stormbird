@@ -32,11 +32,13 @@ class WindEnvironment:
 
 @dataclass(kw_only=True)
 class SailController:
-    target_angle: float = 10.0
-    max_rotational_speed: float = 1.0
+    target_angle: float = -10.0
+    max_rotational_speed: float = 10.0
     nr_sails: int = 2
-    initial_wing_angle: float = 45.0
+    initial_wing_angle: float = 120.0
     angles_in_degrees: bool = True
+    moving_average_window_size: int = 2
+    update_factor: float = 0.2
 
     def to_dict(self):
         target_angles_of_attack = [self.target_angle] * self.nr_sails
@@ -46,7 +48,9 @@ class SailController:
             "target_angles_of_attack": target_angles_of_attack,
             "max_rotational_speed": self.max_rotational_speed,
             "angles_in_degrees": self.angles_in_degrees,
-            "initial_wing_angles": initial_wing_angles
+            "initial_wing_angles": initial_wing_angles,
+            "moving_average_window_size": self.moving_average_window_size,
+            "update_factor": self.update_factor
         }
 
     def to_json_file(self, file_path):
@@ -58,10 +62,12 @@ class LiftingLineSimulation:
     chord: float = 11.0
     span: float = 33.0
     start_height: float = 10.0
-    stall_angle_deg: float = 20.0
+    stall_angle_deg: float = 40.0
     x_locations: List = field(default_factory = lambda: [-60, 60])
     y_locations: List = field(default_factory = lambda: [0.0, 0.0])
     nr_sections: int = 20
+    write_wake_files: bool = False
+    use_smoothing: bool = True
 
     @property
     def nr_sails(self) -> int:
@@ -111,6 +117,17 @@ class LiftingLineSimulation:
         out_dict["nr_sections"] = self.nr_sections
         out_dict["output_coordinate_system"] = "Body"
 
+        if self.use_smoothing:
+            gaussian_smoothing = {
+                "length_factor": 0.1,
+                "end_corrections_delta_span_factor": 1.0,
+                "end_corrections_number_of_insertions": 3
+            }
+
+            out_dict["circulation_corrections"] = {
+                "GaussianSmoothing": gaussian_smoothing
+            }
+
         return out_dict
 
     def wake_settings_dict(self) -> Dict:
@@ -122,7 +139,7 @@ class LiftingLineSimulation:
             "ratio_of_wake_affected_by_induced_velocities": 0.0,
             "use_chord_direction": True,
             "symmetry_condition": "Z",
-            "strength_damping_factor": 0.1,
+            "strength_damping": "DirectFromStall"
         }
 
     def solver_settings_dict(self) -> Dict:
@@ -143,7 +160,7 @@ class LiftingLineSimulation:
             }
         }
 
-        out_dict["write_wake_data_to_file"] = True
+        out_dict["write_wake_data_to_file"] = self.write_wake_files
         out_dict["wake_files_folder_path"] = "wake_files"
 
         return out_dict

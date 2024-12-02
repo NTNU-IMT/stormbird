@@ -39,6 +39,7 @@ impl SteadySimpleIterativeBuilder {
             residual_tolerance_absolute: self.residual_tolerance_absolute,
             strength_difference_tolerance: self.strength_difference_tolerance,
             velocity_corrections: self.velocity_corrections.clone(),
+            use_raw_circulation_during_iterations: false
         }
     }
 }
@@ -56,9 +57,12 @@ pub struct SimpleIterative {
     pub strength_difference_tolerance: f64,
     #[serde(default)]
     pub velocity_corrections: VelocityCorrections,
+    #[serde(default="SimpleIterative::default_use_raw_circulation_during_iterations")]
+    pub use_raw_circulation_during_iterations: bool,
 }
 
 impl SimpleIterative {
+    pub fn default_use_raw_circulation_during_iterations() -> bool {true}
     pub fn default_max_iterations_per_time_step() -> usize {10}
     pub fn default_damping_factor() -> f64 {0.04}
     pub fn default_residual_tolerance_absolute() -> f64 {1e-4}
@@ -111,7 +115,11 @@ impl SimpleIterative {
 
             ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity, CoordinateSystem::Global);
     
-            let new_estimated_strength = line_force_model.circulation_strength(&ctrl_point_velocity, CoordinateSystem::Global);
+            let new_estimated_strength = if self.use_raw_circulation_during_iterations {
+                line_force_model.circulation_strength_raw(&ctrl_point_velocity, CoordinateSystem::Global)
+            } else {
+                line_force_model.circulation_strength(&ctrl_point_velocity, CoordinateSystem::Global)
+            };
     
             residual = line_force_model.average_residual_absolute(
                 &circulation_strength, 
@@ -143,6 +151,8 @@ impl SimpleIterative {
                 converged = true;
             }
         }
+
+        circulation_strength = line_force_model.circulation_strength(&ctrl_point_velocity, CoordinateSystem::Global);
     
         SolverResult {
             circulation_strength,
@@ -161,6 +171,7 @@ impl Default for SimpleIterative {
             residual_tolerance_absolute: SimpleIterative::default_residual_tolerance_absolute(),
             strength_difference_tolerance: SimpleIterative::default_strength_difference_tolerance(),
             velocity_corrections: VelocityCorrections::default(),
+            use_raw_circulation_during_iterations: SimpleIterative::default_use_raw_circulation_during_iterations(),
         }
     }
 }

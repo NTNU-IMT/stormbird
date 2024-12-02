@@ -1,3 +1,4 @@
 *.mp4
 *.json
+*.csv
 /__pycache__

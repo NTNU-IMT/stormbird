@@ -9,6 +9,7 @@ import os
 import argparse
 
 from stormbird_setup import LiftingLineSimulation, SailController, WindEnvironment
+from motion_data import write_motion_data
 
 def delete_all_result_files_in_folder(folder_path: Path):
     '''
@@ -31,8 +32,20 @@ def delete_all_result_files_in_folder(folder_path: Path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run simulation.')
     parser.add_argument('--end-time', type=float, default=100.0, help='End time of simulation.')
+    parser.add_argument("--write-wake-files", action="store_true", help="Write wake files.")
 
-    lifting_line_simulation = LiftingLineSimulation()
+    args = parser.parse_args()
+
+    write_motion_data(
+        period = args.end_time / 2.0,
+        end_time = args.end_time,
+        time_step = 0.1,
+        file_path = 'motion.csv'
+    )
+
+    lifting_line_simulation = LiftingLineSimulation(
+        write_wake_files=args.write_wake_files
+    )
     lifting_line_simulation.to_json_file('lifting_line_setup.json')
 
     controller = SailController()
@@ -41,7 +54,7 @@ if __name__ == '__main__':
     wind_environment = WindEnvironment()
     wind_environment.to_json_file('wind_environment_setup.json')
 
-    args = parser.parse_args()
+    
 
     output_path = Path('output')
     wake_files_path = Path('wake_files')

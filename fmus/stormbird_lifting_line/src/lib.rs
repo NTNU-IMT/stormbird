@@ -41,7 +41,8 @@ struct Parameters {
 
 impl Parameters {
     fn from_json_file(file_path: &str) -> Self {
-        let file = File::open(file_path).unwrap();
+        let file = File::open(file_path).expect("File not found");
+
         let reader = std::io::BufReader::new(file);
         let result = serde_json::from_reader(reader);
 
