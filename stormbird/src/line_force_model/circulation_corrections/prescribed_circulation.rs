@@ -58,30 +58,45 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Returns a circulation distribution that is forced to follow a specific distribution where 
-    /// magnitude and direction is based on the average quantities for each wing.
-    pub fn prescribed_circulation_strength(&self, velocity: &[SpatialVector<3>], prescribed_circulation: &PrescribedCirculationShape, input_coordinate_system: CoordinateSystem) -> Vec<f64> {
+    /// Returns a circulation distribution that is forced to follow a specific distribution shape.
+    pub fn prescribed_circulation_strength(
+        &self, 
+        velocity: &[SpatialVector<3>], 
+        prescribed_circulation: &PrescribedCirculationShape, 
+        input_coordinate_system: CoordinateSystem
+    ) -> Vec<f64> {
+        // Assume that the average velocity over the wing is representative for the velocity at all control points
         let wing_averaged_velocity = self.wing_averaged_values(velocity);
 
-        let effective_velocity = self.section_values_from_wing_values(&wing_averaged_velocity);
+        let circulation_input_velocity = self.section_values_from_wing_values(&wing_averaged_velocity);
 
-        let raw_circulation_strength = self.circulation_strength_raw(&effective_velocity, input_coordinate_system);
+        // Calculate the circulation strength based on the assumed representative velocity
+        let raw_circulation_strength = self.circulation_strength_raw(&circulation_input_velocity, input_coordinate_system);
 
+        /// Calculate a circulation distribution that follows the prescribed shape
         let effective_span_distance = self.effective_span_distance_for_prescribed_circulations();
 
         let prescribed_circulation_non_scaled = prescribed_circulation.get_values(&effective_span_distance);
         
         let wing_averaged_prescribed_circulation_non_scaled = self.wing_averaged_values(&prescribed_circulation_non_scaled);
 
-        prescribed_circulation_non_scaled.iter().enumerate().map(
-            |(i, value)| {
-                let wing_index = self.wing_index_from_global(i);
+        // Scale the prescribed circulation to match the total circulation calculated based on the average velocity
+        prescribed_circulation_non_scaled
+            .iter()
+            .enumerate()
+            .map(
+                |(i, value)| {
+                    let wing_index = self.wing_index_from_global(i);
 
-                let prescribed_circulation_shape = value / wing_averaged_prescribed_circulation_non_scaled[wing_index];
+                    let velocity_correction = velocity[i].length_squared() / 
+                        circulation_input_velocity[i].length_squared();
 
-                raw_circulation_strength[i] * prescribed_circulation_shape
-            }
-        ).collect()
+                    let prescribed_circulation_shape = value / wing_averaged_prescribed_circulation_non_scaled[wing_index];
+
+                    raw_circulation_strength[i] * prescribed_circulation_shape * velocity_correction
+                }
+            )
+            .collect()
     }
 }
 

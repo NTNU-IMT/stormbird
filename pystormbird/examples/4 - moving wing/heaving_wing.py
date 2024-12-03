@@ -120,13 +120,20 @@ if __name__ == "__main__":
 
     line_force_model_dyn = {
         "wing_builders": wings,
+        "nr_sections": nr_sections
+    }
+
+    line_force_model_dyn_prescribed = {
+        "wing_builders": wings,
         "nr_sections": nr_sections,
-        "ctrl_point_chord_factor": 0.0
+        "circulation_corrections": {
+            "PrescribedCirculation": {}
+        }
     }
 
     solver_settings = {
-        "max_iterations_per_time_step": 10,
-        "damping_factor": 0.25,
+        "max_iterations_per_time_step": 5,
+        "damping_factor": 0.5,
     }
 
     dt = 0.25 * chord_length / velocity
@@ -134,33 +141,38 @@ if __name__ == "__main__":
 
     relative_panel_length = dt * velocity / chord_length
 
-    first_panel_relative_length = (dt / velocity) / chord_length
+    first_panel_relative_length = relative_panel_length / chord_length
 
-    sim_settings_list = [
-        {
-            "Dynamic": {
-                "solver": solver_settings,
-                "wake": {
-                    "first_panel_relative_length": relative_panel_length,
-                    "last_panel_relative_length": 20.0,
-                    "wake_length": {
-                        "NrPanels": 400
-                    }
+    dynamic_settings = {
+        "Dynamic": {
+            "solver": solver_settings,
+            "wake": {
+                "first_panel_relative_length": first_panel_relative_length,
+                "last_panel_relative_length": 20.0,
+                "wake_length": {
+                    "NrPanels": 400
                 }
             }
-        },
-        {
-            "QuasiSteady": {
-                "solver": solver_settings,
-            }
         }
+    }
+
+    steady_settings = {
+        "QuasiSteady": {
+            "solver": solver_settings,
+        }
+    }
+
+    sim_settings_list = [
+        dynamic_settings,
+        dynamic_settings,
+        steady_settings
     ]
 
-    #line_force_model_list = [line_force_model_dyn, line_force_model_stat]
-    line_force_model_list = [line_force_model_dyn]
+    line_force_model_list = [line_force_model_dyn, line_force_model_dyn_prescribed, line_force_model_stat]
+    #line_force_model_list = [line_force_model_dyn]
 
-    label_list = ["Dynamic", "Quasi-steady"]
-    color_list = [default_colors[0], default_colors[1]]
+    label_list = ["Dynamic", "Dynamic, prescribed", "Quasi-steady"]
+    color_list = [default_colors[0], default_colors[2], default_colors[1]]
 
 
     w_plot = 14

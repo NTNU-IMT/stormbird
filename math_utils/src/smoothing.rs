@@ -4,6 +4,50 @@
 
 //! Smoothing functions for 1D data.
 
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SmoothingEndConditions {
+    ZeroValues,
+    MirroredValues,
+    ReversedMirroredValues,
+}
+
+impl SmoothingEndConditions {
+    pub fn add_end_values_to_x_data(&self, x: &[f64], number_of_end_insertions: usize) -> Vec<f64> {
+        let mut x_modified: Vec<f64> = Vec::with_capacity(x.len() + number_of_end_insertions * 2);
+
+        // Add start values
+        let x_start = x[0];
+        for i in 0..number_of_end_insertions {
+            let delta_x = x[number_of_end_insertions - i] - x_start;
+
+            x_modified.push(x[0] - (x[number_of_end_insertions - i] - x[0]));
+        }
+
+        // Add interior values
+        x_modified.extend_from_slice(x);
+
+        // Add end values
+        let last_index = x.len() - 1;
+        let x_end = x[last_index];
+        for i in 0..number_of_end_insertions {
+            let delta_x = x_end - x[last_index - i - 1];
+
+            x_modified.push(x_end + delta_x);
+        }
+
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GaussianSmoothing {
+    pub smoothing_length: f64,
+    pub end_conditions: SmoothingEndConditions,
+}
+
+
 pub fn second_order_smoothing<T>(x: &[T], smoothing_factor: f64) -> Vec<T>
 where T:
     std::ops::Mul<f64, Output = T> + 

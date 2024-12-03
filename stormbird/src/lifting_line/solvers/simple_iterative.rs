@@ -62,7 +62,7 @@ pub struct SimpleIterative {
 }
 
 impl SimpleIterative {
-    pub fn default_use_raw_circulation_during_iterations() -> bool {true}
+    pub fn default_use_raw_circulation_during_iterations() -> bool {false}
     pub fn default_max_iterations_per_time_step() -> usize {10}
     pub fn default_damping_factor() -> f64 {0.04}
     pub fn default_residual_tolerance_absolute() -> f64 {1e-4}
