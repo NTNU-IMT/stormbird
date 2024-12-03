@@ -20,9 +20,9 @@ impl SmoothingEndConditions {
         // Add start values
         let x_start = x[0];
         for i in 0..number_of_end_insertions {
-            let delta_x = x[number_of_end_insertions - i] - x_start;
+            let delta_x = x[number_of_end_insertions - i] - x_start; // positive value
 
-            x_modified.push(x[0] - (x[number_of_end_insertions - i] - x[0]));
+            x_modified.push(x_start - delta_x);
         }
 
         // Add interior values
@@ -37,7 +37,68 @@ impl SmoothingEndConditions {
             x_modified.push(x_end + delta_x);
         }
 
-        todo!()
+        x_modified
+    }
+
+    pub fn add_end_values_to_y_data(&self, y: &[f64], number_of_end_insertions: usize) -> Vec<f64> {
+        match self {
+            SmoothingEndConditions::ZeroValues => {
+                let mut y_modified: Vec<f64> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
+
+                // Add start values
+                for _ in 0..number_of_end_insertions {
+                    y_modified.push(0.0);
+                }
+
+                // Add interior values
+                y_modified.extend_from_slice(y);
+
+                // Add end values
+                for _ in 0..number_of_end_insertions {
+                    y_modified.push(0.0);
+                }
+
+                y_modified
+            }
+            SmoothingEndConditions::MirroredValues => {
+                let mut y_modified: Vec<f64> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
+
+                // Add start values
+                for i in 0..number_of_end_insertions {
+                    y_modified.push(y[number_of_end_insertions - i]);
+                }
+
+                // Add interior values
+                y_modified.extend_from_slice(y);
+
+                // Add end values
+                let last_index = y.len() - 1;
+                for i in 0..number_of_end_insertions {
+                    y_modified.push(y[last_index - i]);
+                }
+
+                y_modified
+            }
+            SmoothingEndConditions::ReversedMirroredValues => {
+                let mut y_modified: Vec<f64> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
+
+                // Add start values
+                let last_index = y.len() - 1;
+                for i in 0..number_of_end_insertions {
+                    y_modified.push(y[last_index - number_of_end_insertions + i]);
+                }
+
+                // Add interior values
+                y_modified.extend_from_slice(y);
+
+                // Add end values
+                for i in 0..number_of_end_insertions {
+                    y_modified.push(y[number_of_end_insertions - i]);
+                }
+
+                y_modified
+            }
+        }
     }
 }
 
@@ -148,4 +209,37 @@ where T:
 
     y_smooth
     
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_smoothing_end_conditions() {
+        let x = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
+        let y = vec![1.0, 2.0, 3.0, 3.0, 2.0, 1.0];
+
+        println!("ZeroValues");
+        let end_conditions = SmoothingEndConditions::ZeroValues;
+        let number_of_end_insertions = 2;
+
+        let x_modified = end_conditions.add_end_values_to_x_data(&x, number_of_end_insertions);
+        let y_modified = end_conditions.add_end_values_to_y_data(&y, number_of_end_insertions);
+
+        dbg!(&x_modified);
+        dbg!(&y_modified);
+
+        let x_result = vec![-2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let y_result = vec![0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 2.0, 1.0, 0.0, 0.0];
+
+        assert_eq!(y_modified, y_result);
+        assert_eq!(x_modified, x_result);
+
+        println!("MirroredValues");
+        let end_conditions = SmoothingEndConditions::MirroredValues;
+        let number_of_end_insertions = 2;
+
+        let x_modified = end_conditions.add_end_values_to_x_data(&x, number_of_end_insertions);
+    }
 }
