@@ -6,15 +6,115 @@
 
 use serde::{Serialize, Deserialize};
 
+pub trait SmoothingOps:
+    std::ops::Mul<f64, Output = Self> + 
+    std::ops::Add<Self, Output = Self> + 
+    std::ops::Sub<Self, Output = Self> + 
+    std::ops::Div<f64, Output = Self> +
+    std::ops::Neg<Output = Self> +
+    Default +
+    Copy
+{}
+
+impl<T> SmoothingOps for T where 
+    T:
+        std::ops::Mul<f64, Output = T> + 
+        std::ops::Add<T, Output = T> + 
+        std::ops::Sub<T, Output = T> + 
+        std::ops::Div<f64, Output = T> +
+        std::ops::Neg<Output = T> +
+        Default +
+        Copy
+{}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SmoothingEndConditions {
+pub enum SmoothingEndCondition {
     ZeroValues,
     MirroredValues,
     ReversedMirroredValues,
+    ExtendedValues
 }
 
-impl SmoothingEndConditions {
-    pub fn add_end_values_to_x_data(&self, x: &[f64], number_of_end_insertions: usize) -> Vec<f64> {
+impl SmoothingEndCondition {
+    pub fn from_str(end_condition: &str) -> Self {
+        match end_condition {
+            "ZeroValues" => SmoothingEndCondition::ZeroValues,
+            "MirroredValues" => SmoothingEndCondition::MirroredValues,
+            "ReversedMirroredValues" => SmoothingEndCondition::ReversedMirroredValues,
+            "ExtendedValues" => SmoothingEndCondition::ExtendedValues,
+            _ => panic!("Unknown smoothing end condition: {}", end_condition)
+        }
+    }
+
+    pub fn y_start_values<T>(&self, y: &[T], number_of_end_insertions: usize) -> Vec<T> 
+    where T: SmoothingOps
+    {
+        let mut y_start: Vec<T> = Vec::with_capacity(number_of_end_insertions);
+
+        match self {
+            Self::ZeroValues => {
+                for _ in 0..number_of_end_insertions {
+                    y_start.push(T::default());
+                }
+            }
+            Self::MirroredValues => {
+                for i in 0..number_of_end_insertions {
+                    y_start.push(y[number_of_end_insertions - i]);
+                }
+            }
+            Self::ReversedMirroredValues => {
+                for i in 0..number_of_end_insertions {
+                    y_start.push(-y[number_of_end_insertions - i]);
+                }
+            }
+            Self::ExtendedValues => {
+                for _ in 0..number_of_end_insertions {
+                    y_start.push(y[0]);
+                }
+            }
+        }
+
+        y_start
+    }
+
+    pub fn y_end_values<T>(&self, y: &[T], number_of_end_insertions: usize) -> Vec<T> 
+    where T: SmoothingOps
+    {
+        let mut y_end: Vec<T> = Vec::with_capacity(number_of_end_insertions);
+
+        match self {
+            Self::ZeroValues => {
+                for _ in 0..number_of_end_insertions {
+                    y_end.push(T::default());
+                }
+            }
+            Self::MirroredValues => {
+                let last_index = y.len() - 1;
+
+                for i in 0..number_of_end_insertions {
+                    y_end.push(y[last_index - i - 1]);
+                }
+            }
+            Self::ReversedMirroredValues => {
+                let last_index = y.len() - 1;
+
+                for i in 0..number_of_end_insertions {
+                    y_end.push(-y[last_index - i - 1]);
+                }
+            },
+            Self::ExtendedValues => {
+                let last_index = y.len() - 1;
+
+                for _ in 0..number_of_end_insertions {
+                    y_end.push(y[last_index]);
+                }
+            }
+        }
+
+        y_end
+    }
+
+    pub fn add_end_values_to_x_data(x: &[f64], number_of_end_insertions: usize) -> Vec<f64> {
         let mut x_modified: Vec<f64> = Vec::with_capacity(x.len() + number_of_end_insertions * 2);
 
         // Add start values
@@ -40,81 +140,24 @@ impl SmoothingEndConditions {
         x_modified
     }
 
-    pub fn add_end_values_to_y_data(&self, y: &[f64], number_of_end_insertions: usize) -> Vec<f64> {
-        match self {
-            SmoothingEndConditions::ZeroValues => {
-                let mut y_modified: Vec<f64> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
+    pub fn add_end_values_to_y_data<T>(y: &[T], number_of_end_insertions: usize, end_conditions: [SmoothingEndCondition; 2]) -> Vec<T> 
+    where T: SmoothingOps
+    {
+        let y_start = end_conditions[0].y_start_values(y, number_of_end_insertions);
+        let y_end = end_conditions[1].y_end_values(y, number_of_end_insertions);
 
-                // Add start values
-                for _ in 0..number_of_end_insertions {
-                    y_modified.push(0.0);
-                }
+        let mut y_modified: Vec<T> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
 
-                // Add interior values
-                y_modified.extend_from_slice(y);
+        y_modified.extend_from_slice(&y_start);
+        y_modified.extend_from_slice(y);
+        y_modified.extend_from_slice(&y_end);
 
-                // Add end values
-                for _ in 0..number_of_end_insertions {
-                    y_modified.push(0.0);
-                }
-
-                y_modified
-            }
-            SmoothingEndConditions::MirroredValues => {
-                let mut y_modified: Vec<f64> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
-
-                // Add start values
-                for i in 0..number_of_end_insertions {
-                    y_modified.push(y[number_of_end_insertions - i]);
-                }
-
-                // Add interior values
-                y_modified.extend_from_slice(y);
-
-                // Add end values
-                let last_index = y.len() - 1;
-                for i in 0..number_of_end_insertions {
-                    y_modified.push(y[last_index - i]);
-                }
-
-                y_modified
-            }
-            SmoothingEndConditions::ReversedMirroredValues => {
-                let mut y_modified: Vec<f64> = Vec::with_capacity(y.len() + number_of_end_insertions * 2);
-
-                // Add start values
-                let last_index = y.len() - 1;
-                for i in 0..number_of_end_insertions {
-                    y_modified.push(y[last_index - number_of_end_insertions + i]);
-                }
-
-                // Add interior values
-                y_modified.extend_from_slice(y);
-
-                // Add end values
-                for i in 0..number_of_end_insertions {
-                    y_modified.push(y[number_of_end_insertions - i]);
-                }
-
-                y_modified
-            }
-        }
+        y_modified
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GaussianSmoothing {
-    pub smoothing_length: f64,
-    pub end_conditions: SmoothingEndConditions,
-}
-
-
 pub fn second_order_smoothing<T>(x: &[T], smoothing_factor: f64) -> Vec<T>
-where T:
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
-    Copy
+where T: SmoothingOps
 {
     let mut x_smooth: Vec<T> = Vec::with_capacity(x.len());
 
@@ -141,28 +184,34 @@ pub fn gaussian_kernel(x: f64, x0: f64, smoothing_length: f64) -> f64 {
 
 /// Gaussian smoothing using the kernel function above.
 /// Based on: <https://en.wikipedia.org/wiki/Kernel_smoother>
-pub fn gaussian_smoothing<T>(x: &[f64], y: &[T], smoothing_length: f64) -> Vec<T>
-where T:
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
-    std::ops::Div<f64, Output = T> +
-    Default +
-    Copy
+pub fn gaussian_smoothing<T>(
+    x: &[f64], 
+    y: &[T], 
+    smoothing_length: f64, 
+    number_of_end_insertions: usize, 
+    end_conditions: [SmoothingEndCondition; 2]
+) -> Vec<T>
+where T: SmoothingOps
 {
+    let x_modified = SmoothingEndCondition::add_end_values_to_x_data(x, number_of_end_insertions);
+    let y_modified = SmoothingEndCondition::add_end_values_to_y_data(y, number_of_end_insertions, end_conditions);
+
     let n = y.len();
+    let n_mod = y_modified.len();
 
     let mut y_smooth: Vec<T> = Vec::with_capacity(n);
 
+    // i_0 represents the index of the point to be smoothed
     for i_0 in 0..n {
         let mut kernel_sum = 0.0;
         let mut kernel_func_product_sum: T = Default::default();
 
-        for i in 0..n {
-            let kernel_value = gaussian_kernel(x[i], x[i_0], smoothing_length);
+        for i in 0..n_mod {
+
+            let kernel_value = gaussian_kernel(x_modified[i], x[i_0], smoothing_length);
 
             kernel_sum += kernel_value;
-            kernel_func_product_sum = kernel_func_product_sum + y[i] * kernel_value;
+            kernel_func_product_sum = kernel_func_product_sum + y_modified[i] * kernel_value;
         }
 
         y_smooth.push(kernel_func_product_sum / kernel_sum);
@@ -172,43 +221,77 @@ where T:
     y_smooth
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum CubicPolynomialSmoothingWindowSize {
+    Five,
+    Seven,
+    Nine
+}
+
+impl CubicPolynomialSmoothingWindowSize {
+    pub fn from_str(window_size: &str) -> Self {
+        match window_size {
+            "Five" => Self::Five,
+            "Seven" => Self::Seven,
+            "Nine" => Self::Nine,
+            _ => panic!("Unknown window size: {}", window_size)
+        }
+    }
+
+    pub fn weights(&self) -> Vec<f64> {
+        match self {
+            Self::Five => vec![-3.0, 12.0, 17.0, 12.0, -3.0],
+            Self::Seven => vec![-2.0, 3.0, 6.0, 7.0, 6.0, 3.0, -2.0],
+            Self::Nine => vec![-21.0, 14.0, 39.0, 54.0, 59.0, 54.0, 39.0, 14.0, -21.0]
+        }
+    }
+
+    pub fn normalization(&self) -> f64 {
+        match self {
+            Self::Five => 35.0,
+            Self::Seven => 21.0,
+            Self::Nine => 231.0
+        }
+    }
+
+    pub fn window_offset(&self) -> usize {
+        match self {
+            Self::Five => 2,
+            Self::Seven => 3,
+            Self::Nine => 4
+        }
+    }
+}
+
 /// Based on the Savitzky-Golay filter, with a cubic polynomial and a window size of 5.
-pub fn polynomial_smoothing<T>(y: &[T]) -> Vec<T>
-where T:
-    std::ops::Mul<f64, Output = T> + 
-    std::ops::Add<T, Output = T> + 
-    std::ops::Sub<T, Output = T> + 
-    std::ops::Div<f64, Output = T> +
-    std::ops::Neg<Output = T> +
-    Default +
-    Copy
+pub fn cubic_polynomial_smoothing<T>(y: &[T], end_conditions: [SmoothingEndCondition; 2], window_size: CubicPolynomialSmoothingWindowSize) -> Vec<T>
+where T: SmoothingOps
 {
     let n = y.len();
 
-    let weights = [-3.0, 12.0, 17.0, 12.0, -3.0];
-    let normalization = 35.0;
+    let window_offset = window_size.window_offset();
+    let number_of_end_insertions = window_offset;
 
-    let window_offset = 2;
+    let y_modified = SmoothingEndCondition::add_end_values_to_y_data(y, number_of_end_insertions, end_conditions);
+
+    let weights = window_size.weights();
+    let normalization = window_size.normalization();
 
     let mut y_smooth: Vec<T> = Vec::with_capacity(n);
 
     for i in 0..n {
-        if i < window_offset || i >= n - window_offset {
-            y_smooth.push(y[i]);
-            continue;
-        }
-
         let mut y_smooth_i: T = Default::default();
 
+        let i_mod = i + number_of_end_insertions;
+
         for j in 0..weights.len() {
-            y_smooth_i = y_smooth_i + y[i+j-window_offset] * weights[j];
+            y_smooth_i = y_smooth_i + y_modified[i_mod+j-window_offset] * weights[j];
         }
 
         y_smooth.push(y_smooth_i / normalization);
     }
 
     y_smooth
-    
 }
 
 #[cfg(test)]
