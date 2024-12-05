@@ -4,7 +4,7 @@
 
 //! Interpolation functions
 
-use super::smoothing::gaussian_kernel;
+use super::smoothing::gaussian::gaussian_kernel;
 
 /// Linear interpolation of a target value based on input data.
 ///
