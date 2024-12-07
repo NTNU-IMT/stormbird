@@ -10,19 +10,32 @@ pub fn gaussian_kernel(x: f64, x0: f64, smoothing_length: f64) -> f64 {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GaussianSmoothing {
-    smoothing_length: f64,
-    number_of_end_insertions: usize,
-    end_conditions: [EndCondition; 2]
+    pub smoothing_length: f64,
+    pub number_of_end_insertions: Option<usize>,
+    pub end_conditions: [EndCondition; 2]
 }
 
 impl GaussianSmoothing {
+    pub fn number_of_end_insertions(&self, x: &[f64]) -> usize {
+        let dx = x[1] - x[0];
+
+        match self.number_of_end_insertions {
+            Option::Some(value) => value,
+            Option::None => {
+                let n = (4.0 * self.smoothing_length / dx).ceil() as usize;
+
+                n.max(1).min(x.len())
+            }
+        }
+    }
+
     /// Gaussian smoothing using the kernel function above.
     /// Based on: <https://en.wikipedia.org/wiki/Kernel_smoother>
     pub fn apply_smoothing<T>(&self, x: &[f64], y: &[T]) -> Vec<T>
     where T: SmoothingOps
     {
-        let x_modified = EndCondition::add_end_values_to_x_data(x, self.number_of_end_insertions);
-        let y_modified = EndCondition::add_end_values_to_y_data(y, self.number_of_end_insertions, self.end_conditions);
+        let x_modified = EndCondition::add_end_values_to_x_data(x, self.number_of_end_insertions(x));
+        let y_modified = EndCondition::add_end_values_to_y_data(y, self.number_of_end_insertions(x), self.end_conditions);
 
         let n = y.len();
         let n_mod = y_modified.len();

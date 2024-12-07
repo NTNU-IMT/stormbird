@@ -44,8 +44,8 @@ impl WindowSize {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CubicPolynomialSmoothing {
-    window_size: WindowSize,
-    end_conditions: [EndCondition; 2]
+    pub window_size: WindowSize,
+    pub end_conditions: [EndCondition; 2]
 }
 
 impl CubicPolynomialSmoothing {

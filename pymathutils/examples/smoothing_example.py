@@ -15,7 +15,6 @@ if __name__ == '__main__':
         x=x, 
         y=y_with_noise, 
         smoothing_length= 0.05,
-        number_of_end_insertions=20,
         end_conditions = end_conditions
     )
 

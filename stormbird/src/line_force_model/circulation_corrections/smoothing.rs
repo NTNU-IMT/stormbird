@@ -7,6 +7,7 @@
 use serde::{Serialize, Deserialize};
 
 use math_utils::smoothing;
+use math_utils::smoothing::end_condition::EndCondition;
 
 use crate::line_force_model::LineForceModel;
 
@@ -15,35 +16,39 @@ pub struct GaussianSmoothing {
     #[serde(default="GaussianSmoothing::default_length_factor")]
     /// A non dimensional factor used to calculate the length in Gaussian smoothing kernel. 
     /// The actual smoothing length is calculated as the length factor times the wing span.
-    pub length_factor: f64,
-    #[serde(default="GaussianSmoothing::default_end_corrections_delta_span_factor")]
-    /// A factor used to calculate the span distance to be added to the ends of the wing when
-    /// adding end corrections. The actual span distance to be added is calculated as the 
-    /// geometric length of each line segment times the end corrections delta span factor.
-    pub end_corrections_delta_span_factor: f64,
-    #[serde(default="GaussianSmoothing::default_end_corrections_number_of_insertions")]
-    /// The number of span distance points to be added to the ends of the wing when adding end 
-    /// corrections.
-    pub end_corrections_number_of_insertions: usize,
+    pub length_factor: f64
 }
 
 impl GaussianSmoothing {
     fn default_length_factor() -> f64 {0.1}
-    fn default_end_corrections_delta_span_factor() -> f64 {1.0}
-    fn default_end_corrections_number_of_insertions() -> usize {3}
 }
 
 impl Default for GaussianSmoothing {
     fn default() -> Self {
         Self {
             length_factor: Self::default_length_factor(),
-            end_corrections_delta_span_factor: Self::default_end_corrections_delta_span_factor(),
-            end_corrections_number_of_insertions: Self::default_end_corrections_number_of_insertions(),
         }
     }
 }
 
 impl LineForceModel {
+    pub fn smoothing_end_conditions(&self, wing_index: usize) -> [EndCondition; 2] {
+        let non_zero_circulation_at_ends = self.non_zero_circulation_at_ends[wing_index];
+
+        let first_end_condition = if non_zero_circulation_at_ends[0] {
+            EndCondition::ExtendedValues
+        } else {
+            EndCondition::ZeroValues
+        };
+
+        let second_end_condition = if non_zero_circulation_at_ends[1] {
+            EndCondition::ExtendedValues
+        } else {
+            EndCondition::ZeroValues
+        };
+
+        [first_end_condition, second_end_condition]
+    }
     /// Function that applies a Gaussian smoothing to the supplied strength vector.
     pub fn gaussian_smoothed_values(
         &self, 
@@ -63,53 +68,23 @@ impl LineForceModel {
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let smoothing_length = settings.length_factor * wing_span_lengths[wing_index];
 
-            let non_zero_circulation_at_ends = self.non_zero_circulation_at_ends[wing_index];   
+            let end_conditions = self.smoothing_end_conditions(wing_index);
 
-            let mut local_span_distance = span_distance[wing_indices.clone()].to_vec();
-            let mut local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
+            let local_span_distance = span_distance[wing_indices.clone()].to_vec();
+            let local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 
-            let start_index = if !non_zero_circulation_at_ends[0] {
-                let delta_span_geometric = local_span_distance[1] - local_span_distance[0];
-                let delta_span_corrections = delta_span_geometric * settings.end_corrections_delta_span_factor;
-                
-                for i_insert in 0..settings.end_corrections_number_of_insertions {
-                    local_span_distance.insert(
-                        0, 
-                        local_span_distance[0] - delta_span_corrections * (i_insert as f64 + 1.0)
-                    );
-                    
-                    local_noisy_values.insert(0, 0.0);
-                }
-                
-                settings.end_corrections_number_of_insertions
-            } else {
-                0
+            let gaussian_smoothing = smoothing::gaussian::GaussianSmoothing {
+                smoothing_length,
+                end_conditions,
+                number_of_end_insertions: None
             };
 
-            let end_index = if !non_zero_circulation_at_ends[1] {
-                let delta_span_geometric = local_span_distance[local_span_distance.len()-1] - local_span_distance[local_span_distance.len()-2];
-                let delta_span_corrections = delta_span_geometric * settings.end_corrections_delta_span_factor;
-
-                for i_insert in 0..settings.end_corrections_number_of_insertions {
-                    local_span_distance.push(
-                        local_span_distance[local_span_distance.len()-1] + delta_span_corrections * (i_insert as f64 + 1.0)
-                    );
-                    
-                    local_noisy_values.push(0.0);
-                }
-
-                local_span_distance.len() - settings.end_corrections_number_of_insertions
-            } else {
-                local_span_distance.len()
-            };
-
-            let raw_wing_smoothed_values = smoothing::gaussian_smoothing(
+            let raw_wing_smoothed_values = gaussian_smoothing.apply_smoothing(
                 &local_span_distance, 
                 &local_noisy_values, 
-                smoothing_length
             );
             
-            for index in start_index..end_index {
+            for index in 0..raw_wing_smoothed_values.len() {
                 smoothed_values.push(raw_wing_smoothed_values[index]);
             }
         }
@@ -120,10 +95,17 @@ impl LineForceModel {
     pub fn polynomial_smoothed_values(&self, noisy_values: &[f64]) -> Vec<f64> {
         let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
 
-        for (_, wing_indices) in self.wing_indices.iter().enumerate() {
+        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
+            let end_conditions = self.smoothing_end_conditions(wing_index);
+
             let local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 
-            let wing_smoothed_values = smoothing::polynomial_smoothing(&local_noisy_values);
+            let polynomial_smoothing = smoothing::polynomial::CubicPolynomialSmoothing {
+                window_size: smoothing::polynomial::WindowSize::Seven,
+                end_conditions: end_conditions
+            };
+
+            let wing_smoothed_values = polynomial_smoothing.apply_smoothing(&local_noisy_values);
 
             for index in 0..wing_smoothed_values.len() {
                 smoothed_values.push(wing_smoothed_values[index]);

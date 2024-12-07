@@ -11,7 +11,7 @@ use std::fs;
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::smoothing::gaussian_kernel;
+use math_utils::smoothing::gaussian::gaussian_kernel;
 
 use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;

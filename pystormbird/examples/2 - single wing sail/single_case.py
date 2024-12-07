@@ -57,7 +57,7 @@ if __name__ == "__main__":
         SimulationMode.DYNAMIC
     ]
 
-    cases = [
+    '''cases = [
         TestCase.PRESCRIBED_CIRCULATION, 
         TestCase.RAW_SIMULATION
     ]
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     modes = [
         SimulationMode.STATIC,
         SimulationMode.DYNAMIC
-    ]
+    ]'''
 
     w_plot = 16
     fig = plt.figure(figsize=(w_plot, w_plot/3.0))
