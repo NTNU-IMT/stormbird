@@ -73,7 +73,7 @@ impl LineForceModel {
         // Calculate the circulation strength based on the assumed representative velocity
         let raw_circulation_strength = self.circulation_strength_raw(&circulation_input_velocity, input_coordinate_system);
 
-        /// Calculate a circulation distribution that follows the prescribed shape
+        // Calculate a circulation distribution that follows the prescribed shape
         let effective_span_distance = self.effective_span_distance_for_prescribed_circulations();
 
         let prescribed_circulation_non_scaled = prescribed_circulation.get_values(&effective_span_distance);
@@ -88,12 +88,21 @@ impl LineForceModel {
                 |(i, value)| {
                     let wing_index = self.wing_index_from_global(i);
 
-                    let velocity_correction = velocity[i].length_squared() / 
-                        circulation_input_velocity[i].length_squared();
+                    let circulation_input_velocity_length_squared = circulation_input_velocity[i].length_squared();
 
-                    let prescribed_circulation_shape = value / wing_averaged_prescribed_circulation_non_scaled[wing_index];
+                    let velocity_correction = if circulation_input_velocity_length_squared == 0.0 {
+                        1.0
+                    } else {
+                        wing_averaged_velocity[wing_index].length_squared() / circulation_input_velocity_length_squared
+                    };
 
-                    raw_circulation_strength[i] * prescribed_circulation_shape * velocity_correction
+                    if wing_averaged_prescribed_circulation_non_scaled[wing_index] == 0.0 {
+                        0.0
+                    } else {
+                        let prescribed_circulation_shape = value / wing_averaged_prescribed_circulation_non_scaled[wing_index];
+
+                        raw_circulation_strength[i] * prescribed_circulation_shape * velocity_correction
+                    }
                 }
             )
             .collect()

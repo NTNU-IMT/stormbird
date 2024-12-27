@@ -37,6 +37,8 @@ struct Parameters {
     reverse_wind_direction: bool,
     #[serde(default)]
     non_dim_spanwise_measurement_position: f64,
+    #[serde(default)]
+    visualization_server_address: String
 }
 
 impl Parameters {
@@ -143,6 +145,7 @@ pub struct StormbirdLiftingLine {
     nr_wings: usize,
     nr_freestream_velocity_points: usize,
     initialized_wake_points: bool,
+    visualization_client: Option<reqwest::blocking::Client>,
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
@@ -153,8 +156,6 @@ impl FmuFunctions for StormbirdLiftingLine {
             self.parameters_path.clone()
         };
 
-        //let parameters_path = "../Stormbird/stormbird_parameters.json".to_string();
-        
         self.parameters = Parameters::from_json_file(&parameters_path);
 
         let initial_wake_builder_velocity = SpatialVector([1e-6, 0.0, 0.0]);
@@ -188,7 +189,12 @@ impl FmuFunctions for StormbirdLiftingLine {
 
             self.height_variation_model = Some(height_variation_model);
         }
+
+        if !self.parameters.visualization_server_address.is_empty() {
+            self.visualization_client = Some(reqwest::blocking::Client::new());
+        }
     }
+
     fn do_step(&mut self, current_time: f64, time_step: f64) {
         if self.zero_velocity() {
             return;
@@ -227,7 +233,11 @@ impl FmuFunctions for StormbirdLiftingLine {
         };
 
         if let Some(result) = result {
-            self.set_output(result);
+            self.set_output(&result);
+
+            if self.visualization_client.is_some() {
+                self.send_result_to_visualization_server(&result);
+            }
         }
     }
 }
@@ -432,7 +442,7 @@ impl StormbirdLiftingLine {
         angles_of_attack
     }
 
-    fn set_output(&mut self, result: SimulationResult) {
+    fn set_output(&mut self, result: &SimulationResult) {
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
@@ -480,5 +490,25 @@ impl StormbirdLiftingLine {
         self.angle_of_attack_measurement_8  = angle_of_attack_measurement_extended[7];
         self.angle_of_attack_measurement_9  = angle_of_attack_measurement_extended[8];
         self.angle_of_attack_measurement_10 = angle_of_attack_measurement_extended[9];
+    }
+
+    pub fn send_result_to_visualization_server(&self, result: &SimulationResult) {
+        if let Some(client) = &self.visualization_client {
+            let result_json = serde_json::to_string(result).unwrap();
+
+            let response = client.post(&self.parameters.visualization_server_address)
+                .header("Content-Type", "application/json")
+                .body(result_json)
+                .send();
+
+            match response {
+                Ok(_) => {},
+                Err(e) => {
+                    let error_string = format!("Error sending result to visualization server: {}", e);
+
+                    print_to_file(&error_string, "visualization_error.txt");
+                }
+            }
+        }
     }
 }
