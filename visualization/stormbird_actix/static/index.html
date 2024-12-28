@@ -11,48 +11,10 @@
     </style>
 </head>
 <body>
-    <div id="plot"></div>
-    <script>
-        let trace = {
-            x: [],
-            y: [],
-            type: 'scatter',
-            mode: 'lines+markers'
-        };
+    <button id="clearButton">Clear data</button>
+    <script src="scripts/clearButton.js"></script>
 
-        let layout = {
-            title: 'Real-time Simulation Data 2',
-            xaxis: { title: 'Time' },
-            yaxis: { title: 'Value' }
-        };
-
-        Plotly.newPlot('plot', [trace], layout);
-
-        // Initialize data from server
-        fetch('/data')
-            .then(response => response.json())
-            .then(data => {
-                trace.x = data.map(point => point.x);
-                trace.y = data.map(point => point.y);
-                Plotly.redraw('plot');
-            });
-
-        // WebSocket connection for real-time updates
-        const ws = new WebSocket('ws://localhost:8080/ws');
-        
-        ws.onmessage = function(event) {
-            const point = JSON.parse(event.data);
-            trace.x.push(point.x);
-            trace.y.push(point.y);
-            
-            // Keep only last 1000 points in plot
-            if (trace.x.length > 1000) {
-                trace.x.shift();
-                trace.y.shift();
-            }
-            
-            Plotly.redraw('plot');
-        };
-    </script>
+    <div id="forcePlot"></div>
+    <script src="scripts/forcePlot.js"></script>
 </body>
 </html>

@@ -494,11 +494,11 @@ impl StormbirdLiftingLine {
 
     pub fn send_result_to_visualization_server(&self, result: &SimulationResult) {
         if let Some(client) = &self.visualization_client {
-            let result_json = serde_json::to_string(result).unwrap();
+            let encoded_result: Vec<u8> = bincode::serialize(result).unwrap();
 
             let response = client.post(&self.parameters.visualization_server_address)
-                .header("Content-Type", "application/json")
-                .body(result_json)
+                .header("Content-Type", "application/octet-stream")
+                .body(encoded_result)
                 .send();
 
             match response {
