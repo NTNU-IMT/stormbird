@@ -496,7 +496,7 @@ impl StormbirdLiftingLine {
         if let Some(client) = &self.visualization_client {
             let encoded_result: Vec<u8> = bincode::serialize(result).unwrap();
 
-            let response = client.post(&self.parameters.visualization_server_address)
+            let response = client.post(self.parameters.visualization_server_address.clone() + "/update-result-data")
                 .header("Content-Type", "application/octet-stream")
                 .body(encoded_result)
                 .send();
@@ -509,6 +509,23 @@ impl StormbirdLiftingLine {
                     print_to_file(&error_string, "visualization_error.txt");
                 }
             }
+
+            /*let plotly_wake = self.stormbird_model.as_ref().unwrap().wake.export_to_plotly_mesh();
+            let encoded_plotly_wake: Vec<u8> = bincode::serialize(&plotly_wake).unwrap();
+
+            let response = client.post(self.parameters.visualization_server_address.clone() + "/update-wake-shape")
+                .header("Content-Type", "application/octet-stream")
+                .body(encoded_plotly_wake)
+                .send();
+
+            match response {
+                Ok(_) => {},
+                Err(e) => {
+                    let error_string = format!("Error sending wake shape to visualization server: {}", e);
+
+                    print_to_file(&error_string, "visualization_error.txt");
+                }
+            }*/
         }
     }
 }

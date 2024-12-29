@@ -3,6 +3,8 @@ use std::io::{Write, BufWriter, Error};
 
 use super::Wake;
 
+use std::collections::HashMap;
+
 impl Wake {
     /// Export the wake geometry as an obj file
     ///
@@ -128,5 +130,52 @@ impl Wake {
         writer.flush()?;
 
         Ok(())
+    }
+
+    /// Exports the wake structure to a hashmap with the necessary fields for plotting the mesh 
+    /// using the Plotly library. 
+    pub fn export_to_plotly_mesh(&self) -> HashMap<String, Vec<f64>> {
+        let mut x = Vec::new();
+        let mut y = Vec::new();
+        let mut z = Vec::new();
+        let mut i = Vec::new();
+        let mut j = Vec::new();
+        let mut k = Vec::new();
+        let mut strength = Vec::new();
+
+        for i in 0..self.points.len(){
+            x.push(self.points[i][0]);
+            y.push(self.points[i][1]);
+            z.push(self.points[i][2]);
+        }
+
+        for panel_index in 0..self.strengths.len() {
+            let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
+
+            let indices = self.panel_point_indices(stream_index, span_index);
+
+            // Push two triangles for each panel
+            i.push(indices[0] as f64);
+            j.push(indices[1] as f64);
+            k.push(indices[2] as f64);
+
+            i.push(indices[0] as f64);
+            j.push(indices[2] as f64);
+            k.push(indices[3] as f64);
+
+            strength.push(self.strengths[panel_index]);
+            strength.push(self.strengths[panel_index]); 
+        }
+
+        let mut out_data: HashMap<String, Vec<f64>> = HashMap::new();
+        out_data.insert("x".to_string(), x);
+        out_data.insert("y".to_string(), y);
+        out_data.insert("z".to_string(), z);
+        out_data.insert("i".to_string(), i);
+        out_data.insert("j".to_string(), j);
+        out_data.insert("k".to_string(), k);
+        out_data.insert("strength".to_string(), strength);
+
+        out_data
     }
 }

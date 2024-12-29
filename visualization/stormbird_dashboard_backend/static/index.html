@@ -2,19 +2,17 @@
 <html>
 <head>
     <title>Simulation Visualization</title>
+    <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        #plot {
-            width: 100%;
-            height: 600px;
-        }
-    </style>
+    <script src="js/forcePlot.js"></script>
 </head>
 <body>
     <button id="clearButton">Clear data</button>
-    <script src="scripts/clearButton.js"></script>
+    <script src="js/clearButton.js"></script>
 
     <div id="forcePlot"></div>
-    <script src="scripts/forcePlot.js"></script>
+    <script>
+        forcePlot();
+    </script>
 </body>
 </html>
