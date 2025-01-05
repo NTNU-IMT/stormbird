@@ -2,19 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 
-const ForcePlot = () => {
-    const [data, setData] = useState(
-        [
-            { x: [], y: [], type: 'scatter', mode: 'lines', name: 'Force in x direction' }, 
-            { x: [], y: [], type: 'scatter', mode: 'lines', name: 'Force in y direction' }
-        ]
-    );
+const AverageAnglesOfAttack = () => {
+    const [data, setData] = useState([]);
     
     const [layout, setLayout] = useState(
         {
-            title: 'Integrated forces as a function of time', 
+            title: 'Average angle of attack on each wing as a function of time', 
             xaxis: { title: 'Time step' }, 
-            yaxis: { title: 'Value [N]' },
+            yaxis: { title: 'Value [deg]' },
             width: 600
         }
     );
@@ -29,16 +24,20 @@ const ForcePlot = () => {
         const fetchInterval = 500;
 
         const intervalId = setInterval(() => {
-            fetch('http://localhost:8080/get-forces')
+            fetch('http://localhost:8080/get-average-angles-of-attack')
                 .then(response => response.text())
                 .then(text => {
                     if (text) {
                         const fetchedData = JSON.parse(text);
 
-                        setData([
-                            { x: fetchedData.time, y: fetchedData.force_x, type: 'scatter', mode: 'lines', name: 'Force in x direction' },
-                            { x: fetchedData.time, y: fetchedData.force_y, type: 'scatter', mode: 'lines', name: 'Force in y direction' }
-                        ]);
+                        const data = fetchedData.map((dataset) => ({
+                            x: dataset.time, 
+                            y: dataset.angles_of_attack, 
+                            type: 'scatter', 
+                            mode: 'lines'
+                        }));
+
+                        setData(data);
                     }
                 })
                 .catch(error => console.error('Error fetching data:', error));
@@ -58,4 +57,4 @@ const ForcePlot = () => {
     );
 };
 
-export default ForcePlot;
+export default AverageAnglesOfAttack;

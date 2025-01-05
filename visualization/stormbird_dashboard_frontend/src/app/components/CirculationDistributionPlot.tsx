@@ -2,19 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 
-const ForcePlot = () => {
-    const [data, setData] = useState(
-        [
-            { x: [], y: [], type: 'scatter', mode: 'lines', name: 'Force in x direction' }, 
-            { x: [], y: [], type: 'scatter', mode: 'lines', name: 'Force in y direction' }
-        ]
-    );
+const CirculationDistributionPlot = () => {
+    const [data, setData] = useState([]);
     
     const [layout, setLayout] = useState(
         {
-            title: 'Integrated forces as a function of time', 
-            xaxis: { title: 'Time step' }, 
-            yaxis: { title: 'Value [N]' },
+            title: 'Circulation distribution', 
+            xaxis: { title: 'Z coordinate' }, 
+            yaxis: { title: 'Value' },
             width: 600
         }
     );
@@ -29,16 +24,20 @@ const ForcePlot = () => {
         const fetchInterval = 500;
 
         const intervalId = setInterval(() => {
-            fetch('http://localhost:8080/get-forces')
+            fetch('http://localhost:8080/get-circulation-distribution')
                 .then(response => response.text())
                 .then(text => {
                     if (text) {
                         const fetchedData = JSON.parse(text);
 
-                        setData([
-                            { x: fetchedData.time, y: fetchedData.force_x, type: 'scatter', mode: 'lines', name: 'Force in x direction' },
-                            { x: fetchedData.time, y: fetchedData.force_y, type: 'scatter', mode: 'lines', name: 'Force in y direction' }
-                        ]);
+                        const newData = fetchedData.map((dataset) => ({
+                            x: dataset.ctrl_points_z, 
+                            y: dataset.circulation_strength, 
+                            type: 'scatter', 
+                            mode: 'lines'
+                        }));
+
+                        setData(newData);
                     }
                 })
                 .catch(error => console.error('Error fetching data:', error));
@@ -58,4 +57,4 @@ const ForcePlot = () => {
     );
 };
 
-export default ForcePlot;
+export default CirculationDistributionPlot;

@@ -114,18 +114,9 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
-    /// Measurements of the wind direction at the specified non-dimensional spanwise location of 
-    /// each wing.
-    pub wind_direction_measurement_1: f64,
-    pub wind_direction_measurement_2: f64,
-    pub wind_direction_measurement_3: f64,
-    pub wind_direction_measurement_4: f64,
-    pub wind_direction_measurement_5: f64,
-    pub wind_direction_measurement_6: f64,
-    pub wind_direction_measurement_7: f64,
-    pub wind_direction_measurement_8: f64,
-    pub wind_direction_measurement_9: f64,
-    pub wind_direction_measurement_10: f64,
+    /// Estimation of the apparent wind direction, measured at the same local spanwise position as
+    /// the angle of attack measurements.
+    pub estimated_apparent_wind_direction: f64,
     /// Measurements of the effective angle of attack at the specified non-dimensional spanwise 
     /// location of each wing.
     pub angle_of_attack_measurement_1: f64,
@@ -151,7 +142,7 @@ pub struct StormbirdLiftingLine {
 impl FmuFunctions for StormbirdLiftingLine {
     fn exit_initialization_mode(&mut self) {
         let parameters_path = if self.parameters_path.is_empty() {
-            "../Stormbird/stormbird_parameters.json".to_string()
+            "../Stormbird/stormbird_parameters.json".to_string() // Default string to facilitate using this FMU in hybrid tests.
         } else {
             self.parameters_path.clone()
         };
@@ -233,7 +224,7 @@ impl FmuFunctions for StormbirdLiftingLine {
         };
 
         if let Some(result) = result {
-            self.set_output(&result);
+            self.set_output(&result, &velocity_input);
 
             if self.visualization_client.is_some() {
                 self.send_result_to_visualization_server(&result);
@@ -266,7 +257,7 @@ impl StormbirdLiftingLine {
         SpatialVector([self.x_position, self.y_position, self.z_position])
     }
 
-    fn velocity_input(&self) -> Vec<SpatialVector<3>> {
+    fn get_wind_direction(&self) -> f64 {
         let mut wind_direction = if self.parameters.angles_in_degrees {
             self.wind_direction_coming_from.to_radians()
         } else {
@@ -283,6 +274,12 @@ impl StormbirdLiftingLine {
         } else if wind_direction > PI {
             wind_direction -= 2.0 * PI;
         }
+
+        wind_direction
+    }
+
+    fn velocity_input(&self) -> Vec<SpatialVector<3>> {
+        let wind_direction = self.get_wind_direction();
 
         let freestream_velocity_points: Vec<SpatialVector<3>> =
             if let Some(model) = &self.stormbird_model {
@@ -422,6 +419,39 @@ impl StormbirdLiftingLine {
         wind_directions
     }
 
+    pub fn measure_apparent_wind_direction(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
+        let mut apparent_wind_direction = if let Some(model) = &self.stormbird_model {
+            let relevant_velocities = model.line_force_model.interpolate_values_to_spanwise_location(
+                self.parameters.non_dim_spanwise_measurement_position,
+                velocity
+            );
+
+            let reference_vector = SpatialVector([-1.0, 0.0, 0.0]); // Negative x axis, as the angle is assumed to be 'coming from'
+
+            let axis = if self.parameters.negative_z_is_up {
+                SpatialVector([0.0, 0.0, -1.0])
+            } else {
+                SpatialVector([0.0, 0.0, 1.0])
+            };
+
+            relevant_velocities.iter().map(
+                |velocity| {
+                    reference_vector.signed_angle_between(*velocity, axis)
+                }
+            ).collect()
+        } else {
+            vec![0.0; self.nr_wings]
+        };
+
+        if self.parameters.angles_in_degrees {
+            for i in 0..apparent_wind_direction.len() {
+                apparent_wind_direction[i] = apparent_wind_direction[i].to_degrees();
+            }
+        }
+
+        apparent_wind_direction
+    }
+
     /// Function that measures the angle of attack on each wing.
     fn measure_angles_of_attack(&self, angles_of_attack: &[f64]) -> Vec<f64> {
         let mut angles_of_attack = if let Some(model) = &self.stormbird_model {
@@ -442,7 +472,20 @@ impl StormbirdLiftingLine {
         angles_of_attack
     }
 
-    fn set_output(&mut self, result: &SimulationResult) {
+    fn set_output(&mut self, result: &SimulationResult, velocity_input: &[SpatialVector<3>]) {
+        if let Some(model) = &self.stormbird_model {
+            let velocity_input_at_line_force_models = &velocity_input[0..model.line_force_model.nr_span_lines()];
+
+            let apparent_wind_directions = self.measure_apparent_wind_direction(
+                velocity_input_at_line_force_models
+            );
+
+            self.estimated_apparent_wind_direction = apparent_wind_directions.iter()
+                .sum::<f64>() / apparent_wind_directions.len() as f64;
+        } else {
+            self.estimated_apparent_wind_direction = 0.0;
+        }
+        
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
@@ -454,31 +497,13 @@ impl StormbirdLiftingLine {
         self.moment_y = integrated_moments[1];
         self.moment_z = integrated_moments[2];
 
-        let wind_directions_measurement  = self.measure_felt_wind_direction(&result.force_input.velocity);
         let angles_of_attack_measurement = self.measure_angles_of_attack(&result.force_input.angles_of_attack);
-
-        let mut wind_directions_measurement_extended = vec![0.0; 10];
-
-        for i in 0..wind_directions_measurement.len() {
-            wind_directions_measurement_extended[i] = wind_directions_measurement[i];
-        }
 
         let mut angle_of_attack_measurement_extended = vec![0.0; 10];
 
         for i in 0..angles_of_attack_measurement.len() {
             angle_of_attack_measurement_extended[i] = angles_of_attack_measurement[i];
         }
-
-        self.wind_direction_measurement_1  = wind_directions_measurement_extended[0];
-        self.wind_direction_measurement_2  = wind_directions_measurement_extended[1];
-        self.wind_direction_measurement_3  = wind_directions_measurement_extended[2];
-        self.wind_direction_measurement_4  = wind_directions_measurement_extended[3];
-        self.wind_direction_measurement_5  = wind_directions_measurement_extended[4];
-        self.wind_direction_measurement_6  = wind_directions_measurement_extended[5];
-        self.wind_direction_measurement_7  = wind_directions_measurement_extended[6];
-        self.wind_direction_measurement_8  = wind_directions_measurement_extended[7];
-        self.wind_direction_measurement_9  = wind_directions_measurement_extended[8];
-        self.wind_direction_measurement_10 = wind_directions_measurement_extended[9];
 
         self.angle_of_attack_measurement_1  = angle_of_attack_measurement_extended[0];
         self.angle_of_attack_measurement_2  = angle_of_attack_measurement_extended[1];

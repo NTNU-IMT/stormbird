@@ -186,6 +186,10 @@ impl FrozenWake {
                         self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
                 }
 
+                if induced_velocity[0].is_nan() || induced_velocity[1].is_nan() || induced_velocity[2].is_nan() {
+                    induced_velocity = SpatialVector::<3>::default();
+                }
+
                 induced_velocity
             }
         ).collect()

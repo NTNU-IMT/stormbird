@@ -31,7 +31,6 @@ async fn update_result_data(
     encoded_data: web::Bytes,
     data: web::Data<Arc<Mutex<SimulationData>>>
 ) -> Result<HttpResponse> {
-    println!("Received data");
     let result: SimulationResult = bincode::deserialize(&encoded_data[..]).unwrap();
 
     let mut data = data.lock().unwrap();
@@ -102,6 +101,88 @@ async fn get_wake_shape(
     Ok(HttpResponse::Ok().json(&data.lock().unwrap().wake_shape))
 }
 
+#[get("/get-circulation-distribution")]
+async fn get_circulation_distribution(
+    data: web::Data<Arc<Mutex<SimulationData>>>
+) -> Result<HttpResponse> {
+    let mut out_data: Vec<HashMap<String, Vec<f64>>> = Vec::new();
+    
+    if data.lock().unwrap().results.is_empty() {
+        return Ok(HttpResponse::Ok().json(out_data));
+    }
+
+    let last_data = data.lock().unwrap().results.last().unwrap().clone();
+
+    let nr_of_wings = last_data.nr_of_wings();
+
+    let nr_span_lines_total = last_data.nr_span_lines();
+    let nr_span_lines_per_wing = nr_span_lines_total / nr_of_wings;
+
+    for wing_index in 0..last_data.nr_of_wings() {
+        let mut current_wing_data: HashMap<String, Vec<f64>> = HashMap::new();
+
+        current_wing_data.insert("ctrl_points_x".to_string(), Vec::new());
+        current_wing_data.insert("ctrl_points_y".to_string(), Vec::new());
+        current_wing_data.insert("ctrl_points_z".to_string(), Vec::new());
+        current_wing_data.insert("circulation_strength".to_string(), Vec::new());
+
+        let start_index = wing_index * nr_span_lines_per_wing;
+        let end_index = (wing_index + 1) * nr_span_lines_per_wing;
+
+        for index in start_index..end_index {
+            current_wing_data.get_mut("ctrl_points_x").unwrap().push(last_data.ctrl_points[index][0]);
+            current_wing_data.get_mut("ctrl_points_y").unwrap().push(last_data.ctrl_points[index][1]);
+            current_wing_data.get_mut("ctrl_points_z").unwrap().push(last_data.ctrl_points[index][2]);
+            current_wing_data.get_mut("circulation_strength").unwrap().push(last_data.force_input.circulation_strength[index]);
+        }
+
+        out_data.push(current_wing_data);
+    }
+
+    Ok(HttpResponse::Ok().json(out_data))
+}
+
+#[get("/get-average-angles-of-attack")]
+async fn get_average_angles_of_attack(
+    data: web::Data<Arc<Mutex<SimulationData>>>
+) -> Result<HttpResponse> {
+    let mut out_data: Vec<HashMap<String, Vec<f64>>> = Vec::new();
+    
+    if data.lock().unwrap().results.is_empty() {
+        return Ok(HttpResponse::Ok().json(out_data));
+    }
+
+    let data = data.lock().unwrap();
+
+    let last_data = data.results.last().unwrap().clone();
+
+    let nr_wings = last_data.nr_of_wings();
+    let nr_span_lines_total = last_data.nr_span_lines();
+    let nr_span_lines_per_wing = nr_span_lines_total / nr_wings;
+
+    for wing_index in 0..nr_wings {
+        let mut current_wing_data: HashMap<String, Vec<f64>> = HashMap::new();
+
+        current_wing_data.insert("time".to_string(), Vec::new());
+        current_wing_data.insert("angles_of_attack".to_string(), Vec::new());
+
+        let start_index = wing_index * nr_span_lines_per_wing;
+        let end_index = (wing_index + 1) * nr_span_lines_per_wing;
+
+        for (index, result) in data.results.iter().enumerate() {
+            let average_angle_of_attack = result.force_input.angles_of_attack[start_index..end_index].iter()
+                .sum::<f64>() / nr_span_lines_per_wing as f64;
+
+            current_wing_data.get_mut("time").unwrap().push(index as f64);
+            current_wing_data.get_mut("angles_of_attack").unwrap().push(average_angle_of_attack.to_degrees());
+        }
+
+        out_data.push(current_wing_data);
+    }
+
+    Ok(HttpResponse::Ok().json(out_data))
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
@@ -130,6 +211,8 @@ async fn main() -> std::io::Result<()> {
             .service(clear_data)
             .service(get_forces)
             .service(get_wake_shape)
+            .service(get_circulation_distribution)
+            .service(get_average_angles_of_attack)
             .service(fs::Files::new("/", "./static").index_file("index.html"))
     })
     .bind((args.bind_address, args.port))?
