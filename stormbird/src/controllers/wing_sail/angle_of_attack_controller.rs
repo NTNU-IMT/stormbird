@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::controllers::moving_average::MovingAverage;
 
-use std::f64::consts::PI;
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Builder for the SailController struct
@@ -14,6 +12,8 @@ pub struct AngleOfAttackControllerBuilder {
     pub moving_average_window_size: Option<usize>,
     #[serde(default = "AngleOfAttackControllerBuilder::default_update_factor")]
     pub update_factor: f64,
+    #[serde(default)]
+    pub change_threshold: f64,
 }
 
 impl AngleOfAttackControllerBuilder {
@@ -31,6 +31,7 @@ impl AngleOfAttackControllerBuilder {
 
         AngleOfAttackController {
             update_factor: self.update_factor,
+            change_threshold: self.change_threshold,
             max_rotational_speed: self.max_rotational_speed,
             angles_in_degrees: self.angles_in_degrees,
             angle_estimates,
@@ -47,6 +48,8 @@ impl AngleOfAttackControllerBuilder {
 pub struct AngleOfAttackController {
     /// A factor controlling how quickly the angles of attack are updated
     pub update_factor: f64,
+    /// Minimum error in angle of attack that will cause the wing angles to change
+    pub change_threshold: f64,
     /// The maximum speed at which the wing angles can change
     pub max_rotational_speed: f64,
     /// Whether the angles of attack are in degrees
@@ -81,6 +84,10 @@ impl AngleOfAttackController {
         for i in 0..nr_of_wings {
             let angle_error = self.angle_estimates[i] - target_angles_of_attack[i];
 
+            if angle_error.abs() < self.change_threshold {
+                continue;
+            }
+
             let raw_angle_change = angle_error * self.update_factor;
 
             let change_to_apply = if raw_angle_change.abs() > max_angle_change {
@@ -90,20 +97,6 @@ impl AngleOfAttackController {
             };
 
             self.current_wing_angles[i] = self.current_wing_angles[i] + change_to_apply;
-        }
-
-        let angle_limit = if self.angles_in_degrees {
-            180.0
-        } else {
-            PI
-        };
-
-        for i in 0..nr_of_wings {
-            if self.current_wing_angles[i] > angle_limit {
-                self.current_wing_angles[i] = angle_limit;
-            } else if self.current_wing_angles[i] < -angle_limit {
-                self.current_wing_angles[i] = -angle_limit;
-            }
         }
 
         self.time_step_index += 1;

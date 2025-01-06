@@ -142,7 +142,7 @@ pub struct StormbirdLiftingLine {
 impl FmuFunctions for StormbirdLiftingLine {
     fn exit_initialization_mode(&mut self) {
         let parameters_path = if self.parameters_path.is_empty() {
-            "../Stormbird/stormbird_parameters.json".to_string() // Default string to facilitate using this FMU in hybrid tests.
+            "C:/HLCC 2024 x64/DLL_FMU's/Stormbird/stormbird_parameters.json".to_string() // Default string to facilitate using this FMU in hybrid tests.
         } else {
             self.parameters_path.clone()
         };
@@ -224,7 +224,7 @@ impl FmuFunctions for StormbirdLiftingLine {
         };
 
         if let Some(result) = result {
-            self.set_output(&result, &velocity_input);
+            self.set_output(&result, &velocity_input, time_step);
 
             if self.visualization_client.is_some() {
                 self.send_result_to_visualization_server(&result);
@@ -419,11 +419,13 @@ impl StormbirdLiftingLine {
         wind_directions
     }
 
-    pub fn measure_apparent_wind_direction(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
+    pub fn measure_apparent_wind_direction(&self, velocity: &[SpatialVector<3>], time_step: f64) -> Vec<f64> {
         let mut apparent_wind_direction = if let Some(model) = &self.stormbird_model {
+            let felt_velocity = model.line_force_model.felt_ctrl_points_freestream(velocity, time_step);
+
             let relevant_velocities = model.line_force_model.interpolate_values_to_spanwise_location(
                 self.parameters.non_dim_spanwise_measurement_position,
-                velocity
+                &felt_velocity
             );
 
             let reference_vector = SpatialVector([-1.0, 0.0, 0.0]); // Negative x axis, as the angle is assumed to be 'coming from'
@@ -472,12 +474,13 @@ impl StormbirdLiftingLine {
         angles_of_attack
     }
 
-    fn set_output(&mut self, result: &SimulationResult, velocity_input: &[SpatialVector<3>]) {
+    fn set_output(&mut self, result: &SimulationResult, velocity_input: &[SpatialVector<3>], time_step: f64) {
         if let Some(model) = &self.stormbird_model {
             let velocity_input_at_line_force_models = &velocity_input[0..model.line_force_model.nr_span_lines()];
 
             let apparent_wind_directions = self.measure_apparent_wind_direction(
-                velocity_input_at_line_force_models
+                velocity_input_at_line_force_models,
+                time_step
             );
 
             self.estimated_apparent_wind_direction = apparent_wind_directions.iter()

@@ -8,6 +8,7 @@ pub struct WingSailController {
     #[parameter]
     pub setup_file_path: String,
     #[input]
+    pub loading: f64,
     pub apparent_wind_direction: f64,
     pub angle_of_attack_measurement_1: f64,
     pub angle_of_attack_measurement_2: f64,
@@ -56,8 +57,14 @@ pub struct WingSailController {
 
 impl FmuFunctions for WingSailController {
     fn exit_initialization_mode(&mut self) {
+        let setup_file_path = if self.setup_file_path.is_empty() {
+            "C:/HLCC 2024 x64/DLL_FMU's/Stormbird/wing_sail_controller_setup.json".to_string() // Default string to facilitate using this FMU in hybrid tests.
+        } else {
+            self.setup_file_path.clone()
+        };
+
         self.controller = Some(
-            WingSailControllerInternal::new_from_file(&self.setup_file_path)
+            WingSailControllerInternal::new_from_file(&setup_file_path)
         );
     }
 
@@ -67,6 +74,8 @@ impl FmuFunctions for WingSailController {
         let angle_measurements = self.get_angle_measurements();
 
         let local_wing_angles = if let Some(controller) = &mut self.controller {
+            controller.loading = self.loading;
+
             controller.compute_new_wing_angles(
                 time_step,
                 self.apparent_wind_direction,
