@@ -2,12 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 
-const AverageAnglesOfAttack = () => {
+interface ClearDataProps {
+    serverAddress: string;
+}
+
+const AverageAnglesOfAttack: React.FC<ClearDataProps> = ({ serverAddress }) => {
     const [data, setData] = useState([]);
     
     const [layout, setLayout] = useState(
         {
-            title: 'Average angle of attack on each wing as a function of time', 
+            title: 'Angle of attack measurements on each wing as a function of time', 
             xaxis: { title: 'Time step' }, 
             yaxis: { title: 'Value [deg]' },
             width: 600
@@ -24,15 +28,17 @@ const AverageAnglesOfAttack = () => {
         const fetchInterval = 500;
 
         const intervalId = setInterval(() => {
-            fetch('http://localhost:8080/get-average-angles-of-attack')
+            fetch(`http://${serverAddress}/get-angle-of-attack-measurements`)
                 .then(response => response.text())
                 .then(text => {
                     if (text) {
                         const fetchedData = JSON.parse(text);
 
+                        console.log(fetchedData);
+
                         const data = fetchedData.map((dataset) => ({
                             x: dataset.time, 
-                            y: dataset.angles_of_attack, 
+                            y: dataset.angle_of_attack_measurement, 
                             type: 'scatter', 
                             mode: 'lines'
                         }));
@@ -44,7 +50,7 @@ const AverageAnglesOfAttack = () => {
         }, fetchInterval);
 
         return () => clearInterval(intervalId);
-    }, []);
+    }, [serverAddress]);
 
     if (!Plot) {
         return <div>Loading...</div>;

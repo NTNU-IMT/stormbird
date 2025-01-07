@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+mod model_scaling;
+
 use std::f64::consts::PI;
 
 use fmu_from_struct::prelude::*;
@@ -17,6 +19,7 @@ use serde_json;
 
 use std::fs::File;
 use std::io::prelude::*;
+use std::collections::HashMap;
 
 fn print_to_file(s: &str, file_path: &str) {
     let mut file = File::create(file_path).unwrap();
@@ -36,9 +39,13 @@ struct Parameters {
     #[serde(default)]
     reverse_wind_direction: bool,
     #[serde(default)]
+    reverse_translational_velocity: bool,
+    #[serde(default)]
     non_dim_spanwise_measurement_position: f64,
     #[serde(default)]
-    visualization_server_address: String
+    visualization_server_address: String,
+    #[serde(default)]
+    model_scale_factor: f64,
 }
 
 impl Parameters {
@@ -186,10 +193,14 @@ impl FmuFunctions for StormbirdLiftingLine {
         }
     }
 
-    fn do_step(&mut self, current_time: f64, time_step: f64) {
+
+    fn do_step(&mut self, current_time_in: f64, time_step_in: f64) {
         if self.zero_velocity() {
             return;
         }
+
+        let current_time = self.upscaled_time_value(current_time_in);
+        let time_step = self.upscaled_time_value(time_step_in);
 
         let rotation    = self.rotation();
         let translation = self.translation();
@@ -227,7 +238,7 @@ impl FmuFunctions for StormbirdLiftingLine {
             self.set_output(&result, &velocity_input, time_step);
 
             if self.visualization_client.is_some() {
-                self.send_result_to_visualization_server(&result);
+                self.send_result_to_visualization_server(&result, current_time_in);
             }
         }
     }
@@ -254,7 +265,11 @@ impl StormbirdLiftingLine {
     }
 
     fn translation(&self) -> SpatialVector<3> {
-        SpatialVector([self.x_position, self.y_position, self.z_position])
+        let x_position = self.upscaled_length_value(self.x_position);
+        let y_position = self.upscaled_length_value(self.y_position);
+        let z_position = self.upscaled_length_value(self.z_position);
+
+        SpatialVector([x_position, y_position, z_position])
     }
 
     fn get_wind_direction(&self) -> f64 {
@@ -278,6 +293,24 @@ impl StormbirdLiftingLine {
         wind_direction
     }
 
+    fn translational_velocity(&self) -> SpatialVector<3> {
+        let translational_velocity_x = self.upscaled_velocity_value(self.translational_velocity_x);
+        let translational_velocity_y = self.upscaled_velocity_value(self.translational_velocity_y);
+        let translational_velocity_z = self.upscaled_velocity_value(self.translational_velocity_z);
+
+        let mut translational_velocity = SpatialVector([
+            translational_velocity_x,
+            translational_velocity_y,
+            translational_velocity_z,
+        ]);
+
+        if self.parameters.reverse_translational_velocity {
+            translational_velocity *= -1.0;
+        }
+
+        translational_velocity
+    }
+
     fn velocity_input(&self) -> Vec<SpatialVector<3>> {
         let wind_direction = self.get_wind_direction();
 
@@ -288,11 +321,7 @@ impl StormbirdLiftingLine {
                 vec![]
             };
 
-        let translational_velocity = SpatialVector([
-            self.translational_velocity_x,
-            self.translational_velocity_y,
-            self.translational_velocity_z,
-        ]);
+        let translational_velocity = self.translational_velocity();
 
         freestream_velocity_points.iter().map(
             |point| {
@@ -492,13 +521,13 @@ impl StormbirdLiftingLine {
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
-        self.force_x = integrated_forces[0];
-        self.force_y = integrated_forces[1];
-        self.force_z = integrated_forces[2];
+        self.force_x = self.downscaled_force_value(integrated_forces[0]);
+        self.force_y = self.downscaled_force_value(integrated_forces[1]);
+        self.force_z = self.downscaled_force_value(integrated_forces[2]);
 
-        self.moment_x = integrated_moments[0];
-        self.moment_y = integrated_moments[1];
-        self.moment_z = integrated_moments[2];
+        self.moment_x = self.downscaled_moment_value(integrated_moments[0]);
+        self.moment_y = self.downscaled_moment_value(integrated_moments[1]);
+        self.moment_z = self.downscaled_moment_value(integrated_moments[2]);
 
         let angles_of_attack_measurement = self.measure_angles_of_attack(&result.force_input.angles_of_attack);
 
@@ -520,7 +549,7 @@ impl StormbirdLiftingLine {
         self.angle_of_attack_measurement_10 = angle_of_attack_measurement_extended[9];
     }
 
-    pub fn send_result_to_visualization_server(&self, result: &SimulationResult) {
+    pub fn send_result_to_visualization_server(&self, result: &SimulationResult, time: f64) {
         if let Some(client) = &self.visualization_client {
             let encoded_result: Vec<u8> = bincode::serialize(result).unwrap();
 
@@ -533,6 +562,43 @@ impl StormbirdLiftingLine {
                 Ok(_) => {},
                 Err(e) => {
                     let error_string = format!("Error sending result to visualization server: {}", e);
+
+                    print_to_file(&error_string, "visualization_error.txt");
+                }
+            }
+
+            let mut fmu_output_dict: HashMap<String, f64> = HashMap::new();
+            
+            fmu_output_dict.insert("time".to_string(), time);
+            fmu_output_dict.insert("force_x".to_string(), self.force_x);
+            fmu_output_dict.insert("force_y".to_string(), self.force_y);
+            fmu_output_dict.insert("force_z".to_string(), self.force_z);
+            fmu_output_dict.insert("moment_x".to_string(), self.moment_x);
+            fmu_output_dict.insert("moment_y".to_string(), self.moment_y);
+            fmu_output_dict.insert("moment_z".to_string(), self.moment_z);
+            fmu_output_dict.insert("estimated_apparent_wind_direction".to_string(), self.estimated_apparent_wind_direction);
+            fmu_output_dict.insert("angle_of_attack_measurement_1".to_string(), self.angle_of_attack_measurement_1);
+            fmu_output_dict.insert("angle_of_attack_measurement_2".to_string(), self.angle_of_attack_measurement_2);
+            fmu_output_dict.insert("angle_of_attack_measurement_3".to_string(), self.angle_of_attack_measurement_3);
+            fmu_output_dict.insert("angle_of_attack_measurement_4".to_string(), self.angle_of_attack_measurement_4);
+            fmu_output_dict.insert("angle_of_attack_measurement_5".to_string(), self.angle_of_attack_measurement_5);
+            fmu_output_dict.insert("angle_of_attack_measurement_6".to_string(), self.angle_of_attack_measurement_6);
+            fmu_output_dict.insert("angle_of_attack_measurement_7".to_string(), self.angle_of_attack_measurement_7);
+            fmu_output_dict.insert("angle_of_attack_measurement_8".to_string(), self.angle_of_attack_measurement_8);
+            fmu_output_dict.insert("angle_of_attack_measurement_9".to_string(), self.angle_of_attack_measurement_9);
+            fmu_output_dict.insert("angle_of_attack_measurement_10".to_string(), self.angle_of_attack_measurement_10);
+
+            let encoded_fmu_output_dict: Vec<u8> = bincode::serialize(&fmu_output_dict).unwrap();
+
+            let response = client.post(self.parameters.visualization_server_address.clone() + "/update-fmu-output-data")
+                .header("Content-Type", "application/octet-stream")
+                .body(encoded_fmu_output_dict)
+                .send();
+
+            match response {
+                Ok(_) => {},
+                Err(e) => {
+                    let error_string = format!("Error sending FMU output data to visualization server: {}", e);
 
                     print_to_file(&error_string, "visualization_error.txt");
                 }

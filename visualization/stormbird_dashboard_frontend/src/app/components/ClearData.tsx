@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
-const ClearData = () => {
+interface ClearDataProps {
+    serverAddress: string;
+}
+
+const ClearData: React.FC<ClearDataProps> = ({ serverAddress }) => {
     const handleButtonClick = () => {
-        fetch('http://localhost:8080/clear-data', { method: 'POST' })
+        fetch(`http://${serverAddress}/clear-data`, { method: 'POST' })
             .catch(error => console.error('Error calling API:', error));
     };
 
@@ -13,7 +17,6 @@ const ClearData = () => {
             <button onClick={handleButtonClick}>Clear Data</button>
         </div>
     );
-
 }
 
 export default ClearData;

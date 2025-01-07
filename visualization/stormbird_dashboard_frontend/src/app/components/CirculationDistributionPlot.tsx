@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 
-const CirculationDistributionPlot = () => {
+interface ClearDataProps {
+    serverAddress: string;
+}
+
+const CirculationDistributionPlot: React.FC<ClearDataProps> = ({ serverAddress }) => {
     const [data, setData] = useState([]);
     
     const [layout, setLayout] = useState(
@@ -24,7 +28,7 @@ const CirculationDistributionPlot = () => {
         const fetchInterval = 500;
 
         const intervalId = setInterval(() => {
-            fetch('http://localhost:8080/get-circulation-distribution')
+            fetch(`http://${serverAddress}/get-circulation-distribution`)
                 .then(response => response.text())
                 .then(text => {
                     if (text) {
@@ -44,7 +48,7 @@ const CirculationDistributionPlot = () => {
         }, fetchInterval);
 
         return () => clearInterval(intervalId);
-    }, []);
+    }, [serverAddress]);
 
     if (!Plot) {
         return <div>Loading...</div>;

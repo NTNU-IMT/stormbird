@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 
-const ForcePlot = () => {
+interface ClearDataProps {
+    serverAddress: string;
+}
+
+const ForcePlot: React.FC<ClearDataProps> = ({ serverAddress }) => {
     const [data, setData] = useState(
         [
             { x: [], y: [], type: 'scatter', mode: 'lines', name: 'Force in x direction' }, 
@@ -29,7 +33,7 @@ const ForcePlot = () => {
         const fetchInterval = 500;
 
         const intervalId = setInterval(() => {
-            fetch('http://localhost:8080/get-forces')
+            fetch(`http://${serverAddress}/get-forces`)
                 .then(response => response.text())
                 .then(text => {
                     if (text) {
@@ -45,7 +49,7 @@ const ForcePlot = () => {
         }, fetchInterval);
 
         return () => clearInterval(intervalId);
-    }, []);
+    }, [serverAddress]);
 
     if (!Plot) {
         return <div>Loading...</div>;

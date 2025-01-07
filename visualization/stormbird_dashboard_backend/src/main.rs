@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use clap::Parser;
 
 use actix_web::{post, get, web, App, HttpResponse, HttpServer, Result, http::KeepAlive};
-use actix_files as fs;
 use actix_cors::Cors;
 
 use stormbird::io_structs::result::SimulationResult;
@@ -23,6 +22,7 @@ struct Args {
 #[derive(Debug, Clone, Default)]
 pub struct SimulationData {
     pub results: Vec<SimulationResult>,
+    pub fmu_output_dict: Vec<HashMap<String, f64>>,
     pub wake_shape: HashMap<String, Vec<f64>>
 }
 
@@ -40,12 +40,33 @@ async fn update_result_data(
     Ok(HttpResponse::Ok().finish())
 }
 
+#[post("/update-fmu-output-data")]
+async fn update_fmu_output_data(
+    encoded_data: web::Bytes,
+    data: web::Data<Arc<Mutex<SimulationData>>>
+) -> Result<HttpResponse> {
+    println!("Received FMU output data");
+
+    let fmu_output_data: HashMap<String, f64> = bincode::deserialize(&encoded_data[..]).unwrap();
+
+    let mut data = data.lock().unwrap();
+
+    if data.fmu_output_dict.len() > 0 {
+        if data.fmu_output_dict.last().unwrap()["time"] > fmu_output_data["time"] {
+            data.fmu_output_dict.clear();
+        }
+    }
+    
+    data.fmu_output_dict.push(fmu_output_data);
+
+    Ok(HttpResponse::Ok().finish())
+}
+
 #[post("/update-wake-shape")]
 async fn update_wake_shape(
     encoded_data: web::Bytes,
     data: web::Data<Arc<Mutex<SimulationData>>>
 ) -> Result<HttpResponse> {
-    println!("Received wake shape data");
     let wake_shape: HashMap<String, Vec<f64>> = bincode::deserialize(&encoded_data[..]).unwrap();
 
     let mut data = data.lock().unwrap();
@@ -62,6 +83,7 @@ async fn clear_data(
     let mut data = data.lock().unwrap();
 
     data.results.clear();
+    data.fmu_output_dict.clear();
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -76,19 +98,17 @@ async fn get_forces(
     out_data.insert("force_y".to_string(), Vec::new());
     out_data.insert("force_z".to_string(), Vec::new());
 
-    if data.lock().unwrap().results.is_empty() {
+    if data.lock().unwrap().fmu_output_dict.is_empty() {
         return Ok(HttpResponse::Ok().json(out_data));
     }
 
     let data = data.lock().unwrap();
 
-    for (index, result) in data.results.iter().enumerate() {
-        let forces = result.integrated_forces_sum();
-
-        out_data.get_mut("time").unwrap().push(index as f64);
-        out_data.get_mut("force_x").unwrap().push(forces[0]);
-        out_data.get_mut("force_y").unwrap().push(forces[1]);
-        out_data.get_mut("force_z").unwrap().push(forces[2]);
+    for (_, fmu_output) in data.fmu_output_dict.iter().enumerate() {
+        out_data.get_mut("time").unwrap().push(fmu_output["time"]);
+        out_data.get_mut("force_x").unwrap().push(fmu_output["force_x"]);
+        out_data.get_mut("force_y").unwrap().push(fmu_output["force_y"]);
+        out_data.get_mut("force_z").unwrap().push(fmu_output["force_z"]);
     }
 
     Ok(HttpResponse::Ok().json(out_data))
@@ -183,6 +203,54 @@ async fn get_average_angles_of_attack(
     Ok(HttpResponse::Ok().json(out_data))
 }
 
+#[get("/get-angle-of-attack-measurements")]
+async fn get_angle_of_attack_measurements(
+    data: web::Data<Arc<Mutex<SimulationData>>>
+) -> Result<HttpResponse> {
+    let mut out_data: Vec<HashMap<String, Vec<f64>>> = Vec::new();
+
+    let data = data.lock().unwrap();
+    
+    if data.fmu_output_dict.is_empty() {
+        let mut current_wing_data: HashMap<String, Vec<f64>> = HashMap::new();
+
+        current_wing_data.insert("time".to_string(), Vec::new());
+        current_wing_data.insert("angle_of_attack_measurement".to_string(), Vec::new());
+
+        out_data.push(current_wing_data);
+
+        return Ok(HttpResponse::Ok().json(out_data));
+    }
+
+    let nr_wings = if data.results.is_empty() {
+        1
+    } else {
+        data.results.last().unwrap().nr_of_wings()
+    };
+
+    for wing_index in 0..nr_wings {
+        let mut current_wing_data: HashMap<String, Vec<f64>> = HashMap::new();
+
+        current_wing_data.insert("time".to_string(), Vec::new());
+        current_wing_data.insert("angle_of_attack_measurement".to_string(), Vec::new());
+
+        let key = format!("angle_of_attack_measurement_{}", wing_index + 1);
+
+        for (_, fmu_dict) in data.fmu_output_dict.iter().enumerate() {
+            current_wing_data.get_mut("time").unwrap().push(fmu_dict["time"]);
+
+            if !fmu_dict.contains_key(&key) {
+                println!("Key {} not found in FMU output data", key);
+            }
+            current_wing_data.get_mut("angle_of_attack_measurement").unwrap().push(fmu_dict[&key]);
+        }
+
+        out_data.push(current_wing_data);
+    }
+
+    Ok(HttpResponse::Ok().json(out_data))
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
@@ -207,13 +275,14 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(web::Data::new(data.clone()))
             .service(update_result_data)
+            .service(update_fmu_output_data)
             .service(update_wake_shape)
             .service(clear_data)
             .service(get_forces)
             .service(get_wake_shape)
             .service(get_circulation_distribution)
             .service(get_average_angles_of_attack)
-            .service(fs::Files::new("/", "./static").index_file("index.html"))
+            .service(get_angle_of_attack_measurements)
     })
     .bind((args.bind_address, args.port))?
     .keep_alive(KeepAlive::Os)

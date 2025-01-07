@@ -68,7 +68,7 @@ impl FmuFunctions for WingSailController {
         );
     }
 
-    fn do_step(&mut self, _current_time: f64, time_step: f64) {
+    fn do_step(&mut self, current_time: f64, time_step: f64) {
         let nr_wings = self.nr_of_wings();
 
         let angle_measurements = self.get_angle_measurements();
@@ -77,6 +77,7 @@ impl FmuFunctions for WingSailController {
             controller.loading = self.loading;
 
             controller.compute_new_wing_angles(
+                current_time,
                 time_step,
                 self.apparent_wind_direction,
                 &angle_measurements
@@ -96,7 +97,7 @@ impl FmuFunctions for WingSailController {
         self.set_local_wing_angles(&local_wing_angles);
 
         let internal_states = if let Some(controller) = &self.controller {
-            controller.new_internal_states(self.apparent_wind_direction)
+            controller.new_internal_states(current_time, self.apparent_wind_direction)
         } else {
             vec![0.0; nr_wings]
         };
