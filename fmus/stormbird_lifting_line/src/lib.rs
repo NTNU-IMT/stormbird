@@ -337,11 +337,7 @@ impl StormbirdLiftingLine {
                     1.0
                 };
 
-                let rotation_axis = if self.parameters.negative_z_is_up {
-                    SpatialVector([0.0, 0.0, -1.0])
-                } else {
-                    SpatialVector([0.0, 0.0, 1.0])
-                };
+                let rotation_axis = SpatialVector([0.0, 0.0, 1.0]);
 
                 let wind = SpatialVector([
                     -self.wind_velocity * increase_factor,

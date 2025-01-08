@@ -23,7 +23,11 @@ impl SpatialVector<3> {
         let cos_angle = angle.cos();
         let sin_angle = angle.sin();
 
-        self * cos_angle + axis_normalized.cross(self) * sin_angle + axis_normalized * axis_normalized.dot(self) * (1.0 - cos_angle)   
+        let term1 = self * cos_angle;
+        let term2 = axis_normalized.cross(self) * sin_angle;
+        let term3 = axis_normalized * axis_normalized.dot(self) * (1.0 - cos_angle);
+
+        term1 + term2 + term3
     }
 
     #[inline]
@@ -167,5 +171,21 @@ mod tests {
         dbg!(moment, transformed_moment);
 
         assert!(transformed_moment.length() < 1e-6)
+    }
+
+    #[test]
+    fn negative_rotation() {
+        let vector = SpatialVector([-1.0, 0.0, 0.0]);
+        
+        let negative_axis = SpatialVector([0.0, 0.0, -1.0]);
+        let positive_axis = SpatialVector([0.0, 0.0, 1.0]);
+
+        let rotation_angle = 90.0_f64.to_radians();
+
+        let rotated_vector_1 = vector.rotate_around_axis(-rotation_angle, negative_axis);
+        let rotated_vector_2 = vector.rotate_around_axis(rotation_angle, positive_axis);
+        let rotated_vector_3 = vector.rotate_around_axis(rotation_angle, negative_axis);
+
+        dbg!(rotated_vector_1, rotated_vector_2, rotated_vector_3);
     }
 }
