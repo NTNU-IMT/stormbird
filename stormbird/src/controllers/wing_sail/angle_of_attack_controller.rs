@@ -14,6 +14,8 @@ pub struct AngleOfAttackControllerBuilder {
     pub update_factor: f64,
     #[serde(default)]
     pub change_threshold: f64,
+    #[serde(default)]
+    pub max_rotational_speed_to_zero: Option<f64>,
 }
 
 impl AngleOfAttackControllerBuilder {
@@ -33,6 +35,7 @@ impl AngleOfAttackControllerBuilder {
             update_factor: self.update_factor,
             change_threshold: self.change_threshold,
             max_rotational_speed: self.max_rotational_speed,
+            max_rotational_speed_to_zero: self.max_rotational_speed_to_zero,
             angles_in_degrees: self.angles_in_degrees,
             angle_estimates,
             filters,
@@ -52,6 +55,8 @@ pub struct AngleOfAttackController {
     pub change_threshold: f64,
     /// The maximum speed at which the wing angles can change
     pub max_rotational_speed: f64,
+    /// The maximum speed to move to zero angle of attack
+    pub max_rotational_speed_to_zero: Option<f64>,
     /// Whether the angles of attack are in degrees
     pub angles_in_degrees: bool,
     /// The current estimate of the angles of attack
@@ -79,9 +84,19 @@ impl AngleOfAttackController {
 
         let nr_of_wings = self.nr_of_wings();
 
-        let max_angle_change = self.max_rotational_speed * time_step;
+        let max_rotational_speed_to_zero = self.max_rotational_speed_to_zero.unwrap_or(self.max_rotational_speed);
+
+        
 
         for i in 0..nr_of_wings {
+            let max_rotational_speed: f64 = if target_angles_of_attack[i] == 0.0 {
+                max_rotational_speed_to_zero
+            } else {
+                self.max_rotational_speed
+            };
+
+            let max_angle_change = max_rotational_speed * time_step;
+
             let angle_error = self.angle_estimates[i] - target_angles_of_attack[i];
 
             if angle_error.abs() < self.change_threshold {
