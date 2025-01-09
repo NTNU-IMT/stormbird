@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use angle_of_attack_controller::{AngleOfAttackControllerBuilder, AngleOfAttackController};
 use weather_dependent_setpoints::WeatherDependentSetpoints;
 
+use crate::error::Error;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct WingSailControllerBuilder {
     pub angle_of_attack_controller: AngleOfAttackControllerBuilder,
@@ -28,6 +30,14 @@ impl WingSailControllerBuilder {
             model_scale_factor: self.model_scale_factor,
         }
     }
+
+    pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
+        let setup_string = std::fs::read_to_string(file_path)?;
+
+        let builder: WingSailControllerBuilder = serde_json::from_str(&setup_string)?;
+
+        Ok(builder)
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -48,12 +58,10 @@ impl WingSailController {
         }
     }
 
-    pub fn new_from_file(file_path: &str) -> Self {
-        let setup_string = std::fs::read_to_string(file_path).unwrap();
+    pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
+        let builder = WingSailControllerBuilder::new_from_file(file_path)?;
 
-        let builder: WingSailControllerBuilder = serde_json::from_str(&setup_string).unwrap();
-
-        builder.build()
+        Ok(builder.build())
     }
 
     pub fn compute_new_wing_angles(

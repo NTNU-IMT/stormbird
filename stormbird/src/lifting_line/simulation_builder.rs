@@ -13,6 +13,8 @@ use super::simulation::Simulation;
 
 use crate::line_force_model::circulation_corrections::prescribed_circulation::PrescribedCirculationShape;
 
+use crate::error::Error;
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
@@ -79,21 +81,21 @@ impl SimulationBuilder {
 
     /// Creates a new simulation builder by parsing the the string as a JSON object. The parsing is
     /// done using the serde_json library.
-    pub fn new_from_string(string: &str) -> Result<Self, String> {
-        match serde_json::from_str(string) {
-            Ok(builder) => Ok(builder),
-            Err(e) => Err(format!("Error parsing JSON: {}", e))
-        }
+    pub fn new_from_string(string: &str) -> Result<Self, Error> {
+        let builder = serde_json::from_str(string)?;
+        
+        Ok(builder)
     }
 
     /// Creates a new simulation builder by reading the file at the given path and parsing the 
     /// content as a JSON object. The parsing is done using the [SimulationBuilder::new_from_string]
     /// method.
-    pub fn new_from_file(file_path: &str) -> Result<Self, String> {
-        match std::fs::read_to_string(file_path) {
-            Ok(string) => Self::new_from_string(&string),
-            Err(e) => Err(format!("Error reading file: {}", e))
-        }
+    pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
+        let string = std::fs::read_to_string(file_path)?;
+
+        let builder = Self::new_from_string(&string)?;
+
+        Ok(builder)
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.

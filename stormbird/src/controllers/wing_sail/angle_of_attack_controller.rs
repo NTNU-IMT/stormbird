@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use math_utils::filters::moving_average::MovingAverage;
 
+use crate::error::Error;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Builder for the SailController struct
@@ -20,6 +22,14 @@ pub struct AngleOfAttackControllerBuilder {
 
 impl AngleOfAttackControllerBuilder {
     pub fn default_update_factor() -> f64 {1.0}
+
+    pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
+        let file_contents = std::fs::read_to_string(file_path)?;
+
+        let builder = serde_json::from_str(&file_contents)?;
+
+        Ok(builder)
+    }
 
     pub fn build(&self) -> AngleOfAttackController {
         let current_wing_angles = vec![0.0; self.nr_of_wings];
@@ -70,6 +80,12 @@ pub struct AngleOfAttackController {
 }
 
 impl AngleOfAttackController {
+    pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
+        let builder = AngleOfAttackControllerBuilder::new_from_file(file_path)?;
+
+        Ok(builder.build())
+    }
+
     pub fn nr_of_wings(&self) -> usize {
         self.angle_estimates.len()
     }

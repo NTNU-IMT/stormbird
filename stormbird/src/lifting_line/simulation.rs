@@ -14,6 +14,8 @@ use super::simulation_builder::SimulationBuilder;
 
 use super::wake::line_force_model_data::LineForceModelData;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone)]
 /// Struct that contains the data needed to run a dynamic simulation.
 pub struct Simulation {
@@ -31,7 +33,7 @@ impl Simulation {
         setup_string: &str,
         initial_time_step: f64,
         wake_initial_velocity: SpatialVector<3>
-    ) -> Result<Self, String> {
+    ) -> Result<Self, Error> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
         Ok(builder.build(initial_time_step, wake_initial_velocity))

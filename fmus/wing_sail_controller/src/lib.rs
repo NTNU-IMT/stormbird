@@ -63,9 +63,16 @@ impl FmuFunctions for WingSailController {
             self.setup_file_path.clone()
         };
 
-        self.controller = Some(
-            WingSailControllerInternal::new_from_file(&setup_file_path)
-        );
+        let controller = WingSailControllerInternal::new_from_file(&setup_file_path);
+
+        match controller {
+            Ok(controller) => {
+                self.controller = Some(controller);
+            },
+            Err(error) => {
+                println!("Error initializing WingSailController");
+            }
+        }
     }
 
     fn do_step(&mut self, current_time: f64, time_step: f64) {

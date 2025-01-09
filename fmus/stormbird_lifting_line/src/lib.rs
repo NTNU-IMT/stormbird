@@ -13,6 +13,7 @@ use stormbird::empirical_models::wind_environment::height_variation::HeightVaria
 use stormbird::io_structs::result::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
+use stormbird::error::Error;
 
 use math_utils::filters::moving_average::MovingAverage;
 
@@ -22,6 +23,8 @@ use serde_json;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
+
+
 
 fn print_to_file(s: &str, file_path: &str) {
     let mut file = File::create(file_path).unwrap();
@@ -55,22 +58,13 @@ struct Parameters {
 }
 
 impl Parameters {
-    fn from_json_file(file_path: &str) -> Self {
-        let file = File::open(file_path).expect("File not found");
+    fn from_json_file(file_path: &str) -> Result<Self, Error> {
+        let file = File::open(file_path)?;
 
         let reader = std::io::BufReader::new(file);
-        let result = serde_json::from_reader(reader);
+        let result = serde_json::from_reader(reader)?;
 
-        match result {
-            Ok(parameters) => parameters,
-            Err(e) => {
-                let error_string = format!("Error reading parameters from file: {}", e);
-
-                print_to_file(&error_string, "error.txt");
-                
-                panic!("{}", error_string);
-            }
-        }
+        Ok(result)
     }
 }
 
@@ -190,7 +184,18 @@ impl FmuFunctions for StormbirdLiftingLine {
             self.parameters_path.clone()
         };
 
-        self.parameters = Parameters::from_json_file(&parameters_path);
+        let parameters = Parameters::from_json_file(&parameters_path);
+
+        match parameters {
+            Ok(parameters) => {
+                self.parameters = parameters;
+            },
+            Err(e) => {
+                let error_string = format!("Error reading parameters file: {}", e);
+
+                print_to_file(&error_string, "parameters_error.txt");
+            }
+        }
 
         let initial_wake_builder_velocity = SpatialVector([1e-6, 0.0, 0.0]);
 
