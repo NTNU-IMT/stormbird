@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-
 #[derive(Debug, Default, Clone)]
 /// A simple moving average filter
 pub struct MovingAverage {

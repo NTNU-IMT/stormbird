@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::controllers::moving_average::MovingAverage;
+use math_utils::filters::moving_average::MovingAverage;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

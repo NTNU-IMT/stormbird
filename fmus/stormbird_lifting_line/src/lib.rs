@@ -14,6 +14,8 @@ use stormbird::io_structs::result::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
 
+use math_utils::filters::moving_average::MovingAverage;
+
 use serde::{Deserialize, Serialize};
 use serde_json;
 
@@ -46,6 +48,10 @@ struct Parameters {
     visualization_server_address: String,
     #[serde(default)]
     model_scale_factor: f64,
+    #[serde(default)]
+    input_moving_average_window_size: usize,
+    #[serde(default)]
+    pub max_input_velocity: Option<f64>,
 }
 
 impl Parameters {
@@ -64,6 +70,35 @@ impl Parameters {
                 
                 panic!("{}", error_string);
             }
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct InputFilters {
+    pub x_position: MovingAverage,
+    pub y_position: MovingAverage,
+    pub z_position: MovingAverage,
+    pub x_rotation: MovingAverage,
+    pub y_rotation: MovingAverage,
+    pub z_rotation: MovingAverage,
+    pub translational_velocity_x: MovingAverage,
+    pub translational_velocity_y: MovingAverage,
+    pub translational_velocity_z: MovingAverage,
+}
+
+impl InputFilters {
+    pub fn new(window_size: usize) -> Self {
+        Self {
+            x_position: MovingAverage::new(window_size),
+            y_position: MovingAverage::new(window_size),
+            z_position: MovingAverage::new(window_size),
+            x_rotation: MovingAverage::new(window_size),
+            y_rotation: MovingAverage::new(window_size),
+            z_rotation: MovingAverage::new(window_size),
+            translational_velocity_x: MovingAverage::new(window_size),
+            translational_velocity_y: MovingAverage::new(window_size),
+            translational_velocity_z: MovingAverage::new(window_size),
         }
     }
 }
@@ -143,6 +178,7 @@ pub struct StormbirdLiftingLine {
     nr_wings: usize,
     nr_freestream_velocity_points: usize,
     initialized_wake_points: bool,
+    input_filters: Option<InputFilters>,
     visualization_client: Option<reqwest::blocking::Client>,
 }
 
@@ -169,8 +205,6 @@ impl FmuFunctions for StormbirdLiftingLine {
                 let error_string = format!("Error reading lifting line setup file: {}", e);
 
                 print_to_file(&error_string, "builder_error.txt");
-                
-                panic!("{}", error_string);
             }
         }
 
@@ -191,10 +225,15 @@ impl FmuFunctions for StormbirdLiftingLine {
         if !self.parameters.visualization_server_address.is_empty() {
             self.visualization_client = Some(reqwest::blocking::Client::new());
         }
+
+        if self.parameters.input_moving_average_window_size > 0 {
+            self.input_filters = Some(InputFilters::new(self.parameters.input_moving_average_window_size));
+        }
     }
 
-
     fn do_step(&mut self, current_time_in: f64, time_step_in: f64) {
+        self.process_input();
+
         if self.zero_velocity() {
             return;
         }
@@ -245,6 +284,30 @@ impl FmuFunctions for StormbirdLiftingLine {
 }
 
 impl StormbirdLiftingLine {
+    fn process_input(&mut self) {
+        if let Some(filters) = &mut self.input_filters {
+            filters.x_position.add(self.x_position);
+            filters.y_position.add(self.y_position);
+            filters.z_position.add(self.z_position);
+            filters.x_rotation.add(self.x_rotation);
+            filters.y_rotation.add(self.y_rotation);
+            filters.z_rotation.add(self.z_rotation);
+            filters.translational_velocity_x.add(self.translational_velocity_x);
+            filters.translational_velocity_y.add(self.translational_velocity_y);
+            filters.translational_velocity_z.add(self.translational_velocity_z);
+
+            self.x_position = filters.x_position.get_average();
+            self.y_position = filters.y_position.get_average();
+            self.z_position = filters.z_position.get_average();
+            self.x_rotation = filters.x_rotation.get_average();
+            self.y_rotation = filters.y_rotation.get_average();
+            self.z_rotation = filters.z_rotation.get_average();
+            self.translational_velocity_x = filters.translational_velocity_x.get_average();
+            self.translational_velocity_y = filters.translational_velocity_y.get_average();
+            self.translational_velocity_z = filters.translational_velocity_z.get_average();
+        }
+    }
+
     fn rotation(&self) -> SpatialVector<3> {
         if self.parameters.angles_in_degrees {
             SpatialVector([
@@ -323,7 +386,7 @@ impl StormbirdLiftingLine {
 
         let translational_velocity = self.translational_velocity();
 
-        freestream_velocity_points.iter().map(
+        let mut velocity_input: Vec<SpatialVector<3>> = freestream_velocity_points.iter().map(
             |point| {
                 let height = if self.parameters.negative_z_is_up {
                     -point[2]
@@ -347,7 +410,29 @@ impl StormbirdLiftingLine {
 
                 wind + translational_velocity
             }
-        ).collect()
+        ).collect();
+
+        if let Some(max_value) = self.parameters.max_input_velocity {
+            for i in 0..velocity_input.len() {
+                let velocity = velocity_input[i].length();
+
+                let component_signs = SpatialVector([
+                    velocity_input[i][0].signum(),
+                    velocity_input[i][1].signum(),
+                    velocity_input[i][2].signum(),
+                ]);
+
+                if velocity > max_value {
+                    velocity_input[i] = velocity_input[i].normalize() * max_value;
+                }
+
+                velocity_input[i][0] = velocity_input[i][0].abs() * component_signs[0];
+                velocity_input[i][1] = velocity_input[i][1].abs() * component_signs[1];
+                velocity_input[i][2] = velocity_input[i][2].abs() * component_signs[2];
+            }
+        }
+
+        velocity_input
     }
 
     fn local_wing_angles(&self) -> Vec<f64> {
