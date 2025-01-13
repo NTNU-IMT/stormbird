@@ -8,14 +8,19 @@ use std::f64::consts::PI;
 
 use fmu_from_struct::prelude::*;
 
-use math_utils::spatial_vector::SpatialVector;
+use math_utils::{
+    spatial_vector::SpatialVector,
+    spatial_vector::transformations::RotationType,
+    filters::moving_average::MovingAverage,
+};
+
 use stormbird::empirical_models::wind_environment::height_variation::HeightVariationModel;
 use stormbird::io_structs::result::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
 use stormbird::error::Error;
 
-use math_utils::filters::moving_average::MovingAverage;
+use math_utils::
 
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -23,8 +28,6 @@ use serde_json;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
-
-
 
 fn print_to_file(s: &str, file_path: &str) {
     let mut file = File::create(file_path).unwrap();
@@ -55,6 +58,8 @@ struct Parameters {
     input_moving_average_window_size: usize,
     #[serde(default)]
     pub max_input_velocity: Option<f64>,
+    #[serde(default)]
+    pub translational_velocity_in_body_fixed_frame: bool,
 }
 
 impl Parameters {
@@ -371,6 +376,16 @@ impl StormbirdLiftingLine {
             translational_velocity_y,
             translational_velocity_z,
         ]);
+        
+        let rotation_type = if let Some(model) = &self.stormbird_model {
+            if self.parameters.translational_velocity_in_body_fixed_frame {
+                translational_velocity = translational_velocity.from_rotated_to_global_system(
+                    self.rotation(),
+                    model.rotation_type
+                );
+            }
+        }
+        
 
         if self.parameters.reverse_translational_velocity {
             translational_velocity *= -1.0;

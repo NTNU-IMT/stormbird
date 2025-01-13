@@ -4,7 +4,10 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::spatial_vector::SpatialVector;
+use math_utils::spatial_vector::{
+    SpatialVector,
+    transformations::RotationType
+};
 
 #[derive(Debug, Clone)]
 /// Struct that represents spatial coordinates in a coordinate system that is oriented along the 
@@ -30,10 +33,10 @@ impl SpanLine {
         }
     }
 
-    pub fn rotate(&self, rotation: SpatialVector<3>) -> Self {
+    pub fn rotate(&self, rotation: SpatialVector<3>, rotation_type: RotationType) -> Self {
         Self {
-            start_point: self.start_point.rotate(rotation),
-            end_point: self.end_point.rotate(rotation)
+            start_point: self.start_point.rotate(rotation, rotation_type),
+            end_point: self.end_point.rotate(rotation, rotation_type)
         }
     }
 

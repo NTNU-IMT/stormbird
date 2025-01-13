@@ -2,7 +2,10 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use math_utils::spatial_vector::SpatialVector;
+use math_utils::spatial_vector::{
+    SpatialVector,
+    transformations::RotationType
+};
 
 use serde::{Serialize, Deserialize};
 
@@ -23,8 +26,8 @@ pub struct RigidBodyMotion {
 }
 
 impl RigidBodyMotion {
-    pub fn apply_transformation_to_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
-        point.rotate(self.transformation.angular) + self.transformation.linear
+    pub fn apply_transformation_to_point(&self, point: SpatialVector<3>, rotation_type: RotationType) -> SpatialVector<3> {
+        point.rotate(self.transformation.angular, rotation_type) + self.transformation.linear
     }
     
     pub fn point_in_body_frame(&self, point: SpatialVector<3>) -> SpatialVector<3> {
@@ -73,6 +76,8 @@ mod tests {
 
         let mut rotated_points: Vec<SpatialVector<3>> = Vec::new();
         let mut motions: Vec<RigidBodyMotion> = Vec::new();
+
+        let rotation_type = RotationType::XYZ;
         
         let mut t = 0.0;
         while t < end_time {
@@ -93,7 +98,7 @@ mod tests {
                 }
             );
             
-            rotated_points.push(point_to_check.rotate(motions.last().unwrap().transformation.angular));
+            rotated_points.push(point_to_check.rotate(motions.last().unwrap().transformation.angular, rotation_type));
 
             t += dt;
         }
