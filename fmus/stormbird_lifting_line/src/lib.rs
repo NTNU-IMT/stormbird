@@ -55,6 +55,10 @@ struct Parameters {
     input_moving_average_window_size: usize,
     #[serde(default)]
     pub max_input_velocity: Option<f64>,
+    #[serde(default)]
+    pub max_position_change_velocity: Option<f64>,
+    #[serde(default)]
+    pub max_rotation_change_velocity: Option<f64>,
 }
 
 impl Parameters {
@@ -174,6 +178,8 @@ pub struct StormbirdLiftingLine {
     initialized_wake_points: bool,
     input_filters: Option<InputFilters>,
     visualization_client: Option<reqwest::blocking::Client>,
+    previous_position: SpatialVector<3>,
+    previous_rotation: SpatialVector<3>,
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
@@ -246,8 +252,8 @@ impl FmuFunctions for StormbirdLiftingLine {
         let current_time = self.upscaled_time_value(current_time_in);
         let time_step = self.upscaled_time_value(time_step_in);
 
-        let rotation    = self.rotation();
-        let translation = self.translation();
+        let rotation    = self.rotation(time_step);
+        let translation = self.translation(time_step);
 
         let velocity_input: Vec<SpatialVector<3>> = self.velocity_input();
 
@@ -277,6 +283,8 @@ impl FmuFunctions for StormbirdLiftingLine {
         } else {
             None
         };
+
+        self.post_do_step(time_step);
 
         if let Some(result) = result {
             self.set_output(&result, &velocity_input, time_step);
@@ -313,8 +321,16 @@ impl StormbirdLiftingLine {
         }
     }
 
-    fn rotation(&self) -> SpatialVector<3> {
-        if self.parameters.angles_in_degrees {
+    pub fn post_do_step(&mut self, time_step: f64) {
+        let translation = self.translation(time_step);
+        let rotation = self.rotation(time_step);
+
+        self.previous_position = translation;
+        self.previous_rotation = rotation;
+    }
+
+    fn rotation(&self, time_step: f64) -> SpatialVector<3> {
+        let rotation_raw = if self.parameters.angles_in_degrees {
             SpatialVector([
                 self.x_rotation.to_radians(),
                 self.y_rotation.to_radians(),
@@ -322,7 +338,38 @@ impl StormbirdLiftingLine {
             ])
         } else {
             SpatialVector([self.x_rotation, self.y_rotation, self.z_rotation])
+        };
+
+        let rotation_change_velocity = (rotation_raw - self.previous_rotation) / time_step;
+        
+        let rotation_change_velocity_magnitude = rotation_change_velocity.length();
+
+        if let Some(max_value) = self.parameters.max_rotation_change_velocity {
+            if rotation_change_velocity_magnitude > max_value {
+                let component_signs = SpatialVector([
+                    rotation_change_velocity[0].signum(),
+                    rotation_change_velocity[1].signum(),
+                    rotation_change_velocity[2].signum(),
+                ]);
+
+                let rotation_change_velocity_normalized = rotation_change_velocity.normalize();
+
+                let rotation_change_velocity_scaled = rotation_change_velocity_normalized * max_value;
+
+                let rotation_change_velocity_scaled = SpatialVector([
+                    rotation_change_velocity_scaled[0].abs() * component_signs[0],
+                    rotation_change_velocity_scaled[1].abs() * component_signs[1],
+                    rotation_change_velocity_scaled[2].abs() * component_signs[2],
+                ]);
+
+                self.previous_rotation + rotation_change_velocity_scaled * time_step
+            } else {
+                rotation_raw
+            }
+        } else {
+            rotation_raw
         }
+
     }
 
     fn zero_velocity(&self) -> bool {
@@ -332,12 +379,43 @@ impl StormbirdLiftingLine {
         self.wind_velocity == 0.0
     }
 
-    fn translation(&self) -> SpatialVector<3> {
+    fn translation(&self, time_step: f64) -> SpatialVector<3> {
         let x_position = self.upscaled_length_value(self.x_position);
         let y_position = self.upscaled_length_value(self.y_position);
         let z_position = self.upscaled_length_value(self.z_position);
 
-        SpatialVector([x_position, y_position, z_position])
+        let current_position_raw = SpatialVector([x_position, y_position, z_position]);
+
+        let position_change_velocity = (current_position_raw - self.previous_position) / time_step;
+
+        let position_change_velocity_magnitude = position_change_velocity.length();
+
+        if let Some(max_value) = self.parameters.max_position_change_velocity {
+            if position_change_velocity_magnitude > max_value {
+                let component_signs = SpatialVector([
+                    position_change_velocity[0].signum(),
+                    position_change_velocity[1].signum(),
+                    position_change_velocity[2].signum(),
+                ]);
+
+                let position_change_velocity_normalized = position_change_velocity.normalize();
+
+                let position_change_velocity_scaled = position_change_velocity_normalized * max_value;
+
+                let position_change_velocity_scaled = SpatialVector([
+                    position_change_velocity_scaled[0].abs() * component_signs[0],
+                    position_change_velocity_scaled[1].abs() * component_signs[1],
+                    position_change_velocity_scaled[2].abs() * component_signs[2],
+                ]);
+
+                self.previous_position + position_change_velocity_scaled * time_step
+            } else {
+                current_position_raw
+            }
+        } else {
+            current_position_raw
+        }
+
     }
 
     fn get_wind_direction(&self) -> f64 {
