@@ -63,12 +63,13 @@ impl MotionDerivatives {
         
         for i in 0..line_force_model.nr_span_lines() {
             let position_history = [
+                self.ctrl_points_history[0][i],
                 self.ctrl_points_history[1][i],
                 current_ctrl_points[i]
             ];
 
             ctrl_point_velocity.push(
-                finite_difference::first_derivative_first_order(
+                finite_difference::first_derivative_second_order_backward(
                     &position_history, time_step
                 )
             );

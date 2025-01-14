@@ -10,7 +10,6 @@ use fmu_from_struct::prelude::*;
 
 use math_utils::{
     spatial_vector::SpatialVector,
-    spatial_vector::transformations::RotationType,
     filters::moving_average::MovingAverage,
 };
 
@@ -19,8 +18,6 @@ use stormbird::io_structs::result::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
 use stormbird::error::Error;
-
-use math_utils::
 
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -260,7 +257,7 @@ impl FmuFunctions for StormbirdLiftingLine {
         let rotation    = self.rotation(time_step);
         let translation = self.translation(time_step);
 
-        let velocity_input: Vec<SpatialVector<3>> = self.velocity_input();
+        let velocity_input: Vec<SpatialVector<3>> = self.velocity_input(time_step);
 
         let local_wing_angles = self.local_wing_angles();
         let section_models_internal_state = self.section_models_internal_state();
@@ -444,7 +441,7 @@ impl StormbirdLiftingLine {
         wind_direction
     }
 
-    fn translational_velocity(&self) -> SpatialVector<3> {
+    fn translational_velocity(&self, time_step: f64) -> SpatialVector<3> {
         let translational_velocity_x = self.upscaled_velocity_value(self.translational_velocity_x);
         let translational_velocity_y = self.upscaled_velocity_value(self.translational_velocity_y);
         let translational_velocity_z = self.upscaled_velocity_value(self.translational_velocity_z);
@@ -455,11 +452,11 @@ impl StormbirdLiftingLine {
             translational_velocity_z,
         ]);
         
-        let rotation_type = if let Some(model) = &self.stormbird_model {
+        if let Some(model) = &self.stormbird_model {
             if self.parameters.translational_velocity_in_body_fixed_frame {
                 translational_velocity = translational_velocity.from_rotated_to_global_system(
-                    self.rotation(),
-                    model.rotation_type
+                    self.rotation(time_step),
+                    model.line_force_model.rotation_type
                 );
             }
         }
@@ -472,7 +469,7 @@ impl StormbirdLiftingLine {
         translational_velocity
     }
 
-    fn velocity_input(&self) -> Vec<SpatialVector<3>> {
+    fn velocity_input(&self, time_step: f64) -> Vec<SpatialVector<3>> {
         let wind_direction = self.get_wind_direction();
 
         let freestream_velocity_points: Vec<SpatialVector<3>> =
@@ -482,7 +479,7 @@ impl StormbirdLiftingLine {
                 vec![]
             };
 
-        let translational_velocity = self.translational_velocity();
+        let translational_velocity = self.translational_velocity(time_step);
 
         let mut velocity_input: Vec<SpatialVector<3>> = freestream_velocity_points.iter().map(
             |point| {
