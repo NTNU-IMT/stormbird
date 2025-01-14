@@ -8,7 +8,11 @@
 
 use std::{f64::consts::PI, ops::Range};
 
-use math_utils::{spatial_vector::SpatialVector, statistics::mean, interpolation::linear_interpolation};
+use math_utils::{
+    spatial_vector::SpatialVector,
+    spatial_vector::transformations::RotationType,
+    statistics::mean, 
+    interpolation::linear_interpolation};
 
 pub mod builder;
 pub mod derivatives;
@@ -80,6 +84,8 @@ pub struct LineForceModel {
     pub ctrl_point_chord_factor: f64,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
+    /// Rotation type used in the calculations
+    pub rotation_type: RotationType,
     /// Optional model for calculation motion and flow derivatives
     derivatives: Option<Derivatives>,
 }
@@ -112,6 +118,7 @@ impl LineForceModel {
             circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
             output_coordinate_system: CoordinateSystem::Global,
+            rotation_type: RotationType::XYZ,
         }
     }
 
@@ -220,7 +227,7 @@ impl LineForceModel {
 
         self.span_lines_local[index]
             .rotate_around_axis(angle, axis)
-            .rotate(self.rotation)
+            .rotate(self.rotation, self.rotation_type)
             .translate(self.translation)
     }
 
@@ -229,7 +236,7 @@ impl LineForceModel {
         self.span_lines_local
             .iter()
             .enumerate()
-            .map(|(_, line)| line.rotate(self.rotation).translate(self.translation))
+            .map(|(_, line)| line.rotate(self.rotation, self.rotation_type).translate(self.translation))
             .collect()
     }
 
@@ -241,7 +248,7 @@ impl LineForceModel {
 
     pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
         self.local_chord_vector_at_index(index)
-            .rotate(self.rotation)
+            .rotate(self.rotation, self.rotation_type)
     }
 
     /// Returns the chord vectors in global coordinates.
@@ -262,7 +269,7 @@ impl LineForceModel {
 
         local_chord_vectors
             .iter()
-            .map(|chord_vector| chord_vector.rotate(self.rotation))
+            .map(|chord_vector| chord_vector.rotate(self.rotation, self.rotation_type))
             .collect()
     }
 
