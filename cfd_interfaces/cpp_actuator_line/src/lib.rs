@@ -5,7 +5,7 @@
 
 use stormbird::actuator_line::ActuatorLine;
 
-use stormbird::vec3::Vec3;
+use math_utils::spatial_vector::SpatialVector;
 
 #[cxx::bridge(namespace="stormbird_interface")]
 mod ffi {
@@ -77,18 +77,18 @@ impl CppActuatorLine {
         cell_volume: f64,
     ) -> [f64; 4] {
         let (numerator, denominator) = self.model.get_weighted_velocity_integral_terms_for_cell(
-            line_index, Vec3::from(*velocity), Vec3::from(*cell_center), cell_volume
+            line_index, SpatialVector::<3>::from(*velocity), SpatialVector::<3>::from(*cell_center), cell_volume
         );
 
-        [numerator.x, numerator.y, numerator.z, denominator]
+        [numerator[0], numerator[1], numerator[2], denominator]
     }
 
     fn set_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]) {
-        self.model.ctrl_points_velocity[index] = Vec3::from(velocity);
+        self.model.ctrl_points_velocity[index] = SpatialVector::<3>::from(velocity);
     }
 
     fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize {
-        self.model.dominating_line_element_index_at_point(Vec3::from(*point))
+        self.model.dominating_line_element_index_at_point(SpatialVector::<3>::from(*point))
     }
 
     pub fn calculate_result(&mut self, time_step: f64) {
@@ -96,13 +96,13 @@ impl CppActuatorLine {
     }
 
     pub fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3] {
-        let body_force = self.model.distributed_body_force_at_point(Vec3::from(*point));
+        let body_force = self.model.distributed_body_force_at_point(SpatialVector::<3>::from(*point));
 
         body_force.into()
     }
 
     pub fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64 {
-        self.model.summed_projection_weights_at_point(Vec3::from(*point))
+        self.model.summed_projection_weights_at_point(SpatialVector::<3>::from(*point))
     }
 
     pub fn write_results(&self) {

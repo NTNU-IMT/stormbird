@@ -1,6 +1,6 @@
 [package]
 name = "cpp_actuator_line"
-version = "0.3.2"
+version = "0.5.2"
 edition = "2021"
 
 [lib]
@@ -10,3 +10,4 @@ crate-type = ["staticlib"]
 cxx = "1.0"
 
 stormbird = {path = "../../stormbird"}
+math_utils = {path = "../../math_utils"}
