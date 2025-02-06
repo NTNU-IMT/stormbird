@@ -36,6 +36,7 @@ if __name__ == '__main__':
 
         drag_1.append(force_wing_1.x / simulation.force_factor)
         drag_2.append(force_wing_2.x / simulation.force_factor)
+        
         lift_1.append(force_wing_1.y / simulation.force_factor)
         lift_2.append(force_wing_2.y / simulation.force_factor)
                       

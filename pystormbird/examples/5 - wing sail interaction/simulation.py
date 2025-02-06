@@ -29,6 +29,10 @@ class SimulationCase:
     @property
     def force_factor(self) -> float:
         return 0.5 * self.chord_length * self.span * self.density * self.wind_speed**2
+    
+    @property
+    def wind_angle(self) -> float:
+        return np.radians(self.wind_angle_deg)
 
     def get_line_force_model(self) -> dict:
         chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
@@ -41,7 +45,6 @@ class SimulationCase:
         y_coordinates = [-6.0, 6.0]
 
         for x, y in zip(x_coordinates, y_coordinates):
-
             wing_builders.append(
                 {
                     "section_points": [
@@ -71,15 +74,16 @@ class SimulationCase:
 
         return line_force_model
     
-    def angle_of_attack(self):
+    def free_stream_velocity(self):
+        return SpatialVector(self.wind_speed, 0.0, 0.0)
+    
+    def wing_angle(self):
         return np.radians(self.wind_angle_deg - self.angle_of_attack_deg)
     
     def run(self):
-        freestream_velocity = SpatialVector(self.wind_speed, 0.0, 0.0)
+        freestream_velocity = self.free_stream_velocity()
 
         line_force_model = self.get_line_force_model()
-
-        
 
         if self.dynamic:
             solver = {
@@ -114,7 +118,7 @@ class SimulationCase:
         }
 
         dt = 0.1
-        nr_time_steps = 100 if self.dynamic else 1
+        nr_time_steps = 100
 
         simulation = Simulation(
             setup_string = json.dumps(setup),
@@ -131,10 +135,12 @@ class SimulationCase:
             )
 
         nr_wings = len(line_force_model["wing_builders"])
-        angles_of_attack = np.ones(nr_wings) * self.angle_of_attack()
+        wing_angles = np.ones(nr_wings) * self.wing_angle()
 
-        simulation.set_local_wing_angles(angles_of_attack.tolist())
-        simulation.set_rotation(SpatialVector(0.0, 0.0, -np.radians(self.wind_angle_deg)))
+        simulation.set_local_wing_angles(wing_angles.tolist())
+        simulation.set_rotation(
+            SpatialVector(0.0, 0.0, -self.wind_angle)
+        )
 
         for i in range(nr_time_steps):
             result = simulation.do_step(
