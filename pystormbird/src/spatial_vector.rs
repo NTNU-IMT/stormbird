@@ -5,6 +5,7 @@
 use pyo3::prelude::*;
 
 use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
+use math_utils::spatial_vector::transformations::RotationType;
 
 #[pyclass]
 #[derive(Clone)]
@@ -46,7 +47,7 @@ impl SpatialVector {
 
     pub fn rotate(&self, rotation: SpatialVector) -> Self {
         Self {
-            data: self.data.rotate(rotation.data)
+            data: self.data.rotate(rotation.data, RotationType::XYZ)
         }
     }
 
