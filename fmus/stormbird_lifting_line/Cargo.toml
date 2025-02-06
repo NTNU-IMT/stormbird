@@ -1,6 +1,6 @@
 [package]
 name = "stormbird_lifting_line"
-version = "0.4.0"
+version = "0.5.2"
 edition = "2021"
 
 [lib]
@@ -12,3 +12,6 @@ fmu_from_struct = { version = "0.1.1" }
 stormbird = { path = "../../stormbird"}
 math_utils = { path = "../../math_utils"}
 serde_json = "1.0.128"
+serde = { version = "1.0.215", features = ["derive"] }
+reqwest = { version = "0.12.10", features = ["blocking"] }
+bincode = "1.3.3"

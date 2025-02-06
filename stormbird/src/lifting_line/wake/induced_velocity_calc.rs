@@ -53,6 +53,46 @@ impl Wake {
         )
     }
 
+    fn induced_velocities_local_include_self_induced(
+        &self, 
+        points: &[SpatialVector<3>], 
+        start_index: usize, 
+        end_index: usize
+    ) -> Vec<SpatialVector<3>> {
+        // Could be par_iter
+        points.par_iter()
+        .map(|point| {
+            (start_index..end_index).into_iter().map(|i_panel| {
+                self.induced_velocity_from_panel(i_panel, *point)
+            }).sum()
+        }).collect()
+    }
+
+    fn induced_velocity_local_neglect_self_induced(
+        &self, 
+        points: &[SpatialVector<3>], 
+        start_index: usize, 
+        end_index: usize, 
+    ) -> Vec<SpatialVector<3>> {
+        // Could be par_iter
+        points.par_iter()
+        .enumerate()
+        .map(|(point_index, point)| {
+            (start_index..end_index).into_iter().map(|i_panel| {
+                let (_stream_index, span_index) = self.indices.reverse_panel_index(i_panel);
+
+                let wing_index_panel = self.wing_index(span_index);
+                let wing_index_point = self.wing_index(point_index);
+
+                if wing_index_panel == wing_index_point {
+                    SpatialVector::<3>::default()
+                } else {
+                    self.induced_velocity_from_panel(i_panel, *point)
+                }
+            }).sum()
+        }).collect()
+    }
+
     /// Calculates induced velocities from the panels starting at start_index and ending at end_index
     fn induced_velocities_local(
         &self, 
@@ -61,27 +101,11 @@ impl Wake {
         end_index: usize, 
         neglect_self_induced: bool
     ) -> Vec<SpatialVector<3>> {
-        points.par_iter()
-            .enumerate()
-            .map(|(point_index, point)| {
-                (start_index..end_index).into_iter().map(|i_panel| {
-                    if neglect_self_induced {
-                        let (_stream_index, span_index) = self.indices.reverse_panel_index(i_panel);
-
-                        let wing_index_panel = self.wing_index(span_index);
-                        let wing_index_point = self.wing_index(point_index);
-
-                        if wing_index_panel == wing_index_point {
-                            SpatialVector::<3>::default()
-                        } else {
-                            self.induced_velocity_from_panel(i_panel, *point)
-                        }
-
-                    } else {
-                        self.induced_velocity_from_panel(i_panel, *point)
-                    }
-                }).sum()
-            }).collect()
+        if neglect_self_induced {
+            self.induced_velocity_local_neglect_self_induced(points, start_index, end_index)
+        } else {
+            self.induced_velocities_local_include_self_induced(points, start_index, end_index)
+        }
     }
 
     #[inline(always)]
@@ -92,17 +116,9 @@ impl Wake {
         span_index: usize,
         point: SpatialVector<3>, 
     ) -> SpatialVector<3> {
-        let panel_points = self.panel_points(stream_index, span_index);
-
         let flat_index = self.indices.panel_index(stream_index, span_index);
 
-        let viscous_core_length = self.panels_viscous_core_length[flat_index];
-
-        self.potential_theory_model.induced_velocity_from_panel_with_unit_strength(
-            &panel_points, 
-            point,
-            viscous_core_length
-        )
+        self.unit_strength_induced_velocity_from_panel_flat_index(flat_index, point)
     }
 
     #[inline(always)]
@@ -112,9 +128,17 @@ impl Wake {
         panel_index: usize, 
         point: SpatialVector<3>, 
     ) -> SpatialVector<3> {
-        let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
+        let u_i = self.panels[panel_index].induced_velocity_with_unit_strength(point);
 
-        self.unit_strength_induced_velocity_from_panel(stream_index, span_index, point)
+        let point_mirrored = self.potential_theory_settings.symmetry_condition.mirrored_point(point);
+
+        if let Some(point_mirrored) = point_mirrored {
+            let u_i_m = self.panels[panel_index].induced_velocity_with_unit_strength(point_mirrored);
+
+            self.potential_theory_settings.symmetry_condition.corrected_velocity(u_i, u_i_m)
+        } else {
+            u_i
+        }
     }
 
     #[inline(always)]

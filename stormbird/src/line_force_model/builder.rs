@@ -24,6 +24,8 @@ pub struct LineForceModelBuilder {
     pub ctrl_point_chord_factor: f64,
     #[serde(default)]
     pub output_coordinate_system: CoordinateSystem,
+    #[serde(default)]
+    pub rotation_type: RotationType,
 }
 
 impl LineForceModelBuilder {
@@ -35,6 +37,7 @@ impl LineForceModelBuilder {
             circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
             output_coordinate_system: CoordinateSystem::Global,
+            rotation_type: RotationType::XYZ,
         }
     }
 

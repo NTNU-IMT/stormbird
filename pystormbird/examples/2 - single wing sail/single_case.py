@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import time
+
 import sys
 
 import argparse
@@ -55,6 +57,16 @@ if __name__ == "__main__":
         SimulationMode.DYNAMIC
     ]
 
+    '''cases = [
+        TestCase.PRESCRIBED_CIRCULATION, 
+        TestCase.RAW_SIMULATION
+    ]
+
+    modes = [
+        SimulationMode.STATIC,
+        SimulationMode.DYNAMIC
+    ]'''
+
     w_plot = 16
     fig = plt.figure(figsize=(w_plot, w_plot/3.0))
     ax1 = fig.add_subplot(131)
@@ -78,7 +90,16 @@ if __name__ == "__main__":
             write_wake_files=write_wake_files
         )
 
+        start_time = time.time()
+
         result_history = sim_case.run()
+
+        end_time = time.time()
+
+        elapsed_time = end_time - start_time
+
+        print('Elapsed time:', elapsed_time)
+        print('Time speed up', sim_case.end_time / elapsed_time)
 
         cd = np.zeros(len(result_history))
         cl = np.zeros(len(result_history))

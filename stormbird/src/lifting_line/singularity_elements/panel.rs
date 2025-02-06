@@ -7,112 +7,102 @@ use std::f64::consts::PI;
 use math_utils::spatial_vector::SpatialVector;
 use math_utils::spatial_vector::geometry_functions;
 
-use super::PotentialTheoryModel;
+use super::vortex_line;
 
-impl PotentialTheoryModel {
-    /// Function that calculates the induced velocity from a vortex panel, based on the corner points
-    /// given as input
-    pub fn induced_velocity_from_panel_with_unit_strength(
-        &self, 
-        panel_points: &[SpatialVector<3>; 4], 
-        ctrl_point: SpatialVector<3>,
+#[derive(Clone, Debug, Default)]
+pub struct Panel {
+    points: [SpatialVector<3>; 4],
+    center: SpatialVector<3>,
+    area: f64,
+    normal: SpatialVector<3>,
+    far_field_length: f64,
+    viscous_core_length: f64,
+}
+
+impl Panel {
+    pub fn new(
+        points: [SpatialVector<3>; 4],
+        far_field_ratio: f64,
         viscous_core_length: f64,
-    ) -> SpatialVector<3> {
-        let panel_center = 0.25 * (panel_points[0] + panel_points[1] + panel_points[2] + panel_points[3]);
-        let panel_area = geometry_functions::area_of_quadrilateral(&panel_points);
-        let panel_normal = geometry_functions::normal_of_quadrilateral(&panel_points);
+    ) -> Self {
+        let center = 0.25 * (points[0] + points[1] + points[2] + points[3]);
+        let area = geometry_functions::area_of_quadrilateral(&points);
+        let normal = geometry_functions::normal_of_quadrilateral(&points);
 
-        let distance_to_ctrl_point = (ctrl_point - panel_center).length();
-
-        let bound_vortex_length = (panel_points[1] - panel_points[0]).length();
-
-        let stream_length = (panel_points[2] - panel_points[1]).length();
+        let bound_vortex_length = (points[1] - points[0]).length();
+        let stream_length = (points[2] - points[1]).length();
 
         let representative_length = bound_vortex_length.max(stream_length);
 
-        let u_i = if distance_to_ctrl_point > representative_length * self.far_field_ratio {
+        let far_field_length = representative_length * far_field_ratio;
 
-            self.induced_velocity_from_panel_as_point_doublet_with_unit_strength(
-                panel_area, 
-                panel_normal,
-                panel_center,
-                ctrl_point
-            )
-        } else {
-            self.induced_velocity_from_panel_as_vortex_lines_with_unit_strength(
-                panel_points, 
-                ctrl_point, 
-                viscous_core_length
-            )
-        };
-
-        let ctrl_point_mirrored = self.symmetry_condition.mirrored_point(ctrl_point);
-
-        if let Some(ctrl_point_mirrored) = ctrl_point_mirrored {
-            let mirrored_distance_to_ctrl_point = (ctrl_point_mirrored - panel_center).length();
-
-            let u_i_m = if mirrored_distance_to_ctrl_point > representative_length * self.far_field_ratio {
-                self.induced_velocity_from_panel_as_point_doublet_with_unit_strength(
-                    panel_area, 
-                    panel_normal,
-                    panel_center, 
-                    ctrl_point_mirrored
-                )
-            } else {
-                self.induced_velocity_from_panel_as_vortex_lines_with_unit_strength(
-                    panel_points, 
-                    ctrl_point_mirrored, 
-                    viscous_core_length
-                )
-            };
-
-            self.symmetry_condition.corrected_velocity(u_i, u_i_m)
-        } else {
-            u_i
+        Self {
+            points,
+            center,
+            area,
+            normal,
+            far_field_length,
+            viscous_core_length,
         }
     }
 
-    pub fn induced_velocity_from_panel_as_vortex_lines_with_unit_strength(
+    /// Function that calculates the induced velocity from a vortex panel, based on the corner points
+    /// given as input
+    pub fn induced_velocity_with_unit_strength(
         &self, 
-        panel_points: &[SpatialVector<3>; 4], 
         ctrl_point: SpatialVector<3>,
-        viscous_core_length: f64,
     ) -> SpatialVector<3> {
-        let mut u_i: SpatialVector<3> = SpatialVector::<3>::default();
+        let distance_to_ctrl_point = (ctrl_point - self.center).length();
 
-        for i_point in 0..panel_points.len() {
-            let line_points: [SpatialVector<3>; 2] = if i_point == panel_points.len() - 1 {
-                [panel_points[i_point], panel_points[0]]
-            } else {
-                [panel_points[i_point], panel_points[i_point + 1]]
-            };
-
-            u_i += Self::induced_velocity_from_line_with_unit_strength(
-                &line_points, ctrl_point, viscous_core_length, self.closeness_error
-            );
+        if distance_to_ctrl_point > self.far_field_length {
+            self.induced_velocity_as_point_doublet_with_unit_strength(
+                ctrl_point
+            )
+        } else {
+            self.induced_velocity_as_vortex_lines_with_unit_strength(
+                ctrl_point, 
+            )
         }
-
-        u_i
     }
 
     /// Simplified formulation for a panel, based on a point formulation.
     /// Based on the equations from: 
     /// <https://ntrs.nasa.gov/api/citations/19900004884/downloads/19900004884.pdf>, page 38
-    pub fn induced_velocity_from_panel_as_point_doublet_with_unit_strength(
+    pub fn induced_velocity_as_point_doublet_with_unit_strength(
         &self, 
-        area: f64,
-        normal: SpatialVector<3>,
-        center: SpatialVector<3>,
         ctrl_point: SpatialVector<3>
     ) -> SpatialVector<3> {
-        let area_term = area / (4.0 * PI);
+        let area_term = self.area / (4.0 * PI);
 
-        let translated_point = ctrl_point - center;
+        let translated_point = ctrl_point - self.center;
 
         let distance = translated_point.length();
  
-        let normal_height = translated_point.dot(normal);
+        let normal_height = translated_point.dot(self.normal);
 
-        area_term * (3.0 * normal_height * translated_point - distance.powi(2) * normal) / distance.powi(5)
+        area_term * 
+        (3.0 * normal_height * translated_point - distance.powi(2) * self.normal) / 
+        distance.powi(5)
+    }
+
+    pub fn induced_velocity_as_vortex_lines_with_unit_strength(
+        &self, 
+        ctrl_point: SpatialVector<3>,
+    ) -> SpatialVector<3> {
+        let mut u_i: SpatialVector<3> = SpatialVector::<3>::default();
+
+        for i_point in 0..self.points.len() {
+            let line_points: [SpatialVector<3>; 2] = if i_point == self.points.len() - 1 {
+                [self.points[i_point], self.points[0]]
+            } else {
+                [self.points[i_point], self.points[i_point + 1]]
+            };
+
+            u_i += vortex_line::induced_velocity_from_line_with_unit_strength(
+                &line_points, ctrl_point, self.viscous_core_length
+            );
+        }
+
+        u_i
     }
 }

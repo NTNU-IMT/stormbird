@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 
 import json
 
+import time as time_func
+
 from simulation import SimulationCase, SimulationMode, TestCase
 
 section_model_path = '../1 - section models'
@@ -45,7 +47,7 @@ if __name__ == "__main__":
         TestCase.PRESCRIBED_CIRCULATION, 
         TestCase.INITIALIZED_SIMULATION,
         TestCase.SMOOTHED,
-        TestCase.SMOOTHED
+        TestCase.RAW_SIMULATION
     ]
 
     modes = [
@@ -63,7 +65,9 @@ if __name__ == "__main__":
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
     
+
     for case, mode in zip(cases, modes):
+        start_time = time_func.time()
         print()
         print(case.to_string())
 
@@ -91,6 +95,8 @@ if __name__ == "__main__":
 
             cd[angle_index] = force.x / sim_case.force_factor
             cl[angle_index] = force.y / sim_case.force_factor
+
+        print("Elapsed time: ", time_func.time() - start_time)
 
         cl_theory = cl_2d / (1 + 2/theoretical_aspect_ratio)
         cd_theory = cd_2d + cl_theory**2 / (np.pi * theoretical_aspect_ratio)

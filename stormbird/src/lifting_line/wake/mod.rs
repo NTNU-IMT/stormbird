@@ -4,8 +4,9 @@
 
 //! Implementations of wake models used to calculate induced velocities in lifting line simulations
 
+pub mod settings;
 pub mod builders;
-pub mod file_export;
+pub mod export;
 pub mod prelude;
 
 pub mod frozen_wake;
@@ -26,62 +27,7 @@ use rayon::iter::ParallelIterator;
 use std::ops::Range;
 
 use crate::lifting_line::singularity_elements::prelude::*;
-
-#[derive(Debug, Clone)]
-pub struct WakeIndices {
-    pub nr_points_along_span: usize,
-    pub nr_panels_along_span: usize,
-    pub nr_panels_per_line_element: usize,
-    pub nr_points_per_line_element: usize,
-}
-
-impl WakeIndices {
-    #[inline(always)]
-    /// Returns a flatten index for the wake panels. The panels are ordered streamwise-major.
-    fn panel_index(&self, stream_index: usize, span_index: usize) -> usize {
-        stream_index * self.nr_panels_along_span + span_index
-    }
-
-    #[inline(always)]
-    /// Returns the stream and span indices from a flatten index
-    fn reverse_panel_index(&self, flat_index: usize) -> (usize, usize) {
-        let stream_index = flat_index / self.nr_panels_along_span;
-        let span_index   = flat_index % self.nr_panels_along_span;
-
-        (stream_index, span_index)
-    }
-
-    #[inline(always)]
-    /// Returns a flatten index for the wake points. The points are ordered streamwise-major.
-    fn point_index(&self, stream_index: usize, span_index: usize) -> usize {
-        stream_index * self.nr_points_along_span + span_index
-    }
-
-    #[inline(always)]
-    /// Return the total number of panels
-    pub fn nr_panels(&self) -> usize {
-        self.nr_panels_along_span * self.nr_panels_per_line_element
-    }
-
-    #[inline(always)]
-    /// Return the total number of points
-    pub fn nr_points(&self) -> usize {
-        self.nr_points_along_span * self.nr_points_per_line_element
-    }
-}
-
-#[derive(Debug, Clone)]
-/// Settings for the wake
-pub struct WakeSettings {
-    pub first_panel_relative_length: f64,
-    pub last_panel_relative_length: f64,
-    pub use_chord_direction: bool,
-    pub strength_damping_factor: f64,
-    pub strength_damping_factor_separated: Option<f64>,
-    pub end_index_induced_velocities_on_wake: usize,
-    pub shape_damping_factor: f64,
-    pub neglect_self_induced_velocities: bool
-}
+use settings::*;
 
 #[derive(Debug, Clone)]
 /// Model of a wake for lifting line simulations
@@ -109,9 +55,9 @@ pub struct Wake {
     pub indices: WakeIndices,
     /// The points making up the vortex wake
     pub points: Vec<SpatialVector<3>>,
-    /// The area of the panels
+    /// The strength of the panels without damping
     pub undamped_strengths: Vec<f64>,
-    /// The strengths of the vortex lines
+    /// The strengths of the panels
     pub strengths: Vec<f64>,
     /// The life-time of the panels in the wake
     pub panels_lifetime: Vec<f64>,
@@ -122,11 +68,13 @@ pub struct Wake {
     /// Settings for the wake behavior
     pub settings: WakeSettings,
     /// The model used to calculate induced velocities from vortex lines
-    pub potential_theory_model: PotentialTheoryModel,
+    pub potential_theory_settings: PotentialTheorySettings,
     /// To determine which wing the wake points belong to. Copied directly from the line force model
     pub wing_indices: Vec<Range<usize>>,
     /// Counter to keep track of the number of time steps that have been completed
     pub number_of_time_steps_completed: usize,
+    /// Panel geometry data
+    pub panels: Vec<Panel>,
 }
 
 impl Wake {

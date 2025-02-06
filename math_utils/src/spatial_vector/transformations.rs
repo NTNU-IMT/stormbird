@@ -6,6 +6,15 @@
 
 use super::*;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum RotationType {
+    #[default]
+    XYZ,
+    YawPitchRoll,
+}
+
 impl SpatialVector<3> {
     #[inline]
     /// Translates the vector by the given translation vector
@@ -23,7 +32,18 @@ impl SpatialVector<3> {
         let cos_angle = angle.cos();
         let sin_angle = angle.sin();
 
-        self * cos_angle + axis_normalized.cross(self) * sin_angle + axis_normalized * axis_normalized.dot(self) * (1.0 - cos_angle)   
+        let term1 = self * cos_angle;
+        let term2 = axis_normalized.cross(self) * sin_angle;
+        let term3 = axis_normalized * axis_normalized.dot(self) * (1.0 - cos_angle);
+
+        term1 + term2 + term3
+    }
+
+    pub fn rotate(self, rotation: Self, rotation_type: RotationType) -> Self {
+        match rotation_type {
+            RotationType::XYZ => self.rotate_xyz(rotation),
+            RotationType::YawPitchRoll => self.rotate_yaw_pitch_roll(rotation),
+        }
     }
 
     #[inline]
@@ -49,7 +69,7 @@ impl SpatialVector<3> {
     /// | cos -sin 0 |
     /// | sin  cos 0 |
     /// | 0    0   1 |
-    pub fn rotate(self, rotation: Self) -> Self {
+    pub fn rotate_xyz(self, rotation: Self) -> Self {
         let mut new_vector = self;
 
         if rotation[0] != 0.0 {
@@ -77,22 +97,57 @@ impl SpatialVector<3> {
     }
 
     #[inline]
+    /// Rotates the vector around the yaw, pitch, and roll angles specified in the rotation vector
+    pub fn rotate_yaw_pitch_roll(self, rotation: Self) -> Self {
+        let yaw_axis = SpatialVector::<3>::unit_z();
+
+        let pitch_axis = SpatialVector::<3>::unit_y()
+            .rotate_around_axis(rotation[2], yaw_axis);
+
+        let roll_axis = SpatialVector::<3>::unit_x()
+            .rotate_around_axis(rotation[2], yaw_axis)
+            .rotate_around_axis(rotation[1], pitch_axis);
+
+        self.rotate_around_axis(rotation[2], yaw_axis)
+            .rotate_around_axis(rotation[1], pitch_axis)
+            .rotate_around_axis(rotation[0], roll_axis)
+    }
+
+    #[inline]
     /// Rotates the vector around a point in space
-    pub fn rotate_around_point(self, rotation: Self, point: Self) -> Self {
-        (self - point).rotate(rotation) + point
+    pub fn rotate_around_point(self, rotation: Self, point: Self, rotation_type: RotationType) -> Self {
+        (self - point).rotate(rotation, rotation_type) + point
+    }
+
+    pub fn rotated_system_axes(&self, rotation: Self, rotation_type: RotationType) -> [Self; 3] {
+        let x_axis = SpatialVector::<3>::unit_x().rotate(rotation, rotation_type);
+        let y_axis = SpatialVector::<3>::unit_y().rotate(rotation, rotation_type);
+        let z_axis = SpatialVector::<3>::unit_z().rotate(rotation, rotation_type);
+
+        [x_axis, y_axis, z_axis]
+    }
+
+    /// Assumes self is expressed in a rotated coordinate system, specified by the system rotation
+    /// input, and transforms it back to the global coordinate system.
+    pub fn from_rotated_to_global_system(self, system_rotation: Self, rotation_type: RotationType) -> Self {
+        let rotated_system_axes = self.rotated_system_axes(system_rotation, rotation_type);
+
+        Self([
+            self[0] * rotated_system_axes[0][0] + self[1] * rotated_system_axes[1][0] + self[2] * rotated_system_axes[2][0],
+            self[0] * rotated_system_axes[0][1] + self[1] * rotated_system_axes[1][1] + self[2] * rotated_system_axes[2][1],
+            self[0] * rotated_system_axes[0][2] + self[1] * rotated_system_axes[1][2] + self[2] * rotated_system_axes[2][2],
+        ])
     }
 
     /// Expresses the vector in a coordinate system that is rotated by the input rotation, relative
     /// to the original coordinate system for the vector.
-    pub fn in_rotated_coordinate_system(self, system_rotation: Self) -> Self {
-        let x_axis = SpatialVector::<3>::unit_x().rotate(system_rotation);
-        let y_axis = SpatialVector::<3>::unit_y().rotate(system_rotation);
-        let z_axis = SpatialVector::<3>::unit_z().rotate(system_rotation);
+    pub fn in_rotated_coordinate_system(self, system_rotation: Self, rotation_type: RotationType  ) -> Self {
+        let rotated_system_axes = self.rotated_system_axes(system_rotation, rotation_type);
 
         Self([
-            self.dot(x_axis),
-            self.dot(y_axis),
-            self.dot(z_axis),
+            self.dot(rotated_system_axes[0]),
+            self.dot(rotated_system_axes[1]),
+            self.dot(rotated_system_axes[2]),
         ])
     }
 
@@ -106,9 +161,10 @@ impl SpatialVector<3> {
         system_rotation: Self,
         system_translation: Self,
         force_that_created_the_moment: Self,
+        rotation_type: RotationType
     ) -> Self {
         // Rotation of the moment vector
-        let rotated_moment = self.in_rotated_coordinate_system(system_rotation);
+        let rotated_moment = self.in_rotated_coordinate_system(system_rotation, rotation_type);
         
         // The additional moment created by the force due to translation
         // The *arm* in the new coordinate system is the negative of the translation vector from old
@@ -116,7 +172,7 @@ impl SpatialVector<3> {
         // resulting moment must also be rotated.
         let moment_arm = -system_translation;
         let moment_due_to_force = moment_arm.cross(force_that_created_the_moment);
-        let rotated_moment_due_to_force = moment_due_to_force.in_rotated_coordinate_system(system_rotation);
+        let rotated_moment_due_to_force = moment_due_to_force.in_rotated_coordinate_system(system_rotation, rotation_type);
 
         rotated_moment + rotated_moment_due_to_force
     }
@@ -137,9 +193,11 @@ mod tests {
             -16.1_f64.to_radians(),
         );
 
+        let rotation_type = RotationType::XYZ;
+
         let original_vector = SpatialVector::<3>::new(1.3, 1.2, 1.5);
 
-        let rotated_vector_1 = original_vector.rotate(rotation);
+        let rotated_vector_1 = original_vector.rotate(rotation, rotation_type);
         let rotated_vector_2 = original_vector
             .rotate_around_axis(rotation[0], SpatialVector::<3>::unit_x())
             .rotate_around_axis(rotation[1], SpatialVector::<3>::unit_y())
@@ -158,14 +216,98 @@ mod tests {
 
         let moment = location.cross(force);
 
+        let rotation_type = RotationType::XYZ;
+
         let transformed_moment = moment.moment_in_new_coordinate_system(
             rotation,
             location,
             force,
+            rotation_type
         );
 
         dbg!(moment, transformed_moment);
 
         assert!(transformed_moment.length() < 1e-6)
+    }
+
+    #[test]
+    fn negative_rotation() {
+        let vector = SpatialVector([-1.0, 0.0, 0.0]);
+        
+        let negative_axis = SpatialVector([0.0, 0.0, -1.0]);
+        let positive_axis = SpatialVector([0.0, 0.0, 1.0]);
+
+        let rotation_angle = 90.0_f64.to_radians();
+
+        let rotated_vector_1 = vector.rotate_around_axis(-rotation_angle, negative_axis);
+        let rotated_vector_2 = vector.rotate_around_axis(rotation_angle, positive_axis);
+
+        let difference = rotated_vector_1 - rotated_vector_2;
+
+        assert!(difference[0].abs() < 1e-6);
+        assert!(difference[1].abs() < 1e-6);
+        assert!(difference[2].abs() < 1e-6);
+    }
+
+    #[test]
+    fn xyz_rotation_compared_against_blender(){
+        let vector = SpatialVector([1.0, 1.0, 1.0]);
+
+        let rotation = SpatialVector(
+            [
+                30.0_f64.to_radians(),
+                21.2_f64.to_radians(),
+                -16.1_f64.to_radians(),
+            ]
+        );
+
+        let expected_result = SpatialVector([1.47188, -0.043868, 0.91195]); // From blender
+
+        let calculated_result = vector.rotate_xyz(rotation);
+
+        assert!((calculated_result[0] - expected_result[0]).abs() < 0.00001);
+        assert!((calculated_result[1] - expected_result[1]).abs() < 0.00001);
+        assert!((calculated_result[2] - expected_result[2]).abs() < 0.00001);
+        
+
+        dbg!(calculated_result, expected_result);
+    }
+
+    #[test]
+    fn yaw_pitch_roll_rotation() {
+        let vector = SpatialVector([1.2, 0.0, 0.0]);
+
+        let pure_yaw_rotation = SpatialVector([0.0, 0.0, 90.0_f64.to_radians()]);
+        let pure_pitch_rotation = SpatialVector([0.0, 90.0_f64.to_radians(), 0.0]);
+        let combined_rotation = SpatialVector([0.0, -90.0_f64.to_radians(), 90.0_f64.to_radians()]);
+
+        let yaw_rotated_vector = vector.rotate_yaw_pitch_roll(pure_yaw_rotation);
+        let pitch_rotated_vector = vector.rotate_yaw_pitch_roll(pure_pitch_rotation);
+        let combined_rotated_vector = vector.rotate_yaw_pitch_roll(combined_rotation);
+        
+        assert!((yaw_rotated_vector[1] - vector[0]).abs() < 1e-6);
+        assert!((pitch_rotated_vector[2] + vector[0]).abs() < 1e-6);
+        assert!((combined_rotated_vector[2] - vector[0]).abs() < 1e-6);
+
+        dbg!(yaw_rotated_vector, pitch_rotated_vector, combined_rotated_vector);
+
+        // Extrinsic xyz rotation should be the same as intrinsic yaw-pitch-roll rotation
+        let vector = SpatialVector([1.2, 4.0, 2.0]);
+
+        let yaw_angle = 30.0_f64.to_radians();
+        let pitch_angle = 21.2_f64.to_radians();
+        let roll_angle = -16.1_f64.to_radians();
+
+        let rotation = SpatialVector([roll_angle, pitch_angle, yaw_angle]);
+
+        let test_1 = vector.rotate_xyz(rotation);
+        let test_2 = vector.rotate_yaw_pitch_roll(rotation);
+
+        dbg!(test_1, test_2);
+
+        assert!((test_1[0] - test_2[0]).abs() < 1e-6);
+        assert!((test_1[1] - test_2[1]).abs() < 1e-6);
+        assert!((test_1[2] - test_2[2]).abs() < 1e-6);
+
     }
 }

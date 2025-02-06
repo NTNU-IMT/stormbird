@@ -10,10 +10,14 @@ Articles that use the Stormbird library directly is shown in the sub sections be
 
 ## Lifting line
 ### Open source projects
+Below is a list of other open source lifting line implementations that have similar functionality as Stormbird
+
 - **[CN-AeroModels](https://gitlab.com/lheea/CN-AeroModels)**. An open source implementation of a discrete static lifting line, intended for wind propulsion modelling. The capabilities of this software are very similar to the static lifting line implementation in Stormbird.
 - **[MachUpX](https://github.com/usuaero/MachUpX)**. An open source implementation of a discrete static lifting line, intended for wings with and without sweep.
 
 ### Papers
+Below is a list of papers that either use lifting line methods for sail modeling or serves as direct inspiration for the lifting line method implemented in Stormbird.
+
 - **[Modern Adaptation of Prandtl's Classic Lifting-Line Theory](https://arc.aiaa.org/doi/abs/10.2514/2.2649?journalCode=ja)** (2000) by W. F. Phillips and more. First known example of a discrete lifting line, as in, capable of modelling multiple wings in the same simulation.
 - **[A Numerical Lifting-Line Method Using Horseshoe Vortex Sheets](https://digitalcommons.usu.edu/spacegrant/2011/Session1/4/)** (2011) by W. F. Phillips. Another example of a discrete lifting line implementation.
 - **[Numerical analysis of multiple, thin-sail geometries based on Prandtl’s lifting-line theory](https://www.sciencedirect.com/science/article/pii/S0045793013001606)** (2013) by R. E. Spall and more. A paper about modeling sails using lifting line theory. The output is compared against other potential theory methods with good results.

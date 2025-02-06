@@ -17,3 +17,6 @@ pub mod spatial_vector;
 pub mod special_functions;
 pub mod multi_dimensional_indices;
 pub mod float_trait;
+pub mod solvers;
+pub mod array2;
+pub mod filters;

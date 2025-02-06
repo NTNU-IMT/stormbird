@@ -58,7 +58,7 @@ class TestCase(Enum):
         '''
         match self:
             case TestCase.SMOOTHED:
-                return 0.05
+                return 0.1
             case _:
                 return None
 
@@ -132,6 +132,14 @@ class SimulationCase():
             }
 
         return line_force_model
+    
+    @property
+    def end_time(self) -> float:
+        return 40 * self.chord_length / self.freestream_velocity
+    
+    @property
+    def time_step(self) -> float:
+        return 0.25 * self.chord_length / self.freestream_velocity
 
     
     def run(self):
@@ -140,15 +148,12 @@ class SimulationCase():
         line_force_model = self.get_line_force_model()
             
         solver = {
-            "max_iterations_per_time_step": 20,
+            "max_iterations_per_time_step": 10,
             "damping_factor": 0.1
         } if self.simulation_mode == SimulationMode.DYNAMIC else {
             "max_iterations_per_time_step": 1000,
             "damping_factor": 0.05
         }   
-
-        end_time = 40 * self.chord_length / self.freestream_velocity
-        dt = 0.25 * self.chord_length / self.freestream_velocity
 
         wake = {}
 
@@ -157,7 +162,12 @@ class SimulationCase():
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
-                wake["strength_damping_factor_separated"] = 0.5
+                #wake["viscous_core_length_separated"] = {
+                #    "Absolute": 1.0 * self.chord_length
+                #}
+
+                wake["strength_damping"] = "DirectFromStall"
+
                 wake["wake_length"] = {
                     "NrPanels": 200
                 }
@@ -192,7 +202,7 @@ class SimulationCase():
 
         simulation = Simulation(
             setup_string = setup_string,
-            initial_time_step = dt,
+            initial_time_step = self.time_step,
             initialization_velocity = freestream_velocity
         )
 
@@ -211,14 +221,14 @@ class SimulationCase():
         simulation.set_local_wing_angles([-np.radians(self.angle_of_attack)])
 
         if self.simulation_mode == SimulationMode.DYNAMIC:
-            while current_time < end_time:
+            while current_time < self.end_time:
                 result = simulation.do_step(
                     time = current_time, 
-                    time_step = dt, 
+                    time_step = self.time_step, 
                     freestream_velocity = freestream_velocity_list
                 )
 
-                current_time += dt
+                current_time += self.time_step
 
                 result_history.append(result)
         else:
@@ -227,13 +237,13 @@ class SimulationCase():
             if self.prescribed_initialization:
                 simulation.initialize_with_elliptic_distribution(
                     time = current_time,
-                    time_step = end_time,
+                    time_step = self.time_step,
                     freestream_velocity = freestream_velocity_list
                 )
 
             result = simulation.do_step(
                 time = current_time, 
-                time_step = end_time, 
+                time_step = self.time_step, 
                 freestream_velocity = freestream_velocity_list
             )
 

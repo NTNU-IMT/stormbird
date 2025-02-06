@@ -13,6 +13,8 @@ use crate::lifting_line::simulation_builder::{
 
 use super::test_setup::RectangularWing;
 
+use math_utils::spatial_vector::transformations::RotationType;
+
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
 fn coordinate_systems() {
@@ -100,15 +102,19 @@ fn coordinate_systems() {
     let moments_global = result_global.integrated_moments_sum();
     let moments_body = result_body.integrated_moments_sum();
 
+    let rotation_type = RotationType::XYZ;
+
 
     let forces_global_transformed = forces_global.in_rotated_coordinate_system(
-        rotation
+        rotation,
+        rotation_type
     );
 
     let moment_global_transformed = moments_global.moment_in_new_coordinate_system(
         rotation,
         translation,
-        forces_global
+        forces_global,
+        rotation_type
     );
 
     let force_error_body = (forces_body - forces_fixed).length() / forces_fixed.length();

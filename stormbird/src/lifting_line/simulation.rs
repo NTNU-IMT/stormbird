@@ -14,11 +14,14 @@ use super::simulation_builder::SimulationBuilder;
 
 use super::wake::line_force_model_data::LineForceModelData;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone)]
 /// Struct that contains the data needed to run a dynamic simulation.
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     pub wake: Wake,
+    pub frozen_wake: FrozenWake,
     pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
     pub write_wake_data_to_file: bool,
@@ -30,7 +33,7 @@ impl Simulation {
         setup_string: &str,
         initial_time_step: f64,
         wake_initial_velocity: SpatialVector<3>
-    ) -> Result<Self, String> {
+    ) -> Result<Self, Error> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
         Ok(builder.build(initial_time_step, wake_initial_velocity))
@@ -84,16 +87,16 @@ impl Simulation {
 
         self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
 
-        let frozen_wake = FrozenWake::from_wake(
+        self.frozen_wake.update(
             &self.line_force_model,
             &self.wake
         );
-
+   
         // Solve for the circulation strength
         let solver_result = self.solver.do_step(
             &self.line_force_model,
             &felt_ctrl_points_freestream,
-            &frozen_wake,
+            &self.frozen_wake,
             &self.previous_circulation_strength
         );
 
@@ -103,7 +106,6 @@ impl Simulation {
             &solver_result.ctrl_point_velocity,
         );
 
-        // Update the wake model if needed
         self.wake.update_after_completed_time_step(
             &solver_result.circulation_strength,
             &line_force_model_data,

@@ -70,4 +70,12 @@ impl SimulationResult {
 
         Ok(())
     }
+
+    pub fn nr_span_lines(&self) -> usize {
+        self.ctrl_points.len()
+    }
+
+    pub fn nr_of_wings(&self) -> usize {
+        self.integrated_forces.len()
+    }
 }
