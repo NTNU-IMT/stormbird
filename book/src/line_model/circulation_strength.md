@@ -72,7 +72,7 @@ As can bee seen, simple Gaussian smoothing introduces some errors towards the en
 
 ## Prescribed distribution
 
-Predetermined circulation distributions are a special mode where the circulation is forces to always follow a simple mathematical shape. For instance, it is possible to force the distribution to always be elliptical. This gives very stable simulations, and sometimes results that are very close a *full simulation*. It is particular useful if the goal is only to estimate interaction effects between wings, but where the lift and drag for a single wing is already known from, for instance, experimental or CFD results. **more on this to come**.
+Predetermined circulation distributions are a special mode where the circulation is forces to always follow a simple mathematical shape. For instance, it is possible to force the distribution to always be elliptical. This gives very stable simulations, and sometimes results that are very close a *full simulation*. It is particular useful if the goal is only to estimate interaction effects between wings, but where the lift and drag for a single wing is already known from, for instance, experimental or CFD results.
 
 A view of the `PrescribedCirculationShape` structure: 
 
@@ -82,3 +82,13 @@ pub struct PrescribedCirculationShape {
     pub outer_power: f64,
 }
 ```
+
+The parameters in the structure is used to force the circulation to always follow a mathematical shape that looks like the equation below, where \\(s\\) is the local non-dimensional span distance, varying from -0.5 to 0.5 along each wing:
+
+\\[
+    \Gamma(s) = \Gamma_0 (1.0 - (2 s)^{\text{inner_power}})^{\text{outer_power}}
+\\]
+
+The default values are to set `inner_power` to 2.0 and `outer_power` to 0.5. This corresponds to an elliptic distributions.
+
+

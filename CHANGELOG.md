@@ -21,7 +21,6 @@ Mostly a restructuring of the internal data, with the goal of either simplifying
 - The changes to the interface on the rust side also affects the Python side, as Python still relies on JSON strings to set up models. See the updated examples for how to set up models. The most important change is perhaps the change in the spatial vector name, from `Vec3` to `SpatialVector`.
 
 ## 0.5.0 - 2024-10-21
-
 ### Highlights
 - Some internal clean up of methods and structures
 - It is now possible to get forces in *either* a global coordinate system or a body-fixed coordinate system
@@ -39,3 +38,12 @@ Mostly a restructuring of the internal data, with the goal of either simplifying
 ## 0.5.1 - 2024-10-24
 ### Bug fixes
 - Fixed a bug in the dynamic wake update. The last and fist panels in the dynamic wake was not updated entirly correctly when the wing was moving. The last panel was only moved in the direction of the freestream velocity, if the last panel length was set to be longer than the time step would indicate, the motion became incorrect. The second panel behind the line force model was also updated wrong, as the position was integrated in time from the current version of the first apnel, not the previous. This caused a small "bend" in the wake when the wing was moving.
+
+## 0.5.2 - 2025-02-06
+### Highlights
+This update was mostly about small changes to the FMU version, to better facilitate hybrid testing of wind-powered ships. The background was the first test of Stormbird in a hybrid test campaign in the SeaZero project. 
+
+In particular, the interface to the FMU was changed to fit better with the needs in such experiments. This included the following:
+- Possibility of applying Froude model scaling to the input (from model scale to full-scale) and output (from full-scale to model scale)
+- All parameters where moved to separate JSON files. The reason was simply that the current lab software used for doing hybrid tests only supports float variables directly in the FMU. There was therefore a need to move all non-float parameters to a separate interface. To make the setup consistent, all parameters where therefore moved to a separate JSON file. The file path can still be specified in the FMU, but it also has a default value suitable for hybrid testing (the default value only makes sense for the hybrid testing setup, so please specify the path in any other case)
+- Adding possibility the possibility of specifying "translational velocity" as input to the FMU. This is an alternative to applying motion directly through updates to the position, and instead specify the motion velocity directly. That is, the velocity due to translational motion, not rotational (that might come later but was not necessary in this case)

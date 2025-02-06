@@ -34,25 +34,25 @@ fn print_to_file(s: &str, file_path: &str) {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Parameters {
-    lifting_line_setup_file_path: String,
+    pub lifting_line_setup_file_path: String,
     #[serde(default)]
-    wind_environment_setup_file_path: String,
+    pub wind_environment_setup_file_path: String,
     #[serde(default)]
-    angles_in_degrees: bool,
+    pub angles_in_degrees: bool,
     #[serde(default)]
-    negative_z_is_up: bool,
+    pub negative_z_is_up: bool,
     #[serde(default)]
-    reverse_wind_direction: bool,
+    pub reverse_wind_direction: bool,
     #[serde(default)]
-    reverse_translational_velocity: bool,
+    pub reverse_translational_velocity: bool,
     #[serde(default)]
-    non_dim_spanwise_measurement_position: f64,
+    pub non_dim_spanwise_measurement_position: f64,
     #[serde(default)]
-    visualization_server_address: String,
+    pub visualization_server_address: String,
     #[serde(default)]
-    model_scale_factor: f64,
+    pub model_scale_factor: f64,
     #[serde(default)]
-    input_moving_average_window_size: usize,
+    pub input_moving_average_window_size: usize,
     #[serde(default)]
     pub max_input_velocity: Option<f64>,
     #[serde(default)]

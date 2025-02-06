@@ -1,6 +1,2 @@
 # Actuator line
-An actuator line model is essentially the same as a lifting line model, except that the velocity field is entirely modeled using a CFD solver. There are t least two benefits with this approach. The first is that most of the complexity related to how model the velocity field is can be moved to an external solver. As CFD solvers are grid-based, they naturally handle dynamic effects in the wake. The second, and most important benefit, is that it becomes possible to combine a simplified model of a lifting surface with other *models* in the CFD solver. This can, for instance, be other geometric structures that are represented directly in the mesh, as usual for CFD solvers. 
-
-However, the new challenge with an actuator becomes how to connect the simplified line force model of a lifting surface to the actual simulated fluid in the CFD solver. 
-
-The genera principle in an actuator line method is to project forces estimated from the line force model as *body forces* in the CFD domain. If the shape and magnitude of this body force distribution is correct, the flow field will be affected approximately in the same manner 
+TO COME!
