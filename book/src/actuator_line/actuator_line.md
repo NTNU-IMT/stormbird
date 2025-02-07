@@ -1,2 +1,9 @@
 # Actuator line
-TO COME!
+
+An actuator line model is essentially the same as a lifting line model, but specicically made to interact with a CFD simualtion. The wings are divided into line segments and the forces on each line segment are dependent on the local velocity and the sectional models. However, unlike a lifting line simulation, there is no potential theory wake. The velocity at each control point is instead estimated directly from the velocity field in a CFD solver. The benefit of this is that other structures may influence the felt velocity at each control point. For the sake of sail simualtions, this allows for modelling the interaction effects between the deck and superstructure and the sails.
+
+However, an actuator line model is different in how it account for lift-induced velocities. Rather than using a potential theory wake, the effect of the lift force on the wings are projected directly to the CFD solver using a body force field. This approach is similar to simplified models for propellers in CFD, such as actuator disks models and Blade Element Momentum models.
+
+The actuator line implementation in Stormbird uses the same line force model and the same sectional models as the lifting line implementation. However two new core functionalities must be implemented; 1) fucntionality to estimate the velocity at the control points for each line segement and 2) functionality to project forces from the line force model back into the CFD domain. 
+
+These topics are described in this chapter, along with details how the actuator line model can be set up and how it can be used together with the open source CFD solver [OpenFOAM](https://www.openfoam.com/) to run actual simulations.
