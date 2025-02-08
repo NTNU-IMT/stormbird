@@ -129,7 +129,7 @@ pub struct SimulationResult {
 impl SimulationResult {
     #[classmethod]
     pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> Vec<SimulationResult> {
-        let rust_vector = SimulationResultRust::result_history_from_file(&file_path);
+        let rust_vector = SimulationResultRust::result_history_from_file(&file_path).unwrap();
 
         rust_vector.iter().map(|v| SimulationResult { data: v.clone() }).collect()
     }

@@ -26,7 +26,7 @@ pub struct LineForceModel {
 impl LineForceModel {
     #[new]
     pub fn new(json_string: String) -> Self {
-        let builder = LineForceModelBuilderRust::new_from_string(&json_string);
+        let builder = LineForceModelBuilderRust::new_from_string(&json_string).unwrap();
 
         Self {
             data: builder.build()

@@ -7,6 +7,8 @@ use math_utils::special_functions;
 
 use std::f64::consts::PI;
 
+use crate::error::Error;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum StallModel {
     #[default]
@@ -121,8 +123,10 @@ impl Foil {
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
     pub fn default_cd_power_after_stall() -> f64 {1.6}
 
-    pub fn new_from_string(string: &str) -> Self {
-        serde_json::from_str(string).unwrap()
+    pub fn new_from_string(string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(string)?;
+
+        Ok(serde_res)
     }
 
     pub fn to_string(&self) -> String {

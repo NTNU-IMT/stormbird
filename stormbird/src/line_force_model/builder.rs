@@ -9,6 +9,8 @@ use super::*;
 
 use super::single_wing::WingBuilder;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LineForceModelBuilder {
@@ -41,8 +43,10 @@ impl LineForceModelBuilder {
         }
     }
 
-    pub fn new_from_string(setup_string: &str) -> Self {
-        serde_json::from_str(setup_string).unwrap()
+    pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(setup_string)?;
+
+        Ok(serde_res)
     }
 
     pub fn add_wing(&mut self, wing_builder: WingBuilder) {

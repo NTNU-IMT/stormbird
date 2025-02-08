@@ -72,7 +72,7 @@ impl Foil {
     #[classmethod]
     pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
         Self {
-            data: FoilRust::new_from_string(&string)
+            data: FoilRust::new_from_string(&string).unwrap()
         }
     }
 
