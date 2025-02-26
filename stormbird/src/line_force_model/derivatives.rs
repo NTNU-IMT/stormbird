@@ -42,7 +42,7 @@ impl LineForceModel {
 
     pub fn update_derivatives(&mut self, current_velocity: &[SpatialVector<3>], current_angles_of_attack: &[f64]) {
         let ctrl_points = self.ctrl_points();
-        let rotation = self.rotation.clone();
+        let rotation = self.rigid_body_motion.rotation.clone();
         
         if let Some(derivatives) = self.derivatives.as_mut() {
             derivatives.motion.update(&ctrl_points, rotation);

@@ -61,11 +61,11 @@ fn coordinate_systems() {
         SimulationMode::QuasiSteady(steady_settings.clone())
     ).build(time_step, velocity);
 
-    sim_global.line_force_model.rotation = rotation;
-    sim_body.line_force_model.rotation = rotation;
-
-    sim_global.line_force_model.translation = translation;
-    sim_body.line_force_model.translation = translation;
+    sim_global.line_force_model.rigid_body_motion.rotation = rotation;
+    sim_body.line_force_model.rigid_body_motion.rotation = rotation;
+    
+    sim_global.line_force_model.rigid_body_motion.translation = translation;
+    sim_body.line_force_model.rigid_body_motion.translation = translation;
 
     let velocity_points = sim_global.get_freestream_velocity_points();
 

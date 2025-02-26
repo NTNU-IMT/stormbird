@@ -141,11 +141,11 @@ impl LineForceModel {
         match self.output_coordinate_system {
             CoordinateSystem::Body => {
                 for i in 0..nr_span_lines {
-                    velocity[i] = velocity[i].in_rotated_coordinate_system(self.rotation, self.rotation_type);
-                    acceleration[i] = acceleration[i].in_rotated_coordinate_system(self.rotation, self.rotation_type);
+                    velocity[i] = self.rigid_body_motion.vector_in_body_fixed_coordinate_system(velocity[i]);
+                    acceleration[i] = self.rigid_body_motion.vector_in_body_fixed_coordinate_system(acceleration[i]);
                 }
 
-                rotation_velocity = rotation_velocity.in_rotated_coordinate_system(self.rotation, self.rotation_type);
+                rotation_velocity = self.rigid_body_motion.vector_in_body_fixed_coordinate_system(rotation_velocity);
             },
             CoordinateSystem::Global => {}
         }

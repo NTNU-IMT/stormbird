@@ -41,7 +41,7 @@ impl MotionDerivatives {
         
         Self {
             ctrl_points_history: [ctrl_points.clone(), ctrl_points],
-            rotation_history: [line_force_model.rotation, line_force_model.rotation],
+            rotation_history: [line_force_model.rigid_body_motion.rotation, line_force_model.rigid_body_motion.rotation],
             update_count: 0,
         }
     }
@@ -82,7 +82,7 @@ impl MotionDerivatives {
         let rotation_history = [
             self.rotation_history[0],
             self.rotation_history[1],
-            line_force_model.rotation
+            line_force_model.rigid_body_motion.rotation
         ];
 
         finite_difference::first_derivative_second_order_backward(

@@ -63,7 +63,7 @@ fn right_sign_of_the_force_when_translating() {
 
         let translation = SpatialVector([0.0, translation_y, 0.0]);
 
-        sim.line_force_model.translation = translation;
+        sim.line_force_model.rigid_body_motion.translation = translation;
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
     
@@ -129,7 +129,7 @@ fn right_sign_of_the_moment_when_rotating() {
 
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
-        sim.line_force_model.rotation = rotation;
+        sim.line_force_model.rigid_body_motion.rotation = rotation;
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
         
@@ -180,7 +180,7 @@ fn rotational_velocity() {
         let rotation = SpatialVector([rotation_x, 0.0, 0.0]);
         let velocity = SpatialVector([rotation_vel_x, 0.0, 0.0]);
 
-        line_force_model.rotation = rotation;
+        line_force_model.rigid_body_motion.rotation = rotation;
 
         let motion_velocity = motion_calculator.ctrl_point_velocity(&line_force_model, time_step);
         
@@ -206,6 +206,6 @@ fn rotational_velocity() {
             }
         }
     
-        motion_calculator.update(&ctrl_points, line_force_model.rotation);
+        motion_calculator.update(&ctrl_points, line_force_model.rigid_body_motion.rotation);
     }
 }

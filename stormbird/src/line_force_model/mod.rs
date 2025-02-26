@@ -24,6 +24,7 @@ pub mod prelude;
 pub mod single_wing;
 
 pub mod motion;
+pub mod rigid_body_motion;
 
 #[cfg(test)]
 mod tests;
@@ -32,6 +33,7 @@ use crate::io_structs::prelude::*;
 use crate::section_models::SectionModel;
 
 use self::motion::derivatives::Derivatives;
+use self::rigid_body_motion::RigidBodyMotion;
 
 use circulation_corrections::CirculationCorrection;
 use single_wing::SingleWing;
@@ -51,10 +53,8 @@ pub struct LineForceModel {
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
     pub wing_indices: Vec<Range<usize>>,
-    /// Translation from local to global coordinates
-    pub translation: SpatialVector<3>,
-    /// Rotation from local to global coordinates
-    pub rotation: SpatialVector<3>,
+    /// Motion of the line force model
+    pub rigid_body_motion: RigidBodyMotion,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along
     /// the span axis during a dynamic simulation. The typical example is changing the angle of
     /// attack on a wing sail due to changing apparent wind conditions.
@@ -84,8 +84,6 @@ pub struct LineForceModel {
     pub ctrl_point_chord_factor: f64,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
-    /// Rotation type used in the calculations
-    pub rotation_type: RotationType,
     /// Optional model for calculation motion and flow derivatives
     derivatives: Option<Derivatives>,
 }
@@ -108,8 +106,7 @@ impl LineForceModel {
             chord_vectors_local: Vec::new(),
             section_models: Vec::new(),
             wing_indices: Vec::new(),
-            translation: SpatialVector::<3>::default(),
-            rotation: SpatialVector::<3>::default(),
+            rigid_body_motion: RigidBodyMotion::default(),
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
             virtual_wings: Vec::new(),
@@ -118,7 +115,6 @@ impl LineForceModel {
             circulation_corrections: Default::default(),
             ctrl_point_chord_factor: 0.0,
             output_coordinate_system: CoordinateSystem::Global,
-            rotation_type: RotationType::XYZ,
         }
     }
 
@@ -223,20 +219,18 @@ impl LineForceModel {
     }
 
     pub fn span_line_at_index(&self, index: usize) -> SpanLine {
-        let (angle, axis) = self.wing_rotation_data_from_global(index);
+        let mut span_line = self.span_lines_local[index].clone();
 
-        self.span_lines_local[index]
-            .rotate_around_axis(angle, axis)
-            .rotate(self.rotation, self.rotation_type)
-            .translate(self.translation)
+        span_line.start_point = self.rigid_body_motion.transform_point(span_line.start_point);
+        span_line.end_point = self.rigid_body_motion.transform_point(span_line.end_point);
+
+        span_line
     }
 
     /// Returns the span lines in global coordinates.
     pub fn span_lines(&self) -> Vec<SpanLine> {
-        self.span_lines_local
-            .iter()
-            .enumerate()
-            .map(|(_, line)| line.rotate(self.rotation, self.rotation_type).translate(self.translation))
+        (0..self.nr_span_lines())
+            .map(|i| self.span_line_at_index(i))
             .collect()
     }
 
@@ -247,8 +241,7 @@ impl LineForceModel {
     }
 
     pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
-        self.local_chord_vector_at_index(index)
-            .rotate(self.rotation, self.rotation_type)
+        self.rigid_body_motion.transform_vector(self.local_chord_vector_at_index(index))
     }
 
     /// Returns the chord vectors in global coordinates.
@@ -269,7 +262,7 @@ impl LineForceModel {
 
         local_chord_vectors
             .iter()
-            .map(|chord_vector| chord_vector.rotate(self.rotation, self.rotation_type))
+            .map(|chord_vector| self.rigid_body_motion.transform_vector(*chord_vector))
             .collect()
     }
 
