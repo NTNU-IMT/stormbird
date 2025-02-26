@@ -279,7 +279,7 @@ impl WakeBuilder {
         let nr_panels_per_line_element = match self.wake_length {
             WakeLength::NrPanels(nr_panels) => nr_panels,
             WakeLength::TargetLengthFactor(_) => {
-                if initial_velocity.length() == 0.0 {
+                if initial_velocity.length() <= 1e-7 {
                     panic!("Freestream velocity is zero. Cannot calculate wake length.");
                 }
 

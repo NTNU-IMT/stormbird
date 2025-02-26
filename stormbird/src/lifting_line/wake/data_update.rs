@@ -63,10 +63,12 @@ impl Wake {
     /// Function to initialize shape and strength of the wake. This is to be used at the beginning of a simulation. It
     /// can also be used to reset a simulation.
     pub fn initialize(&mut self, line_force_model: &LineForceModel, wake_building_velocity: SpatialVector<3>, time_step: f64) {
-        self.strengths = vec![0.0; self.indices.nr_panels()];
-        self.undamped_strengths = vec![0.0; self.indices.nr_panels()];
-        self.panels_lifetime = vec![0.0; self.indices.nr_panels()];
-        self.panels_strength_damping_factor = vec![0.0; self.indices.nr_panels()];
+        let nr_panels = self.indices.nr_panels();
+        
+        self.strengths                      = vec![0.0; nr_panels];
+        self.undamped_strengths             = vec![0.0; nr_panels];
+        self.panels_lifetime                = vec![0.0; nr_panels];
+        self.panels_strength_damping_factor = vec![0.0; nr_panels];
 
         let ctrl_points_freestream = vec![wake_building_velocity; line_force_model.nr_span_lines()];
         let wake_points_freestream = vec![wake_building_velocity; self.points.len()];
@@ -261,19 +263,22 @@ impl Wake {
     ///
     /// The length of the last panel is determined based on the `last_panel_relative_length`
     /// parameter in the settings, plus the chord length. The direction of the last panel is taken
-    /// to be the same as the direcion between the previous two points in the wake.
+    /// to be the same as the direction between the previous two points in the wake.
     ///
     /// # Arguments
     /// * `line_force_model_data` - The line force model data that the should use for the update
     pub fn move_last_wake_points(
         &mut self,
         line_force_model_data: &LineForceModelData,
-    ) {
-        let start_index_last = self.points.len() - self.indices.nr_points_along_span;
+    ) { 
+        let nr_points = self.points.len();
+        let nr_points_along_span = self.indices.nr_points_along_span;
 
-        let start_index_previous = start_index_last - self.indices.nr_points_along_span;
-        let start_index_second_previous = start_index_previous - self.indices.nr_points_along_span;
+        let multi_panel_wake = self.indices.nr_panels_per_line_element > 1;
 
+        let start_index_last = nr_points - nr_points_along_span;
+        let start_index_previous = start_index_last - nr_points_along_span;
+        
         let chord_vectors = line_force_model_data.span_point_values_from_ctrl_point_values(
             &line_force_model_data.chord_vectors, true
         );
@@ -283,9 +288,9 @@ impl Wake {
         );
 
         for i in 0..self.indices.nr_points_along_span {
-            let change_direction = if self.indices.nr_panels_per_line_element > 1 {
-                let previous_point = self.points[start_index_previous + i];
-                let second_previous_point = self.points[start_index_second_previous + i];
+            let change_direction = if multi_panel_wake {
+                let previous_point        = self.points[start_index_previous + i];
+                let second_previous_point = self.points[start_index_previous - nr_points_along_span + i];
 
                 (previous_point - second_previous_point).normalize()
             } else {

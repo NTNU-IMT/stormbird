@@ -44,8 +44,12 @@ fn steady_lift() {
     let mut prescribed_wing_builder = wing_builder.clone();
     prescribed_wing_builder.circulation_corrections = CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
 
+    
+
     let steady_settings  = SteadySettings::default();
     let dynamic_settings = UnsteadySettings::default();
+
+    
 
     let nr_time_steps = 200;
 
@@ -82,6 +86,7 @@ fn steady_lift() {
         time_step, 
         &static_velocity_freestream
     );
+
     println!("Time to run steady simulation: {} secs", start.elapsed().as_secs_f64());
     println!("Number of steady iterations: {}", result_steady.iterations);
     println!("Residual for steady simulation: {}", result_steady.residual);

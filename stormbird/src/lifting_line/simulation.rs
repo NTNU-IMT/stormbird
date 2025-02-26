@@ -91,6 +91,8 @@ impl Simulation {
             &self.line_force_model,
             &self.wake
         );
+
+        // self.frozen_wake = FrozenWake::new_complete(&self.line_force_model, &self.wake);
    
         // Solve for the circulation strength
         let solver_result = self.solver.do_step(

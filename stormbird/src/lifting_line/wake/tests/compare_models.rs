@@ -14,7 +14,7 @@ fn compare_wake_models() {
         ..Default::default()
     }.build().build();
 
-    let velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
+    let velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let time_step = 0.5; 
 
@@ -45,5 +45,4 @@ fn compare_wake_models() {
     for (u_i_steady, u_i_dynamic) in u_i_steady.iter().zip(u_i_dynamic.iter()) {
         assert!((*u_i_steady - *u_i_dynamic).length() < allowable_error);
     }
-    
 }
