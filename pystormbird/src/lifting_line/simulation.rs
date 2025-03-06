@@ -43,11 +43,11 @@ impl Simulation {
     }
 
     pub fn set_translation(&mut self, translation: SpatialVector) {
-        self.data.line_force_model.translation = translation.data;
+        self.data.line_force_model.rigid_body_motion.translation = translation.data;
     }
 
     pub fn set_rotation(&mut self, rotation: SpatialVector) {
-        self.data.line_force_model.rotation = rotation.data;
+        self.data.line_force_model.rigid_body_motion.rotation = rotation.data;
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {
