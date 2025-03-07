@@ -40,14 +40,14 @@ impl LineForceModel {
         ctrl_point_velocity
     }
 
-    pub fn update_derivatives(&mut self, current_velocity: &[SpatialVector<3>], current_angles_of_attack: &[f64]) {
+    pub fn update_derivatives(&mut self, result: &SimulationResult) {
         let ctrl_points = self.ctrl_points();
         let rotation = self.rigid_body_motion.rotation.clone();
         
         if let Some(derivatives) = self.derivatives.as_mut() {
             derivatives.motion.update(&ctrl_points, rotation);
 
-            derivatives.flow.update(current_velocity, current_angles_of_attack);
+            derivatives.flow.update(&result.force_input.velocity, &result.force_input.angles_of_attack);
         }
     }
 }

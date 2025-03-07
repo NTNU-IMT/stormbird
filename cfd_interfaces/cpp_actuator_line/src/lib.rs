@@ -32,7 +32,7 @@ mod ffi {
         fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize;
 
         // ---- Force methods ----        
-        fn calculate_result(&mut self, time_step: f64);
+        fn do_step(&mut self, time_step: f64);
         fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3];
         fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
         
@@ -91,8 +91,8 @@ impl CppActuatorLine {
         self.model.dominating_line_element_index_at_point(SpatialVector::<3>::from(*point))
     }
 
-    pub fn calculate_result(&mut self, time_step: f64) {
-        self.model.calculate_and_add_result(time_step)
+    pub fn do_step(&mut self, time_step: f64) {
+        self.model.do_step(time_step)
     }
 
     pub fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3] {

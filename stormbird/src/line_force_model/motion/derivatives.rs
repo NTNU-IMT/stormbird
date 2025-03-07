@@ -151,7 +151,7 @@ impl FlowDerivatives {
     }
 
     pub fn angles_of_attack_derivative(&self, current_angles_of_attack: &[f64], time_step: f64) -> Vec<f64> {
-        if self.update_count < 2 {
+        if self.update_count < 3 {
             return vec![0.0; current_angles_of_attack.len()];
         }
         

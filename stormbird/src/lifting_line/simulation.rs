@@ -130,29 +130,11 @@ impl Simulation {
             }
         }
 
-        let force_input = self.line_force_model.sectional_force_input(&solver_result, time_step);
-
-        let ctrl_points = self.line_force_model.ctrl_points();
-        let sectional_forces   = self.line_force_model.sectional_forces(&force_input);
-        let integrated_forces = sectional_forces.integrate_forces(&self.line_force_model);
-        let integrated_moments = sectional_forces.integrate_moments(&self.line_force_model);
-
-        let result = SimulationResult {
-            ctrl_points,
-            force_input,
-            sectional_forces,
-            integrated_forces,
-            integrated_moments,
-            iterations: solver_result.iterations,
-            residual: solver_result.residual,
-        };
+        let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
 
         self.previous_circulation_strength = result.force_input.circulation_strength.clone();
 
-        self.line_force_model.update_derivatives(
-            &result.force_input.velocity,
-            &result.force_input.angles_of_attack
-        );
+        self.line_force_model.update_derivatives(&result);
 
         result
     }

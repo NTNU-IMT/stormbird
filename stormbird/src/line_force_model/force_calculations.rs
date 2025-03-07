@@ -250,19 +250,23 @@ impl LineForceModel {
                     _ => {}
                 }
 
-                let added_mass_coefficient = match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => {
-                        foil.added_mass_coefficient(relevant_acceleration.length())
-                    },
-                    SectionModel::VaryingFoil(foil) => {
-                        foil.added_mass_coefficient(relevant_acceleration.length())
-                    },
-                    SectionModel::RotatingCylinder(cylinder) => {
-                        cylinder.added_mass_coefficient(relevant_acceleration.length())
-                    }
-                };
-
-                added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
+                if relevant_acceleration.length() == 0.0 {
+                    SpatialVector::<3>::default()
+                } else {
+                    let added_mass_coefficient = match &self.section_models[wing_index] {
+                        SectionModel::Foil(foil) => {
+                            foil.added_mass_coefficient(relevant_acceleration.length())
+                        },
+                        SectionModel::VaryingFoil(foil) => {
+                            foil.added_mass_coefficient(relevant_acceleration.length())
+                        },
+                        SectionModel::RotatingCylinder(cylinder) => {
+                            cylinder.added_mass_coefficient(relevant_acceleration.length())
+                        }
+                    };
+                    
+                    added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
+                }
             }
         ).collect()
     }
@@ -358,5 +362,24 @@ impl LineForceModel {
                 self.section_models[wing_index].amount_of_flow_separation(angles_of_attack[i])
             }
         ).collect()
+    }
+
+    pub fn calculate_simulation_result(&self, solver_result: &SolverResult, time_step: f64) -> SimulationResult {
+        let force_input = self.sectional_force_input(&solver_result, time_step);
+
+        let ctrl_points = self.ctrl_points();
+        let sectional_forces   = self.sectional_forces(&force_input);
+        let integrated_forces = sectional_forces.integrate_forces(&self);
+        let integrated_moments = sectional_forces.integrate_moments(&self);
+
+        SimulationResult {
+            ctrl_points,
+            force_input,
+            sectional_forces,
+            integrated_forces,
+            integrated_moments,
+            iterations: solver_result.iterations,
+            residual: solver_result.residual,
+        }
     }
 }

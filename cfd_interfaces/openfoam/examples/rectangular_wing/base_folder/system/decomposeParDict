@@ -7,11 +7,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains 12;
+#include "../simulation_settings.txt";
 
-method          hierarchical;
+numberOfSubdomains $number_of_threads;
+
+method          scotch;
 
 coeffs
 {
-    n           (3 2 2);
 }

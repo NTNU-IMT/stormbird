@@ -7,7 +7,7 @@ snappyHexMesh -overwrite
 
 decomposePar
 
-mpirun -np 12 pimpleFoam -parallel
+mpirun -np $number_of_threads pimpleFoam -parallel
 
 reconstructPar
 

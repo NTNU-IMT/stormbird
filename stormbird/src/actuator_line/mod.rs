@@ -22,7 +22,7 @@ use projection::Projection;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ActuatorLineSolverSettings {
+pub struct SolverSettings {
     #[serde(default)]
     pub strength_damping: f64,
 }
@@ -35,7 +35,7 @@ pub struct ActuatorLineBuilder {
     #[serde(default)]
     pub projection: Projection,
     #[serde(default)]
-    pub solver_settings: ActuatorLineSolverSettings,
+    pub solver_settings: SolverSettings
 }
 
 impl ActuatorLineBuilder {
@@ -43,7 +43,7 @@ impl ActuatorLineBuilder {
         Self {
             line_force_model,
             projection: Projection::default(),
-            solver_settings: ActuatorLineSolverSettings::default(),
+            solver_settings: SolverSettings::default()
         }
     }
 
@@ -77,7 +77,7 @@ pub struct ActuatorLine {
     /// Results from the model
     pub results: Vec<SimulationResult>,
     /// Numerical settings
-    pub solver_settings: ActuatorLineSolverSettings,
+    pub solver_settings: SolverSettings,
 }
 
 impl ActuatorLine {
@@ -131,17 +131,19 @@ impl ActuatorLine {
         (numerator, denominator)
     }
 
-    pub fn calculate_and_add_result(&mut self, time_step: f64) {        
-        let result = self.calculate_result(&self.ctrl_points_velocity, time_step);
+    pub fn do_step(&mut self, time_step: f64) {        
+        let solver_result = self.solve(&self.ctrl_points_velocity);
+
+        let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
+
+        self.line_force_model.update_derivatives(&result);
 
         self.results.push(result);
     }
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn calculate_result(&self, ctrl_point_velocity: &[SpatialVector<3>], time_step: f64) -> SimulationResult {
-        let ctrl_points = self.line_force_model.ctrl_points();
-
+    pub fn solve(&self, ctrl_point_velocity: &[SpatialVector<3>]) -> SolverResult {
         let new_estimated_circulation_strength = self.line_force_model.circulation_strength(
             &ctrl_point_velocity, CoordinateSystem::Global
         );
@@ -166,25 +168,9 @@ impl ActuatorLine {
             CoordinateSystem::Global
         );
 
-        let solver_result = SolverResult {
+        SolverResult {
             circulation_strength,
             ctrl_point_velocity: ctrl_point_velocity.to_vec(),
-            iterations: 1,
-            residual,
-        };
-
-        let force_input = self.line_force_model.sectional_force_input(&solver_result, time_step);
-        
-        let sectional_forces = self.line_force_model.sectional_forces(&force_input);
-        let integrated_forces = sectional_forces.integrate_forces(&self.line_force_model);
-        let integrated_moments = sectional_forces.integrate_moments(&self.line_force_model);
-
-        SimulationResult {
-            ctrl_points,
-            force_input,
-            sectional_forces,
-            integrated_forces,
-            integrated_moments,
             iterations: 1,
             residual,
         }
