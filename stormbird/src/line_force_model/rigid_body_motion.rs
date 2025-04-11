@@ -24,26 +24,33 @@ pub struct RigidBodyMotion {
 }
 
 impl RigidBodyMotion {
+    /// Applies the rigid body motion to a point in space
     pub fn transform_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
         point.rotate(self.rotation, self.rotation_type) + self.translation
     }
 
+    /// Applies the rigid body motion to a vector in space. That is, it applies the rotation.
     pub fn transform_vector(&self, vector: SpatialVector<3>) -> SpatialVector<3> {
         vector.rotate(self.rotation, self.rotation_type)
     }
 
+    /// Returns the input vector in the body fixed coordinate system defined by the rigid body 
+    /// motion.
     pub fn vector_in_body_fixed_coordinate_system(&self, vector: SpatialVector<3>) -> SpatialVector<3> {
         vector.in_rotated_coordinate_system(self.rotation, self.rotation_type)
     }
     
+    /// Returns the relative position of the point to the center of the body.
     pub fn point_relative_to_body_center(&self, point: SpatialVector<3>) -> SpatialVector<3> {
         point - self.translation
     }
 
+    /// Computes the velocity at a point due to the motion of the rigid body. 
     pub fn velocity_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
         self.velocity_linear + self.velocity_angular.cross(self.point_relative_to_body_center(point))
     }
 
+    /// Computes the acceleration at a point due to the motion of the rigid body.
     pub fn acceleration_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
         let point_relative_to_body_center = self.point_relative_to_body_center(point);
 

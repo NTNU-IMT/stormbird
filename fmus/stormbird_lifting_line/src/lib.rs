@@ -263,8 +263,8 @@ impl FmuFunctions for StormbirdLiftingLine {
         let section_models_internal_state = self.section_models_internal_state();
 
         let result = if let Some(model) = &mut self.stormbird_model {            
-            model.line_force_model.rotation = rotation;
-            model.line_force_model.translation = translation;
+            model.line_force_model.rigid_body_motion.rotation = rotation;
+            model.line_force_model.rigid_body_motion.translation = translation;
             model.line_force_model.local_wing_angles = local_wing_angles;
 
             model.line_force_model
@@ -456,7 +456,7 @@ impl StormbirdLiftingLine {
             if self.parameters.translational_velocity_in_body_fixed_frame {
                 translational_velocity = translational_velocity.from_rotated_to_global_system(
                     self.rotation(time_step),
-                    model.line_force_model.rotation_type
+                    model.line_force_model.rigid_body_motion.rotation_type
                 );
             }
         }
