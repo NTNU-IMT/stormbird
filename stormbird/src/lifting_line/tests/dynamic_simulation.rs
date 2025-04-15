@@ -13,8 +13,6 @@ use crate::lifting_line::simulation_builder::{
     SteadySettings,
 };
 
-use crate::line_force_model::motion::derivatives::MotionDerivatives;
-
 use super::test_setup::RectangularWing;
 
 #[test]
@@ -145,7 +143,7 @@ fn right_sign_of_the_moment_when_rotating() {
     }
 }
 
-#[test]
+/*#[test]
 /// tests the estimated ctrl point velocity when applying a rotation
 fn rotational_velocity() {
     // wing settings
@@ -208,4 +206,4 @@ fn rotational_velocity() {
     
         motion_calculator.update(&ctrl_points, line_force_model.rigid_body_motion.rotation);
     }
-}
+}*/

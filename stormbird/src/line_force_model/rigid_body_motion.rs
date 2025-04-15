@@ -58,6 +58,30 @@ impl RigidBodyMotion {
         self.acceleration_angular.cross(point_relative_to_body_center) + 
         self.velocity_angular.cross(self.velocity_angular.cross(point_relative_to_body_center))
     }
+
+    /// Function that sets new values for the translation and rotation, and then calculates the 
+    /// derivatives (velocity and acceleration) using finite difference.
+    pub fn update_translation_and_rotation_with_derivatives_using_finite_difference(
+        &mut self, 
+        translation: SpatialVector<3>, 
+        rotation: SpatialVector<3>,
+        time_step: f64
+    ) {
+        let old_translation = self.translation.clone();
+        let old_velocity_linear = self.velocity_linear.clone();
+
+        let old_rotation = self.rotation.clone();
+        let old_velocity_angular = self.velocity_angular.clone();
+
+        self.translation = translation;
+        self.rotation = rotation;
+
+        self.velocity_linear = (self.translation - old_translation) / time_step;
+        self.acceleration_linear = (self.velocity_linear - old_velocity_linear) / time_step;
+
+        self.velocity_angular = (self.rotation - old_rotation) / time_step;
+        self.acceleration_angular = (self.velocity_angular - old_velocity_angular) / time_step;
+    }
 }
 
 #[cfg(test)]
@@ -67,9 +91,10 @@ mod tests {
     use std::f64::consts::PI;
     
     #[test]
-    /// Test to compare the motion calculated by the rigid body motion struct against the a simpler, but less accurate,
-    /// finite difference method. The purpose is to validate the correctness of the rigid body motion struct. It is 
-    /// assumed that any logic mistakes can be detected if the difference against the finite difference method is large.
+    /// Test to compare the motion calculated by the rigid body motion struct against the a simpler, 
+    /// but less accurate, finite difference method. The purpose is to validate the correctness of 
+    /// the rigid body motion struct. It is assumed that any logic mistakes can be detected if the 
+    /// difference against the finite difference method is large.
     fn compare_motion_against_finite_difference() {
         let rotation_amplitude = 45.0_f64.to_radians();
         let translation_amplitude = 2.1;

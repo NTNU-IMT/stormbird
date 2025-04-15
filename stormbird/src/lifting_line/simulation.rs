@@ -20,6 +20,7 @@ use crate::error::Error;
 /// Struct that contains the data needed to run a dynamic simulation.
 pub struct Simulation {
     pub line_force_model: LineForceModel,
+    pub flow_derivatives: FlowDerivatives,
     pub wake: Wake,
     pub frozen_wake: FrozenWake,
     pub solver: SimpleIterative,
@@ -76,13 +77,8 @@ impl Simulation {
         let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
         let wake_points_freestream = freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec();
 
-        // If the force input calculator has not been initialized, initialize it.
-        if self.line_force_model.need_derivative_initialization() {
-            self.line_force_model.initialize_derivatives(&ctrl_points_freestream);
-        }
-
-        let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_freestream(
-            &ctrl_points_freestream, time_step
+        let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_velocity(
+            &ctrl_points_freestream
         );
 
         self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
@@ -134,7 +130,7 @@ impl Simulation {
 
         self.previous_circulation_strength = result.force_input.circulation_strength.clone();
 
-        self.line_force_model.update_derivatives(&result);
+        self.flow_derivatives.update(&solver_result.ctrl_point_velocity);
 
         result
     }

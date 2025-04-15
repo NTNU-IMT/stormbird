@@ -93,10 +93,6 @@ pub struct Foil {
     /// The range of the stall transition. The default value is 6 degrees.
     pub stall_range: f64,
     #[serde(default)]
-    /// Factor to model lift due to changing angle of attack. This is zero by default, and therefore
-    /// not used.
-    pub cl_changing_aoa_factor: f64,
-    #[serde(default)]
     /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
     pub added_mass_factor: f64,
     #[serde(default)]
@@ -237,7 +233,6 @@ impl Default for Foil {
             mean_positive_stall_angle: Self::default_mean_stall_angle(),
             mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),
-            cl_changing_aoa_factor: 0.0,
             added_mass_factor:      0.0,
             stall_model:            StallModel::Harmonic,
         }

@@ -1,4 +1,4 @@
-use crate::io_structs::prelude::CoordinateSystem;
+use crate::common_utils::prelude::CoordinateSystem;
 use crate::line_force_model::span_line::SpanLine;
 
 use super::*;

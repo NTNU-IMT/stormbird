@@ -8,8 +8,10 @@
 
 pub mod result;
 pub mod forces_and_moments;
+pub mod flow_derivatives;
 
 pub mod prelude {
     pub use super::result::*;
     pub use super::forces_and_moments::*;
+    pub use super::flow_derivatives::*;
 }

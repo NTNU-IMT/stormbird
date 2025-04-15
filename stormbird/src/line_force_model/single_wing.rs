@@ -15,7 +15,6 @@ pub struct SingleWing {
     pub chord_vectors_local: Vec<SpatialVector<3>>,
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
-    pub virtual_wing: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -94,7 +93,6 @@ impl WingBuilder {
             chord_vectors_local,
             section_model,
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
-            virtual_wing: self.virtual_wing,
         }
     }
 }

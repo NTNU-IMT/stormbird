@@ -47,7 +47,6 @@ impl VaryingFoil {
         let mean_negative_stall_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
         let stall_range_data: Vec<f64> = self.foils_data.iter().map(|x| x.stall_range).collect();
 
-        let cl_changing_aoa_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_changing_aoa_factor).collect();
         let added_mass_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
 
         let x = self.current_internal_state;
@@ -68,7 +67,6 @@ impl VaryingFoil {
             mean_positive_stall_angle: linear_interpolation(x, x_data, &mean_positive_stall_angle_data),
             mean_negative_stall_angle: linear_interpolation(x, x_data, &mean_negative_stall_angle_data),
             stall_range:            linear_interpolation(x, x_data, &stall_range_data),
-            cl_changing_aoa_factor: linear_interpolation(x, x_data, &cl_changing_aoa_factor_data),
             added_mass_factor:      linear_interpolation(x, x_data, &added_mass_factor_data),
             stall_model:            stall_model,
         }

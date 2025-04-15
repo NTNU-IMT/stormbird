@@ -16,7 +16,7 @@ use math_utils::smoothing::gaussian::gaussian_kernel;
 use math_utils::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
 use crate::line_force_model::builder::LineForceModelBuilder;
-use crate::io_structs::prelude::*;
+use crate::common_utils::prelude::*;
 
 use projection::Projection;
 
@@ -136,7 +136,7 @@ impl ActuatorLine {
 
         let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
 
-        self.line_force_model.update_derivatives(&result);
+        //self.line_force_model.update_flow_derivatives(&result);
 
         self.results.push(result);
     }

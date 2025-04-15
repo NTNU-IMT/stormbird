@@ -15,7 +15,6 @@ use math_utils::{
     interpolation::linear_interpolation};
 
 pub mod builder;
-pub mod derivatives;
 pub mod force_calculations;
 pub mod span_line;
 
@@ -23,16 +22,14 @@ pub mod circulation_corrections;
 pub mod prelude;
 pub mod single_wing;
 
-pub mod motion;
 pub mod rigid_body_motion;
 
 #[cfg(test)]
 mod tests;
 
-use crate::io_structs::prelude::*;
+use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
 
-use self::motion::derivatives::Derivatives;
 use self::rigid_body_motion::RigidBodyMotion;
 
 use circulation_corrections::CirculationCorrection;
@@ -53,7 +50,7 @@ pub struct LineForceModel {
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
     pub wing_indices: Vec<Range<usize>>,
-    /// Motion of the line force model
+    /// Rigid body motion of the line force model
     pub rigid_body_motion: RigidBodyMotion,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along
     /// the span axis during a dynamic simulation. The typical example is changing the angle of
@@ -69,23 +66,12 @@ pub struct LineForceModel {
     /// - When the boolean is false, the circulation is set to zero at the end, and when it is true,
     ///  the circulation is assumed to be non-zero.
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
-    /// A vector containing information about whether or not a wing is 'virtual' or real. Virtual
-    /// wings are included in the simulations like non-virtual wings, except that the forces are not
-    /// included in the total force calculations. The primary use case is modelling end plates.
-    /// Adding a virtual wing at the tip of another wing will reduce the tip losses, similar to how
-    /// an end plate would work in reality.
-    pub virtual_wings: Vec<bool>,
     /// Density used in force calculations
     pub density: f64,
     /// Optional corrections that can be applied to the estimated circulation strength.
     pub circulation_corrections: CirculationCorrection,
-    /// Optional variables to
-    /// Factor used to control the control point location
-    pub ctrl_point_chord_factor: f64,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
-    /// Optional model for calculation motion and flow derivatives
-    derivatives: Option<Derivatives>,
 }
 
 impl Default for LineForceModel {
@@ -95,11 +81,13 @@ impl Default for LineForceModel {
 }
 
 impl LineForceModel {
+    /// Default density for air at sea level in kg/m^3
     pub fn default_density() -> f64 {
         1.225
     }
 
-    /// Creates a new empty line force model. Wings can be added using the [LineForceModel::add_wing] function.
+    /// Creates a new empty line force model. Wings can be added using the 
+    /// [LineForceModel::add_wing] function.
     pub fn new(density: f64) -> LineForceModel {
         Self {
             span_lines_local: Vec::new(),
@@ -109,12 +97,9 @@ impl LineForceModel {
             rigid_body_motion: RigidBodyMotion::default(),
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
-            virtual_wings: Vec::new(),
             density,
-            derivatives: None,
             circulation_corrections: Default::default(),
-            ctrl_point_chord_factor: 0.0,
-            output_coordinate_system: CoordinateSystem::Global,
+            output_coordinate_system: CoordinateSystem::Global
         }
     }
 
@@ -148,7 +133,6 @@ impl LineForceModel {
         self.local_wing_angles.push(0.0);
         self.non_zero_circulation_at_ends
             .push(wing.non_zero_circulation_at_ends);
-        self.virtual_wings.push(wing.virtual_wing);
     }
 
     /// Short hand for querying for the number of wings in the model
@@ -270,12 +254,10 @@ impl LineForceModel {
     /// span line
     pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
         let span_lines = self.span_lines();
-        let chord_vectors = self.global_chord_vectors();
 
         span_lines
             .iter()
-            .zip(chord_vectors.iter())
-            .map(|(line, chord)| line.ctrl_point() + *chord * self.ctrl_point_chord_factor)
+            .map(|line| line.ctrl_point())
             .collect()
     }
 
@@ -578,9 +560,5 @@ impl LineForceModel {
         }
 
         span_point_values
-    }
-
-    pub fn need_derivative_initialization(&self) -> bool {
-        self.derivatives.is_none()
     }
 }

@@ -5,10 +5,10 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use stormbird::io_structs::result::SimulationResult as SimulationResultRust;
-use stormbird::io_structs::forces_and_moments::SectionalForces as SectionalForcesRust;
-use stormbird::io_structs::forces_and_moments::IntegratedValues as IntegratedValuesRust;
-use stormbird::io_structs::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
+use stormbird::common_utils::result::SimulationResult as SimulationResultRust;
+use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalForcesRust;
+use stormbird::common_utils::forces_and_moments::IntegratedValues as IntegratedValuesRust;
+use stormbird::common_utils::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
 
 use crate::spatial_vector::SpatialVector;
 
@@ -38,11 +38,6 @@ impl SectionalForcesInput {
     #[getter]
     pub fn acceleration(&self) -> Vec<SpatialVector> {
         self.data.acceleration.iter().map(|v| SpatialVector::from(v.clone())).collect()
-    }
-
-    #[getter]
-    pub fn angles_of_attack_derivative(&self) -> Vec<f64> {
-        self.data.angles_of_attack_derivative.clone()
     }
 
     #[getter]

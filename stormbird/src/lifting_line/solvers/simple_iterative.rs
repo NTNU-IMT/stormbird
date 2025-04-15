@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 use math_utils::spatial_vector::SpatialVector;
 
 use crate::line_force_model::prelude::*;
-use crate::io_structs::prelude::*;
+use crate::common_utils::prelude::*;
 use crate::lifting_line::wake::prelude::*;
 use super::velocity_corrections::VelocityCorrections;
 

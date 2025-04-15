@@ -4,7 +4,7 @@ In dynamic simulations, it will often be interesting to apply motion to the sail
 
 ## How motion affects the simulation results
 
-The forces on the each line segment is primarily dependent on the local velocity, local angle of attack, the internal state of the sectional models. Some forces will also be generated due to the rotational velocity of the chord vectors and the acceleration of each line segment.
+The forces on the each line segment is primarily dependent on the local velocity, local angle of attack, and the internal state of the sectional models. Some forces will also be generated due to the rotational velocity of the chord vectors and the acceleration of each line segment.
 
 As such, when a motion is applied to the line force model, it is necessary to calculate the *felt velocity* and *felt acceleration* of each line segment, so that this can further be used as input to the force calculation functions. As will be further highlighted [later](force_calculations.md), the forces are estimated from a `SectionalForceInput` structure, which have fields as shown in the code block below. The velocity and acceleration values calculated in the `SectionalForceInput` structure are dependent on the motion of the sails. 
 

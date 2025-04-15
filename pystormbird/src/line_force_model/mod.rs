@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use stormbird::io_structs::prelude::CoordinateSystem;
+use stormbird::common_utils::prelude::CoordinateSystem;
 
 pub mod span_line;
 pub mod builder;

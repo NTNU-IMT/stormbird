@@ -139,8 +139,13 @@ impl SimulationBuilder {
             CoordinateSystem::Global
         );
 
+        let flow_derivatives = FlowDerivatives::new(
+            &vec![initialization_velocity; nr_of_lines]
+        );
+
         Simulation {
             line_force_model,
+            flow_derivatives,
             wake,
             frozen_wake,
             solver,
