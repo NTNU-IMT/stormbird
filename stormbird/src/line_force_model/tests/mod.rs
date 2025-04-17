@@ -32,7 +32,6 @@ fn test_wing_angles() {
             ],
             section_model: SectionModel::Foil(Foil::default()),
             non_zero_circulation_at_ends: [false, false],
-            virtual_wing: false,
             nr_sections: None,
         };
 

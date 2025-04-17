@@ -1,0 +1,68 @@
+{
+    "line_force_model": {
+        "wing_builders": [
+            {
+                "section_points": [
+                    {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": -10.0
+                    },
+                    {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": -43.0
+                    }
+                ],
+                "chord_vectors": [
+                    {
+                        "x": -11.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    {
+                        "x": -11.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    }
+                ],
+                "section_model": {
+                    "Foil": {
+                        "cl_zero_angle": 0.0,
+                        "mean_positive_stall_angle": 0.6981317007977318,
+                        "mean_negative_stall_angle": 0.6981317007977318
+                    }
+                },
+                "non_zero_circulation_at_ends": [
+                    false,
+                    false
+                ]
+            }
+        ],
+        "nr_sections": 20,
+        "output_coordinate_system": "Body",
+        "circulation_corrections": {
+            "GaussianSmoothing": {
+                "length_factor": 0.1,
+                "end_corrections_delta_span_factor": 1.0,
+                "end_corrections_number_of_insertions": 3
+            }
+        }
+    },
+    "simulation_settings": {
+        "Dynamic": {
+            "wake": {
+                "nr_panels_per_line_element": 100,
+                "last_panel_relative_length": 5.0,
+                "ratio_of_wake_affected_by_induced_velocities": 0.0,
+                "use_chord_direction": true,
+                "symmetry_condition": "Z",
+                "strength_damping": "DirectFromStall"
+            },
+            "solver": {
+                "max_iterations_per_time_step": 10,
+                "damping_factor": 0.05
+            }
+        }
+    }
+}

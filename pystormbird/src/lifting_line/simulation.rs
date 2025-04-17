@@ -20,24 +20,12 @@ pub struct Simulation {
 #[pymethods]
 impl Simulation {
     #[new]
-    #[pyo3(
-        signature=(
-            *,
-            setup_string, 
-            initial_time_step,
-            initialization_velocity
-        )
-    )]
     pub fn new(
-        setup_string: String, 
-        initial_time_step: f64, 
-        initialization_velocity: SpatialVector
+        setup_string: String
     ) -> Self {
         Self {
             data: SimulationRust::new_from_string(
-                &setup_string, 
-                initial_time_step, 
-                initialization_velocity.data
+                &setup_string
             ).unwrap()
         }
     }

@@ -6,6 +6,20 @@ use super::Wake;
 use std::collections::HashMap;
 
 impl Wake {
+    pub fn write_wake_data_to_file_if_activated(&self, time_step_index: usize) {
+        if self.settings.write_wake_data_to_file {
+            let file_path = format!("{}/wake_{}.vtp", self.settings.wake_files_folder_path, time_step_index);
+            let write_result = self.write_wake_to_vtk_file(&file_path);
+
+            match write_result {
+                Ok(_) => {},
+                Err(e) => {
+                    log::error!("Error writing wake data to file: {}", e);
+                }
+            }
+        }
+    }
+
     /// Export the wake geometry as an obj file
     ///
     /// # Argument

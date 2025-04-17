@@ -18,8 +18,6 @@ pub struct RigidBodyMotion {
     pub rotation: SpatialVector<3>,
     pub velocity_linear: SpatialVector<3>,
     pub velocity_angular: SpatialVector<3>,
-    pub acceleration_linear: SpatialVector<3>,
-    pub acceleration_angular: SpatialVector<3>,
     pub rotation_type: RotationType,
 }
 
@@ -50,14 +48,6 @@ impl RigidBodyMotion {
         self.velocity_linear + self.velocity_angular.cross(self.point_relative_to_body_center(point))
     }
 
-    /// Computes the acceleration at a point due to the motion of the rigid body.
-    pub fn acceleration_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
-        let point_relative_to_body_center = self.point_relative_to_body_center(point);
-
-        self.acceleration_linear + 
-        self.acceleration_angular.cross(point_relative_to_body_center) + 
-        self.velocity_angular.cross(self.velocity_angular.cross(point_relative_to_body_center))
-    }
 
     /// Function that sets new values for the translation and rotation, and then calculates the 
     /// derivatives (velocity and acceleration) using finite difference.
@@ -68,19 +58,15 @@ impl RigidBodyMotion {
         time_step: f64
     ) {
         let old_translation = self.translation.clone();
-        let old_velocity_linear = self.velocity_linear.clone();
 
         let old_rotation = self.rotation.clone();
-        let old_velocity_angular = self.velocity_angular.clone();
 
         self.translation = translation;
         self.rotation = rotation;
 
         self.velocity_linear = (self.translation - old_translation) / time_step;
-        self.acceleration_linear = (self.velocity_linear - old_velocity_linear) / time_step;
-
+       
         self.velocity_angular = (self.rotation - old_rotation) / time_step;
-        self.acceleration_angular = (self.velocity_angular - old_velocity_angular) / time_step;
     }
 }
 
@@ -109,11 +95,9 @@ mod tests {
 
         let rotation_motion = |t: f64| rotation_amplitude * (angular_frequency * t).sin();
         let rotation_motion_derivative = |t: f64| rotation_amplitude * angular_frequency * (angular_frequency * t).cos();
-        let rotation_motion_second_derivative = |t: f64| -rotation_amplitude * angular_frequency.powi(2) * (angular_frequency * t).sin();
         
         let translation_motion = |t: f64| translation_amplitude * (angular_frequency * t).sin();
         let translation_motion_derivative = |t: f64| translation_amplitude * angular_frequency * (angular_frequency * t).cos();
-        let translation_motion_second_derivative = |t: f64| -translation_amplitude * angular_frequency.powi(2) * (angular_frequency * t).sin();
     
         let initial_point_to_check = SpatialVector::<3>::new(0.0, 1.3, 0.8);
 
@@ -129,8 +113,6 @@ mod tests {
                 rotation: SpatialVector([rotation_motion(t), 0.0, 0.0]),
                 velocity_linear: SpatialVector([0.0, translation_motion_derivative(t), 0.0]),
                 velocity_angular: SpatialVector([rotation_motion_derivative(t), 0.0, 0.0]),
-                acceleration_linear: SpatialVector([0.0, translation_motion_second_derivative(t), 0.0]),
-                acceleration_angular: SpatialVector([rotation_motion_second_derivative(t), 0.0, 0.0]),
                 rotation_type: RotationType::XYZ,
             };
 
@@ -145,28 +127,18 @@ mod tests {
                 transformed_points[i + 1] - transformed_points[i - 1]
             ) / (2.0 * dt);
 
-            let fd_acceleration = (
-                transformed_points[i + 1] - 2.0 * transformed_points[i] + transformed_points[i - 1]
-            ) / dt.powi(2);
-
             let expected_velocity = motions[i].velocity_at_point(transformed_points[i]);
-            let expected_acceleration = motions[i].acceleration_at_point(transformed_points[i]);
 
             let velocity_difference = (fd_velocity - expected_velocity).length();
-            let acceleration_difference = (fd_acceleration - expected_acceleration).length();
 
             if i % 1000 == 0  {
                 dbg!(fd_velocity, expected_velocity);
-                dbg!(fd_acceleration, expected_acceleration);
             }
 
             assert!(velocity_difference / max_rotational_velocity < 0.0001,
                 "fd velocity: {}, rb velocity {}", fd_velocity, expected_velocity
             );
 
-            assert!(acceleration_difference / max_rotational_velocity < 0.0001,
-                "fd acceleration: {}, rb acceleration {}", fd_acceleration, expected_acceleration
-            );
         }
      }
 }

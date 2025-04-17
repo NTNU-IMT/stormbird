@@ -28,8 +28,6 @@ pub struct WingBuilder {
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
     #[serde(default)]
-    pub virtual_wing: bool,
-    #[serde(default)]
     pub nr_sections: Option<usize>,
 }
 

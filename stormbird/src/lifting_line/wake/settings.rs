@@ -97,5 +97,9 @@ pub struct WakeSettings {
     /// The amount of damping in the shape of the wake
     pub shape_damping_factor: f64,
     /// A variable to determine whether the self-induced velocities should be neglected or not
-    pub neglect_self_induced_velocities: bool
+    pub neglect_self_induced_velocities: bool,
+    /// A variable to determine whether the wake geometry and data should be written to a file
+    pub write_wake_data_to_file: bool,
+    /// The path to the folder where the wake data should be written to
+    pub wake_files_folder_path: String,
 }

@@ -161,7 +161,7 @@ impl LineForceModel {
     pub fn sectional_force_input(
         &self, 
         solver_result: &SolverResult, 
-        time_step: f64
+        _time_step: f64
     ) -> SectionalForcesInput {
         let angles_of_attack = self.angles_of_attack(&solver_result.ctrl_point_velocity, CoordinateSystem::Global);
 

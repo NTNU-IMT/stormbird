@@ -9,7 +9,7 @@ use std::f64::consts::PI;
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
-    SimulationMode,
+    SimulationSettings,
     SteadySettings,
 };
 
@@ -44,8 +44,8 @@ fn right_sign_of_the_force_when_translating() {
 
     let mut sim = SimulationBuilder::new (
         wing_builder,
-        SimulationMode::QuasiSteady(SteadySettings::default()),
-    ).build(time_step, freestream_velocity);
+        SimulationSettings::QuasiSteady(SteadySettings::default()),
+    ).build();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
@@ -104,10 +104,10 @@ fn right_sign_of_the_moment_when_rotating() {
 
     let mut sim = SimulationBuilder::new (
         wing_builder,
-        SimulationMode::QuasiSteady(
+        SimulationSettings::QuasiSteady(
             SteadySettings::default()
         ),
-    ).build(time_step, freestream_velocity);
+    ).build();
 
     let frequency = 2.0 * PI / period;
 

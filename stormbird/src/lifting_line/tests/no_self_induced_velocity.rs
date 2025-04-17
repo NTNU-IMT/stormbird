@@ -5,7 +5,7 @@
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
-    SimulationMode,
+    SimulationSettings,
     UnsteadySettings,
 };
 
@@ -97,8 +97,8 @@ fn no_self_induced_velocity() {
 
     let mut sim = SimulationBuilder::new(
         line_force_model_builder,
-        SimulationMode::Dynamic(settings)
-    ).build(time_step, velocity);
+        SimulationSettings::Dynamic(settings)
+    ).build();
 
     let force_factor = sim.line_force_model.total_force_factor(velocity.length());
 

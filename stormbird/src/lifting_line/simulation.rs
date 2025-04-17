@@ -25,19 +25,15 @@ pub struct Simulation {
     pub frozen_wake: FrozenWake,
     pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
-    pub write_wake_data_to_file: bool,
-    pub wake_files_folder_path: String,
 }
 
 impl Simulation {
     pub fn new_from_string(
         setup_string: &str,
-        initial_time_step: f64,
-        wake_initial_velocity: SpatialVector<3>
     ) -> Result<Self, Error> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
-        Ok(builder.build(initial_time_step, wake_initial_velocity))
+        Ok(builder.build())
     }
 
     /// Returns the points where the freestream velocity must be specified in order to execute a
@@ -113,18 +109,7 @@ impl Simulation {
 
         let time_step_index = (time / time_step) as usize;
 
-        if self.write_wake_data_to_file {
-            let wake_file_path = format!("{}/wake_{}.vtp", self.wake_files_folder_path, time_step_index);
-
-            let write_result = self.wake.write_wake_to_vtk_file(&wake_file_path);
-
-            match write_result {
-                Ok(_) => {},
-                Err(e) => {
-                    println!("Error writing wake data to file: {}", e);
-                }
-            }
-        }
+        self.wake.write_wake_data_to_file_if_activated(time_step_index);
 
         let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
 

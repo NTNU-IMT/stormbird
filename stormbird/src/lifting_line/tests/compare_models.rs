@@ -10,7 +10,7 @@ use std::time::Instant;
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
-    SimulationMode,
+    SimulationSettings,
     SteadySettings,
     UnsteadySettings,
 };
@@ -59,18 +59,18 @@ fn steady_lift() {
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
-        SimulationMode::QuasiSteady(steady_settings.clone())
-    ).build(time_step, velocity);
+        SimulationSettings::QuasiSteady(steady_settings.clone())
+    ).build();
 
     let mut prescribed_sim = SimulationBuilder::new(
         prescribed_wing_builder.clone(),
-        SimulationMode::QuasiSteady(steady_settings)
-    ).build(time_step, velocity);
+        SimulationSettings::QuasiSteady(steady_settings)
+    ).build();
 
     let mut dynamic_sim = SimulationBuilder::new(
         wing_builder.clone(),
-        SimulationMode::Dynamic(dynamic_settings)
-    ).build(time_step, velocity);
+        SimulationSettings::Dynamic(dynamic_settings)
+    ).build();
 
     let force_factor = steady_sim.line_force_model.total_force_factor(velocity.length());
 

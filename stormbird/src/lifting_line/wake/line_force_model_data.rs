@@ -5,7 +5,9 @@ use super::*;
 
 #[derive(Debug, Clone, Default)]
 /// Structure for storing relevant data from the line force model that is needed for several methods
-/// in the wake model.
+/// in the wake model. The reason for extracting this into a separate struct is that this data 
+/// stores the values with all transformations applied. This avoids repeated calculations of the
+/// same values in the wake model.
 pub struct LineForceModelData {
     pub span_lines: Vec<SpanLine>,
     pub chord_vectors: Vec<SpatialVector<3>>,

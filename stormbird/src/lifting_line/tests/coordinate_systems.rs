@@ -7,7 +7,7 @@
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
-    SimulationMode,
+    SimulationSettings,
     SteadySettings,
 };
 
@@ -51,15 +51,15 @@ fn coordinate_systems() {
 
     let mut sim_fixed = SimulationBuilder::new(
         model_builder_global.clone(),
-        SimulationMode::QuasiSteady(steady_settings.clone())
-    ).build(time_step, velocity);
+        SimulationSettings::QuasiSteady(steady_settings.clone())
+    ).build();
 
     let mut sim_global = sim_fixed.clone();
 
     let mut sim_body = SimulationBuilder::new(
         model_builder_body.clone(),
-        SimulationMode::QuasiSteady(steady_settings.clone())
-    ).build(time_step, velocity);
+        SimulationSettings::QuasiSteady(steady_settings.clone())
+    ).build();
 
     sim_global.line_force_model.rigid_body_motion.rotation = rotation;
     sim_body.line_force_model.rigid_body_motion.rotation = rotation;
