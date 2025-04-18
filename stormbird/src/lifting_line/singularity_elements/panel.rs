@@ -4,8 +4,8 @@
 
 use std::f64::consts::PI;
 
-use math_utils::spatial_vector::SpatialVector;
-use math_utils::spatial_vector::geometry_functions;
+use stormath::spatial_vector::SpatialVector;
+use stormath::spatial_vector::geometry_functions;
 
 use super::vortex_line;
 

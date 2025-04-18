@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use math_utils::filters::moving_average::MovingAverage;
+use stormath::filters::moving_average::MovingAverage;
 
 use crate::error::Error;
 

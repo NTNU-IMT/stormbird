@@ -4,7 +4,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone)]
 /// Struct that represents spatial coordinates in a coordinate system that is oriented along the 

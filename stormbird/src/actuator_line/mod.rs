@@ -11,9 +11,9 @@ use std::fs;
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::smoothing::gaussian::gaussian_kernel;
+use stormath::smoothing::gaussian::gaussian_kernel;
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
 use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::common_utils::prelude::*;

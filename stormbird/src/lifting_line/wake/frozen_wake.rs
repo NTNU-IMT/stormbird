@@ -1,7 +1,7 @@
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
-use math_utils::array2::Array2;
+use stormath::array2::Array2;
 
 use rayon::prelude::*;
 

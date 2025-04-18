@@ -5,7 +5,7 @@
 //! Funtctionality for vortex lines and their induced velocities.
 use std::f64::consts::PI;
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 const CLOSENESS_ERROR: f64 = 1.0e-10;
 

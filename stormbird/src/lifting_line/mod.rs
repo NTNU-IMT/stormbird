@@ -16,7 +16,7 @@ pub mod simulation;
 
 /// Typical imports when using the lifting line functionality
 pub mod prelude {
-    pub use math_utils::spatial_vector::SpatialVector;
+    pub use stormath::spatial_vector::SpatialVector;
     pub use crate::common_utils::prelude::*;
     pub use crate::line_force_model::prelude::*;
 

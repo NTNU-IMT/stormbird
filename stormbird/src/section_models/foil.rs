@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use super::*;
-use math_utils::special_functions;
+use stormath::special_functions;
 
 use std::f64::consts::PI;
 

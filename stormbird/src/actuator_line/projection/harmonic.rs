@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 use crate::line_force_model::span_line::SpanLine;
 

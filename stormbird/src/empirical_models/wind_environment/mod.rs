@@ -4,7 +4,7 @@
 
 /// Functionality to represent the a wind environment
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 use serde::{Serialize, Deserialize};
 
 pub mod height_variation;

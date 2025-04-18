@@ -6,8 +6,8 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::smoothing;
-use math_utils::smoothing::end_condition::EndCondition;
+use stormath::smoothing;
+use stormath::smoothing::end_condition::EndCondition;
 
 use crate::line_force_model::LineForceModel;
 

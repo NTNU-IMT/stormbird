@@ -6,7 +6,7 @@ use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::section_models::SectionModel;
 use crate::section_models::foil::Foil;
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 #[test]
 fn test_wing_angles() {

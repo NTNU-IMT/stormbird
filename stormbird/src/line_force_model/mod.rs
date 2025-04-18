@@ -8,7 +8,7 @@
 
 use std::{f64::consts::PI, ops::Range};
 
-use math_utils::{
+use stormath::{
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 

@@ -50,7 +50,6 @@ that supports the FMI-standard
 implemented in Stormbird more thoroughly than what is done in the code docs, together with 
 references to papers with more information. **Waring**: This is currently very much a work in 
 progress.
-- `tutorials` contains files relevant for the tutorials described the book above.
 
 ## Instructions for how to use the library
 Each of the folders contains its own `README` file with install instructions.

@@ -1,7 +1,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::{
+use stormath::{
     spatial_vector::SpatialVector,
     interpolation::linear_interpolation,
 };

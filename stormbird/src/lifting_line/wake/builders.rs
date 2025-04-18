@@ -6,7 +6,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 use crate::line_force_model::LineForceModel;
 

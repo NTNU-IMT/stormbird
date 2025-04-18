@@ -7,7 +7,7 @@
 pub mod wing_wake;
 pub mod wake_models;
 
-use crate::math_utils::statistics::mean;
+use crate::stormath::statistics::mean;
 use crate::vec3::Vec3;
 
 use wing_wake::WingWake;

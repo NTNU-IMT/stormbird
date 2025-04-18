@@ -4,7 +4,7 @@
 
 //! Results from simulations.
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 use serde::{Serialize, Deserialize};
 
 use crate::error::Error;

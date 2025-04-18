@@ -5,8 +5,8 @@
 //! Functionality to compute derivatives of different quantities relevant or the output from the 
 //! line force model.
 
-use math_utils::spatial_vector::SpatialVector;
-use math_utils::finite_difference;
+use stormath::spatial_vector::SpatialVector;
+use stormath::finite_difference;
 
 
 
