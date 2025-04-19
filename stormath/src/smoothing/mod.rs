@@ -7,6 +7,7 @@
 pub mod end_condition;
 pub mod gaussian;
 pub mod polynomial;
+pub mod moving_average;
 
 use end_condition::EndCondition;
 

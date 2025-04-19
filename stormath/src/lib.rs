@@ -5,7 +5,10 @@
 
 //! Collection of common mathematical utility functions.
 //!
-//! These are implemented on a need-to-have basis.
+//! The library is developed in parallel to, and for, the *Stormbird library*. The functions 
+//! available is closely connected to what is needed here. However, the implementation of the 
+//! functionality in this crate is such that it may also be useful in other contexts. It is 
+//! therefore kept as a  separate crate. 
 
 pub mod interpolation;
 pub mod integration;
@@ -15,8 +18,5 @@ pub mod array_generation;
 pub mod finite_difference;
 pub mod spatial_vector;
 pub mod special_functions;
-pub mod multi_dimensional_indices;
-pub mod float_trait;
 pub mod solvers;
 pub mod array2;
-pub mod filters;

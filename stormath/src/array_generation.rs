@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Helper functions to generate arrays of numbers.
+
 /// A function that returns a vector that linearly goes from a start value to an end value with a
 /// specified number of elements.
 ///

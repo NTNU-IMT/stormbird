@@ -1,12 +1,28 @@
 
+// Copyright (C) 2024, NTNU
+// Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+
+//! Numerical solvers, such as root-finding algorithms.
+
 #[derive(Debug, Clone)]
+/// General structure for passing in settings to a numerical solver
 pub struct SolverSettings {
+    /// Tolerance for the solver to stop iterating
     pub tolerance: f64,
+    /// Maximum number of iterations to perform for the solver
     pub max_iterations: usize,
 }
 
 /// Secant method for finding the root of a function.
+///
 /// For more: <https://en.wikipedia.org/wiki/Secant_method>
+///
+/// # Arguments
+/// * `f` - The function to find the root of. Must be a function of one variable.
+/// * `x1` - The first initial guess for the root.
+/// * `x2` - The second initial guess for the root.
+/// * `settings` - The settings for the solver. See `SolverSettings` for more information.
 pub fn secant_solver(
     f: impl Fn(f64) -> f64, 
     x1: f64, 

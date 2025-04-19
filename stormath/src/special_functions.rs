@@ -1,5 +1,20 @@
+
+//! *Special functions* means functions that are well known, but which otherwise are just functions
+//! that produce a value based on some input. The name *special functions* is inspired by the
+//! the scipy library.
+
+
+/// A sigmoid function where the value goes from zero to one.
+///
+/// ## Arguments
+/// * `x` - The input value to the function
+/// * `x0` - The x-value where the function is equal to 0.5
+/// * `transition_range` - The range around x0 where the function transitions from close to 0 to 
+/// close to 1. The
+///
+/// ## Returns
+/// The value of the sigmoid function at the input
 pub fn sigmoid_zero_to_one(x: f64, x0: f64, transition_range: f64) -> f64 {
-    
     // The slope constant is set such that this function returns 0.01 at x = x0 - transition_range
     // and 0.99 at x = x0 + transition_range
     let slope = 4.5951212 / transition_range;

@@ -41,7 +41,7 @@ where T:
 
 /// Calculates the double derivative based on the data using a backwards finite difference scheme.
 /// 
-/// Source: https://en.wikipedia.org/wiki/Finite_difference
+/// Source: <https://en.wikipedia.org/wiki/Finite_difference>
 /// 
 /// # Arguments
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest

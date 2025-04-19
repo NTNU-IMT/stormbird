@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Numerical integration functions
+
 /// Trapezoidal integration of the input arrays.
 /// For more: <https://en.wikipedia.org/wiki/Trapezoidal_rule>
 ///
