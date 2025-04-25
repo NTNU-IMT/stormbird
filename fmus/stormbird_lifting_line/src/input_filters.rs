@@ -1,4 +1,4 @@
-use math_utils:: smoothing::moving_average::MovingAverage;
+use stormath:: smoothing::moving_average::MovingAverage;
 
 #[derive(Debug, Default, Clone)]
 pub struct InputFilters {

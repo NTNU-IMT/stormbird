@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use fmu_from_struct::prelude::*;
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 use stormbird::empirical_models::wind_environment::height_variation::HeightVariationModel;
 use stormbird::common_utils::result::SimulationResult;
@@ -193,15 +193,19 @@ impl StormbirdLiftingLine {
     fn build_lifting_line_model(&mut self) {
         log::info!("Building lifting line model for the sails");
 
+        let mut setup_path = self.parameters_path();
+        setup_path.pop();
+        setup_path.push(self.parameters.lifting_line_setup_file_path.clone());
+
         let stormbird_model_builder =
-            SimulationBuilder::new_from_file(&self.parameters.lifting_line_setup_file_path);
+            SimulationBuilder::new_from_file(&setup_path.to_string_lossy());
 
         match stormbird_model_builder {
             Ok(builder) => {
                 self.stormbird_model = Some(builder.build());
             },
             Err(e) => {
-                log::error!("Error reading lifting line setup file: {}", e);
+                log::error!("Error reading lifting line setup file from path: {}. Error: {}", &setup_path.to_string_lossy(), e);
             }
         }
     }
