@@ -3,11 +3,11 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 
-use math_utils::spatial_vector::{
+use stormath::spatial_vector::{
     SpatialVector,
     transformations::RotationType,
+    geometry_functions,
 };
-use math_utils::spatial_vector::geometry_functions;
 
 use super::super::panel::Panel;
 

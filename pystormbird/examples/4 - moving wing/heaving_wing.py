@@ -149,9 +149,7 @@ if __name__ == "__main__":
             "wake": {
                 "first_panel_relative_length": first_panel_relative_length,
                 "last_panel_relative_length": 20.0,
-                "wake_length": {
-                    "NrPanels": 400
-                }
+                "nr_panels_per_line_element": 400
             }
         }
     }
@@ -190,18 +188,12 @@ if __name__ == "__main__":
 
         setup = {
             "line_force_model": line_force_model,
-            "simulation_mode": simulation_settings,
-            "write_wake_data_to_file": args.write_wake_files if label == "Dynamic" else False,
-            "wake_files_folder_path": str(wake_files_folder_path)
+            "simulation_settings": simulation_settings
         }
 
         setup_string = json.dumps(setup)
 
-        simulation = Simulation(
-            setup_string = setup_string,
-            initial_time_step = dt,
-            initialization_velocity = SpatialVector(velocity, 0.0, 0.0), 
-        )
+        simulation = Simulation(setup_string = setup_string)
 
         time = []
         lift = []
@@ -224,7 +216,10 @@ if __name__ == "__main__":
         start_time = time_func.time()
         while t < final_time:
             print("Running sim at time = ", t)
-            simulation.set_translation(SpatialVector(0.0, position_func(t), 0.0))
+            simulation.set_translation_with_velocity_using_finite_difference(
+                SpatialVector(0.0, position_func(t), 0.0),
+                dt
+            )
 
             result = simulation.do_step(
                 time = t, 

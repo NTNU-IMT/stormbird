@@ -17,7 +17,7 @@ use super::wake::line_force_model_data::LineForceModelData;
 use crate::error::Error;
 
 #[derive(Debug, Clone)]
-/// Struct that contains the data needed to run a dynamic simulation.
+/// Struct that contains the data needed to run a lifting line simulation.
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     pub flow_derivatives: FlowDerivatives,
@@ -25,9 +25,13 @@ pub struct Simulation {
     pub frozen_wake: FrozenWake,
     pub solver: SimpleIterative,
     pub previous_circulation_strength: Vec<f64>,
+    pub previous_line_force_model_data: LineForceModelData,
+    pub first_time_step_completed: bool,
 }
 
 impl Simulation {
+    /// Creates a new simulation from a string that describes a `SimulationBuilder` in a JSON 
+    /// format.
     pub fn new_from_string(
         setup_string: &str,
     ) -> Result<Self, Error> {
@@ -58,6 +62,10 @@ impl Simulation {
     }
 
     /// Steps the simulation forward in time by one time step.
+    /// 
+    /// # Steps that are performed in this function:
+    /// - Updated the wake from the previous time step.
+    /// - Solve for new circulation strength with updated wake structure
     ///
     /// # Arguments
     /// - `time`: The current time of the simulation.
@@ -77,16 +85,31 @@ impl Simulation {
             &ctrl_points_freestream
         );
 
-        self.wake.synchronize_wing_geometry_before_time_step(&self.line_force_model);
+        if !self.first_time_step_completed {
+            let averaged_ctrl_points_freesteream = ctrl_points_freestream.iter()
+                .sum::<SpatialVector<3>>() / ctrl_points_freestream.len() as f64;
+
+            self.wake.initialize_with_velocity_and_time_step(
+                &self.line_force_model,
+                averaged_ctrl_points_freesteream,
+                time_step,
+            );
+
+            self.initialize_line_force_model_data(&felt_ctrl_points_freestream);
+
+            self.first_time_step_completed = true;
+        }
+
+        self.wake.update_before_solving(
+            time_step, 
+            &self.line_force_model, 
+            &self.previous_line_force_model_data
+        );
 
         self.frozen_wake.update(
-            &self.line_force_model,
             &self.wake
         );
 
-        // self.frozen_wake = FrozenWake::new_complete(&self.line_force_model, &self.wake);
-   
-        // Solve for the circulation strength
         let solver_result = self.solver.do_step(
             &self.line_force_model,
             &felt_ctrl_points_freestream,
@@ -94,16 +117,8 @@ impl Simulation {
             &self.previous_circulation_strength
         );
 
-        let line_force_model_data = LineForceModelData::new(
-            &self.line_force_model,
-            &felt_ctrl_points_freestream,
-            &solver_result.ctrl_point_velocity,
-        );
-
-        self.wake.update_after_completed_time_step(
+        self.wake.update_after_solving(
             &solver_result.circulation_strength,
-            &line_force_model_data,
-            time_step,
             &wake_points_freestream,
         );
 
@@ -111,15 +126,21 @@ impl Simulation {
 
         self.wake.write_wake_data_to_file_if_activated(time_step_index);
 
-        let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
+        self.previous_circulation_strength = solver_result.circulation_strength.clone();
 
-        self.previous_circulation_strength = result.force_input.circulation_strength.clone();
+        self.previous_line_force_model_data = LineForceModelData::new(
+            &self.line_force_model,
+            &felt_ctrl_points_freestream,
+            &solver_result.ctrl_point_velocity,
+        );
 
         self.flow_derivatives.update(&solver_result.ctrl_point_velocity);
 
-        result
+        self.line_force_model.calculate_simulation_result(&solver_result, time_step)
     }
 
+
+    /// Interface function to calculate the induced velocities from the wake at the given points.
     pub fn induced_velocities(
         &self,
         points: &[SpatialVector<3>],
@@ -127,6 +148,18 @@ impl Simulation {
         self.wake.induced_velocities(points)
     }
 
+    pub fn initialize_line_force_model_data(
+        &mut self,
+        felt_ctrl_points_freestream: &[SpatialVector<3>],
+    ) {
+        self.previous_line_force_model_data = LineForceModelData::new(
+            &self.line_force_model,
+            felt_ctrl_points_freestream,
+            felt_ctrl_points_freestream,
+        );
+    }
+
+    /// Initialize the circulation strength of the simulation with a given elliptic distribution.
     pub fn initialize_with_elliptic_distribution(
         &mut self,
         time: f64,
@@ -136,7 +169,15 @@ impl Simulation {
         let old_circulation_correction = self.line_force_model.circulation_corrections.clone();
         let old_damping_factor = self.solver.damping_factor;
 
-        self.line_force_model.circulation_corrections =CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
+        let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
+
+        let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_velocity(
+            &ctrl_points_freestream
+        );
+
+        self.initialize_line_force_model_data(&felt_ctrl_points_freestream);
+
+        self.line_force_model.circulation_corrections = CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
         self.solver.damping_factor = 0.25_f64.max(old_damping_factor);
 
         let _ = self.do_step(time, time_step, freestream_velocity);

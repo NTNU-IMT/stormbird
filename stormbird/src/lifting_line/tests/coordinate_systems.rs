@@ -13,7 +13,7 @@ use crate::lifting_line::simulation_builder::{
 
 use super::test_setup::RectangularWing;
 
-use math_utils::spatial_vector::transformations::RotationType;
+use stormath::spatial_vector::transformations::RotationType;
 
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
@@ -43,11 +43,11 @@ fn coordinate_systems() {
     let mut model_builder_body = model_builder_global.clone();
     model_builder_body.output_coordinate_system = CoordinateSystem::Body;
 
-    let steady_settings  = SteadySettings::default();
-
     let velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let time_step = 0.1;
+
+    let steady_settings = SteadySettings::default();
 
     let mut sim_fixed = SimulationBuilder::new(
         model_builder_global.clone(),

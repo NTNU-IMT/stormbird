@@ -111,7 +111,6 @@ pub struct StormbirdLiftingLine {
     parameters: FmuParameters,
     stormbird_model: Option<Simulation>,
     height_variation_model: Option<HeightVariationModel>,
-    initialized_wake: bool,
     input_filters: Option<InputFilters>,
     iterations_completed: usize,
 }
@@ -134,7 +133,6 @@ impl FmuFunctions for StormbirdLiftingLine {
 
         if self.stormbird_model.is_some() && waiting_iterations_is_done {
             self.set_line_force_model_state(time_step);
-            self.initialize_wake_if_not_done(time_step);
 
             let freestream_velocity = self.freestream_velocity();
 
@@ -233,26 +231,6 @@ impl StormbirdLiftingLine {
         }
     }
 
-    /// Initialize the wake in the model
-    fn initialize_wake_if_not_done(&mut self, time_step: f64) {
-        if !self.initialized_wake {
-            let freestream_velocity = self.freestream_velocity();
-
-            let average_freestream_velocity = freestream_velocity.iter().sum::<SpatialVector<3>>()
-                / freestream_velocity.len() as f64;
-
-            if let Some(model) = &mut self.stormbird_model {
-                model.wake.initialize_with_velocity_and_time_step(
-                    &model.line_force_model, 
-                    average_freestream_velocity, 
-                    time_step
-                );
-
-                self.initialized_wake = true;
-            }
-        }
-    }
-
     /// Functions that sets the state of the line force model before a step is performed.
     fn set_line_force_model_state(&mut self, time_step: f64) {
         let translation = self.translation_vector();
@@ -287,8 +265,15 @@ impl StormbirdLiftingLine {
                 model
                     .line_force_model
                     .rigid_body_motion
-                    .update_translation_and_rotation_with_derivatives_using_finite_difference(
+                    .update_translation_with_velocity_using_finite_difference(
                         translation,
+                        time_step
+                    );
+
+                model
+                    .line_force_model
+                    .rigid_body_motion
+                    .update_rotation_with_velocity_using_finite_difference(
                         rotation,
                         time_step
                     );

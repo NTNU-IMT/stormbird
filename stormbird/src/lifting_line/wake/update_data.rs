@@ -1,14 +1,78 @@
 use super::*;
 
-/// This code block contains the logic to update the wake structure, which primarily happens after a
-/// time step has been completed.
+/// This code block contains the logic to update the wake structure
 impl Wake {
+    /// Function that updates the wake data before the solver executes a new time step. The main job
+    /// is to ensure that geometry of the wake and the strength behind the first panels is correct.
+    /// 
+    /// # Steps that are performed in this function
+    /// Since the last time step, the line force model might have moved, and the wake points have 
+    /// streamed downstream. That means that the following must happen:
+    /// - Synchronize the geometry for the first points in the wake to the geometry of the line 
+    /// force model.
+    /// - Stream the old wake points downstream.
+    /// - Shift the strength of the panels downstream.
+    /// 
+    /// # Arguments
+    /// * `time_step` - The current value of the time step
+    /// * `line_force_model` - The line force model that the wake is based on
+    /// * `wake_points_freestream` - The freestream velocity at the points in the wake for the 
+    /// current time step
+    pub fn update_before_solving(
+        &mut self,
+        time_step: f64,
+        line_force_model: &LineForceModel,
+        line_force_model_data: &LineForceModelData,
+    ) {
+        self.update_wake_points(time_step, line_force_model, line_force_model_data);
+        self.update_panel_data();
+
+        self.stream_old_strength_values_downstream();
+
+        self.update_panel_strength_damping_factor(line_force_model_data);
+        self.update_panel_viscous_core_length(line_force_model_data);
+    }
+
+    /// Update the wake geometry and strength based on the final solution at a time step.
+    ///
+    /// This will:
+    /// 1) stream the wake points downstream
+    /// 2) stream the strength downstream
+    pub fn update_after_solving(
+        &mut self,
+        new_circulation_strength: &[f64],
+        wake_points_freestream: &[SpatialVector<3>],
+    ) {
+        self.update_strength_after_completed_time_step(new_circulation_strength);
+
+        self.update_velocity_at_points(wake_points_freestream);
+
+        self.number_of_time_steps_completed += 1;
+    }
+
+    /// Update the wake points by streaming them downstream.
+    ///
+    /// The first and second "rows" - meaning the wing geometries and the first row of wake points -
+    /// are treaded as special cases. The rest are moved based on the euler method
+    pub fn update_wake_points(
+        &mut self,
+        time_step: f64,
+        line_force_model: &LineForceModel,
+        line_force_model_data: &LineForceModelData,
+    ) {
+        self.synchronize_first_points_to_wing_geometry(line_force_model);
+        self.stream_free_wake_points_based_on_stored_velocity(time_step);
+        self.move_first_free_wake_points(line_force_model_data);
+        self.move_last_wake_points(line_force_model_data);
+    }
+
     /// Takes a line force vector as input, that might have a different position and orientation
-    /// than the current model, and updates the relevant internal geometry
+    /// than the previous time step, and updates the first points in the wake to match the new 
+    /// geometry.
     ///
     /// # Argument
     /// * `line_force_model` - The line force model that the wake is based on
-    pub fn synchronize_wing_geometry_before_time_step(&mut self, line_force_model: &LineForceModel) {
+    pub fn synchronize_first_points_to_wing_geometry(&mut self, line_force_model: &LineForceModel) {
         let span_points = line_force_model.span_points();
 
         for i in 0..span_points.len() {
@@ -31,96 +95,8 @@ impl Wake {
         }
     }
 
-    /// Update the wake geometry and strength based on the final solution at a time step.
-    ///
-    /// This will:
-    /// 1) stream the wake points downstream
-    /// 2) stream the strength downstream
-    pub fn update_after_completed_time_step(
-        &mut self,
-        new_circulation_strength: &[f64],
-        line_force_model_data: &LineForceModelData,
-        time_step: f64,
-        wake_points_freestream: &[SpatialVector<3>]
-    ) {
-        self.update_wake_points_after_completed_time_step(
-            time_step,
-            line_force_model_data,
-            wake_points_freestream
-        );
-
-        self.update_panel_data();
-
-        self.update_strength_after_completed_time_step(new_circulation_strength);
-
-        self.update_panel_lifetime(time_step);
-        self.update_panel_strength_damping_factor(line_force_model_data);
-        self.update_panel_viscous_core_length(line_force_model_data);
-
-        self.number_of_time_steps_completed += 1;
-    }
-
-    /// Function to initialize shape and strength of the wake, where the length is determined based
-    /// on the input velocity and time step. This can be used at the beginning of a simulation.
-    pub fn initialize_with_velocity_and_time_step(
-        &mut self, 
-        line_force_model: &LineForceModel, 
-        wake_building_velocity: SpatialVector<3>, 
-        time_step: f64
-    ) {
-        let nr_panels = self.indices.nr_panels();
-        
-        self.strengths                      = vec![0.0; nr_panels];
-        self.undamped_strengths             = vec![0.0; nr_panels];
-        self.panels_lifetime                = vec![0.0; nr_panels];
-        self.panels_strength_damping_factor = vec![0.0; nr_panels];
-
-        let ctrl_points_freestream = vec![wake_building_velocity; line_force_model.nr_span_lines()];
-        let wake_points_freestream = vec![wake_building_velocity; self.points.len()];
-
-        let line_force_model_data = LineForceModelData::new(
-            line_force_model,
-            &ctrl_points_freestream,
-            &ctrl_points_freestream
-        );
-
-        self.synchronize_wing_geometry_before_time_step(line_force_model);
-
-        let nr_initial_time_steps = self.indices.nr_points_per_line_element;
-
-        for _ in 0..nr_initial_time_steps {
-            self.update_wake_points_after_completed_time_step(
-                time_step,
-                &line_force_model_data,
-                &wake_points_freestream
-            );
-        }
-
-        self.update_panel_data();
-    }
-
-
-    pub fn initialize_based_on_chord_length(
-        &mut self, 
-        line_force_model: &LineForceModel,
-        relative_length_factor: f64,
-    ) {
-        let nr_panels_per_line_element = self.indices.nr_panels_per_line_element;
-
-        let chord_vectors = line_force_model.global_chord_vectors();
-
-        let average_chord_vector = chord_vectors.iter()
-            .sum::<SpatialVector<3>>() / chord_vectors.len() as f64;
-
-        let average_chord_length = average_chord_vector.length();
-
-        let wake_length = relative_length_factor * average_chord_length;
-
-        let time_step = 1.0;
-        let wake_building_velocity = (wake_length / nr_panels_per_line_element as f64) * average_chord_vector;
-
-        self.initialize_with_velocity_and_time_step(line_force_model, wake_building_velocity, time_step);
-
+    pub fn update_velocity_at_points(&mut self, wake_points_freestream: &[SpatialVector<3>]) {
+        self.velocity_at_points = self.velocity_at_wake_points(wake_points_freestream);
     }
 
     /// Update the strength of the wake panels closest to the wing geometry.
@@ -129,18 +105,6 @@ impl Wake {
     pub fn update_wing_strength(&mut self, new_circulation_strength: &[f64]) {
         for i in 0..new_circulation_strength.len() {
             self.undamped_strengths[i] = new_circulation_strength[i];
-        }
-    }
-
-    /// Update the lifetime of the panels in the wake.
-    fn update_panel_lifetime(&mut self, time_step: f64) {
-        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
-            for i_span in 0..self.indices.nr_panels_along_span {
-                let current_index  = self.indices.panel_index(i_stream, i_span);
-                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
-
-                self.panels_lifetime[current_index] = self.panels_lifetime[previous_index] + time_step;
-            }
         }
     }
 
@@ -208,25 +172,15 @@ impl Wake {
         self.update_panel_strength_damping_first_panels(line_force_model_data);
     }
 
-    /// Update the wake points by streaming them downstream.
-    ///
-    /// The first and second "rows" - meaning the wing geometries and the first row of wake points -
-    /// are treaded as special cases. The rest are moved based on the euler method
-    pub fn update_wake_points_after_completed_time_step(
-        &mut self,
-        time_step: f64,
-        line_force_model_data: &LineForceModelData,
-        wake_points_freestream: &[SpatialVector<3>]
-    ) {
-        self.stream_free_wake_points(time_step, wake_points_freestream);
-        self.move_first_free_wake_points(line_force_model_data);
-        self.move_last_wake_points(line_force_model_data);
-    }
-
     /// Moves the first wake points after the wing geometry itself.
     ///
     /// How the points are moved depends on both the sectional force model for each wing and - in
     /// some cases - the angle of attack on each line force model.
+    /// 
+    /// In general, the principle is that the first free wake points are moved from the wing 
+    /// geometry and then *either* in the direction of the chord vector or the velocity vector. 
+    /// Which vector to use as a direction depends on the `amount_of_flow_separation` value and 
+    /// wether the `use_chord_direction` setting is set to true or false.
     fn move_first_free_wake_points(
         &mut self,
         line_force_model_data: &LineForceModelData,
@@ -333,16 +287,14 @@ impl Wake {
     }
 
     /// Stream all free wake points based on the Euler method.
-    fn stream_free_wake_points(&mut self, time_step: f64, wake_points_freestream: &[SpatialVector<3>]) {
-        let velocity = self.velocity_at_wake_points(wake_points_freestream);
-
+    fn stream_free_wake_points_based_on_stored_velocity(&mut self, time_step: f64) {
         for i_stream in (2..self.indices.nr_points_per_line_element).rev() {
             for i_span in 0..self.indices.nr_points_along_span {
                 let previous_flat_index = self.indices.point_index(i_stream - 1, i_span);
                 let current_flat_index  = self.indices.point_index(i_stream, i_span);
 
                 let previous_wake_point = self.points[previous_flat_index];
-                let previous_velocity = velocity[previous_flat_index];
+                let previous_velocity = self.velocity_at_points[previous_flat_index];
 
                 let integrated_point = previous_wake_point + time_step * previous_velocity;
 
@@ -358,15 +310,7 @@ impl Wake {
         }
     }
 
-    /// Shift strength values downstream and update the wing values with the new circulation
-    ///
-    /// Principle: the strength of each panel is updated to be the same as the previous panel in the
-    /// stream wise direction in the last time step.
-    ///
-    /// # Argument
-    /// * `new_circulation_strength` - The new circulation strength for the wing
-    fn update_strength_after_completed_time_step(&mut self, new_circulation_strength: &[f64]) {
-        // Stream old strength values downstream
+    pub fn stream_old_strength_values_downstream(&mut self) {
         for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
             for i_span in 0..self.indices.nr_panels_along_span {
                 let current_index  = self.indices.panel_index(i_stream, i_span);
@@ -375,7 +319,16 @@ impl Wake {
                 self.undamped_strengths[current_index] = self.undamped_strengths[previous_index];
             }
         }
+    }
 
+    /// Shift strength values downstream and update the wing values with the new circulation
+    ///
+    /// Principle: the strength of each panel is updated to be the same as the previous panel in the
+    /// stream wise direction in the last time step.
+    ///
+    /// # Argument
+    /// * `new_circulation_strength` - The new circulation strength for the wing
+    fn update_strength_after_completed_time_step(&mut self, new_circulation_strength: &[f64]) {
         // Update the strength of the first panels
         self.update_wing_strength(new_circulation_strength);
 
@@ -391,11 +344,7 @@ impl Wake {
                 }
             },
             StrengthDamping::Exponential(_) => {
-                for i in 0..self.indices.nr_panels() {
-                    let damping = (-self.panels_lifetime[i] * self.panels_strength_damping_factor[i]).exp();
-
-                    self.strengths[i] = self.undamped_strengths[i] * damping;
-                }
+                unimplemented!("Exponential strength damping not implemented yet");
             },
             StrengthDamping::DirectFromStall => {
                 for i in 0..self.indices.nr_panels() {

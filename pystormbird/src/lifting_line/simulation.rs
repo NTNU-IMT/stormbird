@@ -4,10 +4,12 @@
 
 //! Interface to a dynamic simulation using a lifting line model.
 
+use std::time;
+
 use pyo3::prelude::*;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
-use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
+use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
 
 use crate::spatial_vector::SpatialVector;
 use crate::result_structs::SimulationResult;
@@ -30,12 +32,18 @@ impl Simulation {
         }
     }
 
-    pub fn set_translation(&mut self, translation: SpatialVector) {
-        self.data.line_force_model.rigid_body_motion.translation = translation.data;
+    pub fn set_translation_with_velocity_using_finite_difference(&mut self, translation: SpatialVector, time_step: f64) {
+        self.data.line_force_model.rigid_body_motion.update_translation_with_velocity_using_finite_difference(
+            translation.data, 
+            time_step
+        );
     }
 
-    pub fn set_rotation(&mut self, rotation: SpatialVector) {
-        self.data.line_force_model.rigid_body_motion.rotation = rotation.data;
+    pub fn set_rotation_with_velocity_using_finite_difference(&mut self, rotation: SpatialVector, time_step: f64) {
+        self.data.line_force_model.rigid_body_motion.update_rotation_with_velocity_using_finite_difference(
+            rotation.data, 
+            time_step
+        );
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {

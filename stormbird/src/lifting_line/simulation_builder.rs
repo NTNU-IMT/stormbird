@@ -7,7 +7,10 @@
 use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::wake::frozen_wake::FrozenWake;
+use crate::lifting_line::wake::{
+    frozen_wake::FrozenWake,
+    line_force_model_data::LineForceModelData,
+};
 
 use super::simulation::Simulation;
 
@@ -126,6 +129,14 @@ impl SimulationBuilder {
             &vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines]
         );
 
+        let felt_ctrl_point_freestream = vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines];
+
+        let previous_line_force_model_data = LineForceModelData::new(
+            &line_force_model,
+            &felt_ctrl_point_freestream,
+            &felt_ctrl_point_freestream,
+        );
+
         Simulation {
             line_force_model,
             flow_derivatives,
@@ -133,6 +144,8 @@ impl SimulationBuilder {
             frozen_wake,
             solver,
             previous_circulation_strength,
+            previous_line_force_model_data,
+            first_time_step_completed: false,
         }
     }
 }

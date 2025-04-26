@@ -12,7 +12,8 @@ pub mod prelude;
 pub mod frozen_wake;
 
 pub mod induced_velocity_calc;
-pub mod data_update;
+pub mod update_data;
+pub mod initialization;
 pub mod line_force_model_data;
 
 use line_force_model_data::LineForceModelData;
@@ -55,12 +56,12 @@ pub struct Wake {
     pub indices: WakeIndices,
     /// The points making up the vortex wake
     pub points: Vec<SpatialVector<3>>,
+    /// The velocity at each point in the wake
+    pub velocity_at_points: Vec<SpatialVector<3>>,
     /// The strength of the panels without damping
     pub undamped_strengths: Vec<f64>,
     /// The strengths of the panels
     pub strengths: Vec<f64>,
-    /// The life-time of the panels in the wake
-    pub panels_lifetime: Vec<f64>,
     /// 'Viscosity' of each panel
     pub panels_strength_damping_factor: Vec<f64>,
     /// The viscous core length of each panel
@@ -78,6 +79,18 @@ pub struct Wake {
 }
 
 impl Wake {
+    pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
+        let mut ctrl_points: Vec<SpatialVector::<3>> = Vec::with_capacity(self.indices.nr_panels_along_span);
+
+        for i in 0..self.indices.nr_panels_along_span {
+            ctrl_points.push(
+                (self.points[i] + self.points[i+1]) * 0.5
+            );
+        }
+
+        ctrl_points
+    }
+
     /// Returns the index of the wing that the span index belongs to
     fn wing_index(&self, span_index: usize) -> usize {
         for i in 0..self.wing_indices.len() {

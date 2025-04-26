@@ -18,4 +18,4 @@ crate-type = ["cdylib"]
 pyo3 = "0.21.0"
 
 stormbird = { path = "../stormbird"}
-math_utils = { path = "../math_utils" }
+stormath = { path = "../stormath" }

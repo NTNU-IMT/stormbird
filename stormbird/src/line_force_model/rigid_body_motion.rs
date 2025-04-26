@@ -48,24 +48,27 @@ impl RigidBodyMotion {
         self.velocity_linear + self.velocity_angular.cross(self.point_relative_to_body_center(point))
     }
 
-
-    /// Function that sets new values for the translation and rotation, and then calculates the 
-    /// derivatives (velocity and acceleration) using finite difference.
-    pub fn update_translation_and_rotation_with_derivatives_using_finite_difference(
+    pub fn update_translation_with_velocity_using_finite_difference(
         &mut self, 
         translation: SpatialVector<3>, 
-        rotation: SpatialVector<3>,
         time_step: f64
     ) {
         let old_translation = self.translation.clone();
 
-        let old_rotation = self.rotation.clone();
-
         self.translation = translation;
-        self.rotation = rotation;
 
         self.velocity_linear = (self.translation - old_translation) / time_step;
-       
+    }
+
+    pub fn update_rotation_with_velocity_using_finite_difference(
+        &mut self, 
+        rotation: SpatialVector<3>, 
+        time_step: f64
+    ) {
+        let old_rotation = self.rotation.clone();
+
+        self.rotation = rotation;
+
         self.velocity_angular = (self.rotation - old_rotation) / time_step;
     }
 }

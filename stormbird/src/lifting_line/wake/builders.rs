@@ -168,19 +168,20 @@ impl WakeBuilder {
 
         let undamped_strengths: Vec<f64> = vec![0.0; nr_panels];
         let strengths: Vec<f64> = vec![0.0; nr_panels];
-        let panels_lifetime: Vec<f64> = vec![0.0; nr_panels];
         let panels_strength_damping_factor: Vec<f64> = vec![0.0; nr_panels];
 
         let panels_viscous_core_length = vec![viscous_core_length.value; nr_panels];
 
         let panels = vec![Panel::default(); nr_panels];
 
+        let velocity_at_points = vec![SpatialVector::<3>::default(); indices.nr_points()];
+
         let mut wake = Wake {
             indices,
             points,
+            velocity_at_points,
             undamped_strengths,
             strengths,
-            panels_lifetime,
             panels_strength_damping_factor,
             panels_viscous_core_length,
             settings,

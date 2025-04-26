@@ -4,6 +4,8 @@
 
 use std::f64::consts::PI;
 
+/// Structure used to calculate the lift and drag coefficients for an elliptic wing using the
+/// elliptic wing theory.
 pub struct EllipticWingTheory {
     pub cl_2d: f64,
     pub aspect_ratio: f64

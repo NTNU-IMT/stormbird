@@ -11,9 +11,109 @@ use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationSettings,
     SteadySettings,
+    UnsteadySettings,
 };
 
 use super::test_setup::RectangularWing;
+use super::elliptic_wing_theory::EllipticWingTheory;
+
+#[test]
+/// tests that a dynamic forward motion gives the same result as with steady inflow.
+fn right_force_magnitude_with_steady_forward_motion() {
+    let aspect_ratio = 5.0;
+    let cl_zero_angle = 0.5;
+    let angle_of_attack = 0.0;
+    let cl_2d = cl_zero_angle + 2.0 * PI * angle_of_attack;
+
+    let theory = EllipticWingTheory {
+        cl_2d,
+        aspect_ratio
+    };
+
+    dbg!(theory.cl(), theory.cd());
+
+    let wing_builder = RectangularWing {
+        aspect_ratio,
+        cl_zero_angle,
+        angle_of_attack,
+        negative_span_orientation: true,
+        ..Default::default()
+    }.build();
+
+    let vel_magnitude = 5.2;
+
+    let freestream_velocity = SpatialVector([vel_magnitude, 0.0, 0.0]);
+
+    let steady_settings = SteadySettings::default();
+    let dynamic_settings = UnsteadySettings::default();
+
+    let _sim_settings_steady = SimulationSettings::QuasiSteady(steady_settings.clone());
+    let sim_settings_dynamic = SimulationSettings::Dynamic(dynamic_settings.clone());
+
+    let mut sim_translation = SimulationBuilder::new (
+        wing_builder.clone(),
+        sim_settings_dynamic.clone(),
+    ).build();
+
+    let mut sim_inflow = SimulationBuilder::new (
+        wing_builder,
+        sim_settings_dynamic.clone(),
+    ).build();
+
+    let freestream_velocity_points = sim_inflow.get_freestream_velocity_points();
+    let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
+    let input_freestream_velocity_translation = vec![SpatialVector::<3>::default(); freestream_velocity_points.len()];
+
+    let force_factor = 0.5 * aspect_ratio * vel_magnitude.powi(2) * sim_translation.line_force_model.density;
+
+    let time_step = 0.1;
+    for i in 1..20 {
+        
+        let time = (i as f64) * time_step;
+        
+        let translation = SpatialVector([
+            -vel_magnitude * time, 
+            0.0, 
+            0.0
+        ]);
+
+        sim_translation
+            .line_force_model
+            .rigid_body_motion
+            .update_translation_with_velocity_using_finite_difference(
+                translation,
+                time_step,
+            );
+
+        //sim_translation.line_force_model.rigid_body_motion.velocity_linear = -freestream_velocity;
+
+        let result_translation = sim_translation.do_step(
+            time, 
+            time_step, 
+            &input_freestream_velocity_translation
+        );
+
+        let result_inflow = sim_inflow.do_step(
+            time, 
+            time_step, 
+            &input_freestream_velocity
+        );
+    
+        let cl_translation = result_translation.integrated_forces_sum()[1] / force_factor;
+        let cl_inflow = result_inflow.integrated_forces_sum()[1] / force_factor;
+
+        let cl_difference = (cl_translation - cl_inflow).abs() / cl_inflow.abs();
+
+        assert!(
+            cl_difference < 0.00001,
+            "The difference between the two simulations is too large. Difference = {}",
+            cl_difference
+        );
+
+        dbg!(cl_translation, cl_inflow, cl_difference);
+    }
+
+}
 
 #[test]
 /// Tests whether a wing moving dynamically will create forces in the right direction. The forces

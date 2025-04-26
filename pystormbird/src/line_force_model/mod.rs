@@ -9,7 +9,7 @@ pub mod span_line;
 pub mod builder;
 
 use crate::spatial_vector::SpatialVector;
-use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
+use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
 
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;

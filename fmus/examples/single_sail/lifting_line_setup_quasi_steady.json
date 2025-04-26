@@ -6,12 +6,12 @@
                     {
                         "x": 0.0,
                         "y": 0.0,
-                        "z": -10.0
+                        "z": 10.0
                     },
                     {
                         "x": 0.0,
                         "y": 0.0,
-                        "z": -43.0
+                        "z": 43.0
                     }
                 ],
                 "chord_vectors": [
@@ -42,27 +42,10 @@
         "nr_sections": 20,
         "output_coordinate_system": "Body",
         "circulation_corrections": {
-            "GaussianSmoothing": {
-                "length_factor": 0.1,
-                "end_corrections_delta_span_factor": 1.0,
-                "end_corrections_number_of_insertions": 3
-            }
+            "PrescribedCirculation": {}
         }
     },
     "simulation_settings": {
-        "Dynamic": {
-            "wake": {
-                "nr_panels_per_line_element": 100,
-                "last_panel_relative_length": 5.0,
-                "ratio_of_wake_affected_by_induced_velocities": 0.0,
-                "use_chord_direction": true,
-                "symmetry_condition": "Z",
-                "strength_damping": "DirectFromStall"
-            },
-            "solver": {
-                "max_iterations_per_time_step": 10,
-                "damping_factor": 0.05
-            }
-        }
+        "QuasiSteady": {}
     }
 }

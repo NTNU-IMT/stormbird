@@ -1,5 +1,8 @@
 use crate::common_utils::prelude::CoordinateSystem;
-use crate::line_force_model::span_line::SpanLine;
+use crate::line_force_model::{
+    span_line::SpanLine,
+    LineForceModel,
+};
 
 use super::*;
 
@@ -9,17 +12,35 @@ use super::*;
 /// stores the values with all transformations applied. This avoids repeated calculations of the
 /// same values in the wake model.
 pub struct LineForceModelData {
+    /// The span lines of the line force model, with both translation and rotation applied.
     pub span_lines: Vec<SpanLine>,
+    /// The chord vectors of the line force model, with both translation and rotation applied.
     pub chord_vectors: Vec<SpatialVector<3>>,
+    /// The felt freestream velocity at the control points of the line force model. That is, 
+    /// velocity due to the inflow free stream AND the motion of the line force model.
     pub felt_ctrl_points_freestream: Vec<SpatialVector<3>>,
+    /// The felt velocity at the control points of the line force model. That is, velocity due to 
+    /// the inflow free stream AND the motion of the line force model AND the induced velocities
     pub felt_ctrl_points_velocity: Vec<SpatialVector<3>>,
+    /// The effective angles of attack at the control points of the line force model. 
     pub angles_of_attack: Vec<f64>,
+    /// The amount of flow separation at the control points of the line force model. 
     pub amount_of_flow_separation: Vec<f64>,
+    /// The angles of the wake at the control points of the line force model.
     pub wake_angles: Vec<f64>,
     pub wing_indices: Vec<Range<usize>>,
 }
 
 impl LineForceModelData {
+    /// This function executes the right methods from the line force model to get the data needed to
+    /// create the LineForceModelData, together with the supplied input data.
+    /// 
+    /// # Arguments
+    /// * `line_force_model`: The line force model to get the data from.
+    /// * `felt_ctrl_points_freestream`: The felt freestream velocity at the control points of 
+    /// the line force model.
+    /// * `felt_ctrl_points_velocity`: The felt velocity at the control points of the line force 
+    /// model, including the induced velocities.
     pub fn new(
         line_force_model: &LineForceModel,
         felt_ctrl_points_freestream: &[SpatialVector<3>],
@@ -54,7 +75,7 @@ impl LineForceModelData {
     }
 
     pub fn nr_span_lines(&self) -> usize {
-        self.chord_vectors.len()
+        self.span_lines.len()
     }
 
     pub fn nr_wings(&self) -> usize {
@@ -74,41 +95,10 @@ impl LineForceModelData {
             + std::ops::Mul<f64, Output = T>
             + Copy,
     {
-        let mut span_point_values: Vec<T> =
-            Vec::with_capacity(self.nr_span_lines() + self.nr_wings());
-
-        for wing_index in 0..self.wing_indices.len() {
-            let first_index = self.wing_indices[wing_index].start;
-
-            // First point is extrapolated
-            if extrapolate_ends {
-                let first_delta =
-                    ctrl_point_values[first_index] - ctrl_point_values[first_index + 1];
-
-                span_point_values.push(ctrl_point_values[first_index] + first_delta);
-            } else {
-                span_point_values.push(ctrl_point_values[first_index]);
-            }
-
-            // Loop over all span lines in the wing
-            for i in self.wing_indices[wing_index].clone() {
-                let last_index = self.wing_indices[wing_index].clone().last().unwrap();
-
-                // Last point is extrapolated, all others are interpolated
-                if i == last_index {
-                    if extrapolate_ends {
-                        let last_delta =
-                            ctrl_point_values[last_index] - ctrl_point_values[last_index - 1];
-                        span_point_values.push(ctrl_point_values[last_index] + last_delta);
-                    } else {
-                        span_point_values.push(ctrl_point_values[last_index]);
-                    }
-                } else {
-                    span_point_values.push((ctrl_point_values[i] + ctrl_point_values[i + 1]) * 0.5);
-                }
-            }
-        }
-
-        span_point_values
+        LineForceModel::span_point_values_from_ctrl_point_values(
+            &self.wing_indices,
+            ctrl_point_values,
+            extrapolate_ends
+        )
     }
 }
