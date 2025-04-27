@@ -1,0 +1,86 @@
+// Copyright (C) 2024, NTNU 
+// Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+
+//! Results from simulations.
+
+use stormath::spatial_vector::SpatialVector;
+use serde::{Serialize, Deserialize};
+
+use crate::error::Error;
+
+use super::forces_and_moments::{
+    IntegratedValues,
+    SectionalForces,
+    SectionalForcesInput
+};
+
+#[derive(Debug, Clone)]
+/// Results from a lifting line solver, which will be further used to generate SimulationResults
+pub struct SolverResult {
+    pub circulation_strength: Vec<f64>,
+    pub ctrl_point_velocity: Vec<SpatialVector<3>>,
+    pub iterations: usize,
+    pub residual: f64,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+/// Structures used to return results from simulations. 
+pub struct SimulationResult {
+    pub ctrl_points: Vec<SpatialVector<3>>,
+    pub force_input: SectionalForcesInput,
+    pub sectional_forces: SectionalForces,
+    pub integrated_forces: Vec<IntegratedValues>,
+    pub integrated_moments: Vec<IntegratedValues>,
+    pub iterations: usize,
+    pub residual: f64,
+}
+
+impl SimulationResult {
+    pub fn result_history_from_file(file_path: &str) -> Result<Vec<SimulationResult>, Error> {
+        let file = std::fs::File::open(file_path)?;
+
+        let reader = std::io::BufReader::new(file);
+
+        let serde_res = serde_json::from_reader(reader)?;
+
+        Ok(serde_res)
+    }
+
+    pub fn integrated_forces_sum(&self) -> SpatialVector<3> {
+        let mut sum = SpatialVector::<3>::default();
+
+        for i in 0..self.integrated_forces.len() {
+            sum += self.integrated_forces[i].total;
+        }
+        
+        sum
+    }
+
+    pub fn integrated_moments_sum(&self) -> SpatialVector<3> {
+        let mut sum = SpatialVector::<3>::default();
+
+        for i in 0..self.integrated_moments.len() {
+            sum += self.integrated_moments[i].total;
+        }
+        
+        sum
+    }
+
+    pub fn write_to_file(&self, file_path: &str) -> std::io::Result<()> {
+        let file = std::fs::File::create(file_path)?;
+        let writer = std::io::BufWriter::new(file);
+
+        serde_json::to_writer(writer, self)?;
+
+        Ok(())
+    }
+
+    pub fn nr_span_lines(&self) -> usize {
+        self.ctrl_points.len()
+    }
+
+    pub fn nr_of_wings(&self) -> usize {
+        self.integrated_forces.len()
+    }
+}

@@ -1,13 +1,11 @@
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
-use math_utils::array2::Array2;
+use stormath::array2::Array2;
 
 use rayon::prelude::*;
 
 use crate::lifting_line::wake::Wake;
-use crate::line_force_model::LineForceModel;
-
 #[derive(Debug, Clone)]
 /// Represents a wake where the shape is assumed to be frozen, but where the strength on parts of 
 /// the wake can be updated. That is, it is intended to be used while solving for the circulation
@@ -48,31 +46,19 @@ impl FrozenWake {
         }
     }
 
-    pub fn update(
-        &mut self, 
-        line_force_model: &LineForceModel, 
-        wake: &Wake
-    ) {
-        self.update_fixed_velocities(line_force_model, wake);
-        self.update_variable_velocity_factors(line_force_model, wake);
+    pub fn update(&mut self, wake: &Wake) {
+        self.update_fixed_velocities(wake);
+        self.update_variable_velocity_factors(wake);
     }
 
-    pub fn update_fixed_velocities(
-        &mut self, 
-        line_force_model: &LineForceModel, 
-        wake: &Wake
-    ) {
-        let ctrl_points = line_force_model.ctrl_points();
+    pub fn update_fixed_velocities(&mut self, wake: &Wake) {
+        let ctrl_points = wake.ctrl_points();
 
         self.fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
     }
 
-    pub fn update_variable_velocity_factors(
-        &mut self, 
-        line_force_model: &LineForceModel, 
-        wake: &Wake
-    ) {
-        let ctrl_points = line_force_model.ctrl_points();
+    pub fn update_variable_velocity_factors(&mut self, wake: &Wake) {
+        let ctrl_points = wake.ctrl_points();
 
         let indices_logic = self.variable_velocity_factors.indices.clone();
 
@@ -109,62 +95,6 @@ impl FrozenWake {
                     ctrl_points[ctrl_point_index]
                 );
             });
-        }
-    }
-
-    /// Construct a frozen wake from a full dynamic wake. 
-    pub fn new_complete(line_force_model: &LineForceModel, wake: &Wake) -> Self {
-        let ctrl_points = line_force_model.ctrl_points();
-
-        let nr_span_lines = ctrl_points.len();
-
-        let fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
-
-        let mut variable_velocity_factors: Array2<SpatialVector<3>> = Array2::new_default(
-            [nr_span_lines, nr_span_lines]
-        );
-
-        let indices_logic = variable_velocity_factors.indices.clone();
-
-        if wake.settings.neglect_self_induced_velocities {
-            variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let indices = indices_logic.indices_from_index(flat_index);
-
-                let ctrl_point_index = indices[0];
-                let panel_index = indices[1];
-    
-                let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
-                let panel_wing_index      = wake.wing_index(panel_index);
-    
-                if ctrl_point_wing_index == panel_wing_index {
-                    *factor = SpatialVector::<3>::default();
-                } else {
-                    *factor = wake.unit_strength_induced_velocity_from_panel(
-                        0, 
-                        panel_index, 
-                        ctrl_points[ctrl_point_index]
-                    );
-                }
-            });
-        } else {
-            variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let indices = indices_logic.indices_from_index(flat_index);
-
-                let ctrl_point_index = indices[0];
-                let panel_index = indices[1];
-    
-                *factor = wake.unit_strength_induced_velocity_from_panel(
-                    0, 
-                    panel_index, 
-                    ctrl_points[ctrl_point_index]
-                );
-            });
-        }
-        
-
-        FrozenWake {
-            fixed_velocities,
-            variable_velocity_factors,
         }
     }
 

@@ -54,8 +54,6 @@ if __name__ == '__main__':
     wind_environment = WindEnvironment()
     wind_environment.to_json_file('wind_environment_setup.json')
 
-    
-
     output_path = Path('output')
     wake_files_path = Path('wake_files')
 

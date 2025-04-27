@@ -3,13 +3,13 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use stormbird::io_structs::prelude::CoordinateSystem;
+use stormbird::common_utils::prelude::CoordinateSystem;
 
 pub mod span_line;
 pub mod builder;
 
 use crate::spatial_vector::SpatialVector;
-use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
+use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
 
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
@@ -26,7 +26,7 @@ pub struct LineForceModel {
 impl LineForceModel {
     #[new]
     pub fn new(json_string: String) -> Self {
-        let builder = LineForceModelBuilderRust::new_from_string(&json_string);
+        let builder = LineForceModelBuilderRust::new_from_string(&json_string).unwrap();
 
         Self {
             data: builder.build()

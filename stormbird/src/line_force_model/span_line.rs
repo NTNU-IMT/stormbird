@@ -4,10 +4,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::spatial_vector::{
-    SpatialVector,
-    transformations::RotationType
-};
+use stormath::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone)]
 /// Struct that represents spatial coordinates in a coordinate system that is oriented along the 
@@ -19,34 +16,13 @@ pub struct LineCoordinates {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-/// A line segement of a wing span
+/// A line segment of a wing span
 pub struct SpanLine {
     pub start_point: SpatialVector<3>,
     pub end_point: SpatialVector<3>
 }
 
 impl SpanLine {
-    pub fn translate(&self, translation: SpatialVector<3>) -> Self {
-        Self {
-            start_point: self.start_point + translation,
-            end_point: self.end_point + translation
-        }
-    }
-
-    pub fn rotate(&self, rotation: SpatialVector<3>, rotation_type: RotationType) -> Self {
-        Self {
-            start_point: self.start_point.rotate(rotation, rotation_type),
-            end_point: self.end_point.rotate(rotation, rotation_type)
-        }
-    }
-
-    pub fn rotate_around_axis(&self, angle: f64, axis: SpatialVector<3>) -> Self {
-        Self {
-            start_point: self.start_point.rotate_around_axis(angle, axis),
-            end_point: self.end_point.rotate_around_axis(angle, axis)
-        }
-    }
-
     pub fn relative_vector(&self) -> SpatialVector<3> {
         self.end_point - self.start_point
     }
@@ -83,7 +59,7 @@ impl SpanLine {
         }
     }
 
-    /// Computes the line coordinates of the input point, based on the geoemtry of Self, and an 
+    /// Computes the line coordinates of the input point, based on the geometry of Self, and an 
     /// input chord vector.
     /// 
     /// The chord and span direction is given directly by Self and the input. The thickness 

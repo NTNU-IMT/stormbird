@@ -20,4 +20,4 @@ LIB_LIBS = \
     -lturbulenceModels \
     -lincompressibleTurbulenceModels \
     -lcompressibleTurbulenceModels \
-    -L../../cpp_actuator_line/target/release -lcpp_actuator_line
+    -L../rust_build -lcpp_actuator_line

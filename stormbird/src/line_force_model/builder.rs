@@ -9,6 +9,8 @@ use super::*;
 
 use super::single_wing::WingBuilder;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LineForceModelBuilder {
@@ -20,8 +22,6 @@ pub struct LineForceModelBuilder {
     pub density: f64,
     #[serde(default)]
     pub circulation_corrections: CirculationCorrection,
-    #[serde(default)]
-    pub ctrl_point_chord_factor: f64,
     #[serde(default)]
     pub output_coordinate_system: CoordinateSystem,
     #[serde(default)]
@@ -35,14 +35,15 @@ impl LineForceModelBuilder {
             nr_sections,
             density: LineForceModel::default_density(),
             circulation_corrections: Default::default(),
-            ctrl_point_chord_factor: 0.0,
             output_coordinate_system: CoordinateSystem::Global,
             rotation_type: RotationType::XYZ,
         }
     }
 
-    pub fn new_from_string(setup_string: &str) -> Self {
-        serde_json::from_str(setup_string).unwrap()
+    pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(setup_string)?;
+
+        Ok(serde_res)
     }
 
     pub fn add_wing(&mut self, wing_builder: WingBuilder) {
@@ -63,7 +64,6 @@ impl LineForceModelBuilder {
         }
 
         line_force_model.circulation_corrections = self.circulation_corrections.clone();
-        line_force_model.ctrl_point_chord_factor = self.ctrl_point_chord_factor;
         line_force_model.output_coordinate_system = self.output_coordinate_system;
 
         line_force_model

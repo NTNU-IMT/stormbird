@@ -7,11 +7,12 @@
 use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::wake::frozen_wake::FrozenWake;
+use crate::lifting_line::wake::{
+    frozen_wake::FrozenWake,
+    line_force_model_data::LineForceModelData,
+};
 
 use super::simulation::Simulation;
-
-use crate::line_force_model::circulation_corrections::prescribed_circulation::PrescribedCirculationShape;
 
 use crate::error::Error;
 
@@ -42,14 +43,14 @@ pub struct UnsteadySettings {
 /// 
 /// Both quasi-steady and dynamic simulations are supported. The settings for each simulation type 
 /// is stored as a member variable of each variant.
-pub enum SimulationMode {
+pub enum SimulationSettings {
     QuasiSteady(SteadySettings),
     Dynamic(UnsteadySettings),
 }
 
-impl Default for SimulationMode {
+impl Default for SimulationSettings {
     fn default() -> Self {
-        SimulationMode::QuasiSteady(SteadySettings::default())
+        SimulationSettings::QuasiSteady(SteadySettings::default())
     }
 }
 
@@ -59,23 +60,17 @@ impl Default for SimulationMode {
 pub struct SimulationBuilder {
     pub line_force_model: LineForceModelBuilder,
     #[serde(default)]
-    pub simulation_mode: SimulationMode,
-    #[serde(default)]
-    pub write_wake_data_to_file: bool,
-    #[serde(default)]
-    pub wake_files_folder_path: String,
+    pub simulation_settings: SimulationSettings,
 }
 
 impl SimulationBuilder {
     pub fn new(
         line_force_model: LineForceModelBuilder,
-        simulation_mode: SimulationMode,
+        simulation_settings: SimulationSettings,
     ) -> Self {
         SimulationBuilder {
             line_force_model,
-            simulation_mode,
-            write_wake_data_to_file: false,
-            wake_files_folder_path: String::new()
+            simulation_settings,
         }
     }
 
@@ -99,54 +94,58 @@ impl SimulationBuilder {
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.
-    pub fn build(&self, initial_time_step: f64, initialization_velocity: SpatialVector<3>) -> Simulation {
+    pub fn build(&self) -> Simulation {
         let line_force_model = self.line_force_model.build();
+
         let nr_of_lines = line_force_model.nr_span_lines();
 
-        let wake = match &self.simulation_mode {
-            SimulationMode::Dynamic(settings) => {
+        let wake = match &self.simulation_settings {
+            SimulationSettings::Dynamic(settings) => {
                 settings.wake.build(
-                    initial_time_step,
-                    &line_force_model,
-                    initialization_velocity,
+                    &line_force_model
                 )
             },
-            SimulationMode::QuasiSteady(settings) => {
+            SimulationSettings::QuasiSteady(settings) => {
                 settings.wake.build(
-                    initial_time_step,
                     &line_force_model,
-                    initialization_velocity,
                 )
             }
         };
 
         let frozen_wake = FrozenWake::initialize(nr_of_lines);
 
-        let solver = match &self.simulation_mode {
-            SimulationMode::Dynamic(settings) => {
+        let solver = match &self.simulation_settings {
+            SimulationSettings::Dynamic(settings) => {
                 settings.solver.clone()
             },
-            SimulationMode::QuasiSteady(settings) => {
+            SimulationSettings::QuasiSteady(settings) => {
                 settings.solver.build()
             }
         };
 
-        let initial_circulation_shape = PrescribedCirculationShape::default();
+        let previous_circulation_strength = vec![0.0; nr_of_lines];
 
-        let previous_circulation_strength = line_force_model.prescribed_circulation_strength(
-            &vec![initialization_velocity; nr_of_lines], 
-            &initial_circulation_shape,
-            CoordinateSystem::Global
+        let flow_derivatives = FlowDerivatives::new(
+            &vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines]
+        );
+
+        let felt_ctrl_point_freestream = vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines];
+
+        let previous_line_force_model_data = LineForceModelData::new(
+            &line_force_model,
+            &felt_ctrl_point_freestream,
+            &felt_ctrl_point_freestream,
         );
 
         Simulation {
             line_force_model,
+            flow_derivatives,
             wake,
             frozen_wake,
             solver,
             previous_circulation_strength,
-            write_wake_data_to_file: self.write_wake_data_to_file,
-            wake_files_folder_path: self.wake_files_folder_path.clone()
+            previous_line_force_model_data,
+            first_time_step_completed: false,
         }
     }
 }

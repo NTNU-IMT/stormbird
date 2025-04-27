@@ -6,7 +6,7 @@
 
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 
-pub mod io_structs;
+pub mod common_utils;
 pub mod section_models;
 pub mod line_force_model;
 pub mod lifting_line;

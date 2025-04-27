@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 
 use super::*;
 
-use math_utils::interpolation;
+use stormath::interpolation;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

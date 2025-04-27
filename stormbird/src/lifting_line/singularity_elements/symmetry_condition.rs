@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use serde::{Serialize, Deserialize};
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

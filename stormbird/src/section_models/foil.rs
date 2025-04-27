@@ -3,9 +3,11 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use super::*;
-use math_utils::special_functions;
+use stormath::special_functions;
 
 use std::f64::consts::PI;
+
+use crate::error::Error;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum StallModel {
@@ -91,10 +93,6 @@ pub struct Foil {
     /// The range of the stall transition. The default value is 6 degrees.
     pub stall_range: f64,
     #[serde(default)]
-    /// Factor to model lift due to changing angle of attack. This is zero by default, and therefore
-    /// not used.
-    pub cl_changing_aoa_factor: f64,
-    #[serde(default)]
     /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
     pub added_mass_factor: f64,
     #[serde(default)]
@@ -121,8 +119,10 @@ impl Foil {
     pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
     pub fn default_cd_power_after_stall() -> f64 {1.6}
 
-    pub fn new_from_string(string: &str) -> Self {
-        serde_json::from_str(string).unwrap()
+    pub fn new_from_string(string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(string)?;
+
+        Ok(serde_res)
     }
 
     pub fn to_string(&self) -> String {
@@ -233,7 +233,6 @@ impl Default for Foil {
             mean_positive_stall_angle: Self::default_mean_stall_angle(),
             mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),
-            cl_changing_aoa_factor: 0.0,
             added_mass_factor:      0.0,
             stall_model:            StallModel::Harmonic,
         }

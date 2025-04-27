@@ -1,30 +1,35 @@
 
+//! Tests for the line force model functionality.
+
+
+pub mod motion;
 
 use crate::line_force_model::single_wing::WingBuilder;
 use crate::line_force_model::builder::LineForceModelBuilder;
+use crate::line_force_model::LineForceModel;
 
 use crate::section_models::SectionModel;
 use crate::section_models::foil::Foil;
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
-#[test]
-fn test_wing_angles() {
+/// Returns an example line force model with two wings, oriented along the z-axis.
+pub fn get_example_model() -> LineForceModel {
+    let chord_length = 11.0;
+    let span = 33.0;
+    let start_height = 5.2;
+
     let mut builder = LineForceModelBuilder::new(5);
 
-    let chord_vector = SpatialVector([1.0, 0.0, 0.0]);
+    let chord_vector = SpatialVector([chord_length, 0.0, 0.0]);
 
-    let x_positions = vec![-1.5, 1.32];
-
-    let rotation_angle = 45.0_f64.to_radians();
-
-    let rotated_chord_vector = chord_vector.rotate_around_axis(rotation_angle, SpatialVector([0.0, 0.0, 1.0]));
+    let x_positions = vec![-1.5 * span, 1.32 * span];
 
     for x in x_positions {
         let wing = WingBuilder{
             section_points: vec![
-                SpatialVector([x, 0.0, 0.0]),
-                SpatialVector([x, 0.0, 1.0]),
+                SpatialVector([x, 0.0, start_height]),
+                SpatialVector([x, 0.0, start_height + span]),
             ],
             chord_vectors: vec![
                 chord_vector,
@@ -32,29 +37,11 @@ fn test_wing_angles() {
             ],
             section_model: SectionModel::Foil(Foil::default()),
             non_zero_circulation_at_ends: [false, false],
-            virtual_wing: false,
             nr_sections: None,
         };
 
         builder.add_wing(wing);
     }
 
-    let mut line_force_model = builder.build();
-
-    let original_span_points = line_force_model.span_points();
-
-    let wing_angles = vec![rotation_angle, rotation_angle];
-
-    line_force_model.local_wing_angles = wing_angles.clone();
-
-    let chord_vectors = line_force_model.global_chord_vectors();
-    let span_points = line_force_model.span_points();
-
-    for i in 0..chord_vectors.len() {
-        assert_eq!(chord_vectors[i], rotated_chord_vector);
-    }
-
-    for i in 0..span_points.len() {
-        assert_eq!(span_points[i], original_span_points[i]);
-    }
+    builder.build()
 }

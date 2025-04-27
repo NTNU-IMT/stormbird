@@ -24,15 +24,16 @@ class StormbirdSettings():
         
         wing_builder = {
             "section_points": [
-                {"x": 0.0, "y": 0.0, "z": -self.span / 2},
-                {"x": 0.0, "y": 0.0, "z": self.span / 2}
+                {"x": 0.0, "y": 0.0, "z": 0.0},
+                {"x": 0.0, "y": 0.0, "z": self.span}
             ],
             "chord_vectors": [chord_vector, chord_vector],
             "section_model": {
                 "Foil": {
                     "cl_zero_angle": 0.5,
                 }
-            }
+            },
+            "non_zero_circulation_at_ends": [False, False]
         }
 
         line_force_model = {
@@ -55,7 +56,10 @@ class StormbirdSettings():
 
         return {
             "line_force_model": line_force_model,
-            "projection": projection
+            "projection": projection,
+            "solver_settings": {
+                "strength_damping": 0.1
+            }
         }
     
     def write_actuator_line_setup_to_file(self, file_path):

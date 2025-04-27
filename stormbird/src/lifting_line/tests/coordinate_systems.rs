@@ -7,13 +7,13 @@
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
-    SimulationMode,
+    SimulationSettings,
     SteadySettings,
 };
 
 use super::test_setup::RectangularWing;
 
-use math_utils::spatial_vector::transformations::RotationType;
+use stormath::spatial_vector::transformations::RotationType;
 
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
@@ -43,29 +43,29 @@ fn coordinate_systems() {
     let mut model_builder_body = model_builder_global.clone();
     model_builder_body.output_coordinate_system = CoordinateSystem::Body;
 
-    let steady_settings  = SteadySettings::default();
-
     let velocity = SpatialVector([1.2, 0.0, 0.0]);
 
     let time_step = 0.1;
 
+    let steady_settings = SteadySettings::default();
+
     let mut sim_fixed = SimulationBuilder::new(
         model_builder_global.clone(),
-        SimulationMode::QuasiSteady(steady_settings.clone())
-    ).build(time_step, velocity);
+        SimulationSettings::QuasiSteady(steady_settings.clone())
+    ).build();
 
     let mut sim_global = sim_fixed.clone();
 
     let mut sim_body = SimulationBuilder::new(
         model_builder_body.clone(),
-        SimulationMode::QuasiSteady(steady_settings.clone())
-    ).build(time_step, velocity);
+        SimulationSettings::QuasiSteady(steady_settings.clone())
+    ).build();
 
-    sim_global.line_force_model.rotation = rotation;
-    sim_body.line_force_model.rotation = rotation;
-
-    sim_global.line_force_model.translation = translation;
-    sim_body.line_force_model.translation = translation;
+    sim_global.line_force_model.rigid_body_motion.rotation = rotation;
+    sim_body.line_force_model.rigid_body_motion.rotation = rotation;
+    
+    sim_global.line_force_model.rigid_body_motion.translation = translation;
+    sim_body.line_force_model.rigid_body_motion.translation = translation;
 
     let velocity_points = sim_global.get_freestream_velocity_points();
 

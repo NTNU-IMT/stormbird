@@ -87,15 +87,15 @@ pub struct WakeSettings {
     pub last_panel_relative_length: f64,
     /// A variable to determine of the chord direction should be used for the wake direction
     pub use_chord_direction: bool,
-    /// Variable to determine the amount of strength damping
-    pub strength_damping: StrengthDamping,
-    /// A variable to determine the viscous core length of the panels
-    pub viscous_core_length: SeparationDependentValue,
     /// A variable which panels that should be updated with the induced velocities included in the 
     /// velocity calculation
     pub end_index_induced_velocities_on_wake: usize,
     /// The amount of damping in the shape of the wake
     pub shape_damping_factor: f64,
     /// A variable to determine whether the self-induced velocities should be neglected or not
-    pub neglect_self_induced_velocities: bool
+    pub neglect_self_induced_velocities: bool,
+    /// A variable to determine whether the wake geometry and data should be written to a file
+    pub write_wake_data_to_file: bool,
+    /// The path to the folder where the wake data should be written to
+    pub wake_files_folder_path: String,
 }

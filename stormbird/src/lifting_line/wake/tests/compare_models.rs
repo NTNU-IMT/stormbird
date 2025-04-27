@@ -4,7 +4,6 @@
 
 use super::*;
 
-use math_utils::spatial_vector::SpatialVector;
 use crate::lifting_line::tests::test_setup::RectangularWing;
 
 #[test]
@@ -14,18 +13,14 @@ fn compare_wake_models() {
         ..Default::default()
     }.build().build();
 
-    let velocity = SpatialVector::<3>::new(1.2, 0.0, 0.0);
-
-    let time_step = 0.5; 
-
     let mut dynamic_wake = WakeBuilder{
-        wake_length: WakeLength::NrPanels(10),
+        nr_panels_per_line_element: 10,
         last_panel_relative_length: 100.0,
         ..Default::default()
-    }.build(time_step, &line_force_model, velocity);
+    }.build(&line_force_model);
 
     let mut steady_wake = SteadyWakeBuilder::default()
-        .build(time_step, &line_force_model, velocity);
+        .build(&line_force_model);
 
     let circulation_strength_value = 1.31;
 
@@ -45,5 +40,4 @@ fn compare_wake_models() {
     for (u_i_steady, u_i_dynamic) in u_i_steady.iter().zip(u_i_dynamic.iter()) {
         assert!((*u_i_steady - *u_i_dynamic).length() < allowable_error);
     }
-    
 }

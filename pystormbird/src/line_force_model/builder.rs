@@ -27,7 +27,6 @@ impl WingBuilder {
         chord_vectors: Vec<SpatialVector>, 
         section_model: SectionModel,
         non_zero_circulation_at_ends: [bool; 2],
-        virtual_wing: bool,
         nr_sections: usize
     ) -> Self {
         WingBuilder {
@@ -36,7 +35,6 @@ impl WingBuilder {
                 chord_vectors: chord_vectors.iter().map(|v| v.data).collect(),
                 section_model: section_model.data,
                 non_zero_circulation_at_ends,
-                virtual_wing,
                 nr_sections: Some(nr_sections),
             }
         }
@@ -61,7 +59,7 @@ impl LineForceModelBuilder {
     #[classmethod]
     pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
         Self {
-            data: LineForceModelBuilderRust::new_from_string(&string),
+            data: LineForceModelBuilderRust::new_from_string(&string).unwrap(),
         }
     }
 

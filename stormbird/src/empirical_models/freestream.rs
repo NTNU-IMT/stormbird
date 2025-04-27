@@ -4,7 +4,7 @@
 
 /// Functionality to represent the freestream velocity in a simulation
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 use serde::{Serialize, Deserialize};
 

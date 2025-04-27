@@ -5,10 +5,10 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use stormbird::io_structs::result::SimulationResult as SimulationResultRust;
-use stormbird::io_structs::forces_and_moments::SectionalForces as SectionalForcesRust;
-use stormbird::io_structs::forces_and_moments::IntegratedValues as IntegratedValuesRust;
-use stormbird::io_structs::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
+use stormbird::common_utils::result::SimulationResult as SimulationResultRust;
+use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalForcesRust;
+use stormbird::common_utils::forces_and_moments::IntegratedValues as IntegratedValuesRust;
+use stormbird::common_utils::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
 
 use crate::spatial_vector::SpatialVector;
 
@@ -38,11 +38,6 @@ impl SectionalForcesInput {
     #[getter]
     pub fn acceleration(&self) -> Vec<SpatialVector> {
         self.data.acceleration.iter().map(|v| SpatialVector::from(v.clone())).collect()
-    }
-
-    #[getter]
-    pub fn angles_of_attack_derivative(&self) -> Vec<f64> {
-        self.data.angles_of_attack_derivative.clone()
     }
 
     #[getter]
@@ -129,7 +124,7 @@ pub struct SimulationResult {
 impl SimulationResult {
     #[classmethod]
     pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> Vec<SimulationResult> {
-        let rust_vector = SimulationResultRust::result_history_from_file(&file_path);
+        let rust_vector = SimulationResultRust::result_history_from_file(&file_path).unwrap();
 
         rust_vector.iter().map(|v| SimulationResult { data: v.clone() }).collect()
     }

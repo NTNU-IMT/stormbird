@@ -1,6 +1,6 @@
 
 use serde::{Deserialize, Serialize};
-use math_utils::interpolation::linear_interpolation;
+use stormath::interpolation::linear_interpolation;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

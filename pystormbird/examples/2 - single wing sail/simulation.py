@@ -162,15 +162,9 @@ class SimulationCase():
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
-                #wake["viscous_core_length_separated"] = {
-                #    "Absolute": 1.0 * self.chord_length
-                #}
-
                 wake["strength_damping"] = "DirectFromStall"
 
-                wake["wake_length"] = {
-                    "NrPanels": 200
-                }
+                wake["nr_panels_per_line_element"] = 200
                 wake["use_chord_direction"] = True
                 wake["first_panel_relative_length"] = 0.75
                 
@@ -193,18 +187,12 @@ class SimulationCase():
 
         setup = {
             "line_force_model": line_force_model,
-            "simulation_mode": sim_settings,
-            "write_wake_data_to_file": self.write_wake_files,
-            "wake_files_folder_path": "wake_files_output"
+            "simulation_settings": sim_settings
         }
 
         setup_string = json.dumps(setup)
 
-        simulation = Simulation(
-            setup_string = setup_string,
-            initial_time_step = self.time_step,
-            initialization_velocity = freestream_velocity
-        )
+        simulation = Simulation(setup_string = setup_string)
 
         freestream_velocity_points = simulation.get_freestream_velocity_points()
 

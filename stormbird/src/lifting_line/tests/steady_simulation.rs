@@ -7,7 +7,7 @@
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
-    SimulationMode,
+    SimulationSettings,
     SteadySettings
 };
 
@@ -31,12 +31,10 @@ fn moment_test() {
 
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder,
-        simulation_mode: SimulationMode::QuasiSteady(
+        simulation_settings: SimulationSettings::QuasiSteady(
             SteadySettings::default()
-        ),
-        wake_files_folder_path: "".to_string(),
-        write_wake_data_to_file: false,        
-    }.build(1.0, freestream_velocity);
+        ) 
+    }.build();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
 

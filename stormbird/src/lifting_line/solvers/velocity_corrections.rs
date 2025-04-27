@@ -6,7 +6,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 /// Model to empirically correct the estimated velocity in lifting line simulations, based on the 

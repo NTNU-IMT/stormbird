@@ -4,8 +4,8 @@
 
 use pyo3::prelude::*;
 
-use math_utils::spatial_vector::SpatialVector as SpatialVectorRust;
-use math_utils::spatial_vector::transformations::RotationType;
+use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
+use stormath::spatial_vector::transformations::RotationType;
 
 #[pyclass]
 #[derive(Clone)]

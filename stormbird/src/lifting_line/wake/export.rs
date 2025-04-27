@@ -6,6 +6,20 @@ use super::Wake;
 use std::collections::HashMap;
 
 impl Wake {
+    pub fn write_wake_data_to_file_if_activated(&self, time_step_index: usize) {
+        if self.settings.write_wake_data_to_file {
+            let file_path = format!("{}/wake_{}.vtp", self.settings.wake_files_folder_path, time_step_index);
+            let write_result = self.write_wake_to_vtk_file(&file_path);
+
+            match write_result {
+                Ok(_) => {},
+                Err(e) => {
+                    log::error!("Error writing wake data to file: {}", e);
+                }
+            }
+        }
+    }
+
     /// Export the wake geometry as an obj file
     ///
     /// # Argument
@@ -118,6 +132,15 @@ impl Wake {
         write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"strength\" format=\"ascii\">\n")?;
         for i in 0..nr_faces {
             write!(writer, "\t\t\t\t\t{}\n", self.strengths[i])?;
+        }
+
+        write!(writer, "\t\t\t\t</DataArray>\n")?;
+
+        // Write viscous core length
+
+        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"viscous_core_length\" format=\"ascii\">\n")?;
+        for i in 0..nr_faces {
+            write!(writer, "\t\t\t\t\t{}\n", self.panels_viscous_core_length[i])?;
         }
 
         write!(writer, "\t\t\t\t</DataArray>\n")?;
