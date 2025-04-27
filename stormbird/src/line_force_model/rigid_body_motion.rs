@@ -48,6 +48,12 @@ impl RigidBodyMotion {
         self.velocity_linear + self.velocity_angular.cross(self.point_relative_to_body_center(point))
     }
 
+    pub fn velocities_at_points(&self, points: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
+        points.iter()
+            .map(|point| self.velocity_at_point(*point))
+            .collect()
+    }
+
     pub fn update_translation_with_velocity_using_finite_difference(
         &mut self, 
         translation: SpatialVector<3>, 

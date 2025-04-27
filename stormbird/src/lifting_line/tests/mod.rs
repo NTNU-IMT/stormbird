@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Tests for the lifting line functionality.
+
 pub mod test_setup;
 pub mod elliptic_wing_theory;
 
