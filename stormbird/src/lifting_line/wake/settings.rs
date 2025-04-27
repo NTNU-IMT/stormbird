@@ -87,10 +87,6 @@ pub struct WakeSettings {
     pub last_panel_relative_length: f64,
     /// A variable to determine of the chord direction should be used for the wake direction
     pub use_chord_direction: bool,
-    /// Variable to determine the amount of strength damping
-    pub strength_damping: StrengthDamping,
-    /// A variable to determine the viscous core length of the panels
-    pub viscous_core_length: SeparationDependentValue,
     /// A variable which panels that should be updated with the induced velocities included in the 
     /// velocity calculation
     pub end_index_induced_velocities_on_wake: usize,

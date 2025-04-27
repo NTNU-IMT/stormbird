@@ -11,9 +11,7 @@
     ) {
         let nr_panels = self.indices.nr_panels();
         
-        self.strengths                      = vec![0.0; nr_panels];
-        self.undamped_strengths             = vec![0.0; nr_panels];
-        self.panels_strength_damping_factor = vec![0.0; nr_panels];
+        self.strengths = vec![0.0; nr_panels];
 
         self.velocity_at_points = vec![wake_building_velocity; self.points.len()];
 

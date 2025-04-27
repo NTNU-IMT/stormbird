@@ -154,14 +154,17 @@ fn right_sign_of_the_force_when_translating() {
 
     for i in 1..20 {
         
-        let time = (i as f64) * time_step;
+        let time: f64 = (i as f64) * time_step;
 
         let translation_y = amplitude * (time * frequency).sin();
         let velocity_y = amplitude * frequency * (time * frequency).cos();
 
         let translation = SpatialVector([0.0, translation_y, 0.0]);
 
-        sim.line_force_model.rigid_body_motion.translation = translation;
+        sim.line_force_model.rigid_body_motion.update_translation_with_velocity_using_finite_difference(
+            translation,
+            time_step,
+        );
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
     
@@ -183,7 +186,7 @@ fn right_sign_of_the_force_when_translating() {
 /// and moments from a motion should always oppose the motion. In other words, a symmetric wing that
 /// move upwards should experience a downwards force and vice versa.
 fn right_sign_of_the_moment_when_rotating() {
-    let aspect_ratio = 5.0;
+    let aspect_ratio: f64 = 5.0;
     let cl_zero_angle = 0.0;
     let angle_of_attack = 0.0;
 
@@ -195,7 +198,6 @@ fn right_sign_of_the_moment_when_rotating() {
         ..Default::default()
     }.build();
 
-    
     let freestream_velocity = SpatialVector([10.2, 0.0, 0.0]);
 
     let period = 2.0;
@@ -227,10 +229,12 @@ fn right_sign_of_the_moment_when_rotating() {
 
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
-        sim.line_force_model.rigid_body_motion.rotation = rotation;
+        sim.line_force_model.rigid_body_motion.update_rotation_with_velocity_using_finite_difference(
+            rotation,
+            time_step,
+        );
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
-        
         
         let moment_in_x = result.integrated_moments_sum()[0];
     
@@ -242,68 +246,3 @@ fn right_sign_of_the_moment_when_rotating() {
         );
     }
 }
-
-/*#[test]
-/// tests the estimated ctrl point velocity when applying a rotation
-fn rotational_velocity() {
-    // wing settings
-    let aspect_ratio = 5.0;
-    let cl_zero_angle = 0.0;
-    let angle_of_attack = 0.0;
-
-    // motion settings
-    let amplitude = 1.0_f64.to_radians();
-    let time_step = 0.1;
-    let period = 2.0;
-    let frequency = 2.0 * PI / period;
-
-    let mut line_force_model = RectangularWing {
-        aspect_ratio,
-        cl_zero_angle,
-        angle_of_attack,
-        negative_span_orientation: true,
-        ..Default::default()
-    }.build().build();
-
-    let freestream_velocity = SpatialVector([1.2, 0.0, 0.0]);
-
-    let mut motion_calculator = MotionDerivatives::new(&line_force_model);
-
-    for i_t in 1..20 {
-        let time = (i_t as f64) * time_step;
-
-        let rotation_x     = amplitude * (frequency * time).sin();
-        let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
-
-        let rotation = SpatialVector([rotation_x, 0.0, 0.0]);
-        let velocity = SpatialVector([rotation_vel_x, 0.0, 0.0]);
-
-        line_force_model.rigid_body_motion.rotation = rotation;
-
-        let motion_velocity = motion_calculator.ctrl_point_velocity(&line_force_model, time_step);
-        
-        let ctrl_points = line_force_model.ctrl_points();
-
-        let mut ctrl_point_velocity_est = vec![freestream_velocity; ctrl_points.len()];
-
-        for i in 0..line_force_model.nr_span_lines() {
-            ctrl_point_velocity_est[i] -= motion_velocity[i];
-        }
-
-        for i in 0..ctrl_points.len() {
-            let velocity_local = velocity.cross(ctrl_points[i]);
-
-            if velocity_local[1].abs() < 1e-6 {
-                continue;
-            }
-
-            if i_t > 3 {
-                let error = (velocity_local[1] + ctrl_point_velocity_est[i][1]).abs() / velocity_local[1].abs();
-
-                assert!(error < 0.06, "Error in rotational velocity estimation at ctrl point {} = {}", i, error);
-            }
-        }
-    
-        motion_calculator.update(&ctrl_points, line_force_model.rigid_body_motion.rotation);
-    }
-}*/

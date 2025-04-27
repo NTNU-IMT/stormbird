@@ -147,7 +147,9 @@ impl FmuFunctions for StormbirdLiftingLine {
             if let Some(result) = result {
                 self.set_output(&result, &freestream_velocity);
             }
-        }   
+        }
+
+        self.iterations_completed += 1;
     }
 }
 
@@ -494,7 +496,6 @@ impl StormbirdLiftingLine {
             return vec![];
         }
 
-        
         let section_models_internal_state_raw = vec![
             self.section_models_internal_state_1,
             self.section_models_internal_state_2,

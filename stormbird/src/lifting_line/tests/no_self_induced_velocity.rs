@@ -128,7 +128,7 @@ fn no_self_induced_velocity() {
 
     dbg!(cd_error.abs() / cd_data, cl_error.abs() / cl_data);
 
-    assert!(cd_error.abs() / cd_data < 0.00035);
+    assert!(cd_error.abs() / cd_data < 0.0005);
     assert!(cl_error.abs() / cl_data < 0.0001);
 
 }

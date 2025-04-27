@@ -135,6 +135,15 @@ impl Wake {
         }
 
         write!(writer, "\t\t\t\t</DataArray>\n")?;
+
+        // Write viscous core length
+
+        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"viscous_core_length\" format=\"ascii\">\n")?;
+        for i in 0..nr_faces {
+            write!(writer, "\t\t\t\t\t{}\n", self.panels_viscous_core_length[i])?;
+        }
+
+        write!(writer, "\t\t\t\t</DataArray>\n")?;
         write!(writer, "\t\t\t</CellData>\n")?;
 
         write!(writer, "\t\t</Piece>\n")?;

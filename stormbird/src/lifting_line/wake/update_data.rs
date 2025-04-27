@@ -27,10 +27,7 @@ impl Wake {
         self.update_wake_points(time_step, line_force_model, line_force_model_data);
         self.update_panel_data();
 
-        self.stream_old_strength_values_downstream();
-
-        self.update_panel_strength_damping_factor(line_force_model_data);
-        self.update_panel_viscous_core_length(line_force_model_data);
+        self.stream_strength_values_downstream();
     }
 
     /// Update the wake geometry and strength based on the final solution at a time step.
@@ -43,7 +40,7 @@ impl Wake {
         new_circulation_strength: &[f64],
         wake_points_freestream: &[SpatialVector<3>],
     ) {
-        self.update_strength_after_completed_time_step(new_circulation_strength);
+        self.update_wing_strength(new_circulation_strength);
 
         self.update_velocity_at_points(wake_points_freestream);
 
@@ -80,6 +77,7 @@ impl Wake {
         }
     }
 
+    /// Recalculates the panel data based on the current geometry of the wake.
     pub fn update_panel_data(&mut self) {
         for i in 0..self.indices.nr_panels() {
             let (stream_index, span_index) = self.indices.reverse_panel_index(i);
@@ -95,6 +93,7 @@ impl Wake {
         }
     }
 
+    /// Calculates the velocity at the wake points based on the current state of the wake.
     pub fn update_velocity_at_points(&mut self, wake_points_freestream: &[SpatialVector<3>]) {
         self.velocity_at_points = self.velocity_at_wake_points(wake_points_freestream);
     }
@@ -104,72 +103,8 @@ impl Wake {
     /// This is the same as updating the circulation strength on the first panels in the wake.
     pub fn update_wing_strength(&mut self, new_circulation_strength: &[f64]) {
         for i in 0..new_circulation_strength.len() {
-            self.undamped_strengths[i] = new_circulation_strength[i];
+            self.strengths[i] = new_circulation_strength[i];
         }
-    }
-
-    fn update_panel_viscous_core_length_first_panels(&mut self, line_force_model_data: &LineForceModelData) {
-        for i_span in 0..self.indices.nr_panels_along_span {
-            let current_index = self.indices.panel_index(0, i_span);
-
-            let amount_of_flow_separation = line_force_model_data.amount_of_flow_separation[i_span];
-
-            self.panels_viscous_core_length[current_index] = 
-                self.settings.viscous_core_length.get_value(amount_of_flow_separation);
-        }
-    }
-
-    fn update_panel_strength_damping_first_panels(&mut self, line_force_model_data: &LineForceModelData) {
-        match self.settings.strength_damping {
-            StrengthDamping::None => {},
-            StrengthDamping::Exponential(separation_dependent_value) => {
-                for i_span in 0..self.indices.nr_panels_along_span {
-                    let current_index = self.indices.panel_index(0, i_span);
-
-                    let amount_of_flow_separation = line_force_model_data.amount_of_flow_separation[i_span];
-
-                    self.panels_strength_damping_factor[current_index] = 
-                        separation_dependent_value.get_value(amount_of_flow_separation);
-                }
-            },
-            StrengthDamping::DirectFromStall => {
-                for i_span in 0..self.indices.nr_panels_along_span {
-                    let current_index = self.indices.panel_index(0, i_span);
-
-                    let amount_of_flow_separation = line_force_model_data.amount_of_flow_separation[i_span];
-
-                    self.panels_strength_damping_factor[current_index] = amount_of_flow_separation;
-                }
-            }
-        }
-    }
-
-    fn update_panel_viscous_core_length(&mut self, line_force_model_data: &LineForceModelData) {
-        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
-            for i_span in 0..self.indices.nr_panels_along_span {
-                let current_index  = self.indices.panel_index(i_stream, i_span);
-                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
-
-                self.panels_viscous_core_length[current_index] = 
-                    self.panels_viscous_core_length[previous_index];
-            }
-        }
-
-        self.update_panel_viscous_core_length_first_panels(line_force_model_data);
-    }
-
-    fn update_panel_strength_damping_factor(&mut self, line_force_model_data: &LineForceModelData) {
-        for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
-            for i_span in 0..self.indices.nr_panels_along_span {
-                let current_index  = self.indices.panel_index(i_stream, i_span);
-                let previous_index = self.indices.panel_index(i_stream - 1, i_span);
-
-                self.panels_strength_damping_factor[current_index] = 
-                    self.panels_strength_damping_factor[previous_index];
-            }
-        }
-
-        self.update_panel_strength_damping_first_panels(line_force_model_data);
     }
 
     /// Moves the first wake points after the wing geometry itself.
@@ -310,48 +245,14 @@ impl Wake {
         }
     }
 
-    pub fn stream_old_strength_values_downstream(&mut self) {
+    /// Shifts the strength of the panels downstream. 
+    pub fn stream_strength_values_downstream(&mut self) {
         for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
             for i_span in 0..self.indices.nr_panels_along_span {
                 let current_index  = self.indices.panel_index(i_stream, i_span);
                 let previous_index = self.indices.panel_index(i_stream - 1, i_span);
 
-                self.undamped_strengths[current_index] = self.undamped_strengths[previous_index];
-            }
-        }
-    }
-
-    /// Shift strength values downstream and update the wing values with the new circulation
-    ///
-    /// Principle: the strength of each panel is updated to be the same as the previous panel in the
-    /// stream wise direction in the last time step.
-    ///
-    /// # Argument
-    /// * `new_circulation_strength` - The new circulation strength for the wing
-    fn update_strength_after_completed_time_step(&mut self, new_circulation_strength: &[f64]) {
-        // Update the strength of the first panels
-        self.update_wing_strength(new_circulation_strength);
-
-        // Apply damping to the strength
-        self.apply_damping_to_strength();
-    }
-
-    fn apply_damping_to_strength(&mut self) {
-        match self.settings.strength_damping {
-            StrengthDamping::None => {
-                for i in 0..self.indices.nr_panels() {
-                    self.strengths[i] = self.undamped_strengths[i]
-                }
-            },
-            StrengthDamping::Exponential(_) => {
-                unimplemented!("Exponential strength damping not implemented yet");
-            },
-            StrengthDamping::DirectFromStall => {
-                for i in 0..self.indices.nr_panels() {
-                    let damping = self.panels_strength_damping_factor[i];
-
-                    self.strengths[i] = self.undamped_strengths[i] * (1.0 - damping);
-                }
+                self.strengths[current_index] = self.strengths[previous_index];
             }
         }
     }

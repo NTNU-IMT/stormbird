@@ -36,18 +36,18 @@ use settings::*;
 /// The induced velocities are calculated from vortex panels and their strengths.
 ///
 /// The wake points and panels are assumed to be organized as a structured surface where indices
-/// are stream wise-major. That means, the first panels right behind the wings are also the first
+/// are streamwise-major. That means, the first panels right behind the wings are also the first
 /// panels in the vector of panels in the wake.
 ///
 /// A typical use case is as follows:
 /// - For each time step, the points in the wake lying exactly on the wing lines are updated to
-/// match the current wing geometry (which might have moved since the last time step)
+/// match the current wing geometry (which might have moved since the last time step), and the wake 
+/// points stream downstream, based on the current velocity field and time step.
 /// - The strength of the first panel is then updated iteratively to solve the lifting line
 /// equations. This happens in whatever solver that use this model. This model is used to calculate
 /// the velocity as a function of the strength.
 /// - When the strength for a time step is solved, the final velocity at the control points are
 /// calculated.
-/// - Finally, the wake points stream downstream, based on the current velocity field and time step.
 ///
 /// There are methods to update the strength and the shape of the vortex line for each time step in
 /// the simulation.
@@ -58,12 +58,8 @@ pub struct Wake {
     pub points: Vec<SpatialVector<3>>,
     /// The velocity at each point in the wake
     pub velocity_at_points: Vec<SpatialVector<3>>,
-    /// The strength of the panels without damping
-    pub undamped_strengths: Vec<f64>,
     /// The strengths of the panels
     pub strengths: Vec<f64>,
-    /// 'Viscosity' of each panel
-    pub panels_strength_damping_factor: Vec<f64>,
     /// The viscous core length of each panel
     pub panels_viscous_core_length: Vec<f64>,
     /// Settings for the wake behavior
