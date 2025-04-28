@@ -102,6 +102,13 @@ pub struct StormbirdLiftingLine {
     pub angle_of_attack_measurement_8: f64,
     pub angle_of_attack_measurement_9: f64,
     pub angle_of_attack_measurement_10: f64,
+    /// Calculated rigid body velocity, primarily used for debugging purposes.
+    pub calculated_motion_velocity_linear_x: f64,
+    pub calculated_motion_velocity_linear_y: f64,
+    pub calculated_motion_velocity_linear_z: f64,
+    pub calculated_motion_velocity_angular_x: f64,
+    pub calculated_motion_velocity_angular_y: f64,
+    pub calculated_motion_velocity_angular_z: f64,
 
     /// The FmuInfo variable is used by the fmu_from_struct macro to store information given about
     /// the FMU using the FMI-standard. This includes, for instance, the path to the unzipped
@@ -251,36 +258,39 @@ impl StormbirdLiftingLine {
             model.line_force_model
                 .set_section_models_internal_state(&section_models_internal_state);
 
-            if self.parameters.use_motion_velocity {
-                model.line_force_model.rigid_body_motion.rotation = rotation;
-                
-                // Only apply translation and linear velocity IF the linear motion velocity is NOT
-                // used as a freestream condition. It does not make sense set these variables if the 
-                // effect of them is already included in the inflow velocity.
-                if !self.parameters.use_motion_velocity_linear_as_freestream {
-                    model.line_force_model.rigid_body_motion.translation = translation;
-                    model.line_force_model.rigid_body_motion.velocity_linear = motion_velocity_linear;
-                } 
-                
-                model.line_force_model.rigid_body_motion.velocity_angular = motion_velocity_angular;
-            } else {
-                model
-                    .line_force_model
-                    .rigid_body_motion
-                    .update_translation_with_velocity_using_finite_difference(
-                        translation,
-                        time_step
-                    );
+            model
+                .line_force_model
+                .rigid_body_motion
+                .update_translation_with_velocity_using_finite_difference(
+                    translation,
+                    time_step
+                );
 
-                model
-                    .line_force_model
-                    .rigid_body_motion
-                    .update_rotation_with_velocity_using_finite_difference(
-                        rotation,
-                        time_step
-                    );
+            model
+                .line_force_model
+                .rigid_body_motion
+                .update_rotation_with_velocity_using_finite_difference(
+                    rotation,
+                    time_step
+                );
+
+            self.calculated_motion_velocity_linear_x = model.line_force_model.rigid_body_motion.velocity_linear[0];
+            self.calculated_motion_velocity_linear_y = model.line_force_model.rigid_body_motion.velocity_linear[1];
+            self.calculated_motion_velocity_linear_z = model.line_force_model.rigid_body_motion.velocity_linear[2];
+            self.calculated_motion_velocity_angular_x = model.line_force_model.rigid_body_motion.velocity_angular[0];
+            self.calculated_motion_velocity_angular_y = model.line_force_model.rigid_body_motion.velocity_angular[1];
+            self.calculated_motion_velocity_angular_z = model.line_force_model.rigid_body_motion.velocity_angular[2];
+
+            if self.parameters.use_motion_velocity {
+                model.line_force_model.rigid_body_motion.velocity_angular = motion_velocity_angular;
+                
+                // Only apply the linear velocity IF the linear motion velocity is NOT used as a 
+                // freestream condition. It does not make sense set these variables if the effect of 
+                // them is already included in the inflow velocity.
+                if !self.parameters.use_motion_velocity_linear_as_freestream {
+                    model.line_force_model.rigid_body_motion.velocity_linear = motion_velocity_linear;
+                }
             }
-            
         }
     }
 
