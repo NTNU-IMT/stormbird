@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+use std::f64::consts::PI;
+
 use stormath::spatial_vector::{
     SpatialVector,
     transformations::RotationType
@@ -75,7 +77,20 @@ impl RigidBodyMotion {
 
         self.rotation = rotation;
 
-        self.velocity_angular = (self.rotation - old_rotation) / time_step;
+        let mut rotation_difference = self.rotation - old_rotation;
+
+        // Logic to handle situations where the input rotation might have switched quadrants. 
+        // WARNING: this implicitly assumes that the rotation will never be larger than PI during
+        // one time step. This seems like a reasonable assumption, but it is not guaranteed.
+        for i in 0..3 {
+            if rotation_difference[i] > PI {
+                rotation_difference[i] -= 2.0 * PI;
+            } else if rotation_difference[i] < -PI {
+                rotation_difference[i] += 2.0 * PI;
+            }
+        }
+
+        self.velocity_angular = rotation_difference / time_step;
     }
 }
 
