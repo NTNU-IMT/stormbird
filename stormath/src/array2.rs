@@ -6,8 +6,9 @@
 
 use std::ops::{Index, IndexMut};
 use std::fmt::Debug;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Array2Indices {
     pub shape: [usize; 2],
 }
@@ -24,7 +25,7 @@ impl Array2Indices {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Array2<T> {
     pub data: Vec<T>,
     pub indices: Array2Indices,
@@ -63,6 +64,18 @@ where T: Default + Clone + Copy + Debug,
     #[inline(always)]
     pub fn indices_from_index(&self, flat_index: usize) -> [usize; 2] {
         self.indices.indices_from_index(flat_index)
+    }
+
+    pub fn nr_rows(&self) -> usize {
+        self.indices.shape[0]
+    }
+
+    pub fn nr_cols(&self) -> usize {
+        self.indices.shape[1]
+    }
+
+    pub fn shape(&self) -> [usize; 2] {
+        self.indices.shape
     }
 }
 
