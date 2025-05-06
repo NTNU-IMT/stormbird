@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmState {
+    pub iteration: usize,
     pub position: Array2<f64>,
     pub velocity: Array2<f64>,
     pub function_values: Vec<f64>,
