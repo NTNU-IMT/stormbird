@@ -15,8 +15,6 @@
 
 #include "cpp_actuator_line.hpp"
 
-// --------------------- Set the necessary data for the interpolation ------------------------------
-
 void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
     const vectorField& cell_centers = mesh_.C();
     

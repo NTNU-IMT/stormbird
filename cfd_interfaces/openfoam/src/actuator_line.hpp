@@ -2,6 +2,12 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see seperate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+///
+/// This is the OpenFOAM interface for the actuator line model in Stormbird. The interface consists
+/// of a C++ class that inherits from the necessary base class in OpenFOAM to implement volume 
+/// forces which holds the actuator line model in Stormbird as a member. 
+/// 
+
 #ifndef ACTUATOR_LINE_H
 #define ACTUATOR_LINE_H
 
@@ -14,6 +20,7 @@ namespace Foam {
         public:
             TypeName("actuatorLine")
 
+            /// Constructor
             ActuatorLine(
                 const word& name, 
                 const word& modelType, 
@@ -21,19 +28,26 @@ namespace Foam {
                 const fvMesh& mesh
             );
 
+            /// Destructor
             virtual ~ActuatorLine() = default;
 
+            /// Necessary function in OpenFOAM to add volume forces in solvers which do not use the 
+            /// density in the momentum equation
             virtual void addSup(
                 fvMatrix<vector>& eqn, 
                 const label fieldi
             );
             
+            /// Necessary function in OpenFOAM to add volume forces in solvers which use the density
+            /// in the momentum equation
             virtual void addSup(
                 const volScalarField& rho, 
                 fvMatrix<vector>& eqn, 
                 const label fieldi
             );
 
+            /// Necessary function in OpenFOAM to add volume forces in solvers which use the density
+            /// and the volume of fluid in the momentum equation
             virtual void addSup(
                 const volScalarField& alpha, 
                 const volScalarField& rho, 
@@ -42,11 +56,12 @@ namespace Foam {
             );
 
         private:
-            // Actuator line model
+            /// The Stormbird actuator line model
             stormbird_interface::CppActuatorLine* model;
             
-            // Fields
+            /// The body force field, that will be exported by OpenFOAM during the simulation
             volVectorField* body_force_field;
+            /// The body force field weight, that will be exported by OpenFOAM during the simulation
             volScalarField* body_force_field_weight;
 
             // Mesh to actuator line data
@@ -71,8 +86,7 @@ namespace Foam {
             labelList relevant_cells_for_velocity_sampling;
             labelList dominating_line_element_index_sampling;
 
-
-            // Custom add function
+            /// The add function, intended to be use across all the OpenFOAM addSup functions
             void add(const volVectorField& velocity, fvMatrix<vector>& eqn);
 
             // Check which cells are relevant
@@ -80,7 +94,7 @@ namespace Foam {
             void set_velocity_sampling_data_interpolation();
             void set_velocity_sampling_data_integral();
 
-            // Ways to estimate the velocity
+            /// Ways to estimate the velocity
             void set_integrated_weighted_velocity(const volVectorField& velocity);
             void set_interpolated_velocity(const volVectorField& velocity);
 

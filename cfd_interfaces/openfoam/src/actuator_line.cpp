@@ -144,13 +144,13 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
 }
 
 void Foam::fv::ActuatorLine::addSup(fvMatrix<vector>& eqn, const label fieldi) {
-    add(eqn.psi(), eqn);
+    this->add(eqn.psi(), eqn);
 }
 
 void Foam::fv::ActuatorLine::addSup(const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi) {
-    add(eqn.psi(), eqn);
+    this->add(eqn.psi(), eqn);
 }
 
 void Foam::fv::ActuatorLine::addSup(const volScalarField& alpha, const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi) {
-    add(eqn.psi(), eqn);
+    this->add(eqn.psi(), eqn);
 }

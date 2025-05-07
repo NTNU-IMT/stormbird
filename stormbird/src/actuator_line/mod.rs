@@ -18,6 +18,8 @@ use crate::line_force_model::LineForceModel;
 use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::common_utils::prelude::*;
 
+use crate::controllers::dynamic_optimizer::DynamicOptimizer;
+
 use projection::Projection;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -35,7 +37,9 @@ pub struct ActuatorLineBuilder {
     #[serde(default)]
     pub projection: Projection,
     #[serde(default)]
-    pub solver_settings: SolverSettings
+    pub solver_settings: SolverSettings,
+    #[serde(default)]
+    pub optimizer: Option<DynamicOptimizer>,
 }
 
 impl ActuatorLineBuilder {
@@ -43,7 +47,8 @@ impl ActuatorLineBuilder {
         Self {
             line_force_model,
             projection: Projection::default(),
-            solver_settings: SolverSettings::default()
+            solver_settings: SolverSettings::default(),
+            optimizer: None,
         }
     }
 
@@ -59,6 +64,7 @@ impl ActuatorLineBuilder {
             ctrl_points_velocity: vec![SpatialVector::<3>::default(); nr_span_lines],
             results: Vec::new(),
             solver_settings: self.solver_settings.clone(),
+            optimizer: self.optimizer.clone(),
         }
     }
 }
@@ -78,6 +84,8 @@ pub struct ActuatorLine {
     pub results: Vec<SimulationResult>,
     /// Numerical settings
     pub solver_settings: SolverSettings,
+    /// Dynamic optimizer that can be optionally used to optimize the settings in the model
+    pub optimizer: Option<DynamicOptimizer>,
 }
 
 impl ActuatorLine {
@@ -96,6 +104,8 @@ impl ActuatorLine {
         builder.build()
     }
 
+    /// Function used to query the actuator line model for the weighted velocity integral term for
+    /// a given cell. This is used to compute the body force in the CFD simulation.
     pub fn get_weighted_velocity_integral_terms_for_cell(
         &self, 
         line_index: usize, 
@@ -131,10 +141,18 @@ impl ActuatorLine {
         (numerator, denominator)
     }
 
-    pub fn do_step(&mut self, time_step: f64) {        
+    pub fn do_step(&mut self, time_step: f64, time: f64) {        
         let solver_result = self.solve(&self.ctrl_points_velocity);
 
         let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
+
+        if let Some(ref mut optimizer) = self.optimizer {
+            let new_local_wing_angles = optimizer.update(&result, time);
+
+            if let Some(new_angles) = new_local_wing_angles {
+                self.line_force_model.local_wing_angles = new_angles;
+            }
+        }
 
         //self.line_force_model.update_flow_derivatives(&result);
 
@@ -220,10 +238,13 @@ impl ActuatorLine {
         projection_values
     }
 
+    /// Computes the sum of the projection weights for all line elements at a given point in space.
     pub fn summed_projection_weights_at_point(&self, point: SpatialVector<3>) -> f64 {
         self.line_segments_projection_weights_at_point(point).iter().sum()
     }
 
+    /// Checks which line element is dominating at a given point in space by comparing the 
+    /// projection weights of each line element.
     pub fn dominating_line_element_index_at_point(&self, point: SpatialVector<3>) -> usize {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
