@@ -99,3 +99,21 @@ where T: Default + Clone + Copy + Debug,
         &mut self.data[flat_index]
     }
 }
+
+impl<T> std::ops::Add for Array2<T> 
+where T: Default + Clone + Copy + Debug + std::ops::Add<Output = T>,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        assert_eq!(self.shape(), other.shape(), "Array2 shapes do not match");
+        
+        let mut result = self.clone();
+        
+        for i in 0..self.data.len() {
+            result.data[i] = self.data[i] + other.data[i];
+        }
+        
+        result
+    }
+}

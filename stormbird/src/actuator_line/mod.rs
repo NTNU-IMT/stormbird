@@ -146,14 +146,6 @@ impl ActuatorLine {
 
         let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
 
-        if let Some(ref mut optimizer) = self.optimizer {
-            let new_local_wing_angles = optimizer.update(&result, time);
-
-            if let Some(new_angles) = new_local_wing_angles {
-                self.line_force_model.local_wing_angles = new_angles;
-            }
-        }
-
         //self.line_force_model.update_flow_derivatives(&result);
 
         self.results.push(result);
