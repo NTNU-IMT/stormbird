@@ -40,12 +40,34 @@ impl SwarmState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmResult {
+    /// The function values of the particles in the swarm
     pub function_values: Vec<f64>,
+    /// The historical best position of the particles in the swarm
     pub global_best_position: Vec<f64>,
+    /// The historical best function value of the particles in the swarm
     pub global_best_function_value: f64,
 }
 
 impl SwarmResult {
+    pub fn new(nr_particles: usize, nr_dimensions: usize) -> Self {
+        let mut function_values = Vec::with_capacity(nr_particles);
+        let mut global_best_position = Vec::with_capacity(nr_dimensions);
+
+        for _ in 0..nr_particles {
+            function_values.push(std::f64::INFINITY);
+        }
+
+        for _ in 0..nr_dimensions {
+            global_best_position.push(0.0);
+        }
+
+        SwarmResult {
+            function_values,
+            global_best_position,
+            global_best_function_value: std::f64::INFINITY,
+        }
+    }
+
     pub fn nr_particles(&self) -> usize {
         self.function_values.len()
     }
@@ -60,6 +82,33 @@ impl SwarmResult {
         }
 
         best_particle_index
+    }
+
+    pub fn next_initial_result(&self) -> SwarmResult {
+        let mut next_result = self.clone();
+
+        for i in 0..self.nr_particles() {
+            next_result.function_values[i] = std::f64::INFINITY;
+        }
+
+        next_result
+    }
+
+    pub fn add_new_function_value(
+        &mut self, 
+        function_value: f64, 
+        particle_index: usize, 
+        particle_position: &[f64]
+    ) {
+        self.function_values[particle_index] = function_value;
+        
+        if function_value < self.global_best_function_value {
+            self.global_best_function_value = function_value;
+           
+            for j in 0..self.global_best_position.len() {
+                self.global_best_position[j] = particle_position[j];
+            }
+        }
     }
 }
 

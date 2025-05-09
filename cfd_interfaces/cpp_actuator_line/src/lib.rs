@@ -5,7 +5,7 @@
 
 use stormbird::actuator_line::ActuatorLine;
 
-use math_utils::spatial_vector::SpatialVector;
+use stormath::spatial_vector::SpatialVector;
 
 #[cxx::bridge(namespace="stormbird_interface")]
 mod ffi {
@@ -17,6 +17,11 @@ mod ffi {
         
         // ---- Setters and getters ----
         fn nr_span_lines(&self) -> usize;
+        fn nr_wings(&self) -> usize;
+
+        fn get_local_wing_angle(&self, index: usize) -> f64;
+        fn set_local_wing_angle(&mut self, index: usize, angle: f64);
+
         fn get_ctrl_point_at_index(&self, index: usize) -> [f64; 3];
 
         fn get_weighted_velocity_integral_terms_for_cell(
@@ -32,7 +37,7 @@ mod ffi {
         fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize;
 
         // ---- Force methods ----        
-        fn do_step(&mut self, time_step: f64);
+        fn do_step(&mut self, time_step: f64, time: f64);
         fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3];
         fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
         
@@ -65,8 +70,20 @@ impl CppActuatorLine {
         self.model.line_force_model.nr_span_lines()
     }
 
+    fn nr_wings(&self) -> usize {
+        self.model.line_force_model.nr_wings()
+    }
+
     fn get_ctrl_point_at_index(&self, index: usize) -> [f64; 3] {
         self.model.line_force_model.span_lines()[index].ctrl_point().into()
+    }
+
+    fn get_local_wing_angle(&self, index: usize) -> f64 {
+        self.model.line_force_model.local_wing_angles[index]
+    }
+
+    fn set_local_wing_angle(&mut self, index: usize, angle: f64) {
+        self.model.line_force_model.local_wing_angles[index] = angle;
     }
 
     fn get_weighted_velocity_integral_terms_for_cell(
@@ -91,8 +108,8 @@ impl CppActuatorLine {
         self.model.dominating_line_element_index_at_point(SpatialVector::<3>::from(*point))
     }
 
-    pub fn do_step(&mut self, time_step: f64) {
-        self.model.do_step(time_step)
+    pub fn do_step(&mut self, time_step: f64, time: f64) {
+        self.model.do_step(time_step, time)
     }
 
     pub fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3] {

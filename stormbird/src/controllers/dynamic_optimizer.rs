@@ -5,6 +5,10 @@ use stormath::optimization::particle_swarm::{
     ParticleSwarm
 };
 
+use stormath::spatial_vector::SpatialVector;
+
+use stormath::statistics::time_averaged_mean;
+
 use crate::common_utils::result::SimulationResult;
 
 use serde::{Serialize, Deserialize};
@@ -15,6 +19,7 @@ pub struct DynamicOptimizer {
     pub initialization_time: f64,
     pub time_between_evaluations: f64,
     pub averaging_time: f64,
+    pub thrust_direction: SpatialVector<3>,
     pub optimizer: ParticleSwarm,
     #[serde(default)]
     pub current_particle: usize,
@@ -27,8 +32,26 @@ pub struct DynamicOptimizer {
 }
 
 impl DynamicOptimizer {
-    pub fn objective_function(&self, _time: &[f64], _result: &[SimulationResult]) -> f64 {
-        0.0
+    pub fn objective_function(&self, time: &[f64], result: &[SimulationResult]) -> f64 {
+        let mut relevant_thrust_values: Vec<f64> = Vec::new();
+        let mut relevant_times: Vec<f64> = Vec::new();
+
+        let time_length = time.len();
+
+        let time_window_start = time[time_length - 1] - self.averaging_time;
+
+        for i in 0..time.len() {
+            if time[i] > time_window_start {
+                let force = result[i].integrated_forces_sum();
+
+                let thrust = force.dot(self.thrust_direction);
+
+                relevant_thrust_values.push(thrust);
+                relevant_times.push(time[i]);
+            }
+        }
+        
+        time_averaged_mean(&relevant_times, &relevant_thrust_values)
     }
 
     /// Returns the index of the current test in the optimization process.
@@ -67,17 +90,70 @@ impl DynamicOptimizer {
         }
     }
 
+    pub fn update_state_and_result_history(&mut self) { 
+        if self.new_generation() {
+             let (state, result) = if self.test_index() == 0 {
+                let state = self.optimizer.initial_state();
+
+                let result = SwarmResult::new(
+                    self.optimizer.nr_particles,
+                    self.optimizer.nr_dimensions
+                );
+
+                (state, result)
+            } else {
+                let previous_state = self.state_history.last().unwrap();
+                let previous_result = self.result_history.last().unwrap();
+
+                let state = self.optimizer.next_state(
+                    &previous_state,
+                    &previous_result,
+                );
+
+                let result = previous_result.next_initial_result();
+
+                (state, result)
+            };
+
+            self.state_history.push(state);
+            self.result_history.push(result);
+        }
+    }
+
     /// The function responsible for updating the optimizer with new simulation results.
     pub fn update(&mut self, time: &[f64], results: &[SimulationResult]) -> Option<Vec<f64>> {
         let current_time = time.last().unwrap().clone();
 
         if self.new_test_required(current_time) {
+            self.update_state_and_result_history();
+
             let current_obj_func_value = self.objective_function(time, results);
 
-            let new_generation = self.new_generation();
-            
-        }
+            let history_index = self.state_history.len() - 1;
 
-        return None;
+            let mut current_position = vec![0.0; self.optimizer.nr_dimensions];
+
+            for i in 0..self.optimizer.nr_dimensions {
+                current_position[i] = self.state_history[history_index].position[[self.current_particle, i]];
+            }
+
+            self.result_history[history_index].add_new_function_value(
+                current_obj_func_value,
+                self.current_particle,
+                &current_position
+            );
+
+            let mut new_position = vec![0.0; self.optimizer.nr_dimensions];
+
+            for i in 0..self.optimizer.nr_dimensions {
+                new_position[i] = self.state_history[history_index].position[[self.current_particle, i]];
+            }
+
+            self.increase_test_index();
+
+            Some(new_position)
+        } else {
+            None
+        }
     }
 }

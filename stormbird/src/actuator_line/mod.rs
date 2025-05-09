@@ -62,6 +62,7 @@ impl ActuatorLineBuilder {
             line_force_model,
             projection: self.projection.clone(),
             ctrl_points_velocity: vec![SpatialVector::<3>::default(); nr_span_lines],
+            time: Vec::new(),
             results: Vec::new(),
             solver_settings: self.solver_settings.clone(),
             optimizer: self.optimizer.clone(),
@@ -80,6 +81,8 @@ pub struct ActuatorLine {
     pub projection: Projection,
     /// Vector to store interpolated velocity values for each control point
     pub ctrl_points_velocity: Vec<SpatialVector<3>>,
+    /// The time history of the simulation
+    pub time: Vec<f64>,
     /// Results from the model
     pub results: Vec<SimulationResult>,
     /// Numerical settings
@@ -149,6 +152,22 @@ impl ActuatorLine {
         //self.line_force_model.update_flow_derivatives(&result);
 
         self.results.push(result);
+        self.time.push(time);
+
+        let new_local_wing_angles = if let Some(optimizer) = &mut self.optimizer {
+            optimizer.update(
+                &self.time,
+                &self.results,
+            )
+        } else {
+            None
+        };
+
+        if let Some(new_angles) = new_local_wing_angles {
+            for i in 0..self.line_force_model.nr_wings() {
+                self.line_force_model.local_wing_angles[i] = new_angles[i];
+            }
+        }
     }
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation

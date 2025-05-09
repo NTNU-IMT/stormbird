@@ -98,6 +98,10 @@ namespace Foam {
             void set_integrated_weighted_velocity(const volVectorField& velocity);
             void set_interpolated_velocity(const volVectorField& velocity);
 
+            /// This method is used to syncronize the line force model state across all the 
+            /// instances across the processors
+            void sync_line_force_model_state();
+
             // Copy constructor and assignment operator
             ActuatorLine(const ActuatorLine&) = delete;
             void operator=(const ActuatorLine&) = delete;

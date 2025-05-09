@@ -4,6 +4,8 @@
 
 //! Functions that compute statistical properties of vectors
 
+use crate::integration::trapz;
+
 /// Computes the mean value of the input vector.
 pub fn mean<T>(x: &[T]) -> T
 where T: 
@@ -18,6 +20,21 @@ where T:
     }
 
     sum / (x.len() as f64)
+}
+
+pub fn time_averaged_mean<T>(time: &[f64], x: &[T]) -> T
+where T:
+    std::ops::Mul<f64, Output = T> + 
+    std::ops::Add<T, Output = T> + 
+    std::ops::Sub<T, Output = T> + 
+    std::default::Default +
+    Copy
+{
+    let integrated_value = trapz(time, x);
+
+    let average_factor = 1.0 / (time[time.len() - 1] - time[0]);
+
+    integrated_value * average_factor
 }
 
 /// Returns the maximum value in the input vector.

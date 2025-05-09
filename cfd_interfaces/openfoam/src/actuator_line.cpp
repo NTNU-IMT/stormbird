@@ -94,11 +94,39 @@ void Foam::fv::ActuatorLine::set_projection_data() {
     this->projection_data_is_set = true;
 }
 
+void Foam::fv::ActuatorLine::sync_line_force_model_state() {
+    int nr_wings = this->model->nr_wings();
+
+    std::vector<double> local_wing_angles;
+
+    for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
+        local_wing_angles.push_back(0.0);
+    }
+    
+    if (Pstream::master()) {
+        for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
+            local_wing_angles[wing_index] = this->model->get_local_wing_angle(wing_index);
+        }
+    }
+
+    // Sync the wing angles between processors
+    for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
+        reduce(local_wing_angles[wing_index], sumOp<double>());
+    }
+
+    for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
+        this->model->set_local_wing_angle(wing_index, local_wing_angles[wing_index]);
+    }
+}
+
 void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
 {
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
     double time_step = mesh_.time().deltaTValue();
+    double time = mesh_.time().value();
+
+    this->sync_line_force_model_state();
 
     if (!this->projection_data_is_set) {
         this->set_projection_data();
@@ -114,7 +142,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
         this->set_interpolated_velocity(velocity_field);
     }
 
-    this->model->do_step(time_step);
+    this->model->do_step(time_step, time);
     
     if (Pstream::master()) {
         this->model->write_results();
