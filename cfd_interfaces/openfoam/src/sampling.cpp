@@ -150,13 +150,16 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
 
     // Set the values in the model 
     for (int line_index = 0; line_index < nr_span_lines; line_index++) {
-        std::array<double, 3> velocity = {
-            numerator[line_index][0] / denominator[line_index],
-            numerator[line_index][1] / denominator[line_index],
-            numerator[line_index][2] / denominator[line_index]
-        };
+        if (denominator[line_index] != 0.0) {
+            std::array<double, 3> velocity = {
+                numerator[line_index][0] / denominator[line_index],
+                numerator[line_index][1] / denominator[line_index],
+                numerator[line_index][2] / denominator[line_index]
+            };
 
-        this->model->set_velocity_at_index(line_index, velocity);
+            this->model->set_velocity_at_index(line_index, velocity);
+        }
+        
     }
 }
 
