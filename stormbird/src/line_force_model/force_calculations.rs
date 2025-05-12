@@ -387,6 +387,10 @@ impl LineForceModel {
 
                 let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length().powi(2);
 
+                if force_factor == 0.0 {
+                    return 0.0;
+                }
+
                 circulation_lift[i_span] / force_factor - lift_coefficients[i_span]
         }).collect()
     }
