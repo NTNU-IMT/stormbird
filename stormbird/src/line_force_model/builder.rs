@@ -26,6 +26,12 @@ pub struct LineForceModelBuilder {
     pub output_coordinate_system: CoordinateSystem,
     #[serde(default)]
     pub rotation_type: RotationType,
+    #[serde(default)]
+    pub local_wing_angles: Vec<f64>,
+    #[serde(default)]
+    pub rotation: SpatialVector<3>,
+    #[serde(default)]
+    pub translation: SpatialVector<3>,
 }
 
 impl LineForceModelBuilder {
@@ -37,6 +43,9 @@ impl LineForceModelBuilder {
             circulation_corrections: Default::default(),
             output_coordinate_system: CoordinateSystem::Global,
             rotation_type: RotationType::XYZ,
+            local_wing_angles: Vec::new(),
+            rotation: SpatialVector([0.0, 0.0, 0.0]),
+            translation: SpatialVector([0.0, 0.0, 0.0]),
         }
     }
 
@@ -65,6 +74,18 @@ impl LineForceModelBuilder {
 
         line_force_model.circulation_corrections = self.circulation_corrections.clone();
         line_force_model.output_coordinate_system = self.output_coordinate_system;
+
+        if self.local_wing_angles.len() > 0 {
+            if self.local_wing_angles.len() != line_force_model.nr_wings() {
+                panic!("The number of local wing angles does not match the number of wings.");
+            }
+
+            line_force_model.local_wing_angles = self.local_wing_angles.clone();
+        }
+        
+
+        line_force_model.rigid_body_motion.translation = self.translation;
+        line_force_model.rigid_body_motion.rotation = self.rotation;
 
         line_force_model
     }    
