@@ -24,25 +24,17 @@ impl SwarmState {
     pub fn nr_dimensions(&self) -> usize {
         self.position.nr_cols()
     }
-
-    pub fn local_best_position(&self, result: &SwarmResult) -> Vec<f64> {
-        let best_index = result.local_best_index();
-
-        let mut local_best_position = Vec::with_capacity(self.nr_dimensions());
-
-        for j in 0..self.nr_dimensions() {
-            local_best_position.push(self.position[[best_index, j]]);
-        }
-
-        local_best_position
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmResult {
     /// The function values of the particles in the swarm
     pub function_values: Vec<f64>,
-    /// The historical best position of the particles in the swarm
+    /// The historical best position of each particle in the swarm
+    pub local_best_positions: Array2<f64>,
+    /// The historical best function value of each particle in the swarm
+    pub local_best_function_values: Vec<f64>,
+    /// The historical best position of all the particles in the swarm
     pub global_best_position: Vec<f64>,
     /// The historical best function value of the particles in the swarm
     pub global_best_function_value: f64,
@@ -52,9 +44,14 @@ impl SwarmResult {
     pub fn new(nr_particles: usize, nr_dimensions: usize) -> Self {
         let mut function_values = Vec::with_capacity(nr_particles);
         let mut global_best_position = Vec::with_capacity(nr_dimensions);
+        let local_best_positions = Array2::new_default(
+            [nr_particles, nr_dimensions]
+        );
+        let mut local_best_function_values = Vec::with_capacity(nr_particles);
 
         for _ in 0..nr_particles {
             function_values.push(std::f64::INFINITY);
+            local_best_function_values.push(std::f64::INFINITY);   
         }
 
         for _ in 0..nr_dimensions {
@@ -63,6 +60,8 @@ impl SwarmResult {
 
         SwarmResult {
             function_values,
+            local_best_positions,
+            local_best_function_values,
             global_best_position,
             global_best_function_value: std::f64::INFINITY,
         }
@@ -70,18 +69,6 @@ impl SwarmResult {
 
     pub fn nr_particles(&self) -> usize {
         self.function_values.len()
-    }
-
-    pub fn local_best_index(&self) -> usize {
-        let mut best_particle_index = 0;
-
-        for i in 0.. self.nr_particles() {
-            if self.function_values[i] < self.function_values[best_particle_index] {
-                best_particle_index = i;
-            }
-        }
-
-        best_particle_index
     }
 
     pub fn next_initial_result(&self) -> SwarmResult {
@@ -101,6 +88,14 @@ impl SwarmResult {
         particle_position: &[f64]
     ) {
         self.function_values[particle_index] = function_value;
+
+        if function_value < self.local_best_function_values[particle_index] {
+            self.local_best_function_values[particle_index] = function_value;
+
+            for j in 0..self.local_best_positions.nr_cols() {
+                self.local_best_positions[[particle_index, j]] = particle_position[j];
+            }
+        }
         
         if function_value < self.global_best_function_value {
             self.global_best_function_value = function_value;
@@ -116,16 +111,25 @@ impl SwarmResult {
 pub struct ParticleSwarm {
     pub nr_particles: usize,
     pub nr_dimensions: usize,
+    pub expected_number_of_generations: usize,
     pub max_positions: Vec<f64>,
     pub min_positions: Vec<f64>,
+    #[serde(default = "ParticleSwarm::default_inertia_weight_max")]
     pub inertia_weight_max: f64,
+    #[serde(default = "ParticleSwarm::default_inertia_weight_min")]
     pub inertia_weight_min: f64,
-    pub expected_number_of_generations: usize,
+    #[serde(default = "ParticleSwarm::default_local_best_velocity_factor")]
     pub local_best_velocity_factor: f64,
+    #[serde(default = "ParticleSwarm::default_global_best_velocity_factor")]
     pub global_best_velocity_factor: f64,
 }
 
 impl ParticleSwarm {
+    fn default_inertia_weight_max() -> f64 {1.0}
+    fn default_inertia_weight_min() -> f64 {0.4}
+    fn default_local_best_velocity_factor() -> f64 {2.0}
+    fn default_global_best_velocity_factor() -> f64 {2.0}
+
     pub fn initial_state(&self) -> SwarmState {
         let mut rng = rand::rng();
 
@@ -194,8 +198,6 @@ impl ParticleSwarm {
 
         let mut rng = rand::rng();
 
-        let local_best_position = state.local_best_position(result);
-
         let velocity_scale = self.velocity_scale();
         
         for i in 0..self.nr_particles {
@@ -206,7 +208,7 @@ impl ParticleSwarm {
                 let r_g = rng.random_range(0.0..self.global_best_velocity_factor); 
 
                 let global_best_velocity = r_g * (result.global_best_position[j] - state.position[[i, j]]);
-                let local_best_velocity = r_l * (local_best_position[j] - state.position[[i, j]]);
+                let local_best_velocity = r_l * (result.local_best_positions[[i, j]] - state.position[[i, j]]);
 
                 velocity[[i, j]] = inertia_velocity + (
                     global_best_velocity + local_best_velocity

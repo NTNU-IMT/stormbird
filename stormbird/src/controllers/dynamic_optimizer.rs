@@ -51,7 +51,7 @@ impl DynamicOptimizer {
             }
         }
         
-        time_averaged_mean(&relevant_times, &relevant_thrust_values)
+        -time_averaged_mean(&relevant_times, &relevant_thrust_values)
     }
 
     /// Returns the index of the current test in the optimization process.
