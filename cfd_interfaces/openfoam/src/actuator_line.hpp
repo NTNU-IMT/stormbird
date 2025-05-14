@@ -86,6 +86,8 @@ namespace Foam {
             labelList relevant_cells_for_velocity_sampling;
             labelList dominating_line_element_index_sampling;
 
+            bool need_update = true;
+
             /// The add function, intended to be use across all the OpenFOAM addSup functions
             void add(const volVectorField& velocity, fvMatrix<vector>& eqn);
 

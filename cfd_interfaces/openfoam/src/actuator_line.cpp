@@ -128,7 +128,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
 
     this->sync_line_force_model_state();
 
-    if (!this->projection_data_is_set) {
+    if (this->need_update) {
         this->set_projection_data();
     }
 
@@ -142,7 +142,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
         this->set_interpolated_velocity(velocity_field);
     }
 
-    this->model->do_step(time_step, time);
+    this->need_update = this->model->do_step(time_step, time);
     
     if (Pstream::master()) {
         this->model->write_results();
@@ -171,14 +171,26 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
     }
 }
 
-void Foam::fv::ActuatorLine::addSup(fvMatrix<vector>& eqn, const label fieldi) {
+void Foam::fv::ActuatorLine::addSup(
+    fvMatrix<vector>& eqn, 
+    const label field
+) {
     this->add(eqn.psi(), eqn);
 }
 
-void Foam::fv::ActuatorLine::addSup(const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi) {
+void Foam::fv::ActuatorLine::addSup(
+    const volScalarField& rho, 
+    fvMatrix<vector>& eqn, 
+    const label field
+) {
     this->add(eqn.psi(), eqn);
 }
 
-void Foam::fv::ActuatorLine::addSup(const volScalarField& alpha, const volScalarField& rho, fvMatrix<vector>& eqn, const label fieldi) {
+void Foam::fv::ActuatorLine::addSup(
+    const volScalarField& alpha, 
+    const volScalarField& rho, 
+    fvMatrix<vector>& eqn, 
+    const label field
+) {
     this->add(eqn.psi(), eqn);
 }

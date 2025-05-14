@@ -73,7 +73,7 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
 // --------------------- Perform the interpolation -------------------------------------------------
 
 void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) {
-    if (!this->velocity_sampling_data_is_set) {
+    if (this->need_update) {
         this->set_velocity_sampling_data_integral();
     }
 
@@ -164,7 +164,7 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
 }
 
 void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {
-    if (!this->velocity_sampling_data_is_set) {
+    if (this->need_update) {
         this->set_velocity_sampling_data_interpolation();
     }
     

@@ -144,7 +144,7 @@ impl ActuatorLine {
         (numerator, denominator)
     }
 
-    pub fn do_step(&mut self, time_step: f64, time: f64) {        
+    pub fn do_step(&mut self, time_step: f64, time: f64) -> bool{        
         let solver_result = self.solve(&self.ctrl_points_velocity);
 
         let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
@@ -163,11 +163,17 @@ impl ActuatorLine {
             None
         };
 
+        let mut need_update = false;
+
         if let Some(new_angles) = new_local_wing_angles {
             for i in 0..self.line_force_model.nr_wings() {
                 self.line_force_model.local_wing_angles[i] = new_angles[i];
             }
+
+            need_update = true;
         }
+
+        need_update
     }
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
