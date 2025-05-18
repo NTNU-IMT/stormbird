@@ -9,13 +9,15 @@ use stormath::spatial_vector::SpatialVector;
 
 use stormath::statistics::time_averaged_mean;
 
-use crate::common_utils::result::SimulationResult;
+use crate::common_utils::results::simulation::SimulationResult;
 
 use serde::{Serialize, Deserialize};
 
+use super::ControllerOutput;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// This structure is used to control an optimization process that can run in dynamic simulations. 
-pub struct DynamicOptimizer {
+pub struct ParticleSwarmOptimizer {
     pub initialization_time: f64,
     pub time_between_evaluations: f64,
     pub averaging_time: f64,
@@ -31,7 +33,7 @@ pub struct DynamicOptimizer {
     pub result_history: Vec<SwarmResult>,
 }
 
-impl DynamicOptimizer {
+impl ParticleSwarmOptimizer {
     pub fn objective_function(&self, time: &[f64], result: &[SimulationResult]) -> f64 {
         let mut relevant_thrust_values: Vec<f64> = Vec::new();
         let mut relevant_times: Vec<f64> = Vec::new();
@@ -121,7 +123,7 @@ impl DynamicOptimizer {
     }
 
     /// The function responsible for updating the optimizer with new simulation results.
-    pub fn update(&mut self, time: &[f64], results: &[SimulationResult]) -> Option<Vec<f64>> {
+    pub fn update(&mut self, time: &[f64], results: &[SimulationResult]) -> Option<ControllerOutput> {
         let current_time = time.last().unwrap().clone();
 
         if self.new_test_required(current_time) {
@@ -151,7 +153,10 @@ impl DynamicOptimizer {
 
             self.increase_test_index();
 
-            Some(new_position)
+            Some(ControllerOutput {
+                local_wing_angles: Some(new_position),
+                section_models_internal_state: None,
+            })
         } else {
             None
         }

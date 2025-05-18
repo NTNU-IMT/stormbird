@@ -5,9 +5,11 @@
 //! Implementation of actuator line functionality. 
 
 pub mod projection;
+pub mod builder;
 
 use std::path::Path;
 use std::fs;
+use std::io::Write;
 
 use serde::{Serialize, Deserialize};
 
@@ -15,59 +17,19 @@ use stormath::smoothing::gaussian::gaussian_kernel;
 
 use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
-use crate::line_force_model::builder::LineForceModelBuilder;
+
 use crate::common_utils::prelude::*;
 
-use crate::controllers::dynamic_optimizer::DynamicOptimizer;
+use crate::controllers::Controller;
 
 use projection::Projection;
+use builder::ActuatorLineBuilder;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SolverSettings {
     #[serde(default)]
     pub strength_damping: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-/// Builder for the actuator line model.
-pub struct ActuatorLineBuilder {
-    pub line_force_model: LineForceModelBuilder,
-    #[serde(default)]
-    pub projection: Projection,
-    #[serde(default)]
-    pub solver_settings: SolverSettings,
-    #[serde(default)]
-    pub optimizer: Option<DynamicOptimizer>,
-}
-
-impl ActuatorLineBuilder {
-    pub fn new(line_force_model: LineForceModelBuilder) -> Self {
-        Self {
-            line_force_model,
-            projection: Projection::default(),
-            solver_settings: SolverSettings::default(),
-            optimizer: None,
-        }
-    }
-
-    /// Constructs a actuator line model from the builder data.
-    pub fn build(&self) -> ActuatorLine {
-        let line_force_model = self.line_force_model.build();
-
-        let nr_span_lines = line_force_model.nr_span_lines();
-
-        ActuatorLine{
-            line_force_model,
-            projection: self.projection.clone(),
-            ctrl_points_velocity: vec![SpatialVector::<3>::default(); nr_span_lines],
-            time: Vec::new(),
-            results: Vec::new(),
-            solver_settings: self.solver_settings.clone(),
-            optimizer: self.optimizer.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -81,14 +43,12 @@ pub struct ActuatorLine {
     pub projection: Projection,
     /// Vector to store interpolated velocity values for each control point
     pub ctrl_points_velocity: Vec<SpatialVector<3>>,
-    /// The time history of the simulation
-    pub time: Vec<f64>,
     /// Results from the model
-    pub results: Vec<SimulationResult>,
+    pub simulation_result: Option<SimulationResult>,
     /// Numerical settings
     pub solver_settings: SolverSettings,
     /// Dynamic optimizer that can be optionally used to optimize the settings in the model
-    pub optimizer: Option<DynamicOptimizer>,
+    pub controller: Option<Controller>,
 }
 
 impl ActuatorLine {
@@ -144,30 +104,34 @@ impl ActuatorLine {
         (numerator, denominator)
     }
 
-    pub fn do_step(&mut self, time_step: f64, time: f64) -> bool{        
+    pub fn do_step(&mut self, time: f64, time_step: f64) -> bool{        
         let solver_result = self.solve(&self.ctrl_points_velocity);
 
-        let result = self.line_force_model.calculate_simulation_result(&solver_result, time_step);
+        let simulation_result = self.line_force_model.calculate_simulation_result(
+            &solver_result, 
+            time, 
+            time_step
+        );
 
         //self.line_force_model.update_flow_derivatives(&result);
 
-        self.results.push(result);
-        self.time.push(time);
-
-        let new_local_wing_angles = if let Some(optimizer) = &mut self.optimizer {
-            optimizer.update(
-                &self.time,
-                &self.results,
-            )
+        let controller_output = if let Some(controller) = &mut self.controller {
+            controller.update(time_step, &simulation_result)
         } else {
             None
         };
 
+        self.simulation_result = Some(simulation_result);
+
         let mut need_update = false;
 
-        if let Some(new_angles) = new_local_wing_angles {
-            for i in 0..self.line_force_model.nr_wings() {
-                self.line_force_model.local_wing_angles[i] = new_angles[i];
+        if let Some(controller_output) = controller_output {
+            if let Some(new_angles) = controller_output.local_wing_angles {
+                self.line_force_model.local_wing_angles = new_angles;
+            }
+            
+            if let Some(new_internal_states) = controller_output.section_models_internal_state {
+                self.line_force_model.set_section_models_internal_state(&new_internal_states);
             }
 
             need_update = true;
@@ -184,8 +148,9 @@ impl ActuatorLine {
         );
 
         let circulation_strength = if self.solver_settings.strength_damping > 0.0 {
-            let previous_strength = if self.results.len() > 0 {
-                self.results.last().unwrap().force_input.circulation_strength.clone()
+
+            let previous_strength = if let Some(simulation_result) = &self.simulation_result {
+                simulation_result.force_input.circulation_strength.clone()
             } else {
                 vec![0.0; self.line_force_model.nr_span_lines()]
             };
@@ -213,30 +178,49 @@ impl ActuatorLine {
 
     /// Writes the resulting values from the line force model to a file. 
     pub fn write_results(&self) {
-        let serialized_result = serde_json::to_string(&self.results).unwrap();
+        if let Some(simulation_result) = &self.simulation_result {
+            let (header, data) = simulation_result.as_reduced_flatten_csv_string();
 
-        let file_path = "actuator_line_results.json".to_owned();
+            let file_path = Path::new("actuator_line_results.csv");
 
-        fs::write(file_path, serialized_result).expect("Unable to write result file");
+            if file_path.exists() {
+                let mut file = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(file_path)
+                    .expect("Failed to open file for appending");
+
+                writeln!(file, "{}", data).expect("Failed to write data");
+            } else {
+                let mut file = fs::File::create(file_path)
+                    .expect("Failed to create file");
+
+                writeln!(file, "{}", header).expect("Failed to write header");
+                writeln!(file, "{}", data).expect("Failed to write data");
+            }
+        }
     }
 
     /// Computes a distributed body force at a given point in space.
     pub fn distributed_body_force_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
-        let result = self.results.last().unwrap();
+        if let Some(simulation_result) = &self.simulation_result {
+            let sectional_forces_to_project = self.line_force_model.
+                sectional_circulatory_forces(
+                    &simulation_result.force_input.circulation_strength, 
+                    &simulation_result.force_input.velocity
+                );
+            
+            let mut body_force = SpatialVector::<3>::default();
 
-        let sectional_forces_to_project = self.line_force_model.sectional_circulatory_forces(
-            &result.force_input.circulation_strength, &result.force_input.velocity
-        );
-        
-        let mut body_force = SpatialVector::<3>::default();
+            for i in 0..self.line_force_model.nr_span_lines() {
+                body_force += sectional_forces_to_project[i] * projection_weights[i];
+            }
 
-        for i in 0..self.line_force_model.nr_span_lines() {
-            body_force += sectional_forces_to_project[i] * projection_weights[i];
-        }
-
-        body_force
+            body_force
+        } else {
+            SpatialVector::<3>::default()
+        }        
     }
 
     /// Computes the body force weights for each line element at a given point in space.

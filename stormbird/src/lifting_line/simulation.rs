@@ -136,7 +136,7 @@ impl Simulation {
 
         self.flow_derivatives.update(&solver_result.ctrl_point_velocity);
 
-        self.line_force_model.calculate_simulation_result(&solver_result, time_step)
+        self.line_force_model.calculate_simulation_result(&solver_result, time, time_step)
     }
 
 

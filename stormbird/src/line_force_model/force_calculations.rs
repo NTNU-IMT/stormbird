@@ -429,7 +429,8 @@ impl LineForceModel {
 
     pub fn calculate_simulation_result(
         &self, 
-        solver_result: &SolverResult, 
+        solver_result: &SolverResult,
+        time: f64,
         time_step: f64
     ) -> SimulationResult {
         let force_input = self.sectional_force_input(&solver_result, time_step);
@@ -440,6 +441,7 @@ impl LineForceModel {
         let integrated_moments = sectional_forces.integrate_moments(&self);
 
         SimulationResult {
+            time,
             ctrl_points,
             force_input,
             sectional_forces,
@@ -447,6 +449,7 @@ impl LineForceModel {
             integrated_moments,
             iterations: solver_result.iterations,
             residual: solver_result.residual,
+            wing_indices: self.wing_indices.clone(),
         }
     }
 }

@@ -12,7 +12,8 @@ use stormath::{
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 
-    interpolation::linear_interpolation};
+    interpolation::linear_interpolation
+};
 
 pub mod builder;
 pub mod force_calculations;

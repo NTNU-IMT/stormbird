@@ -6,12 +6,13 @@
 //! from the specific methods in the library (lifting- and actuator line), as they are used in 
 //! multiple places.
 
-pub mod result;
+pub mod results;
 pub mod forces_and_moments;
 pub mod flow_derivatives;
 
 pub mod prelude {
-    pub use super::result::*;
+    pub use super::results::solver::SolverResult;
+    pub use super::results::simulation::SimulationResult;
     pub use super::forces_and_moments::*;
     pub use super::flow_derivatives::*;
 }

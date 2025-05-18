@@ -142,7 +142,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
         this->set_interpolated_velocity(velocity_field);
     }
 
-    this->need_update = this->model->do_step(time_step, time);
+    this->need_update = this->model->do_step(time, time_step);
     
     if (Pstream::master()) {
         this->model->write_results();
