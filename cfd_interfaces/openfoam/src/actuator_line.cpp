@@ -120,7 +120,7 @@ void Foam::fv::ActuatorLine::sync_line_force_model_state() {
 }
 
 void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
-{
+{   
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
     double time_step = mesh_.time().deltaTValue();
@@ -142,9 +142,13 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
         this->set_interpolated_velocity(velocity_field);
     }
 
-    this->need_update = this->model->do_step(time, time_step);
+    this->model->do_step(time, time_step);
+
+    this->need_update = false;
     
     if (Pstream::master()) {
+        this->need_update = model->update_controller(time_step);
+        
         this->model->write_results();
     }
 
@@ -157,7 +161,9 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
             cell_centers[cell_id][2]
         };
 
-        std::array<double, 3> body_force_sb = this->model->distributed_body_force_at_point(cell_center);
+        std::array<double, 3> body_force_sb = this->model->distributed_body_force_at_point(
+            cell_center
+        );
 
         vector body_force(vector::zero);
 
@@ -169,6 +175,8 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
 
         this->body_force_field[0][cell_id] = body_force / cell_volumes[cell_id];
     }
+
+    reduce(this->need_update, orOp<bool>());
 }
 
 void Foam::fv::ActuatorLine::addSup(

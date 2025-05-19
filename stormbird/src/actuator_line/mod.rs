@@ -4,12 +4,11 @@
 
 //! Implementation of actuator line functionality. 
 
+use std::fs;
+use std::path::Path;
+
 pub mod projection;
 pub mod builder;
-
-use std::path::Path;
-use std::fs;
-use std::io::Write;
 
 use serde::{Serialize, Deserialize};
 
@@ -21,6 +20,7 @@ use crate::line_force_model::LineForceModel;
 use crate::common_utils::prelude::*;
 
 use crate::controllers::Controller;
+use crate::io_utils::csv_data;
 
 use projection::Projection;
 use builder::ActuatorLineBuilder;
@@ -104,7 +104,7 @@ impl ActuatorLine {
         (numerator, denominator)
     }
 
-    pub fn do_step(&mut self, time: f64, time_step: f64) -> bool{        
+    pub fn do_step(&mut self, time: f64, time_step: f64){
         let solver_result = self.solve(&self.ctrl_points_velocity);
 
         let simulation_result = self.line_force_model.calculate_simulation_result(
@@ -115,15 +115,19 @@ impl ActuatorLine {
 
         //self.line_force_model.update_flow_derivatives(&result);
 
+        self.simulation_result = Some(simulation_result);        
+    }
+
+    pub fn update_controller(&mut self, time_step: f64) -> bool {
         let controller_output = if let Some(controller) = &mut self.controller {
             let model_state = self.line_force_model.model_state();
+
+            let simulation_result = self.simulation_result.as_ref().unwrap();
             
-            controller.update(time_step, &model_state, &simulation_result)
+            controller.update(time_step, &model_state, simulation_result)
         } else {
             None
         };
-
-        self.simulation_result = Some(simulation_result);
 
         let mut need_update = false;
 
@@ -137,6 +141,11 @@ impl ActuatorLine {
             }
 
             need_update = true;
+
+            let new_model_state = self.line_force_model.model_state();
+
+            new_model_state.write_to_csv_file("model_state.csv");
+
         }
 
         need_update
@@ -183,22 +192,11 @@ impl ActuatorLine {
         if let Some(simulation_result) = &self.simulation_result {
             let (header, data) = simulation_result.as_reduced_flatten_csv_string();
 
-            let file_path = Path::new("actuator_line_results.csv");
-
-            if file_path.exists() {
-                let mut file = std::fs::OpenOptions::new()
-                    .append(true)
-                    .open(file_path)
-                    .expect("Failed to open file for appending");
-
-                writeln!(file, "{}", data).expect("Failed to write data");
-            } else {
-                let mut file = fs::File::create(file_path)
-                    .expect("Failed to create file");
-
-                writeln!(file, "{}", header).expect("Failed to write header");
-                writeln!(file, "{}", data).expect("Failed to write data");
-            }
+            let _ = csv_data::create_or_append_header_and_data_strings_file(
+                "actuator_line_results.csv", 
+                &header, 
+                &data
+            );
         }
     }
 

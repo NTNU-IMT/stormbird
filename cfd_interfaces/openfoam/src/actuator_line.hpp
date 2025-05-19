@@ -69,6 +69,8 @@ namespace Foam {
             bool use_integral_velocity_sampling = true;
             bool only_use_dominating_line_element_when_sampling = true;
             bool only_use_dominating_line_element_when_projecting = true;
+
+            bool need_update = true;
             
             bool velocity_sampling_data_is_set = false;
             bool projection_data_is_set = false;
@@ -85,8 +87,6 @@ namespace Foam {
 
             labelList relevant_cells_for_velocity_sampling;
             labelList dominating_line_element_index_sampling;
-
-            bool need_update = true;
 
             /// The add function, intended to be use across all the OpenFOAM addSup functions
             void add(const volVectorField& velocity, fvMatrix<vector>& eqn);

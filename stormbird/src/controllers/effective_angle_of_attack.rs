@@ -6,11 +6,19 @@ use stormath::{
 };
 
 use crate::error::Error;
+use crate::io_utils::csv_data;
 use crate::common_utils::results::simulation::SimulationResult;
 use super::{
     LineForceModelState,
     ControllerOutput
 };
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub enum AngleMeasurmentType {
+    Max,
+    #[default]
+    Mean
+}
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,12 +35,18 @@ pub struct EffectiveAngleOfAttackControllerBuilder {
     pub update_factor: f64,
     #[serde(default = "EffectiveAngleOfAttackControllerBuilder::default_change_threshold")]
     pub change_threshold: f64,
+    #[serde(default)]
+    pub angle_measurment_start_index: usize,
+    #[serde(default)]
+    pub angle_measurment_end_offset: usize,
+    #[serde(default)]
+    pub angle_measurment_type: AngleMeasurmentType,
 }
 
 impl EffectiveAngleOfAttackControllerBuilder {
     pub fn default_time_steps_between_updates() -> usize {1}
     pub fn default_update_factor() -> f64 {1.0}
-    pub fn default_change_threshold() -> f64 {0.05_f64.to_radians()}
+    pub fn default_change_threshold() -> f64 {0.0001_f64.to_radians()}
 
     pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
         let file_contents = std::fs::read_to_string(file_path)?;
@@ -62,6 +76,9 @@ impl EffectiveAngleOfAttackControllerBuilder {
             angle_estimates,
             filters,
             time_step_index: 0,
+            angle_measurment_start_index: self.angle_measurment_start_index,
+            angle_measurment_end_offset: self.angle_measurment_end_offset,
+            angle_measurment_type: self.angle_measurment_type,
         }
     }
 }
@@ -86,6 +103,12 @@ pub struct EffectiveAngleOfAttackController {
     pub filters: Option<Vec<MovingAverage>>,
     /// Index to keep track of the number of time steps
     pub time_step_index: usize,
+    /// At which index to start the angle measurements
+    pub angle_measurment_start_index: usize,
+    /// An offset used to compute the final index of the angle measurements
+    pub angle_measurment_end_offset: usize,
+    /// The type of angle measurement to use
+    pub angle_measurment_type: AngleMeasurmentType,
 }
 
 impl EffectiveAngleOfAttackController {
@@ -95,29 +118,54 @@ impl EffectiveAngleOfAttackController {
         Ok(builder.build())
     }
 
-    pub fn nr_of_wings(&self) -> usize {
+    fn nr_of_wings(&self) -> usize {
         self.angle_estimates.len()
     }
 
-    pub fn measure_angles_of_attack(&self, simulation_result: &SimulationResult) -> Vec<f64> {
+    fn measure_angles_of_attack(&self, simulation_result: &SimulationResult) -> Vec<f64> {
         let mut angles_of_attack = vec![0.0; self.nr_of_wings()];
 
         for i in 0..self.nr_of_wings() {
             let wing_angles_of_attack = simulation_result.angles_of_attack_for_wing(i);
             let nr_strips = wing_angles_of_attack.len();
 
-            angles_of_attack[i] = statistics::mean(&wing_angles_of_attack[1..nr_strips-2]);
+            let start_index = self.angle_measurment_start_index;
+            let end_index = (nr_strips - self.angle_measurment_end_offset - 1).max(start_index+1).min(nr_strips-1);
+
+            angles_of_attack[i] = match self.angle_measurment_type {
+                AngleMeasurmentType::Mean => statistics::mean(
+                    &wing_angles_of_attack[start_index..end_index]
+                ),
+                AngleMeasurmentType::Max => {
+                    if self.target_angles_of_attack[i] > 0.0 {
+                        statistics::max(
+                            &wing_angles_of_attack[start_index..end_index]
+                        )
+                    } else {
+                        statistics::min(
+                            &wing_angles_of_attack[start_index..end_index]
+                        )
+                    }
+                },
+            };
         }
 
         angles_of_attack
     }
 
-    pub fn update(&mut self, time_step: f64, model_state: &LineForceModelState, simulation_result: &SimulationResult) -> Option<ControllerOutput> {
+    pub fn update(
+        &mut self, 
+        time_step: f64, 
+        model_state: &LineForceModelState, 
+        simulation_result: &SimulationResult
+    ) -> Option<ControllerOutput> {
         self.time_step_index += 1;
 
         let angle_measurements = self.measure_angles_of_attack(simulation_result);
 
         self.update_angle_estimate(&angle_measurements);
+
+        self.write_angle_data_to_file(&angle_measurements);
 
         let time_to_update =  self.time_step_index % self.time_steps_between_updates == 0;
         let first_time_step = self.time_step_index == 1;
@@ -125,7 +173,8 @@ impl EffectiveAngleOfAttackController {
         if first_time_step || time_to_update {
             let new_local_wing_angles = self.compute_new_local_wing_angles(
                 time_step,
-                model_state
+                model_state,
+                first_time_step
             );
 
             let change_necessary = self.check_for_change(
@@ -134,9 +183,6 @@ impl EffectiveAngleOfAttackController {
             );
 
             if change_necessary {
-                dbg!(&angle_measurements);
-                dbg!(&new_local_wing_angles);
-
                 Some(
                     ControllerOutput {
                         local_wing_angles: Some(new_local_wing_angles),
@@ -169,7 +215,12 @@ impl EffectiveAngleOfAttackController {
         change_necessary
     }
 
-    pub fn compute_new_local_wing_angles(&self, time_step: f64, model_state: &LineForceModelState) -> Vec<f64> {
+    fn compute_new_local_wing_angles(
+        &self, 
+        time_step: f64, 
+        model_state: &LineForceModelState,
+        first_time_step: bool
+    ) -> Vec<f64> {
         let mut new_local_wing_angles = vec![0.0; self.nr_of_wings()];
 
         let nr_of_wings = self.nr_of_wings();
@@ -185,7 +236,11 @@ impl EffectiveAngleOfAttackController {
 
             angle_error = Self::correct_angle_to_be_between_pi_and_negative_pi(angle_error);
 
-            let raw_angle_change = angle_error * self.update_factor;
+            let raw_angle_change = if first_time_step {
+                angle_error
+            } else {
+                angle_error * self.update_factor
+            };
 
             let change_to_apply = if raw_angle_change.abs() > max_angle_change {
                 max_angle_change.copysign(raw_angle_change)
@@ -201,7 +256,7 @@ impl EffectiveAngleOfAttackController {
         new_local_wing_angles
     }
 
-    pub fn update_angle_estimate(&mut self, angle_measurements: &[f64]) {
+    fn update_angle_estimate(&mut self, angle_measurements: &[f64]) {
         let nr_wings = self.nr_of_wings();
 
         if let Some(filters) = &mut self.filters {
@@ -215,8 +270,44 @@ impl EffectiveAngleOfAttackController {
         }
     }
 
+    fn angle_data_as_csv_string(&self, angle_measurements: &[f64]) -> (String, String) {
+        let mut header = String::new();
+        let mut data = String::new();
+
+        for i in 0..self.nr_of_wings() {
+            if i > 0 {
+                header.push(',');
+                data.push(',');
+            }
+
+            header.push_str(&format!("angle_estimate_{},", i));
+            data.push_str(&format!("{},", self.angle_estimates[i]));
+
+            header.push_str(&format!("target_angle_{},", i));
+            data.push_str(&format!("{},", self.target_angles_of_attack[i]));
+
+            header.push_str(&format!("angle_measurement_{}", i));
+            data.push_str(&format!("{}", angle_measurements[i]));
+        }
+
+        (header, data)
+    }
+
+    fn write_angle_data_to_file(
+        &self, 
+        angle_measurements: &[f64]
+    ) {
+        let (header, data) = self.angle_data_as_csv_string(angle_measurements);
+
+        let _ = csv_data::create_or_append_header_and_data_strings_file(
+            "angle_data.csv",
+            &header,
+            &data
+        );
+    }
+
     #[inline(always)]
-    pub fn correct_angle_to_be_between_pi_and_negative_pi(angle: f64) -> f64 {
+    fn correct_angle_to_be_between_pi_and_negative_pi(angle: f64) -> f64 {
         let mut corrected_angle = angle;
 
         while corrected_angle > std::f64::consts::PI {
