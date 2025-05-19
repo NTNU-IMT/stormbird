@@ -101,7 +101,7 @@ impl EffectiveAngleOfAttackController {
         self.angle_estimates.len()
     }
 
-    pub fn measure_mean_angles_of_attack(&self, simulation_result: &SimulationResult) -> Vec<f64> {
+    pub fn measure_angles_of_attack(&self, simulation_result: &SimulationResult) -> Vec<f64> {
         let mut angles_of_attack = vec![0.0; self.nr_of_wings()];
 
         for i in 0..self.nr_of_wings() {
@@ -117,7 +117,7 @@ impl EffectiveAngleOfAttackController {
     pub fn update(&mut self, time_step: f64, simulation_result: &SimulationResult) -> Option<ControllerOutput> {
         self.time_step_index += 1;
 
-        let angle_measurements = self.measure_mean_angles_of_attack(simulation_result);
+        let angle_measurements = self.measure_angles_of_attack(simulation_result);
 
         self.update_angle_estimate(&angle_measurements);
 
