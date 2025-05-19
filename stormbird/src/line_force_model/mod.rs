@@ -31,6 +31,8 @@ mod tests;
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
 
+use crate::controllers::LineForceModelState;
+
 use self::rigid_body_motion::RigidBodyMotion;
 
 use circulation_corrections::CirculationCorrection;
@@ -454,6 +456,24 @@ impl LineForceModel {
         }
     }
 
+    pub fn section_models_internal_state(&self) -> Vec<f64> {
+        let mut internal_state: Vec<f64> = vec![0.0; self.nr_wings()];
+
+        for wing_index in 0..self.nr_wings() {
+            match self.section_models[wing_index] {
+                SectionModel::VaryingFoil(ref foil) => {
+                    internal_state[wing_index] = foil.current_internal_state;
+                }
+                SectionModel::RotatingCylinder(ref cylinder) => {
+                    internal_state[wing_index] = cylinder.revolutions_per_second;
+                }
+                _ => {}
+            }
+        }
+
+        internal_state
+    }
+
     /// General function for calculating wing-averaged values
     pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T>
     where
@@ -564,5 +584,12 @@ impl LineForceModel {
         }
 
         span_point_values
+    }
+
+    pub fn model_state(&self) -> LineForceModelState {
+        LineForceModelState {
+            local_wing_angles: self.local_wing_angles.clone(),
+            section_models_internal_state: self.section_models_internal_state(),
+        }
     }
 }

@@ -116,7 +116,9 @@ impl ActuatorLine {
         //self.line_force_model.update_flow_derivatives(&result);
 
         let controller_output = if let Some(controller) = &mut self.controller {
-            controller.update(time_step, &simulation_result)
+            let model_state = self.line_force_model.model_state();
+            
+            controller.update(time_step, &model_state, &simulation_result)
         } else {
             None
         };

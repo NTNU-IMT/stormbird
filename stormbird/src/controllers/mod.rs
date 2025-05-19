@@ -7,6 +7,12 @@ use crate::common_utils::results::simulation::SimulationResult;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LineForceModelState {
+    pub local_wing_angles: Vec<f64>,
+    pub section_models_internal_state: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ControllerOutput {
     pub local_wing_angles: Option<Vec<f64>>,
     pub section_models_internal_state: Option<Vec<f64>>,
@@ -34,10 +40,10 @@ pub enum Controller {
 
 
 impl Controller {
-    pub fn update(&mut self, time_step: f64, simulation_result: &SimulationResult) -> Option<ControllerOutput> {
+    pub fn update(&mut self, time_step: f64, model_state: &LineForceModelState, simulation_result: &SimulationResult) -> Option<ControllerOutput> {
         match self {
             Controller::EffectiveAngleOfAttack(optimizer) => {
-                optimizer.update(time_step, simulation_result)
+                optimizer.update(time_step, model_state, simulation_result)
             }
         }
     }
