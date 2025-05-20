@@ -64,20 +64,18 @@ namespace Foam {
             /// The body force field weight, that will be exported by OpenFOAM during the simulation
             volScalarField* body_force_field_weight;
 
-            // Mesh to actuator line data
+            // Parameters for the sampling and projection
             // TODO: make these parameters available in the input file
-            bool use_integral_velocity_sampling = true;
+            bool use_integral_velocity_sampling = false;
             bool only_use_dominating_line_element_when_sampling = true;
             bool only_use_dominating_line_element_when_projecting = true;
-
-            bool need_update = true;
-            
-            bool velocity_sampling_data_is_set = false;
-            bool projection_data_is_set = false;
-
             double projection_limit = 0.1;
             double sampling_integral_limit = 0.1;
 
+            // Switch to determine if the OpenFOAM data needs to be updated, due to changes in the 
+            // actuator line model
+            bool need_update = true;
+            
             // Store all relevant data
             std::vector<label> interpolation_cells;
             std::vector<vector> ctrl_points;
@@ -100,7 +98,7 @@ namespace Foam {
             void set_integrated_weighted_velocity(const volVectorField& velocity);
             void set_interpolated_velocity(const volVectorField& velocity);
 
-            /// This method is used to syncronize the line force model state across all the 
+            /// This method is used to synchronize the line force model state across all the 
             /// instances across the processors
             void sync_line_force_model_state();
 

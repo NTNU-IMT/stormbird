@@ -90,8 +90,6 @@ void Foam::fv::ActuatorLine::set_projection_data() {
             this->body_force_field_weight[0][cell_id] = 0.0;
         }
     }
-
-    this->projection_data_is_set = true;
 }
 
 void Foam::fv::ActuatorLine::sync_line_force_model_state() {
@@ -145,7 +143,6 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
     this->model->do_step(time, time_step);
 
     this->need_update = false;
-    
     if (Pstream::master()) {
         this->need_update = model->update_controller(time_step);
         

@@ -45,9 +45,6 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
             this->body_force_field_weight[0][cell_id] = 0.0;
         }
     }
-
-    this->velocity_sampling_data_is_set = true;
-
 }
 
 void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
@@ -65,8 +62,6 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
             mesh_.findCell(this->ctrl_points[i])
         );
     }
-
-    this->velocity_sampling_data_is_set = true;
 }
 
 
@@ -79,7 +74,6 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
 
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
-    const labelList& cell_ids = !this->projection_data_is_set ? cells() : this->relevant_cells_for_velocity_sampling;
 
     // Initialize the numerator and denominator
     std::vector<vector> numerator;
@@ -93,8 +87,8 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
     }
 
     // Loop over all cells for the current processor
-    forAll(cell_ids, i) {
-        label cell_id = cell_ids[i];
+    forAll(this->relevant_cells_for_velocity_sampling, i) {
+        label cell_id = this->relevant_cells_for_velocity_sampling[i];
 
         std::array<double, 3> velocity = {
             velocity_field[cell_id][0],
