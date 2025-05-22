@@ -20,7 +20,8 @@ use crate::line_force_model::LineForceModel;
 use crate::common_utils::prelude::*;
 
 use crate::controllers::Controller;
-use crate::io_utils::csv_data;
+
+use crate::io_utils;
 
 use projection::Projection;
 use builder::ActuatorLineBuilder;
@@ -49,6 +50,10 @@ pub struct ActuatorLine {
     pub solver_settings: SolverSettings,
     /// Dynamic optimizer that can be optionally used to optimize the settings in the model
     pub controller: Option<Controller>,
+    /// The current iteration of the simulation
+    pub current_iteration: usize,
+    /// The number of iterations between each time a full simualtion result is written to file
+    pub write_iterations_full_result: usize,
 }
 
 impl ActuatorLine {
@@ -115,7 +120,9 @@ impl ActuatorLine {
 
         //self.line_force_model.update_flow_derivatives(&result);
 
-        self.simulation_result = Some(simulation_result);        
+        self.simulation_result = Some(simulation_result);
+        
+        self.current_iteration += 1;
     }
 
     pub fn update_controller(&mut self, time_step: f64) -> bool {
@@ -192,11 +199,23 @@ impl ActuatorLine {
         if let Some(simulation_result) = &self.simulation_result {
             let (header, data) = simulation_result.as_reduced_flatten_csv_string();
 
-            let _ = csv_data::create_or_append_header_and_data_strings_file(
+            let _ = io_utils::csv_data::create_or_append_header_and_data_strings_file(
                 "actuator_line_results.csv", 
                 &header, 
                 &data
             );
+
+            if self.current_iteration % self.write_iterations_full_result == 0 {
+                let folder_path = "actuator_line_results";
+                io_utils::folder_managment::ensure_folder_exists(&folder_path).unwrap();
+
+                let json_string = serde_json::to_string_pretty(&simulation_result).unwrap();
+
+                io_utils::write_text_to_file(
+                    format!("{}/actuator_line_result_{}.json", folder_path, self.current_iteration).as_str(), 
+                    &json_string
+                ).unwrap();
+            }
         }
     }
 

@@ -97,7 +97,7 @@ impl LineForceModel {
         velocity: &[SpatialVector<3>], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
-        match &self.circulation_corrections {
+        match &self.circulation_correction {
             CirculationCorrection::None => self.circulation_strength_raw(velocity, input_coordinate_system),
             CirculationCorrection::PrescribedCirculation(shape) =>
                 self.prescribed_circulation_strength(&velocity,&shape, input_coordinate_system),

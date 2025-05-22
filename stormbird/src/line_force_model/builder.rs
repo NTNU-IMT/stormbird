@@ -21,7 +21,7 @@ pub struct LineForceModelBuilder {
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,
     #[serde(default)]
-    pub circulation_corrections: CirculationCorrection,
+    pub circulation_correction: CirculationCorrection,
     #[serde(default)]
     pub output_coordinate_system: CoordinateSystem,
     #[serde(default)]
@@ -40,7 +40,7 @@ impl LineForceModelBuilder {
             wing_builders: Vec::new(),
             nr_sections,
             density: LineForceModel::default_density(),
-            circulation_corrections: Default::default(),
+            circulation_correction: Default::default(),
             output_coordinate_system: CoordinateSystem::Global,
             rotation_type: RotationType::XYZ,
             local_wing_angles: Vec::new(),
@@ -72,7 +72,7 @@ impl LineForceModelBuilder {
             line_force_model.add_wing(&wing);
         }
 
-        line_force_model.circulation_corrections = self.circulation_corrections.clone();
+        line_force_model.circulation_correction = self.circulation_correction.clone();
         line_force_model.output_coordinate_system = self.output_coordinate_system;
 
         if self.local_wing_angles.len() > 0 {

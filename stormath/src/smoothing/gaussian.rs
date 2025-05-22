@@ -33,9 +33,20 @@ impl GaussianSmoothing {
     /// Based on: <https://en.wikipedia.org/wiki/Kernel_smoother>
     pub fn apply_smoothing<T>(&self, x: &[f64], y: &[T]) -> Vec<T>
     where T: SmoothingOps
-    {
-        let x_modified = EndCondition::add_end_values_to_x_data(x, self.number_of_end_insertions(x));
-        let y_modified = EndCondition::add_end_values_to_y_data(y, self.number_of_end_insertions(x), self.end_conditions);
+    {   
+
+        let number_of_end_insertions = self.number_of_end_insertions(x);
+
+        let x_modified = EndCondition::add_end_values_to_x_data(
+            x, 
+            number_of_end_insertions
+        );
+
+        let y_modified = EndCondition::add_end_values_to_y_data(
+            y, 
+            number_of_end_insertions, 
+            self.end_conditions
+        );
 
         let n = y.len();
         let n_mod = y_modified.len();

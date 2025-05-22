@@ -12,11 +12,15 @@ use stormath::smoothing::end_condition::EndCondition;
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GaussianSmoothing {
     #[serde(default="GaussianSmoothing::default_length_factor")]
     /// A non dimensional factor used to calculate the length in Gaussian smoothing kernel. 
     /// The actual smoothing length is calculated as the length factor times the wing span.
-    pub length_factor: f64
+    pub length_factor: f64,
+    #[serde(default)]
+    /// Option to only do intertior smoothing.
+    pub interior_only: bool,
 }
 
 impl GaussianSmoothing {
@@ -27,6 +31,7 @@ impl Default for GaussianSmoothing {
     fn default() -> Self {
         Self {
             length_factor: Self::default_length_factor(),
+            interior_only: false,
         }
     }
 }
@@ -83,9 +88,29 @@ impl LineForceModel {
                 &local_span_distance, 
                 &local_noisy_values, 
             );
+
+            let start_index = if settings.interior_only {
+                1
+            } else {
+                0
+            };
+
+            let end_index = if settings.interior_only {
+                raw_wing_smoothed_values.len() - 1
+            } else {
+                raw_wing_smoothed_values.len()
+            };
+
+            if settings.interior_only {
+                smoothed_values.push(noisy_values[0]);
+            }
             
-            for index in 0..raw_wing_smoothed_values.len() {
+            for index in start_index..end_index {
                 smoothed_values.push(raw_wing_smoothed_values[index]);
+            }
+
+            if settings.interior_only {
+                smoothed_values.push(noisy_values[noisy_values.len() - 1]);
             }
         }
 

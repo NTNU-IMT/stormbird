@@ -12,14 +12,14 @@ use stormath::{
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 
-    interpolation::linear_interpolation
+    interpolation::linear_interpolation,
 };
 
 pub mod builder;
 pub mod force_calculations;
 pub mod span_line;
 
-pub mod circulation_corrections;
+pub mod corrections;
 pub mod prelude;
 pub mod single_wing;
 
@@ -35,7 +35,7 @@ use crate::controllers::LineForceModelState;
 
 use self::rigid_body_motion::RigidBodyMotion;
 
-use circulation_corrections::CirculationCorrection;
+use corrections::CirculationCorrection;
 use single_wing::SingleWing;
 use span_line::*;
 
@@ -72,7 +72,7 @@ pub struct LineForceModel {
     /// Density used in force calculations
     pub density: f64,
     /// Optional corrections that can be applied to the estimated circulation strength.
-    pub circulation_corrections: CirculationCorrection,
+    pub circulation_correction: CirculationCorrection,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
 }
@@ -101,7 +101,7 @@ impl LineForceModel {
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
             density,
-            circulation_corrections: Default::default(),
+            circulation_correction: Default::default(),
             output_coordinate_system: CoordinateSystem::Global
         }
     }

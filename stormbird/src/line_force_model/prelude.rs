@@ -6,7 +6,7 @@ pub use super::LineForceModel;
 pub use super::builder::LineForceModelBuilder;
 pub use super::single_wing::{SingleWing, WingBuilder};
 pub use super::span_line::SpanLine;
-pub use super::circulation_corrections::{
+pub use super::corrections::{
     smoothing::GaussianSmoothing,
     prescribed_circulation::PrescribedCirculationShape,
 };

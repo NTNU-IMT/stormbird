@@ -20,15 +20,20 @@ pub struct ActuatorLineBuilder {
     pub solver_settings: SolverSettings,
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
+    #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
+    pub write_iterations_full_result: usize,
 }
 
 impl ActuatorLineBuilder {
+    pub fn default_write_iterations_full_result() -> usize {500}
+
     pub fn new(line_force_model: LineForceModelBuilder) -> Self {
         Self {
             line_force_model,
             projection: Projection::default(),
             solver_settings: SolverSettings::default(),
             controller: None,
+            write_iterations_full_result: Self::default_write_iterations_full_result(),
         }
     }
 
@@ -51,6 +56,8 @@ impl ActuatorLineBuilder {
             simulation_result: None,
             solver_settings: self.solver_settings.clone(),
             controller,
+            current_iteration: 0,
+            write_iterations_full_result: self.write_iterations_full_result,
         }
     }
 }

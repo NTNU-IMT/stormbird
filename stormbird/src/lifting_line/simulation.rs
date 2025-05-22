@@ -8,7 +8,7 @@
 //! However, the interface is designed to be as unified as possible.
 
 use crate::lifting_line::prelude::*;
-use crate::line_force_model::circulation_corrections::CirculationCorrection;
+use crate::line_force_model::corrections::CirculationCorrection;
 
 use super::simulation_builder::SimulationBuilder;
 
@@ -166,10 +166,12 @@ impl Simulation {
         time_step: f64,
         freestream_velocity: &[SpatialVector<3>],
     ) {
-        let old_circulation_correction = self.line_force_model.circulation_corrections.clone();
+        let old_circulation_correction = self.line_force_model.circulation_correction.clone();
         let old_damping_factor = self.solver.damping_factor;
 
-        let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
+        let ctrl_points_freestream = freestream_velocity[
+            0..self.line_force_model.nr_span_lines()
+        ].to_vec();
 
         let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_velocity(
             &ctrl_points_freestream
@@ -177,12 +179,14 @@ impl Simulation {
 
         self.initialize_line_force_model_data(&felt_ctrl_points_freestream);
 
-        self.line_force_model.circulation_corrections = CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
+        self.line_force_model.circulation_correction = CirculationCorrection::PrescribedCirculation(
+            PrescribedCirculationShape::default()
+        );
         self.solver.damping_factor = 0.25_f64.max(old_damping_factor);
 
         let _ = self.do_step(time, time_step, freestream_velocity);
 
-        self.line_force_model.circulation_corrections = old_circulation_correction;
+        self.line_force_model.circulation_correction = old_circulation_correction;
         self.solver.damping_factor = old_damping_factor;
     }
 }
