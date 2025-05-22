@@ -4,8 +4,6 @@
 
 //! Interface to a dynamic simulation using a lifting line model.
 
-use std::time;
-
 use pyo3::prelude::*;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
