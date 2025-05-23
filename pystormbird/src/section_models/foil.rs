@@ -27,7 +27,8 @@ impl Foil {
             cl_high_order_factor   = 0.0, 
             cl_high_order_power    = 0.0,
             cl_max_after_stall     = 1.0, 
-            cd_zero_angle          = 0.0, 
+            cd_min                 = 0.0,
+            angle_cd_min            = 0.0,
             cd_second_order_factor = 0.0, 
             cd_max_after_stall     = 1.0, 
             cd_power_after_stall   = FoilRust::default_cd_power_after_stall(), 
@@ -42,7 +43,8 @@ impl Foil {
         cl_high_order_factor: f64,
         cl_high_order_power: f64,
         cl_max_after_stall: f64,
-        cd_zero_angle: f64,
+        cd_min: f64,
+        angle_cd_min: f64,
         cd_second_order_factor: f64,
         cd_max_after_stall: f64,
         cd_power_after_stall: f64,
@@ -57,7 +59,8 @@ impl Foil {
                 cl_high_order_factor,
                 cl_high_order_power,
                 cl_max_after_stall,
-                cd_zero_angle,
+                cd_min,
+                angle_cd_min,
                 cd_second_order_factor,
                 cd_max_after_stall,
                 cd_power_after_stall,
@@ -141,13 +144,23 @@ impl Foil {
     }
 
     #[getter]
-    pub fn get_cd_zero_angle(&self) -> f64 {
-        self.data.cd_zero_angle
+    pub fn get_cd_min(&self) -> f64 {
+        self.data.cd_min
     }
 
     #[setter]
-    pub fn set_cd_zero_angle(&mut self, value: f64) {
-        self.data.cd_zero_angle = value;
+    pub fn set_cd_min(&mut self, value: f64) {
+        self.data.cd_min = value;
+    }
+
+    #[getter]
+    pub fn get_angle_cd_min(&self) -> f64 {
+        self.data.angle_cd_min
+    }
+
+    #[setter]
+    pub fn set_angle_cd_min(&mut self, value: f64) {
+        self.data.angle_cd_min = value;
     }
 
     #[getter]

@@ -42,7 +42,7 @@ impl PrescribedCirculationShape {
 }
 
 impl LineForceModel {
-    fn effective_span_distance_for_prescribed_circulations(&self) -> Vec<f64> {
+    pub fn effective_span_distance_for_prescribed_circulations(&self) -> Vec<f64> {
         let relative_span_distance = self.relative_span_distance();
 
         relative_span_distance.iter().enumerate().map(

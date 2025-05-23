@@ -4,6 +4,7 @@
 
 pub mod prescribed_circulation;
 pub mod smoothing;
+pub mod elliptic_end_correction;
 
 use serde::{Serialize, Deserialize};
 
@@ -23,6 +24,9 @@ pub enum CirculationCorrection {
     GaussianSmoothing(GaussianSmoothing),
     /// Polynomial smoothing of the estimated circulation distribution.
     PolynomialSmoothing,
+    /// Correct the ends of the circulation distribution based on an assumption of an elliptical
+    /// circulation distribution.
+    EllipticEndCorrection,
 }
 
 impl Default for CirculationCorrection {

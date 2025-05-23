@@ -110,6 +110,11 @@ impl LineForceModel {
                 let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
 
                 self.polynomial_smoothed_values(&raw_strength)
+            },
+            CirculationCorrection::EllipticEndCorrection => {
+                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+
+                self.apply_elliptic_end_correction_to_strength(&raw_strength)
             }
         }
     }

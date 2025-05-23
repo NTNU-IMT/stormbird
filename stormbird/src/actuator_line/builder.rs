@@ -22,6 +22,8 @@ pub struct ActuatorLineBuilder {
     pub controller: Option<ControllerBuilder>,
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
     pub write_iterations_full_result: usize,
+    #[serde(default)]
+    pub extrapolate_end_velocities: bool,
 }
 
 impl ActuatorLineBuilder {
@@ -34,6 +36,7 @@ impl ActuatorLineBuilder {
             solver_settings: SolverSettings::default(),
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
+            extrapolate_end_velocities: false,
         }
     }
 
@@ -58,6 +61,7 @@ impl ActuatorLineBuilder {
             controller,
             current_iteration: 0,
             write_iterations_full_result: self.write_iterations_full_result,
+            extrapolate_end_velocities: self.extrapolate_end_velocities,
         }
     }
 }

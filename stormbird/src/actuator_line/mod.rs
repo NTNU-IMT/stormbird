@@ -54,6 +54,9 @@ pub struct ActuatorLine {
     pub current_iteration: usize,
     /// The number of iterations between each time a full simualtion result is written to file
     pub write_iterations_full_result: usize,
+    /// Option to compute alternative end-velocity values for the line force model, to handle 
+    /// situations where the end values are noisy, while the interior values are not.
+    pub extrapolate_end_velocities: bool,
 }
 
 impl ActuatorLine {
@@ -70,6 +73,24 @@ impl ActuatorLine {
         let builder: ActuatorLineBuilder = serde_json::from_str(builder_string).unwrap();
 
         builder.build()
+    }
+
+    pub fn correct_end_velocities_through_extrapolation(&mut self) {
+        for wing_index in 0..self.line_force_model.nr_wings() {
+            let first_line_index = self.line_force_model.wing_indices[wing_index].start;
+            let second_line_index = first_line_index + 1;
+            let third_line_index = second_line_index + 1;
+
+            let last_line_index = self.line_force_model.wing_indices[wing_index].end - 1;
+            let second_to_last_line_index = last_line_index - 1;
+            let third_to_last_line_index = second_to_last_line_index - 1;
+
+            let first_delta_velocity = self.ctrl_points_velocity[second_line_index] - self.ctrl_points_velocity[third_line_index];
+            let last_delta_velocity = self.ctrl_points_velocity[second_to_last_line_index] - self.ctrl_points_velocity[third_to_last_line_index];
+
+            self.ctrl_points_velocity[first_line_index] = self.ctrl_points_velocity[second_line_index] + first_delta_velocity;
+            self.ctrl_points_velocity[last_line_index] = self.ctrl_points_velocity[second_to_last_line_index] + last_delta_velocity;
+        }
     }
 
     /// Function used to query the actuator line model for the weighted velocity integral term for
@@ -110,6 +131,10 @@ impl ActuatorLine {
     }
 
     pub fn do_step(&mut self, time: f64, time_step: f64){
+        if self.extrapolate_end_velocities {
+            self.correct_end_velocities_through_extrapolation();
+        }
+        
         let solver_result = self.solve(&self.ctrl_points_velocity);
 
         let simulation_result = self.line_force_model.calculate_simulation_result(
