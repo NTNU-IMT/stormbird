@@ -66,11 +66,11 @@ namespace Foam {
 
             // Parameters for the sampling and projection
             // TODO: make these parameters available in the input file
-            bool use_integral_velocity_sampling = false;
+            bool use_integral_velocity_sampling = true;
             bool only_use_dominating_line_element_when_sampling = true;
             bool only_use_dominating_line_element_when_projecting = true;
-            double projection_limit = 0.1;
-            double sampling_integral_limit = 0.1;
+            double projection_limit = 0.001;
+            double sampling_integral_limit = 0.001;
 
             // Switch to determine if the OpenFOAM data needs to be updated, due to changes in the 
             // actuator line model
