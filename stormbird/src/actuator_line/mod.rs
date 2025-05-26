@@ -46,6 +46,8 @@ pub struct ActuatorLine {
     pub sampling_settings: SamplingSettings,
     /// Dynamic optimizer that can be optionally used to optimize the settings in the model
     pub controller: Option<Controller>,
+    /// The iteration to start solving
+    pub start_iteration: usize,
     /// The current iteration of the simulation
     pub current_iteration: usize,
     /// The number of iterations between each time a full simulation result is written to file
@@ -133,56 +135,62 @@ impl ActuatorLine {
     }
 
     pub fn do_step(&mut self, time: f64, time_step: f64){
-        if self.extrapolate_end_velocities {
-            self.correct_end_velocities_through_extrapolation();
+        if self.current_iteration >= self.start_iteration {
+            if self.extrapolate_end_velocities {
+                self.correct_end_velocities_through_extrapolation();
+            }
+            
+            let solver_result = self.solve(&self.ctrl_points_velocity);
+
+            let simulation_result = self.line_force_model.calculate_simulation_result(
+                &solver_result, 
+                time, 
+                time_step
+            );
+
+            //self.line_force_model.update_flow_derivatives(&result);
+
+            self.simulation_result = Some(simulation_result);
         }
-        
-        let solver_result = self.solve(&self.ctrl_points_velocity);
-
-        let simulation_result = self.line_force_model.calculate_simulation_result(
-            &solver_result, 
-            time, 
-            time_step
-        );
-
-        //self.line_force_model.update_flow_derivatives(&result);
-
-        self.simulation_result = Some(simulation_result);
         
         self.current_iteration += 1;
     }
 
     pub fn update_controller(&mut self, time_step: f64) -> bool {
-        let controller_output = if let Some(controller) = &mut self.controller {
-            let model_state = self.line_force_model.model_state();
+        if self.current_iteration >= self.start_iteration {
+            let controller_output = if let Some(controller) = &mut self.controller {
+                let model_state = self.line_force_model.model_state();
 
-            let simulation_result = self.simulation_result.as_ref().unwrap();
-            
-            controller.update(time_step, &model_state, simulation_result)
+                let simulation_result = self.simulation_result.as_ref().unwrap();
+                
+                controller.update(time_step, &model_state, simulation_result)
+            } else {
+                None
+            };
+
+            let mut need_update = false;
+
+            if let Some(controller_output) = controller_output {
+                if let Some(new_angles) = controller_output.local_wing_angles {
+                    self.line_force_model.local_wing_angles = new_angles;
+                }
+                
+                if let Some(new_internal_states) = controller_output.section_models_internal_state {
+                    self.line_force_model.set_section_models_internal_state(&new_internal_states);
+                }
+
+                need_update = true;
+
+                let new_model_state = self.line_force_model.model_state();
+
+                new_model_state.write_to_csv_file("model_state.csv");
+
+            }
+
+            need_update
         } else {
-            None
-        };
-
-        let mut need_update = false;
-
-        if let Some(controller_output) = controller_output {
-            if let Some(new_angles) = controller_output.local_wing_angles {
-                self.line_force_model.local_wing_angles = new_angles;
-            }
-            
-            if let Some(new_internal_states) = controller_output.section_models_internal_state {
-                self.line_force_model.set_section_models_internal_state(&new_internal_states);
-            }
-
-            need_update = true;
-
-            let new_model_state = self.line_force_model.model_state();
-
-            new_model_state.write_to_csv_file("model_state.csv");
-
+            false
         }
-
-        need_update
     }
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation

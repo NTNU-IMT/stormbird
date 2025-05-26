@@ -26,6 +26,8 @@ pub struct ActuatorLineBuilder {
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
     pub write_iterations_full_result: usize,
     #[serde(default)]
+    pub start_iteration: usize,
+    #[serde(default)]
     pub extrapolate_end_velocities: bool,
 }
 
@@ -40,6 +42,7 @@ impl ActuatorLineBuilder {
             sampling_settings: SamplingSettings::default(),
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
+            start_iteration: 0,
             extrapolate_end_velocities: false,
         }
     }
@@ -64,6 +67,7 @@ impl ActuatorLineBuilder {
             solver_settings: self.solver_settings.clone(),
             sampling_settings: self.sampling_settings.clone(),
             controller,
+            start_iteration: self.start_iteration,
             current_iteration: 0,
             write_iterations_full_result: self.write_iterations_full_result,
             extrapolate_end_velocities: self.extrapolate_end_velocities,
