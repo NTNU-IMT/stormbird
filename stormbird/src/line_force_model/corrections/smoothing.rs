@@ -19,7 +19,7 @@ pub struct GaussianSmoothing {
     /// The actual smoothing length is calculated as the length factor times the wing span.
     pub length_factor: f64,
     #[serde(default)]
-    /// Option to only do intertior smoothing.
+    /// Option to only do interior smoothing.
     pub interior_only: bool,
 }
 

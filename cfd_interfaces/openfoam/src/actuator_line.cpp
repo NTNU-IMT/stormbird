@@ -148,6 +148,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
         
         this->model->write_results();
     }
+    reduce(this->need_update, orOp<bool>());
 
     forAll(cell_ids, i) {
         label cell_id = cell_ids[i];
@@ -172,8 +173,6 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
 
         this->body_force_field[0][cell_id] = body_force / cell_volumes[cell_id];
     }
-
-    reduce(this->need_update, orOp<bool>());
 }
 
 void Foam::fv::ActuatorLine::addSup(

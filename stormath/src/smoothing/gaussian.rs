@@ -16,6 +16,8 @@ pub struct GaussianSmoothing {
 }
 
 impl GaussianSmoothing {
+    /// Returns the number of end-insertions, which is either the user specified value, if present,
+    /// or a default calculation based on the smoothing length
     pub fn number_of_end_insertions(&self, x: &[f64]) -> usize {
         let dx = x[1] - x[0];
 
@@ -39,7 +41,8 @@ impl GaussianSmoothing {
 
         let x_modified = EndCondition::add_end_values_to_x_data(
             x, 
-            number_of_end_insertions
+            number_of_end_insertions,
+            self.end_conditions
         );
 
         let y_modified = EndCondition::add_end_values_to_y_data(

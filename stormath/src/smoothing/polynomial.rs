@@ -57,7 +57,9 @@ impl CubicPolynomialSmoothing {
         let window_offset = self.window_size.window_offset();
         let number_of_end_insertions = window_offset;
 
-        let y_modified = EndCondition::add_end_values_to_y_data(y, number_of_end_insertions, self.end_conditions);
+        let y_modified = EndCondition::add_end_values_to_y_data(
+            y, number_of_end_insertions, self.end_conditions
+        );
 
         let weights = self.window_size.weights();
         let normalization = self.window_size.normalization();

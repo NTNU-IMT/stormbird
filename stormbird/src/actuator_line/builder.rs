@@ -6,8 +6,9 @@ use serde::{Serialize, Deserialize};
 use stormath::spatial_vector::SpatialVector;
 
 use super::projection::Projection;
-use super::SolverSettings;
+use super::settings::*;
 use super::ActuatorLine;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -18,6 +19,8 @@ pub struct ActuatorLineBuilder {
     pub projection: Projection,
     #[serde(default)]
     pub solver_settings: SolverSettings,
+    #[serde(default)]
+    pub sampling_settings: SamplingSettings,
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
@@ -34,6 +37,7 @@ impl ActuatorLineBuilder {
             line_force_model,
             projection: Projection::default(),
             solver_settings: SolverSettings::default(),
+            sampling_settings: SamplingSettings::default(),
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
             extrapolate_end_velocities: false,
@@ -58,6 +62,7 @@ impl ActuatorLineBuilder {
             ctrl_points_velocity: vec![SpatialVector::<3>::default(); nr_span_lines],
             simulation_result: None,
             solver_settings: self.solver_settings.clone(),
+            sampling_settings: self.sampling_settings.clone(),
             controller,
             current_iteration: 0,
             write_iterations_full_result: self.write_iterations_full_result,

@@ -20,7 +20,11 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
     
     const labelList& cell_ids = cells();
 
+    this->relevant_cells_for_velocity_sampling.clear();
+    this->dominating_line_element_index_sampling.clear();
+
     this->relevant_cells_for_velocity_sampling = labelList();
+    this->dominating_line_element_index_sampling = labelList();
 
     forAll(cell_ids, i) {
         label cell_id = cell_ids[i];
@@ -107,7 +111,7 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
         if (this->only_use_dominating_line_element_when_sampling) {
             auto line_index = this->dominating_line_element_index_sampling[i];
             
-            std::array<double, 4> temp_out = this->model->get_weighted_velocity_integral_terms_for_cell(
+            std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
                 line_index,
                 velocity,
                 cell_center,
@@ -121,7 +125,7 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
 
         } else {
             for (int line_index = 0; line_index < nr_span_lines; line_index++) {
-                std::array<double, 4> temp_out = this->model->get_weighted_velocity_integral_terms_for_cell(
+                std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
                     line_index,
                     velocity,
                     cell_center,

@@ -9,8 +9,9 @@ use std::path::Path;
 
 pub mod projection;
 pub mod builder;
+pub mod settings;
 
-use serde::{Serialize, Deserialize};
+
 
 use stormath::smoothing::gaussian::gaussian_kernel;
 
@@ -18,20 +19,13 @@ use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
 
 use crate::common_utils::prelude::*;
-
 use crate::controllers::Controller;
 
 use crate::io_utils;
 
 use projection::Projection;
 use builder::ActuatorLineBuilder;
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SolverSettings {
-    #[serde(default)]
-    pub strength_damping: f64,
-}
+use settings::*;
 
 #[derive(Debug, Clone)]
 /// Structure for representing an actuator line model. 
@@ -46,13 +40,15 @@ pub struct ActuatorLine {
     pub ctrl_points_velocity: Vec<SpatialVector<3>>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
-    /// Numerical settings
+    /// Settings for the solver
     pub solver_settings: SolverSettings,
+    /// Settings for the velocity sampling
+    pub sampling_settings: SamplingSettings,
     /// Dynamic optimizer that can be optionally used to optimize the settings in the model
     pub controller: Option<Controller>,
     /// The current iteration of the simulation
     pub current_iteration: usize,
-    /// The number of iterations between each time a full simualtion result is written to file
+    /// The number of iterations between each time a full simulation result is written to file
     pub write_iterations_full_result: usize,
     /// Option to compute alternative end-velocity values for the line force model, to handle 
     /// situations where the end values are noisy, while the interior values are not.
@@ -94,8 +90,9 @@ impl ActuatorLine {
     }
 
     /// Function used to query the actuator line model for the weighted velocity integral term for
-    /// a given cell. This is used to compute the body force in the CFD simulation.
-    pub fn get_weighted_velocity_integral_terms_for_cell(
+    /// a given cell. This is used when estimating the velocity at control points using the integral 
+    /// method.
+    pub fn get_weighted_velocity_sampling_integral_terms_for_cell(
         &self, 
         line_index: usize, 
         velocity: SpatialVector<3>, 
@@ -112,13 +109,18 @@ impl ActuatorLine {
         let projection_value = if projection_value_org > 0.0 {
             let line_coordinates = span_line.line_coordinates(cell_center, chord_vector);
             
-            // TODO: check if this is necessary
-            let span_projection = gaussian_kernel(
-                line_coordinates.span, 
-                0.0, 
-                0.5 * span_line.length()
-            );
-
+            let span_projection = if self.sampling_settings.neglect_span_projection {
+                1.0
+            } else {
+                let span_smoothing_length = self.sampling_settings.span_projection_factor * span_line.length();
+            
+                gaussian_kernel(
+                    line_coordinates.span, 
+                    0.0, 
+                    span_smoothing_length
+                )
+            };
+            
             projection_value_org * span_projection
         } else {
             0.0
@@ -271,13 +273,17 @@ impl ActuatorLine {
     pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector<3>) -> Vec<f64> {
         let span_lines = self.line_force_model.span_lines();
         let chord_vectors = self.line_force_model.global_chord_vectors();
-
+        
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 
         for i in 0..self.line_force_model.nr_span_lines() {
-            projection_values.push(self.projection.projection_value_at_point(
-                point, chord_vectors[i], &span_lines[i]
-            ));
+            projection_values.push(
+                self.projection.projection_value_at_point(
+                    point, 
+                    chord_vectors[i], 
+                    &span_lines[i]
+                )
+            );
         }
 
         projection_values

@@ -24,7 +24,7 @@ mod ffi {
 
         fn get_ctrl_point_at_index(&self, index: usize) -> [f64; 3];
 
-        fn get_weighted_velocity_integral_terms_for_cell(
+        fn get_weighted_velocity_sampling_integral_terms_for_cell(
             &self,
             line_index: usize,
             velocity: &[f64; 3],
@@ -88,14 +88,14 @@ impl CppActuatorLine {
         self.model.line_force_model.local_wing_angles[index] = angle;
     }
 
-    fn get_weighted_velocity_integral_terms_for_cell(
+    fn get_weighted_velocity_sampling_integral_terms_for_cell(
         &self,
         line_index: usize,
         velocity: &[f64; 3],
         cell_center: &[f64; 3],
         cell_volume: f64,
     ) -> [f64; 4] {
-        let (numerator, denominator) = self.model.get_weighted_velocity_integral_terms_for_cell(
+        let (numerator, denominator) = self.model.get_weighted_velocity_sampling_integral_terms_for_cell(
             line_index, SpatialVector::<3>::from(*velocity), SpatialVector::<3>::from(*cell_center), cell_volume
         );
 
