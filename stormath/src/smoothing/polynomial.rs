@@ -43,14 +43,13 @@ impl WindowSize {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct CubicPolynomialSmoothing {
+pub struct CubicPolynomialSmoothing<T: SmoothingOps> {
     pub window_size: WindowSize,
-    pub end_conditions: [EndCondition; 2]
+    pub end_conditions: [EndCondition<T>; 2]
 }
 
-impl CubicPolynomialSmoothing {
-    pub fn apply_smoothing<T>(&self, y: &[T]) -> Vec<T>
-    where T: SmoothingOps
+impl<T: SmoothingOps> CubicPolynomialSmoothing<T> {
+    pub fn apply_smoothing(&self, y: &[T]) -> Vec<T>
     {
         let n = y.len();
 

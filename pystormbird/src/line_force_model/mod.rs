@@ -14,7 +14,10 @@ use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
-use stormbird::line_force_model::corrections::smoothing::GaussianSmoothing;
+use stormbird::line_force_model::corrections::smoothing::{
+    ValueTypeToBeSmoothed,
+    GaussianSmoothing
+};
 
 #[pyclass]
 #[derive(Clone)]
@@ -63,7 +66,11 @@ impl LineForceModel {
             ..Default::default()
         };
 
-        self.data.gaussian_smoothed_values(&noisy_strength, &settings)
+        self.data.gaussian_smoothed_values(
+            &noisy_strength, 
+            &settings, 
+            ValueTypeToBeSmoothed::Circulation
+        )
     }
 
     #[getter]

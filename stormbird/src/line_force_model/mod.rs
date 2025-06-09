@@ -35,7 +35,10 @@ use crate::controllers::LineForceModelState;
 
 use self::rigid_body_motion::RigidBodyMotion;
 
-use corrections::CirculationCorrection;
+use corrections::{
+    circulation::CirculationCorrection,
+    angle_of_attack::AngleOfAttackCorrection,
+};
 use single_wing::SingleWing;
 use span_line::*;
 
@@ -71,8 +74,10 @@ pub struct LineForceModel {
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     /// Density used in force calculations
     pub density: f64,
-    /// Optional corrections that can be applied to the estimated circulation strength.
+    /// Optional correction that can be applied to the estimated circulation strength.
     pub circulation_correction: CirculationCorrection,
+    /// Optional correction for the angle of attack
+    pub angle_of_attack_correction: AngleOfAttackCorrection,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
 }
@@ -102,6 +107,7 @@ impl LineForceModel {
             non_zero_circulation_at_ends: Vec::new(),
             density,
             circulation_correction: Default::default(),
+            angle_of_attack_correction: Default::default(),
             output_coordinate_system: CoordinateSystem::Global
         }
     }

@@ -55,6 +55,8 @@ pub struct ActuatorLine {
     /// Option to compute alternative end-velocity values for the line force model, to handle 
     /// situations where the end values are noisy, while the interior values are not.
     pub extrapolate_end_velocities: bool,
+    /// Option to remove span velocity
+    pub remove_span_velocity: bool
 }
 
 impl ActuatorLine {
@@ -156,14 +158,14 @@ impl ActuatorLine {
         self.current_iteration += 1;
     }
 
-    pub fn update_controller(&mut self, time_step: f64) -> bool {
+    pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
         if self.current_iteration >= self.start_iteration {
             let controller_output = if let Some(controller) = &mut self.controller {
                 let model_state = self.line_force_model.model_state();
 
                 let simulation_result = self.simulation_result.as_ref().unwrap();
                 
-                controller.update(time_step, &model_state, simulation_result)
+                controller.update(time, time_step, &model_state, simulation_result)
             } else {
                 None
             };
@@ -196,8 +198,17 @@ impl ActuatorLine {
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
     pub fn solve(&self, ctrl_point_velocity: &[SpatialVector<3>]) -> SolverResult {
+        let used_ctrl_point_velocity = if self.remove_span_velocity {
+            self.line_force_model.remove_span_velocity(
+                ctrl_point_velocity, 
+                CoordinateSystem::Global
+            )
+        } else {
+            ctrl_point_velocity.to_vec()
+        };
+        
         let new_estimated_circulation_strength = self.line_force_model.circulation_strength(
-            &ctrl_point_velocity, CoordinateSystem::Global
+            &used_ctrl_point_velocity, CoordinateSystem::Global
         );
 
         let circulation_strength = if self.solver_settings.strength_damping > 0.0 {
@@ -217,13 +228,13 @@ impl ActuatorLine {
 
         let residual = self.line_force_model.average_residual_absolute(
             &circulation_strength, 
-            ctrl_point_velocity,
+            &used_ctrl_point_velocity,
             CoordinateSystem::Global
         );
 
         SolverResult {
             circulation_strength,
-            ctrl_point_velocity: ctrl_point_velocity.to_vec(),
+            ctrl_point_velocity: used_ctrl_point_velocity,
             iterations: 1,
             residual,
         }

@@ -8,7 +8,10 @@
 //! However, the interface is designed to be as unified as possible.
 
 use crate::lifting_line::prelude::*;
-use crate::line_force_model::corrections::CirculationCorrection;
+use crate::line_force_model::corrections::circulation::{
+    CirculationCorrection,
+    prescribed::PrescribedCirculationShape,
+};
 
 use super::simulation_builder::SimulationBuilder;
 

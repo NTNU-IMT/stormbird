@@ -14,7 +14,7 @@ use super::{
 };
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
-pub enum AngleMeasurmentType {
+pub enum AngleMeasurementType {
     Max,
     #[default]
     Mean
@@ -28,6 +28,8 @@ pub struct EffectiveAngleOfAttackControllerBuilder {
     #[serde(default = "EffectiveAngleOfAttackControllerBuilder::default_time_steps_between_updates")]
     pub time_steps_between_updates: usize,
     #[serde(default)]
+    pub start_time: f64,
+    #[serde(default)]
     pub max_rotational_speed: Option<f64>,
     #[serde(default)]
     pub moving_average_window_size: Option<usize>,
@@ -36,11 +38,11 @@ pub struct EffectiveAngleOfAttackControllerBuilder {
     #[serde(default = "EffectiveAngleOfAttackControllerBuilder::default_change_threshold")]
     pub change_threshold: f64,
     #[serde(default)]
-    pub angle_measurment_start_index: usize,
+    pub angle_measurement_start_index: usize,
     #[serde(default)]
-    pub angle_measurment_end_offset: usize,
+    pub angle_measurement_end_offset: usize,
     #[serde(default)]
-    pub angle_measurment_type: AngleMeasurmentType,
+    pub angle_measurement_type: AngleMeasurementType,
 }
 
 impl EffectiveAngleOfAttackControllerBuilder {
@@ -70,15 +72,16 @@ impl EffectiveAngleOfAttackControllerBuilder {
         EffectiveAngleOfAttackController {
             target_angles_of_attack: self.target_angles_of_attack.clone(),
             time_steps_between_updates: self.time_steps_between_updates,
+            start_time: self.start_time,
             update_factor: self.update_factor,
             change_threshold: self.change_threshold,
             max_rotational_speed: self.max_rotational_speed,
             angle_estimates,
             filters,
             time_step_index: 0,
-            angle_measurment_start_index: self.angle_measurment_start_index,
-            angle_measurment_end_offset: self.angle_measurment_end_offset,
-            angle_measurment_type: self.angle_measurment_type,
+            angle_measurement_start_index: self.angle_measurement_start_index,
+            angle_measurement_end_offset: self.angle_measurement_end_offset,
+            angle_measurement_type: self.angle_measurement_type,
         }
     }
 }
@@ -91,6 +94,8 @@ pub struct EffectiveAngleOfAttackController {
     pub target_angles_of_attack: Vec<f64>,
     /// How often to update the angles of attack
     pub time_steps_between_updates: usize,
+    /// The time to start moving the sails
+    pub start_time: f64,
     /// A factor controlling how quickly the angles of attack are updated
     pub update_factor: f64,
     /// Minimum error in angle of attack that will cause the wing angles to change
@@ -104,11 +109,11 @@ pub struct EffectiveAngleOfAttackController {
     /// Index to keep track of the number of time steps
     pub time_step_index: usize,
     /// At which index to start the angle measurements
-    pub angle_measurment_start_index: usize,
+    pub angle_measurement_start_index: usize,
     /// An offset used to compute the final index of the angle measurements
-    pub angle_measurment_end_offset: usize,
+    pub angle_measurement_end_offset: usize,
     /// The type of angle measurement to use
-    pub angle_measurment_type: AngleMeasurmentType,
+    pub angle_measurement_type: AngleMeasurementType,
 }
 
 impl EffectiveAngleOfAttackController {
@@ -129,14 +134,14 @@ impl EffectiveAngleOfAttackController {
             let wing_angles_of_attack = simulation_result.angles_of_attack_for_wing(i);
             let nr_strips = wing_angles_of_attack.len();
 
-            let start_index = self.angle_measurment_start_index;
-            let end_index = (nr_strips - self.angle_measurment_end_offset - 1).max(start_index+1).min(nr_strips-1);
+            let start_index = self.angle_measurement_start_index;
+            let end_index = (nr_strips - self.angle_measurement_end_offset - 1).max(start_index+1).min(nr_strips-1);
 
-            angles_of_attack[i] = match self.angle_measurment_type {
-                AngleMeasurmentType::Mean => statistics::mean(
+            angles_of_attack[i] = match self.angle_measurement_type {
+                AngleMeasurementType::Mean => statistics::mean(
                     &wing_angles_of_attack[start_index..end_index]
                 ),
-                AngleMeasurmentType::Max => {
+                AngleMeasurementType::Max => {
                     if self.target_angles_of_attack[i] > 0.0 {
                         statistics::max(
                             &wing_angles_of_attack[start_index..end_index]
@@ -155,6 +160,7 @@ impl EffectiveAngleOfAttackController {
 
     pub fn update(
         &mut self, 
+        time: f64,
         time_step: f64, 
         model_state: &LineForceModelState, 
         simulation_result: &SimulationResult
@@ -167,10 +173,11 @@ impl EffectiveAngleOfAttackController {
 
         self.write_angle_data_to_file(&angle_measurements);
 
+        let initialization_done = time >= self.start_time;
         let time_to_update =  self.time_step_index % self.time_steps_between_updates == 0;
         let first_time_step = self.time_step_index == 1;
 
-        if first_time_step || time_to_update {
+        if first_time_step || (time_to_update && initialization_done) {
             let new_local_wing_angles = self.compute_new_local_wing_angles(
                 time_step,
                 model_state,

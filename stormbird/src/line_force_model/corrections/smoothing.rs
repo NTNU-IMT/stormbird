@@ -6,10 +6,11 @@
 
 use serde::{Serialize, Deserialize};
 
+use crate::line_force_model::LineForceModel;
+use crate::section_models::SectionModel;
+
 use stormath::smoothing;
 use stormath::smoothing::end_condition::EndCondition;
-
-use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,7 +21,7 @@ pub struct GaussianSmoothing {
     pub length_factor: f64,
     #[serde(default)]
     /// Option to only do interior smoothing.
-    pub interior_only: bool,
+    pub number_of_end_points_to_interpolate: usize,
 }
 
 impl GaussianSmoothing {
@@ -31,34 +32,63 @@ impl Default for GaussianSmoothing {
     fn default() -> Self {
         Self {
             length_factor: Self::default_length_factor(),
-            interior_only: false,
+            number_of_end_points_to_interpolate: 0,
         }
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ValueTypeToBeSmoothed {
+    Circulation,
+    AngleOfAttack,
+}
+
 impl LineForceModel {
-    pub fn smoothing_end_conditions(&self, wing_index: usize) -> [EndCondition; 2] {
+    pub fn smoothing_end_conditions(
+        &self, 
+        wing_index: usize, 
+        value_type_to_be_smoothed: ValueTypeToBeSmoothed
+    ) -> [EndCondition<f64>; 2] {
         let non_zero_circulation_at_ends = self.non_zero_circulation_at_ends[wing_index];
 
-        let first_end_condition = if non_zero_circulation_at_ends[0] {
-            EndCondition::ExtendedValues
-        } else {
-            EndCondition::ZeroValues
+        let alpha_zero = match value_type_to_be_smoothed {
+            ValueTypeToBeSmoothed::AngleOfAttack => {
+                let section_model = &self.section_models[wing_index];
+
+                match section_model {
+                    SectionModel::Foil(foil) => -foil.cl_zero_angle / foil.cl_initial_slope,
+                    SectionModel::VaryingFoil(foil) => {
+                        let current_foil = foil.get_foil();
+
+                        -current_foil.cl_zero_angle / current_foil.cl_initial_slope
+                    },
+                    SectionModel::RotatingCylinder(_) => 0.0
+                }
+            },
+            ValueTypeToBeSmoothed::Circulation => 0.0
         };
 
-        let second_end_condition = if non_zero_circulation_at_ends[1] {
-            EndCondition::ExtendedValues
-        } else {
-            EndCondition::ZeroValues
-        };
+        let mut end_conditions = [EndCondition::Extended, EndCondition::Extended];
 
-        [first_end_condition, second_end_condition]
+        for i in 0..2 {
+            end_conditions[i] = if non_zero_circulation_at_ends[i] {
+                EndCondition::Extended
+            } else {
+                match value_type_to_be_smoothed {
+                    ValueTypeToBeSmoothed::Circulation => EndCondition::Zero,
+                    ValueTypeToBeSmoothed::AngleOfAttack => EndCondition::Given(alpha_zero)
+                }
+            };
+        }
+        
+        end_conditions
     }
     /// Function that applies a Gaussian smoothing to the supplied strength vector.
     pub fn gaussian_smoothed_values(
         &self, 
         noisy_values: &[f64],
         settings: &GaussianSmoothing,
+        value_type_to_be_smoothed: ValueTypeToBeSmoothed,
     ) -> Vec<f64> {
         if settings.length_factor <= 0.0 {
             return noisy_values.to_vec();
@@ -73,55 +103,45 @@ impl LineForceModel {
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let smoothing_length = settings.length_factor * wing_span_lengths[wing_index];
 
-            let end_conditions = self.smoothing_end_conditions(wing_index);
+            let end_conditions = self.smoothing_end_conditions(
+                wing_index, value_type_to_be_smoothed
+            );
 
             let local_span_distance = span_distance[wing_indices.clone()].to_vec();
             let local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 
             let gaussian_smoothing = smoothing::gaussian::GaussianSmoothing {
                 smoothing_length,
+                number_of_end_insertions: None,
                 end_conditions,
-                number_of_end_insertions: None
+                delta_x_factor_end_insertions: 0.5,
+                number_of_end_points_to_interpolate: settings.number_of_end_points_to_interpolate
             };
 
-            let raw_wing_smoothed_values = gaussian_smoothing.apply_smoothing(
+            let wing_smoothed_values = gaussian_smoothing.apply_smoothing(
                 &local_span_distance, 
                 &local_noisy_values, 
             );
-
-            let start_index = if settings.interior_only {
-                1
-            } else {
-                0
-            };
-
-            let end_index = if settings.interior_only {
-                raw_wing_smoothed_values.len() - 1
-            } else {
-                raw_wing_smoothed_values.len()
-            };
-
-            if settings.interior_only {
-                smoothed_values.push(noisy_values[0]);
-            }
             
-            for index in start_index..end_index {
-                smoothed_values.push(raw_wing_smoothed_values[index]);
-            }
-
-            if settings.interior_only {
-                smoothed_values.push(noisy_values[noisy_values.len() - 1]);
+            for index in 0..wing_smoothed_values.len() {
+                smoothed_values.push(wing_smoothed_values[index]);
             }
         }
 
         smoothed_values
     }
 
-    pub fn polynomial_smoothed_values(&self, noisy_values: &[f64]) -> Vec<f64> {
+    pub fn polynomial_smoothed_values(
+        &self, 
+        noisy_values: &[f64], 
+        value_type_to_be_smoothed: ValueTypeToBeSmoothed
+    ) -> Vec<f64> {
         let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
 
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
-            let end_conditions = self.smoothing_end_conditions(wing_index);
+            let end_conditions = self.smoothing_end_conditions(
+                wing_index, value_type_to_be_smoothed
+            );
 
             let local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
 

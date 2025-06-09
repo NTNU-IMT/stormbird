@@ -29,6 +29,8 @@ pub struct ActuatorLineBuilder {
     pub start_iteration: usize,
     #[serde(default)]
     pub extrapolate_end_velocities: bool,
+    #[serde(default)]
+    pub remove_span_velocity: bool
 }
 
 impl ActuatorLineBuilder {
@@ -44,6 +46,7 @@ impl ActuatorLineBuilder {
             write_iterations_full_result: Self::default_write_iterations_full_result(),
             start_iteration: 0,
             extrapolate_end_velocities: false,
+            remove_span_velocity: false
         }
     }
 
@@ -71,6 +74,7 @@ impl ActuatorLineBuilder {
             current_iteration: 0,
             write_iterations_full_result: self.write_iterations_full_result,
             extrapolate_end_velocities: self.extrapolate_end_velocities,
+            remove_span_velocity: self.remove_span_velocity
         }
     }
 }

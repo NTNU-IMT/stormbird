@@ -79,10 +79,16 @@ pub enum Controller {
 
 
 impl Controller {
-    pub fn update(&mut self, time_step: f64, model_state: &LineForceModelState, simulation_result: &SimulationResult) -> Option<ControllerOutput> {
+    pub fn update(
+        &mut self,
+        time: f64,
+        time_step: f64, 
+        model_state: &LineForceModelState, 
+        simulation_result: &SimulationResult
+    ) -> Option<ControllerOutput> {
         match self {
             Controller::EffectiveAngleOfAttack(optimizer) => {
-                optimizer.update(time_step, model_state, simulation_result)
+                optimizer.update(time, time_step, model_state, simulation_result)
             }
         }
     }

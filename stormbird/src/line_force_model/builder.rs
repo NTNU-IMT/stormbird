@@ -23,6 +23,8 @@ pub struct LineForceModelBuilder {
     #[serde(default)]
     pub circulation_correction: CirculationCorrection,
     #[serde(default)]
+    pub angle_of_attack_correction: AngleOfAttackCorrection,
+    #[serde(default)]
     pub output_coordinate_system: CoordinateSystem,
     #[serde(default)]
     pub rotation_type: RotationType,
@@ -41,6 +43,7 @@ impl LineForceModelBuilder {
             nr_sections,
             density: LineForceModel::default_density(),
             circulation_correction: Default::default(),
+            angle_of_attack_correction: Default::default(),
             output_coordinate_system: CoordinateSystem::Global,
             rotation_type: RotationType::XYZ,
             local_wing_angles: Vec::new(),
@@ -73,6 +76,8 @@ impl LineForceModelBuilder {
         }
 
         line_force_model.circulation_correction = self.circulation_correction.clone();
+        line_force_model.angle_of_attack_correction = self.angle_of_attack_correction.clone();
+        
         line_force_model.output_coordinate_system = self.output_coordinate_system;
 
         if self.local_wing_angles.len() > 0 {

@@ -14,7 +14,10 @@ use crate::lifting_line::simulation_builder::{
     SteadySettings,
     UnsteadySettings,
 };
-use crate::line_force_model::corrections::CirculationCorrection;
+use crate::line_force_model::corrections::circulation::{
+    CirculationCorrection,
+    prescribed::PrescribedCirculationShape
+};
 
 use super::test_setup::RectangularWing;
 use super::elliptic_wing_theory::EllipticWingTheory;

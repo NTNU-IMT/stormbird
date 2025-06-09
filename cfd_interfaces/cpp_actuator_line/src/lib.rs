@@ -38,7 +38,7 @@ mod ffi {
 
         // ---- Force methods ----        
         fn do_step(&mut self, time: f64, time_step: f64);
-        fn update_controller(&mut self, time_step: f64) -> bool;
+        fn update_controller(&mut self, time: f64, time_step: f64) -> bool;
 
         fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3];
         fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
@@ -114,8 +114,8 @@ impl CppActuatorLine {
         self.model.do_step(time, time_step)
     }
 
-    pub fn update_controller(&mut self, time_step: f64) -> bool {
-        self.model.update_controller(time_step)
+    pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
+        self.model.update_controller(time, time_step)
     }
 
     pub fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3] {

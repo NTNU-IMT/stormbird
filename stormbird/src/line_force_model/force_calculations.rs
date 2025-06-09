@@ -4,6 +4,8 @@
 
 use super::*;
 
+use super::corrections::smoothing::ValueTypeToBeSmoothed;
+
 /// This implementation block contains the functions that calculates the forces on line elements and
 /// on the wings. These are generally used as the last step in a simulation method using the
 /// line force model.
@@ -55,7 +57,16 @@ impl LineForceModel {
             )
         }).collect();
 
-        angles_of_attack
+        match &self.angle_of_attack_correction {
+            AngleOfAttackCorrection::None => angles_of_attack,
+            AngleOfAttackCorrection::GaussianSmoothing(settings) => {
+                self.gaussian_smoothed_values(
+                    &angles_of_attack, 
+                    &settings, 
+                    ValueTypeToBeSmoothed::AngleOfAttack
+                )
+            }
+        }
     }
 
     /// Returns the local lift coefficient on each line element.
@@ -98,21 +109,44 @@ impl LineForceModel {
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         match &self.circulation_correction {
-            CirculationCorrection::None => self.circulation_strength_raw(velocity, input_coordinate_system),
+            CirculationCorrection::None => self.circulation_strength_raw(
+                velocity, 
+                input_coordinate_system
+            ),
             CirculationCorrection::PrescribedCirculation(shape) =>
-                self.prescribed_circulation_strength(&velocity,&shape, input_coordinate_system),
+                self.prescribed_circulation_strength(
+                    &velocity,
+                    &shape, 
+                    input_coordinate_system
+                ),
             CirculationCorrection::GaussianSmoothing(settings) => {
-                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+                let raw_strength = self.circulation_strength_raw(
+                    velocity, 
+                    input_coordinate_system
+                );
 
-                self.gaussian_smoothed_values(&raw_strength, &settings)
+                self.gaussian_smoothed_values(
+                    &raw_strength, 
+                    &settings,
+                    ValueTypeToBeSmoothed::Circulation
+                )
             },
             CirculationCorrection::PolynomialSmoothing => {
-                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+                let raw_strength = self.circulation_strength_raw(
+                    velocity, 
+                    input_coordinate_system
+                );
 
-                self.polynomial_smoothed_values(&raw_strength)
+                self.polynomial_smoothed_values(
+                    &raw_strength,
+                    ValueTypeToBeSmoothed::Circulation
+                )
             },
             CirculationCorrection::EllipticEndCorrection => {
-                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+                let raw_strength = self.circulation_strength_raw(
+                    velocity, 
+                    input_coordinate_system
+                );
 
                 self.apply_elliptic_end_correction_to_strength(&raw_strength)
             }
