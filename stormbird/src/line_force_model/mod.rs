@@ -480,7 +480,14 @@ impl LineForceModel {
         internal_state
     }
 
-    /// General function for calculating wing-averaged values
+    /// General function for calculating wing-averaged values from a vector of sectional values.
+    /// 
+    /// # Arguments
+    /// * `sectional_values` - A vector of values for each section of the wings
+    /// 
+    /// # Returns
+    /// A vector of wing-averaged values, where each value corresponds to a wing in the model.
+    /// The values are calculated by averaging the sectional values for each wing.
     pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T>
     where
         T: std::ops::Div<f64, Output = T> + std::ops::Add<T, Output = T> + Copy,

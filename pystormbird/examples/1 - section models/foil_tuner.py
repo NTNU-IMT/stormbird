@@ -27,7 +27,7 @@ class FoilTuner:
         self.model.stall_range = x[3]
 
     def set_cd_parameters(self, x):
-        self.model.cd_zero_angle = x[0]
+        self.model.cd_min = x[0]
         self.model.cd_second_order_factor = x[1]
         self.model.cd_power_after_stall = x[2]
         self.model.cd_max_after_stall = x[3]

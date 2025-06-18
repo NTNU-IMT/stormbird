@@ -93,7 +93,7 @@ impl LineForceModel {
         if settings.length_factor <= 0.0 {
             return noisy_values.to_vec();
         }
-
+        
         let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
 
         let wing_span_lengths = self.wing_span_lengths();

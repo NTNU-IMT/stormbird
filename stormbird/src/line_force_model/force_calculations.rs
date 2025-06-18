@@ -4,7 +4,10 @@
 
 use super::*;
 
-use super::corrections::smoothing::ValueTypeToBeSmoothed;
+use super::corrections::{
+    smoothing::ValueTypeToBeSmoothed,
+    circulation::prescribed::PrescribedCirculationShape,
+};
 
 /// This implementation block contains the functions that calculates the forces on line elements and
 /// on the wings. These are generally used as the last step in a simulation method using the
@@ -125,11 +128,29 @@ impl LineForceModel {
                     input_coordinate_system
                 );
 
-                self.gaussian_smoothed_values(
-                    &raw_strength, 
+                let ideal_shape = PrescribedCirculationShape::default();
+
+                let ideal_strength = self.prescribed_circulation_strength(
+                    &velocity,
+                    &ideal_shape, 
+                    input_coordinate_system
+                );
+
+                let subtracted_raw_strength: Vec<f64> = raw_strength.iter()
+                    .zip(ideal_strength.iter())
+                    .map(|(raw, ideal)| raw - ideal)
+                    .collect();
+
+                let smoothed_strength = self.gaussian_smoothed_values(
+                    &subtracted_raw_strength, 
                     &settings,
                     ValueTypeToBeSmoothed::Circulation
-                )
+                );
+
+                smoothed_strength.iter()
+                    .zip(ideal_strength.iter())
+                    .map(|(smoothed, ideal)| smoothed + ideal)
+                    .collect()
             },
             CirculationCorrection::PolynomialSmoothing => {
                 let raw_strength = self.circulation_strength_raw(

@@ -12,7 +12,7 @@ impl LineForceModel {
         &self,
         raw_strength: &[f64],
     ) -> Vec<f64> {
-        let effective_span_distance = self.effective_span_distance_for_prescribed_circulations();
+        let effective_span_distance = self.effective_relative_span_distance();
 
         let mut new_strength = raw_strength.to_vec();
 

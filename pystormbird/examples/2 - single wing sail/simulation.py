@@ -114,17 +114,15 @@ class SimulationCase():
 
         if self.smoothing_length is not None and not(self.prescribed_circulation):
             gaussian_smoothing = {
-                "length_factor": self.smoothing_length,
-                "end_corrections_delta_span_factor": 1.0,
-                "end_corrections_number_of_insertions": 3
+                "length_factor": self.smoothing_length
             }
 
-            line_force_model["circulation_corrections"] = {
+            line_force_model["circulation_correction"] = {
                 "GaussianSmoothing": gaussian_smoothing
             }
 
         if self.prescribed_circulation:
-            line_force_model["circulation_corrections"] = {
+            line_force_model["circulation_correction"] = {
                 "PrescribedCirculation": {
                     "inner_power": 2.5,
                     "outer_power": 0.2 # Note: The default also works ok. This Factor is tuned manually, based on manual comparison with a 'raw' simulation below stall.
@@ -162,8 +160,6 @@ class SimulationCase():
 
         match self.simulation_mode:
             case SimulationMode.DYNAMIC:
-                wake["strength_damping"] = "DirectFromStall"
-
                 wake["nr_panels_per_line_element"] = 200
                 wake["use_chord_direction"] = True
                 wake["first_panel_relative_length"] = 0.75

@@ -42,7 +42,8 @@ impl PrescribedCirculationShape {
 }
 
 impl LineForceModel {
-    pub fn effective_span_distance_for_prescribed_circulations(&self) -> Vec<f64> {
+    /// Returns the effective non-dimensional span distance values for each control point.
+    pub fn effective_relative_span_distance(&self) -> Vec<f64> {
         let relative_span_distance = self.relative_span_distance();
 
         relative_span_distance.iter().enumerate().map(
@@ -58,54 +59,79 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Returns a circulation distribution that is forced to follow a specific distribution shape.
+    /// Returns a circulation distribution that is forced to follow the specified distribution 
+    /// shape, but where the averaged value still is the same as what is calculated from the raw 
+    /// lifting line theory.
+    /// 
+    /// The shape is enforced on the circulation divided by the square of the velocity,
+    /// so that changes due to external velocity variations (e.g., velocity due to rotational 
+    /// motion, atmospheric boundary layer, interactions with a another structure, etc.) are taken 
+    /// into account.
+    /// 
+    /// # Arguments
+    /// * `velocity` - The velocity at the control points, used to calculate the circulation
+    /// * `prescribed_circulation` - The shape of the circulation distribution to be followed
+    /// * `input_coordinate_system` - The coordinate system in which the input velocity is given.
     pub fn prescribed_circulation_strength(
         &self, 
         velocity: &[SpatialVector<3>], 
         prescribed_circulation: &PrescribedCirculationShape, 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
-        // Assume that the average velocity over the wing is representative for the velocity at all control points
-        let wing_averaged_velocity = self.wing_averaged_values(velocity);
 
-        let circulation_input_velocity = self.section_values_from_wing_values(&wing_averaged_velocity);
+        let raw_circulation_strength = self.circulation_strength_raw(
+            velocity, 
+            input_coordinate_system
+        );
 
-        // Calculate the circulation strength based on the assumed representative velocity
-        let raw_circulation_strength = self.circulation_strength_raw(&circulation_input_velocity, input_coordinate_system);
+        let velocity_squared: Vec<f64> = velocity.iter().map(
+            |v| v.length_squared()
+        ).collect();
 
-        // Calculate a circulation distribution that follows the prescribed shape
-        let effective_span_distance = self.effective_span_distance_for_prescribed_circulations();
+        let mut gamma_divided_by_u2 = Vec::with_capacity(raw_circulation_strength.len());
 
-        let prescribed_circulation_non_scaled = prescribed_circulation.get_values(&effective_span_distance);
-        
-        let wing_averaged_prescribed_circulation_non_scaled = self.wing_averaged_values(&prescribed_circulation_non_scaled);
+        for i in 0..raw_circulation_strength.len() {
+            if velocity_squared[i] < f64::MIN_POSITIVE {
+                gamma_divided_by_u2.push(0.0);
+            } else {
+                gamma_divided_by_u2.push(raw_circulation_strength[i] / velocity_squared[i]);
+            }
+        }
 
-        // Scale the prescribed circulation to match the total circulation calculated based on the average velocity
-        prescribed_circulation_non_scaled
-            .iter()
-            .enumerate()
-            .map(
-                |(i, value)| {
-                    let wing_index = self.wing_index_from_global(i);
+        let averaged_gamma_divided_by_u2 = self.wing_averaged_values(
+            &gamma_divided_by_u2
+        );
 
-                    let circulation_input_velocity_length_squared = circulation_input_velocity[i].length_squared();
+        let effective_relative_span_distance = self.effective_relative_span_distance();
 
-                    let velocity_correction = if circulation_input_velocity_length_squared == 0.0 {
-                        1.0
-                    } else {
-                        wing_averaged_velocity[wing_index].length_squared() / circulation_input_velocity_length_squared
-                    };
+        let prescribed_circulation_shape = prescribed_circulation.get_values(
+            &effective_relative_span_distance
+        );
 
-                    if wing_averaged_prescribed_circulation_non_scaled[wing_index] == 0.0 {
-                        0.0
-                    } else {
-                        let prescribed_circulation_shape = value / wing_averaged_prescribed_circulation_non_scaled[wing_index];
+        let averaged_prescribed_circulation_shape = self.wing_averaged_values(
+            &prescribed_circulation_shape
+        );
 
-                        raw_circulation_strength[i] * prescribed_circulation_shape * velocity_correction
-                    }
-                }
+        let mut out: Vec<f64> = Vec::with_capacity(raw_circulation_strength.len());
+
+        for i in 0..raw_circulation_strength.len() {
+            let wing_index = self.wing_index_from_global(i);
+
+            let factor = if averaged_prescribed_circulation_shape[wing_index] == 0.0 {
+                0.0
+            } else {
+                averaged_gamma_divided_by_u2[wing_index] / 
+                averaged_prescribed_circulation_shape[wing_index]
+            };
+
+            out.push(
+                factor * 
+                prescribed_circulation_shape[i] * 
+                velocity_squared[i]
             )
-            .collect()
+        }
+
+        out
     }
 }
 
