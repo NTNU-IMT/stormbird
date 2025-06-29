@@ -14,6 +14,11 @@ mod ffi {
 
         // ---- Constructors ----
         fn new_actuator_line_from_file(file_path: &str) -> *mut CppActuatorLine;
+
+        // ---- Settings accessors ----
+        fn use_point_sampling(&self) -> bool;
+        fn sampling_weight_limit(&self) -> f64;
+        fn projection_weight_limit(&self) -> f64;
         
         // ---- Setters and getters ----
         fn nr_span_lines(&self) -> usize;
@@ -40,7 +45,11 @@ mod ffi {
         fn do_step(&mut self, time: f64, time_step: f64);
         fn update_controller(&mut self, time: f64, time_step: f64) -> bool;
 
-        fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3];
+        fn force_to_project(
+            &self,
+            line_index: usize,
+            velocity: &[f64; 3]
+        ) -> [f64; 3];
         fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
         
         // ---- Export data ----
@@ -68,6 +77,18 @@ fn new_actuator_line_from_file(file_path: &str) -> *mut CppActuatorLine {
 }
 
 impl CppActuatorLine {
+    fn use_point_sampling(&self) -> bool {
+        self.model.sampling_settings.use_point_sampling
+    }
+
+    fn sampling_weight_limit(&self) -> f64 {
+        self.model.sampling_settings.weight_limit
+    }
+
+    fn projection_weight_limit(&self) -> f64 {
+        self.model.projection_settings.weight_limit
+    }
+
     fn nr_span_lines(&self) -> usize {
         self.model.line_force_model.nr_span_lines()
     }
@@ -118,8 +139,15 @@ impl CppActuatorLine {
         self.model.update_controller(time, time_step)
     }
 
-    pub fn distributed_body_force_at_point(&self, point: &[f64; 3]) -> [f64; 3] {
-        let body_force = self.model.distributed_body_force_at_point(SpatialVector::<3>::from(*point));
+    pub fn force_to_project(
+        &self,
+        line_index: usize,
+        velocity: &[f64; 3]
+    ) -> [f64; 3] {
+        let body_force = self.model.force_to_project(
+            line_index,
+            SpatialVector::<3>::from(*velocity)
+        );
 
         body_force.into()
     }

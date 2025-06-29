@@ -8,52 +8,42 @@ use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 
 pub mod gaussian;
-pub mod elliptic;
-pub mod harmonic;
-pub mod chord_variation_from_data;
 
 use gaussian::Gaussian;
-use elliptic::Elliptic;
-use harmonic::Harmonic;
-use chord_variation_from_data::ChordVariationFromData;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub enum Projection {
-    Gaussian(Gaussian),
-    Elliptic(Elliptic),
-    Harmonic(Harmonic),
-    ChordVariationFromData(ChordVariationFromData),
+pub struct ProjectionSettings {
+    #[serde(default)]
+    pub projection_function: Gaussian,
+    #[serde(default)]
+    pub project_normal_to_velocity: bool,
+    #[serde(default="ProjectionSettings::default_weight_limit")]
+    pub weight_limit: f64,
 }
 
-impl Default for Projection {
+impl Default for ProjectionSettings {
     fn default() -> Self {
-        Self::Gaussian(Gaussian::default())
+        Self {
+            projection_function: Gaussian::default(),
+            project_normal_to_velocity: false,
+            weight_limit: Self::default_weight_limit(),
+        }
     }
 }
 
 
-impl Projection {
+impl ProjectionSettings {
+    fn default_weight_limit() -> f64 {0.001}
+
     pub fn projection_value_at_point(
-        &self, point: SpatialVector<3>, 
+        &self, 
+        point: SpatialVector<3>, 
         chord_vector: SpatialVector<3>, 
         span_line: &SpanLine
     ) -> f64 {
-        match self {
-            Self::Gaussian(gaussian) => gaussian.clone().projection_value_at_point(
-                point, chord_vector, span_line
-            ),
-            Self::Elliptic(elliptic) => elliptic.clone().projection_value_at_point(
-                point, chord_vector, span_line
-            ),
-            Self::Harmonic(harmonic) => harmonic.clone().projection_value_at_point(
-                point, chord_vector, span_line
-            ),
-            Self::ChordVariationFromData(chord_variation_from_data) => {
-                chord_variation_from_data.clone().projection_value_at_point(
-                    point, chord_vector, span_line
-                )
-            },
-        }
+        self.projection_function.projection_value_at_point(
+            point, chord_vector, span_line
+        )
     }
 }

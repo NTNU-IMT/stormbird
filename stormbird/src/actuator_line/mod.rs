@@ -8,10 +8,9 @@ use std::fs;
 use std::path::Path;
 
 pub mod projection;
+pub mod sampling;
 pub mod builder;
-pub mod settings;
-
-
+pub mod solver;
 
 use stormath::smoothing::gaussian::gaussian_kernel;
 
@@ -23,9 +22,10 @@ use crate::controllers::Controller;
 
 use crate::io_utils;
 
-use projection::Projection;
+use projection::ProjectionSettings;
+use sampling::SamplingSettings;
 use builder::ActuatorLineBuilder;
-use settings::*;
+use solver::SolverSettings;
 
 #[derive(Debug, Clone)]
 /// Structure for representing an actuator line model. 
@@ -35,11 +35,7 @@ pub struct ActuatorLine {
     pub line_force_model: LineForceModel,
     /// Enum, with an internal structure, that determines how forces are projected in a CFD 
     /// simulation
-    pub projection: Projection,
-    /// Vector to store interpolated velocity values for each control point
-    pub ctrl_points_velocity: Vec<SpatialVector<3>>,
-    /// Results from the model
-    pub simulation_result: Option<SimulationResult>,
+    pub projection_settings: ProjectionSettings,
     /// Settings for the solver
     pub solver_settings: SolverSettings,
     /// Settings for the velocity sampling
@@ -52,11 +48,11 @@ pub struct ActuatorLine {
     pub current_iteration: usize,
     /// The number of iterations between each time a full simulation result is written to file
     pub write_iterations_full_result: usize,
-    /// Option to compute alternative end-velocity values for the line force model, to handle 
-    /// situations where the end values are noisy, while the interior values are not.
-    pub extrapolate_end_velocities: bool,
-    /// Option to remove span velocity
-    pub remove_span_velocity: bool
+    /// Vector to store interpolated velocity values for each control point
+    pub ctrl_points_velocity: Vec<SpatialVector<3>>,
+    /// Results from the model
+    pub simulation_result: Option<SimulationResult>,
+    
 }
 
 impl ActuatorLine {
@@ -106,7 +102,7 @@ impl ActuatorLine {
         let span_line = self.line_force_model.span_line_at_index(line_index);
         let chord_vector = self.line_force_model.global_chord_vector_at_index(line_index);
 
-        let projection_value_org = self.projection.projection_value_at_point(
+        let projection_value_org = self.projection_settings.projection_value_at_point(
             cell_center, chord_vector, &span_line
         );
 
@@ -136,9 +132,14 @@ impl ActuatorLine {
         (numerator, denominator)
     }
 
+
+    /// Function to be executed at each time step in the CFD simulation.
+    /// 
+    /// It solves for the circulation strength and computes the simulation result based on the 
+    /// current estimate of the control point velocities.
     pub fn do_step(&mut self, time: f64, time_step: f64){
         if self.current_iteration >= self.start_iteration {
-            if self.extrapolate_end_velocities {
+            if self.sampling_settings.extrapolate_end_velocities {
                 self.correct_end_velocities_through_extrapolation();
             }
             
@@ -158,6 +159,7 @@ impl ActuatorLine {
         self.current_iteration += 1;
     }
 
+    /// Function to update the controller in the model, if the controller is present.
     pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
         if self.current_iteration >= self.start_iteration {
             let controller_output = if let Some(controller) = &mut self.controller {
@@ -198,7 +200,7 @@ impl ActuatorLine {
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
     pub fn solve(&self, ctrl_point_velocity: &[SpatialVector<3>]) -> SolverResult {
-        let used_ctrl_point_velocity = if self.remove_span_velocity {
+        let used_ctrl_point_velocity = if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
                 ctrl_point_velocity, 
                 CoordinateSystem::Global
@@ -265,24 +267,30 @@ impl ActuatorLine {
         }
     }
 
-    /// Computes a distributed body force at a given point in space.
-    pub fn distributed_body_force_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
-        let projection_weights = self.line_segments_projection_weights_at_point(point);
-
+    /// Returns the force to be projected, based on the line index
+    /// 
+    /// # Arguments
+    /// * `line_index` - The index of the line segment for which the force is to be projected.
+    /// * `velocity` - The velocity vector at the control point of the cell where the force is to be 
+    /// projected.
+    pub fn force_to_project(
+        &self, 
+        line_index: usize, 
+        velocity: SpatialVector<3>
+    ) -> SpatialVector<3> {
         if let Some(simulation_result) = &self.simulation_result {
-            let sectional_forces_to_project = self.line_force_model.
-                sectional_circulatory_forces(
-                    &simulation_result.force_input.circulation_strength, 
-                    &simulation_result.force_input.velocity
-                );
-            
-            let mut body_force = SpatialVector::<3>::default();
+            let raw_force = simulation_result.sectional_forces.circulatory[line_index];
 
-            for i in 0..self.line_force_model.nr_span_lines() {
-                body_force += sectional_forces_to_project[i] * projection_weights[i];
-            }
+            let line = self.line_force_model.span_line_at_index(line_index);
 
-            body_force
+            let force_direction = line
+                .relative_vector()
+                .cross(velocity)
+                .normalize();
+
+            let corrected_force = raw_force.length() * force_direction;
+
+            corrected_force
         } else {
             SpatialVector::<3>::default()
         }        
@@ -297,7 +305,7 @@ impl ActuatorLine {
 
         for i in 0..self.line_force_model.nr_span_lines() {
             projection_values.push(
-                self.projection.projection_value_at_point(
+                self.projection_settings.projection_value_at_point(
                     point, 
                     chord_vectors[i], 
                     &span_lines[i]

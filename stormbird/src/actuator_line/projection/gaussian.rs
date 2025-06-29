@@ -21,7 +21,7 @@ impl Default for Gaussian {
     fn default() -> Self {
         Self {
             chord_factor: 0.4,
-            thickness_factor: 0.4
+            thickness_factor: 0.2
         }
     }
 }

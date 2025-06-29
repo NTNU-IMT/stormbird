@@ -60,38 +60,6 @@ Foam::fv::ActuatorLine::ActuatorLine(
     );
 }
 
-void Foam::fv::ActuatorLine::set_projection_data() {
-    const vectorField& cell_centers = mesh_.C();
-    
-    const labelList& cell_ids = cells();
-
-    this->relevant_cells_for_projection = labelList();
-
-    forAll(cell_ids, i) {
-        label cell_id = cell_ids[i];
-
-        std::array<double, 3> cell_center = {
-            cell_centers[cell_id][0],
-            cell_centers[cell_id][1],
-            cell_centers[cell_id][2]
-        };
-
-        double body_force_weight = this->model->summed_projection_weights_at_point(cell_center);
-
-        if (body_force_weight > this->projection_limit) {
-            this->relevant_cells_for_projection.append(cell_id);
-
-            this->dominating_line_element_index_projection.append(
-                this->model->dominating_line_element_index_at_point(cell_center)
-            );
-
-            this->body_force_field_weight[0][cell_id] = body_force_weight;
-        } else {
-            this->body_force_field_weight[0][cell_id] = 0.0;
-        }
-    }
-}
-
 void Foam::fv::ActuatorLine::sync_line_force_model_state() {
     int nr_wings = this->model->nr_wings();
 
@@ -123,35 +91,44 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
     const scalarField& cell_volumes = mesh_.V();
     double time_step = mesh_.time().deltaTValue();
     double time = mesh_.time().value();
+    vectorField& equation_source = eqn.source();
 
+    // Synchronize the line force model state across all processors
     this->sync_line_force_model_state();
 
+    // Recalculate the projection and velocity sampling data if needed
     if (this->need_update) {
         this->set_projection_data();
+
+        if (this->model->use_point_sampling()) {
+            this->set_velocity_sampling_data_interpolation();
+        } else {
+            this->set_velocity_sampling_data_integral();
+            
+        }
     }
 
     const labelList& cell_ids = this->relevant_cells_for_projection;
     
-    vectorField& equation_source = eqn.source();
-
-    if (this->use_integral_velocity_sampling) {
-        this->set_integrated_weighted_velocity(velocity_field);
-    } else {
+    // Set the velocity field for the actuator line model
+    if (this->model->use_point_sampling()) {
         this->set_interpolated_velocity(velocity_field);
+    } else {
+        this->set_integrated_weighted_velocity(velocity_field);
     }
 
+    // Calculate the circulation
     this->model->do_step(time, time_step);
 
-    this->need_update = false;
-    if (Pstream::master()) {
-        this->need_update = model->update_controller(time, time_step);
-        
-        this->model->write_results();
-    }
-    reduce(this->need_update, orOp<bool>());
-
+    // Apply the body force to the equation source
     forAll(cell_ids, i) {
         label cell_id = cell_ids[i];
+
+        std::array<double, 3> cell_velocity = {
+            velocity_field[cell_id][0],
+            velocity_field[cell_id][1],
+            velocity_field[cell_id][2]
+        };
 
         std::array<double, 3> cell_center = {
             cell_centers[cell_id][0],
@@ -159,20 +136,34 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
             cell_centers[cell_id][2]
         };
 
-        std::array<double, 3> body_force_sb = this->model->distributed_body_force_at_point(
-            cell_center
+        label line_index = this->dominating_line_element_index_projection[i];
+
+        std::array<double, 3> force_to_project = this->model->force_to_project(
+            line_index,
+            cell_velocity
         );
+
+        double body_force_weight = this->body_force_field_weight[0][cell_id];
 
         vector body_force(vector::zero);
 
-        body_force[0] = body_force_sb[0] * cell_volumes[cell_id];
-        body_force[1] = body_force_sb[1] * cell_volumes[cell_id];
-        body_force[2] = body_force_sb[2] * cell_volumes[cell_id];
+        body_force[0] = force_to_project[0] * body_force_weight * cell_volumes[cell_id];
+        body_force[1] = force_to_project[1] * body_force_weight * cell_volumes[cell_id];
+        body_force[2] = force_to_project[2] * body_force_weight * cell_volumes[cell_id];
 
         equation_source[cell_id] += body_force;
 
         this->body_force_field[0][cell_id] = body_force / cell_volumes[cell_id];
     }
+
+    // Check if the model needs to be updated at the next time step
+    this->need_update = false;
+    if (Pstream::master()) {
+        this->need_update = model->update_controller(time, time_step);
+        
+        this->model->write_results();
+    }
+    reduce(this->need_update, orOp<bool>());
 }
 
 void Foam::fv::ActuatorLine::addSup(

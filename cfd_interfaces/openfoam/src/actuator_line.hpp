@@ -1,6 +1,6 @@
 // Copyright (C) 2024, NTNU 
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
-// License: GPL v3.0 (see seperate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 ///
 /// This is the OpenFOAM interface for the actuator line model in Stormbird. The interface consists
@@ -63,14 +63,6 @@ namespace Foam {
             volVectorField* body_force_field;
             /// The body force field weight, that will be exported by OpenFOAM during the simulation
             volScalarField* body_force_field_weight;
-
-            // Parameters for the sampling and projection
-            // TODO: make these parameters available in the input file
-            bool use_integral_velocity_sampling = true;
-            bool only_use_dominating_line_element_when_sampling = true;
-            bool only_use_dominating_line_element_when_projecting = true;
-            double projection_limit = 0.001;
-            double sampling_integral_limit = 0.001;
 
             // Switch to determine if the OpenFOAM data needs to be updated, due to changes in the 
             // actuator line model
