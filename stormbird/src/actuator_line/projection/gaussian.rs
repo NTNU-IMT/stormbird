@@ -21,15 +21,21 @@ impl Default for Gaussian {
     fn default() -> Self {
         Self {
             chord_factor: 0.4,
-            thickness_factor: 0.4,
+            thickness_factor: 0.4
         }
     }
 }
 
 impl Gaussian {
-    pub fn projection_value_at_point(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>, span_line: &SpanLine) -> f64 {
+    pub fn projection_value_at_point(
+        &self, 
+        point: SpatialVector<3>, 
+        chord_vector: SpatialVector<3>, 
+        span_line: &SpanLine
+    ) -> f64 {
         let chord_length = chord_vector.length();
         let line_length = span_line.length();
+
         let point_lc = span_line.line_coordinates(point, chord_vector);
         
         let e_chord     = self.chord_factor * chord_length;

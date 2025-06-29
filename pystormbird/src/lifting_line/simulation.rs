@@ -4,8 +4,6 @@
 
 //! Interface to a dynamic simulation using a lifting line model.
 
-use std::time;
-
 use pyo3::prelude::*;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
@@ -44,6 +42,14 @@ impl Simulation {
             rotation.data, 
             time_step
         );
+    }
+
+    pub fn set_translation_without_velocity(&mut self, translation: SpatialVector) {
+        self.data.line_force_model.rigid_body_motion.translation = translation.data;
+    }
+
+    pub fn set_rotation_without_velocity( &mut self, rotation: SpatialVector) {
+        self.data.line_force_model.rigid_body_motion.rotation = rotation.data;
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {

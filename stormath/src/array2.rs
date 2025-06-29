@@ -6,8 +6,9 @@
 
 use std::ops::{Index, IndexMut};
 use std::fmt::Debug;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Array2Indices {
     pub shape: [usize; 2],
 }
@@ -24,7 +25,7 @@ impl Array2Indices {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Array2<T> {
     pub data: Vec<T>,
     pub indices: Array2Indices,
@@ -64,6 +65,18 @@ where T: Default + Clone + Copy + Debug,
     pub fn indices_from_index(&self, flat_index: usize) -> [usize; 2] {
         self.indices.indices_from_index(flat_index)
     }
+
+    pub fn nr_rows(&self) -> usize {
+        self.indices.shape[0]
+    }
+
+    pub fn nr_cols(&self) -> usize {
+        self.indices.shape[1]
+    }
+
+    pub fn shape(&self) -> [usize; 2] {
+        self.indices.shape
+    }
 }
 
 impl<T> Index<[usize; 2]> for Array2<T> 
@@ -84,5 +97,23 @@ where T: Default + Clone + Copy + Debug,
         let flat_index = self.flat_index(indices);
         
         &mut self.data[flat_index]
+    }
+}
+
+impl<T> std::ops::Add for Array2<T> 
+where T: Default + Clone + Copy + Debug + std::ops::Add<Output = T>,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        assert_eq!(self.shape(), other.shape(), "Array2 shapes do not match");
+        
+        let mut result = self.clone();
+        
+        for i in 0..self.data.len() {
+            result.data[i] = self.data[i] + other.data[i];
+        }
+        
+        result
     }
 }

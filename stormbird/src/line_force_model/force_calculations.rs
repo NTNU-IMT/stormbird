@@ -4,6 +4,11 @@
 
 use super::*;
 
+use super::corrections::{
+    smoothing::ValueTypeToBeSmoothed,
+    circulation::prescribed::PrescribedCirculationShape,
+};
+
 /// This implementation block contains the functions that calculates the forces on line elements and
 /// on the wings. These are generally used as the last step in a simulation method using the
 /// line force model.
@@ -55,7 +60,16 @@ impl LineForceModel {
             )
         }).collect();
 
-        angles_of_attack
+        match &self.angle_of_attack_correction {
+            AngleOfAttackCorrection::None => angles_of_attack,
+            AngleOfAttackCorrection::GaussianSmoothing(settings) => {
+                self.gaussian_smoothed_values(
+                    &angles_of_attack, 
+                    &settings, 
+                    ValueTypeToBeSmoothed::AngleOfAttack
+                )
+            }
+        }
     }
 
     /// Returns the local lift coefficient on each line element.
@@ -97,19 +111,65 @@ impl LineForceModel {
         velocity: &[SpatialVector<3>], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
-        match &self.circulation_corrections {
-            CirculationCorrection::None => self.circulation_strength_raw(velocity, input_coordinate_system),
+        match &self.circulation_correction {
+            CirculationCorrection::None => self.circulation_strength_raw(
+                velocity, 
+                input_coordinate_system
+            ),
             CirculationCorrection::PrescribedCirculation(shape) =>
-                self.prescribed_circulation_strength(&velocity,&shape, input_coordinate_system),
+                self.prescribed_circulation_strength(
+                    &velocity,
+                    &shape, 
+                    input_coordinate_system
+                ),
             CirculationCorrection::GaussianSmoothing(settings) => {
-                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+                let raw_strength = self.circulation_strength_raw(
+                    velocity, 
+                    input_coordinate_system
+                );
 
-                self.gaussian_smoothed_values(&raw_strength, &settings)
+                let ideal_shape = PrescribedCirculationShape::default();
+
+                let ideal_strength = self.prescribed_circulation_strength(
+                    &velocity,
+                    &ideal_shape, 
+                    input_coordinate_system
+                );
+
+                let subtracted_raw_strength: Vec<f64> = raw_strength.iter()
+                    .zip(ideal_strength.iter())
+                    .map(|(raw, ideal)| raw - ideal)
+                    .collect();
+
+                let smoothed_strength = self.gaussian_smoothed_values(
+                    &subtracted_raw_strength, 
+                    &settings,
+                    ValueTypeToBeSmoothed::Circulation
+                );
+
+                smoothed_strength.iter()
+                    .zip(ideal_strength.iter())
+                    .map(|(smoothed, ideal)| smoothed + ideal)
+                    .collect()
             },
             CirculationCorrection::PolynomialSmoothing => {
-                let raw_strength = self.circulation_strength_raw(velocity, input_coordinate_system);
+                let raw_strength = self.circulation_strength_raw(
+                    velocity, 
+                    input_coordinate_system
+                );
 
-                self.polynomial_smoothed_values(&raw_strength)
+                self.polynomial_smoothed_values(
+                    &raw_strength,
+                    ValueTypeToBeSmoothed::Circulation
+                )
+            },
+            CirculationCorrection::EllipticEndCorrection => {
+                let raw_strength = self.circulation_strength_raw(
+                    velocity, 
+                    input_coordinate_system
+                );
+
+                self.apply_elliptic_end_correction_to_strength(&raw_strength)
             }
         }
     }
@@ -387,6 +447,10 @@ impl LineForceModel {
 
                 let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length().powi(2);
 
+                if force_factor == 0.0 {
+                    return 0.0;
+                }
+
                 circulation_lift[i_span] / force_factor - lift_coefficients[i_span]
         }).collect()
     }
@@ -425,7 +489,8 @@ impl LineForceModel {
 
     pub fn calculate_simulation_result(
         &self, 
-        solver_result: &SolverResult, 
+        solver_result: &SolverResult,
+        time: f64,
         time_step: f64
     ) -> SimulationResult {
         let force_input = self.sectional_force_input(&solver_result, time_step);
@@ -436,6 +501,7 @@ impl LineForceModel {
         let integrated_moments = sectional_forces.integrate_moments(&self);
 
         SimulationResult {
+            time,
             ctrl_points,
             force_input,
             sectional_forces,
@@ -443,6 +509,7 @@ impl LineForceModel {
             integrated_moments,
             iterations: solver_result.iterations,
             residual: solver_result.residual,
+            wing_indices: self.wing_indices.clone(),
         }
     }
 }

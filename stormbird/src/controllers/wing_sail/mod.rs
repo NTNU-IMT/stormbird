@@ -1,5 +1,4 @@
 pub mod weather_dependent_setpoints;
-pub mod angle_of_attack_controller;
 
 use serde::{Deserialize, Serialize};
 

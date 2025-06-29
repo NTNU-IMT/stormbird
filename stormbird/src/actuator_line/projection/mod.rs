@@ -34,12 +34,26 @@ impl Default for Projection {
 
 
 impl Projection {
-    pub fn projection_value_at_point(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>, span_line: &SpanLine) -> f64 {
+    pub fn projection_value_at_point(
+        &self, point: SpatialVector<3>, 
+        chord_vector: SpatialVector<3>, 
+        span_line: &SpanLine
+    ) -> f64 {
         match self {
-            Self::Gaussian(gaussian) => gaussian.clone().projection_value_at_point(point, chord_vector, span_line),
-            Self::Elliptic(elliptic) => elliptic.clone().projection_value_at_point(point, chord_vector, span_line),
-            Self::Harmonic(harmonic) => harmonic.clone().projection_value_at_point(point, chord_vector, span_line),
-            Self::ChordVariationFromData(chord_variation_from_data) => chord_variation_from_data.clone().projection_value_at_point(point, chord_vector, span_line),
+            Self::Gaussian(gaussian) => gaussian.clone().projection_value_at_point(
+                point, chord_vector, span_line
+            ),
+            Self::Elliptic(elliptic) => elliptic.clone().projection_value_at_point(
+                point, chord_vector, span_line
+            ),
+            Self::Harmonic(harmonic) => harmonic.clone().projection_value_at_point(
+                point, chord_vector, span_line
+            ),
+            Self::ChordVariationFromData(chord_variation_from_data) => {
+                chord_variation_from_data.clone().projection_value_at_point(
+                    point, chord_vector, span_line
+                )
+            },
         }
     }
 }

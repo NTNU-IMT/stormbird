@@ -5,7 +5,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use stormbird::common_utils::result::SimulationResult as SimulationResultRust;
+use stormbird::common_utils::results::simulation::SimulationResult as SimulationResultRust;
 use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalForcesRust;
 use stormbird::common_utils::forces_and_moments::IntegratedValues as IntegratedValuesRust;
 use stormbird::common_utils::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;

@@ -2,14 +2,13 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-pub mod prescribed_circulation;
-pub mod smoothing;
+pub mod prescribed;
+pub mod elliptic_end_correction;
 
 use serde::{Serialize, Deserialize};
 
-use prescribed_circulation::PrescribedCirculationShape;
-use smoothing::GaussianSmoothing;
-
+use prescribed::PrescribedCirculationShape;
+use super::smoothing::GaussianSmoothing;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Enum for controlling what type of correction to apply to the estimated circulation distribution.
@@ -23,6 +22,9 @@ pub enum CirculationCorrection {
     GaussianSmoothing(GaussianSmoothing),
     /// Polynomial smoothing of the estimated circulation distribution.
     PolynomialSmoothing,
+    /// Correct the ends of the circulation distribution based on an assumption of an elliptical
+    /// circulation distribution.
+    EllipticEndCorrection,
 }
 
 impl Default for CirculationCorrection {

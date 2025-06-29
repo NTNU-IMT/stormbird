@@ -12,13 +12,14 @@ use stormath::{
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 
-    interpolation::linear_interpolation};
+    interpolation::linear_interpolation,
+};
 
 pub mod builder;
 pub mod force_calculations;
 pub mod span_line;
 
-pub mod circulation_corrections;
+pub mod corrections;
 pub mod prelude;
 pub mod single_wing;
 
@@ -30,9 +31,14 @@ mod tests;
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
 
+use crate::controllers::LineForceModelState;
+
 use self::rigid_body_motion::RigidBodyMotion;
 
-use circulation_corrections::CirculationCorrection;
+use corrections::{
+    circulation::CirculationCorrection,
+    angle_of_attack::AngleOfAttackCorrection,
+};
 use single_wing::SingleWing;
 use span_line::*;
 
@@ -68,8 +74,10 @@ pub struct LineForceModel {
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     /// Density used in force calculations
     pub density: f64,
-    /// Optional corrections that can be applied to the estimated circulation strength.
-    pub circulation_corrections: CirculationCorrection,
+    /// Optional correction that can be applied to the estimated circulation strength.
+    pub circulation_correction: CirculationCorrection,
+    /// Optional correction for the angle of attack
+    pub angle_of_attack_correction: AngleOfAttackCorrection,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
 }
@@ -98,7 +106,8 @@ impl LineForceModel {
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
             density,
-            circulation_corrections: Default::default(),
+            circulation_correction: Default::default(),
+            angle_of_attack_correction: Default::default(),
             output_coordinate_system: CoordinateSystem::Global
         }
     }
@@ -453,7 +462,32 @@ impl LineForceModel {
         }
     }
 
-    /// General function for calculating wing-averaged values
+    pub fn section_models_internal_state(&self) -> Vec<f64> {
+        let mut internal_state: Vec<f64> = vec![0.0; self.nr_wings()];
+
+        for wing_index in 0..self.nr_wings() {
+            match self.section_models[wing_index] {
+                SectionModel::VaryingFoil(ref foil) => {
+                    internal_state[wing_index] = foil.current_internal_state;
+                }
+                SectionModel::RotatingCylinder(ref cylinder) => {
+                    internal_state[wing_index] = cylinder.revolutions_per_second;
+                }
+                _ => {}
+            }
+        }
+
+        internal_state
+    }
+
+    /// General function for calculating wing-averaged values from a vector of sectional values.
+    /// 
+    /// # Arguments
+    /// * `sectional_values` - A vector of values for each section of the wings
+    /// 
+    /// # Returns
+    /// A vector of wing-averaged values, where each value corresponds to a wing in the model.
+    /// The values are calculated by averaging the sectional values for each wing.
     pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T>
     where
         T: std::ops::Div<f64, Output = T> + std::ops::Add<T, Output = T> + Copy,
@@ -563,5 +597,12 @@ impl LineForceModel {
         }
 
         span_point_values
+    }
+
+    pub fn model_state(&self) -> LineForceModelState {
+        LineForceModelState {
+            local_wing_angles: self.local_wing_angles.clone(),
+            section_models_internal_state: self.section_models_internal_state(),
+        }
     }
 }

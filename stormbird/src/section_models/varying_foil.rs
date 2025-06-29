@@ -38,10 +38,12 @@ impl VaryingFoil {
         let cl_high_order_power_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_high_order_power).collect();
         let cl_max_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
 
-        let cd_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_zero_angle).collect();
+        let cd_min_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_min).collect();
+        let angle_cd_min_data: Vec<f64> = self.foils_data.iter().map(|x| x.angle_cd_min).collect();
         let cd_second_order_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
         let cd_max_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_max_after_stall).collect();
         let cd_power_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_power_after_stall).collect();
+        let cdi_correction_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cdi_correction_factor).collect();
 
         let mean_positive_stall_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.mean_positive_stall_angle).collect();
         let mean_negative_stall_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
@@ -60,10 +62,12 @@ impl VaryingFoil {
             cl_high_order_factor:   linear_interpolation(x, x_data, &cl_high_order_factor_data),
             cl_high_order_power:    linear_interpolation(x, x_data, &cl_high_order_power_data),
             cl_max_after_stall:     linear_interpolation(x, x_data, &cl_max_after_stall_data),
-            cd_zero_angle:          linear_interpolation(x, x_data, &cd_zero_angle_data),
+            cd_min:                 linear_interpolation(x, x_data, &cd_min_data),
+            angle_cd_min:          linear_interpolation(x, x_data, &angle_cd_min_data),
             cd_second_order_factor: linear_interpolation(x, x_data, &cd_second_order_factor_data),
             cd_max_after_stall:     linear_interpolation(x, x_data, &cd_max_after_stall_data),
             cd_power_after_stall:   linear_interpolation(x, x_data, &cd_power_after_stall_data),
+            cdi_correction_factor:  linear_interpolation(x, x_data, &cdi_correction_factor_data),
             mean_positive_stall_angle: linear_interpolation(x, x_data, &mean_positive_stall_angle_data),
             mean_negative_stall_angle: linear_interpolation(x, x_data, &mean_negative_stall_angle_data),
             stall_range:            linear_interpolation(x, x_data, &stall_range_data),

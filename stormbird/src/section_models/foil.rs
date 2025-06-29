@@ -69,8 +69,11 @@ pub struct Foil {
     /// The maximum lift coefficient after stall. 
     pub cl_max_after_stall: f64,
     #[serde(default)]
-    /// Drag coefficient at zero angle of attack
-    pub cd_zero_angle: f64,
+    /// Minimum drag coefficient angle of attack
+    pub cd_min: f64,
+    #[serde(default)]
+    /// The angle where the the minimum drag coefficient is reached
+    pub angle_cd_min: f64,
     #[serde(default)]
     /// Factor to give the drag coefficient a second order term. This is zero by default.
     pub cd_second_order_factor: f64,
@@ -81,6 +84,11 @@ pub struct Foil {
     /// Power factor for the harmonic dependency of the drag coefficient after stall. Set to 1.6 by 
     /// default.
     pub cd_power_after_stall: f64,
+    #[serde(default)]
+    /// factor that can be used to correct for numerical errors in the lift-induced drag. Set to a
+    /// a positive value to increase the drag, and a negative value to decrease the drag. The 
+    /// default is zero, which means no correction.
+    pub cdi_correction_factor: f64,
     #[serde(default="Foil::default_mean_stall_angle")]
     /// The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to
     /// post-stall behavior. The default value is 20 degrees.
@@ -181,10 +189,22 @@ impl Foil {
     pub fn drag_coefficient(&self, angle_of_attack: f64) -> f64 {
         let stall_angle = get_stall_angle(angle_of_attack);
 
-        let cd_pre_stall  = self.cd_zero_angle + self.cd_second_order_factor * angle_of_attack.powi(2);
+        let pre_stall_effective_angle = (angle_of_attack + self.angle_cd_min).abs();
+
+        let cd_pre_stall  = self.cd_min + self.cd_second_order_factor * pre_stall_effective_angle.powi(2);
         let cd_post_stall = self.cd_max_after_stall * stall_angle.sin().abs().powf(self.cd_power_after_stall);
 
-        self.combine_pre_and_post_stall(angle_of_attack, cd_pre_stall, cd_post_stall)
+        let cd_raw = self.combine_pre_and_post_stall(angle_of_attack, cd_pre_stall, cd_post_stall);
+
+        if self.cdi_correction_factor != 0.0{
+            let cl = self.lift_coefficient(angle_of_attack);
+
+            let cdi_correction = self.cdi_correction_factor * cl.abs().powi(2);
+
+            cd_raw + cdi_correction
+        } else {
+            cd_raw
+        }
     }
 
     /// Calculates the added mass force in the direction of the heave motion of the foil.
@@ -198,14 +218,16 @@ impl Foil {
 
     /// Calculates the amount of stall for a given angle of attack.
     pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
-        let mean_stall_angle = if angle_of_attack >= 0.0 {
+        let effective_angle = angle_of_attack + self.angle_cd_min;
+
+        let mean_stall_angle = if effective_angle >= 0.0 {
             self.mean_positive_stall_angle.abs()
         } else {
             self.mean_negative_stall_angle.abs()
         };
 
         special_functions::sigmoid_zero_to_one(
-            angle_of_attack.abs(), 
+            effective_angle.abs(), 
             mean_stall_angle, 
             self.stall_range
         )
@@ -226,10 +248,12 @@ impl Default for Foil {
             cl_high_order_factor:   0.0,
             cl_high_order_power:    0.0,
             cl_max_after_stall:     Self::default_one(),
-            cd_zero_angle:          0.0,
+            cd_min:                 0.0,
+            angle_cd_min:           0.0,
             cd_second_order_factor: 0.0,
             cd_max_after_stall:     Self::default_one(),
             cd_power_after_stall:   Self::default_cd_power_after_stall(),
+            cdi_correction_factor:  0.0,
             mean_positive_stall_angle: Self::default_mean_stall_angle(),
             mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),

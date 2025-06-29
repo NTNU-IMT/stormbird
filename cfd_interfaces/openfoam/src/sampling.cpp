@@ -15,14 +15,16 @@
 
 #include "cpp_actuator_line.hpp"
 
-// --------------------- Set the necessary data for the interpolation ------------------------------
-
 void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
     const vectorField& cell_centers = mesh_.C();
     
     const labelList& cell_ids = cells();
 
+    this->relevant_cells_for_velocity_sampling.clear();
+    this->dominating_line_element_index_sampling.clear();
+
     this->relevant_cells_for_velocity_sampling = labelList();
+    this->dominating_line_element_index_sampling = labelList();
 
     forAll(cell_ids, i) {
         label cell_id = cell_ids[i];
@@ -47,9 +49,6 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
             this->body_force_field_weight[0][cell_id] = 0.0;
         }
     }
-
-    this->velocity_sampling_data_is_set = true;
-
 }
 
 void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
@@ -67,21 +66,18 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
             mesh_.findCell(this->ctrl_points[i])
         );
     }
-
-    this->velocity_sampling_data_is_set = true;
 }
 
 
 // --------------------- Perform the interpolation -------------------------------------------------
 
 void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) {
-    if (!this->velocity_sampling_data_is_set) {
+    if (this->need_update) {
         this->set_velocity_sampling_data_integral();
     }
 
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
-    const labelList& cell_ids = !this->projection_data_is_set ? cells() : this->relevant_cells_for_velocity_sampling;
 
     // Initialize the numerator and denominator
     std::vector<vector> numerator;
@@ -95,8 +91,8 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
     }
 
     // Loop over all cells for the current processor
-    forAll(cell_ids, i) {
-        label cell_id = cell_ids[i];
+    forAll(this->relevant_cells_for_velocity_sampling, i) {
+        label cell_id = this->relevant_cells_for_velocity_sampling[i];
 
         std::array<double, 3> velocity = {
             velocity_field[cell_id][0],
@@ -115,7 +111,7 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
         if (this->only_use_dominating_line_element_when_sampling) {
             auto line_index = this->dominating_line_element_index_sampling[i];
             
-            std::array<double, 4> temp_out = this->model->get_weighted_velocity_integral_terms_for_cell(
+            std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
                 line_index,
                 velocity,
                 cell_center,
@@ -129,7 +125,7 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
 
         } else {
             for (int line_index = 0; line_index < nr_span_lines; line_index++) {
-                std::array<double, 4> temp_out = this->model->get_weighted_velocity_integral_terms_for_cell(
+                std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
                     line_index,
                     velocity,
                     cell_center,
@@ -152,18 +148,21 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
 
     // Set the values in the model 
     for (int line_index = 0; line_index < nr_span_lines; line_index++) {
-        std::array<double, 3> velocity = {
-            numerator[line_index][0] / denominator[line_index],
-            numerator[line_index][1] / denominator[line_index],
-            numerator[line_index][2] / denominator[line_index]
-        };
+        if (denominator[line_index] != 0.0) {
+            std::array<double, 3> velocity = {
+                numerator[line_index][0] / denominator[line_index],
+                numerator[line_index][1] / denominator[line_index],
+                numerator[line_index][2] / denominator[line_index]
+            };
 
-        this->model->set_velocity_at_index(line_index, velocity);
+            this->model->set_velocity_at_index(line_index, velocity);
+        }
+        
     }
 }
 
 void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {
-    if (!this->velocity_sampling_data_is_set) {
+    if (this->need_update) {
         this->set_velocity_sampling_data_interpolation();
     }
     
