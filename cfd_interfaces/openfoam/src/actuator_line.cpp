@@ -87,7 +87,6 @@ void Foam::fv::ActuatorLine::sync_line_force_model_state() {
 
 void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
 {   
-    const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
     double time_step = mesh_.time().deltaTValue();
     double time = mesh_.time().value();
@@ -128,12 +127,6 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
             velocity_field[cell_id][0],
             velocity_field[cell_id][1],
             velocity_field[cell_id][2]
-        };
-
-        std::array<double, 3> cell_center = {
-            cell_centers[cell_id][0],
-            cell_centers[cell_id][1],
-            cell_centers[cell_id][2]
         };
 
         label line_index = this->dominating_line_element_index_projection[i];

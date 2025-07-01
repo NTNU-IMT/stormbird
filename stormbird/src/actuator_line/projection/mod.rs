@@ -20,6 +20,8 @@ pub struct ProjectionSettings {
     pub project_normal_to_velocity: bool,
     #[serde(default="ProjectionSettings::default_weight_limit")]
     pub weight_limit: f64,
+    #[serde(default)]
+    pub project_sectional_drag: bool,
 }
 
 impl Default for ProjectionSettings {
@@ -28,6 +30,7 @@ impl Default for ProjectionSettings {
             projection_function: Gaussian::default(),
             project_normal_to_velocity: false,
             weight_limit: Self::default_weight_limit(),
+            project_sectional_drag: false,
         }
     }
 }

@@ -11,6 +11,7 @@ pub mod projection;
 pub mod sampling;
 pub mod builder;
 pub mod solver;
+pub mod corrections;
 
 use stormath::smoothing::gaussian::gaussian_kernel;
 
@@ -26,6 +27,9 @@ use projection::ProjectionSettings;
 use sampling::SamplingSettings;
 use builder::ActuatorLineBuilder;
 use solver::SolverSettings;
+
+use corrections::lifting_line::LiftingLineCorrection;
+use corrections::empirical_circulation::EmpiricalCirculationCorrection;
 
 #[derive(Debug, Clone)]
 /// Structure for representing an actuator line model. 
@@ -52,6 +56,10 @@ pub struct ActuatorLine {
     pub ctrl_points_velocity: Vec<SpatialVector<3>>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
+    /// Corrections based on the lifting line model
+    pub lifting_line_correction: Option<LiftingLineCorrection>,
+    /// Empirical correction for the circulation strength, also known as a tip loss factor
+    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
     
 }
 
@@ -143,7 +151,7 @@ impl ActuatorLine {
                 self.correct_end_velocities_through_extrapolation();
             }
             
-            let solver_result = self.solve(&self.ctrl_points_velocity);
+            let solver_result = self.solve(time_step);
 
             let simulation_result = self.line_force_model.calculate_simulation_result(
                 &solver_result, 
@@ -157,6 +165,50 @@ impl ActuatorLine {
         }
         
         self.current_iteration += 1;
+    }
+
+    pub fn lifting_line_velocity_correction(
+        &mut self, 
+        time_step: f64,
+        circulation_strength: &[f64],
+        ctrl_points_velocity: &[SpatialVector<3>]
+    ) -> Option<Vec<SpatialVector<3>>> {
+        if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
+            if !lifting_line_correction.initialized {
+                let mut wake_building_velocity = SpatialVector::<3>::default();
+
+                for i in 0..ctrl_points_velocity.len() {
+                    wake_building_velocity += ctrl_points_velocity[i];
+                }
+                wake_building_velocity /= ctrl_points_velocity.len() as f64;
+                
+                lifting_line_correction.initialize_with_velocity_and_time_step(
+                    &self.line_force_model, 
+                    wake_building_velocity, 
+                    time_step
+                );
+
+                lifting_line_correction.initialize_line_force_model_data(
+                    &self.line_force_model, 
+                    ctrl_points_velocity
+                );
+            }
+
+            lifting_line_correction.update_before_solving(time_step, &self.line_force_model);
+
+            let velocity_correction = lifting_line_correction
+                .correction_for_lift_induced_velocities(circulation_strength);
+
+            lifting_line_correction.update_after_solving(
+                &self.line_force_model, 
+                circulation_strength,
+                ctrl_points_velocity
+            );
+
+            Some(velocity_correction)
+        } else {
+            None
+        }
     }
 
     /// Function to update the controller in the model, if the controller is present.
@@ -197,21 +249,66 @@ impl ActuatorLine {
         }
     }
 
-    /// Takes the estimated velocity on at the control points as input and calculates a simulation
-    /// result from the line force model.
-    pub fn solve(&self, ctrl_point_velocity: &[SpatialVector<3>]) -> SolverResult {
-        let used_ctrl_point_velocity = if self.sampling_settings.remove_span_velocity {
+    pub fn corrected_ctrl_points_velocity(&self) -> Vec<SpatialVector<3>> {
+        if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
-                ctrl_point_velocity, 
+                &self.ctrl_points_velocity, 
                 CoordinateSystem::Global
             )
         } else {
-            ctrl_point_velocity.to_vec()
-        };
+            self.ctrl_points_velocity.clone()
+        }
+    }
+
+    /// Takes the estimated velocity on at the control points as input and calculates a simulation
+    /// result from the line force model.
+    pub fn solve(&mut self, time_step: f64) -> SolverResult {
+        let mut corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity();
         
-        let new_estimated_circulation_strength = self.line_force_model.circulation_strength(
-            &used_ctrl_point_velocity, CoordinateSystem::Global
+        let mut new_estimated_circulation_strength = self.line_force_model.circulation_strength(
+            &corrected_ctrl_points_velocity, CoordinateSystem::Global
         );
+
+        if let Some(_) = &self.lifting_line_correction {
+            let ll_damping = 0.1;
+
+            let mut ll_corrected_ctrl_points_velocity = corrected_ctrl_points_velocity.clone();
+
+            for _ in 0..10 {
+                let velocity_correction = self.lifting_line_velocity_correction(
+                    time_step, 
+                    &new_estimated_circulation_strength, 
+                    &corrected_ctrl_points_velocity
+                ).unwrap();
+
+                for j in 0..corrected_ctrl_points_velocity.len() {
+                    ll_corrected_ctrl_points_velocity[j] = corrected_ctrl_points_velocity[j] + velocity_correction[j];
+                }
+
+                let ll_estimated_circulation_strength = self.line_force_model.circulation_strength(
+                    &ll_corrected_ctrl_points_velocity, 
+                    CoordinateSystem::Global
+                );
+
+                for j in 0..new_estimated_circulation_strength.len() {
+                    new_estimated_circulation_strength[j] += 
+                        ll_damping * (ll_estimated_circulation_strength[j] - new_estimated_circulation_strength[j]);
+                }
+            }
+
+            corrected_ctrl_points_velocity = ll_corrected_ctrl_points_velocity;
+
+        }
+
+        if let Some(empirical_circulation_correction) = &self.empirical_circulation_correction {
+            let non_dim_span_positions = self.line_force_model.effective_relative_span_distance();
+
+            for i in 0..new_estimated_circulation_strength.len() {
+                new_estimated_circulation_strength[i] *= empirical_circulation_correction.correction_factor(
+                    non_dim_span_positions[i]
+                );
+            }
+        }
 
         let circulation_strength = if self.solver_settings.strength_damping > 0.0 {
 
@@ -230,13 +327,13 @@ impl ActuatorLine {
 
         let residual = self.line_force_model.average_residual_absolute(
             &circulation_strength, 
-            &used_ctrl_point_velocity,
+            &corrected_ctrl_points_velocity,
             CoordinateSystem::Global
         );
 
         SolverResult {
             circulation_strength,
-            ctrl_point_velocity: used_ctrl_point_velocity,
+            ctrl_point_velocity: corrected_ctrl_points_velocity,
             iterations: 1,
             residual,
         }
@@ -279,18 +376,28 @@ impl ActuatorLine {
         velocity: SpatialVector<3>
     ) -> SpatialVector<3> {
         if let Some(simulation_result) = &self.simulation_result {
-            let raw_force = simulation_result.sectional_forces.circulatory[line_index];
+            let raw_lift_force = simulation_result.sectional_forces.circulatory[line_index];
 
-            let line = self.line_force_model.span_line_at_index(line_index);
+            let raw_drag_force = if self.projection_settings.project_sectional_drag {
+                simulation_result.sectional_forces.sectional_drag[line_index]
+            } else {
+                SpatialVector::<3>::default()
+            };
 
-            let force_direction = line
-                .relative_vector()
-                .cross(velocity)
-                .normalize();
+            if self.projection_settings.project_normal_to_velocity {
+                let line = self.line_force_model.span_line_at_index(line_index);
 
-            let corrected_force = raw_force.length() * force_direction;
+                let lift_direction = line
+                    .relative_vector()
+                    .cross(velocity)
+                    .normalize();
 
-            corrected_force
+                let drag_direction = velocity.normalize();
+
+                raw_lift_force.length() * lift_direction + raw_drag_force.length() * drag_direction
+            } else {
+                raw_lift_force + raw_drag_force
+            }
         } else {
             SpatialVector::<3>::default()
         }        

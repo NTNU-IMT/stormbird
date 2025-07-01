@@ -10,6 +10,9 @@ use super::sampling::SamplingSettings;
 use super::solver::SolverSettings;
 use super::ActuatorLine;
 
+use super::corrections::lifting_line::LiftingLineCorrection;
+use super::corrections::empirical_circulation::EmpiricalCirculationCorrection;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,6 +31,10 @@ pub struct ActuatorLineBuilder {
     pub write_iterations_full_result: usize,
     #[serde(default)]
     pub start_iteration: usize,
+    #[serde(default)]
+    pub use_lifting_line_correction: bool,
+    #[serde(default)]
+    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>
 }
 
 impl ActuatorLineBuilder {
@@ -41,7 +48,9 @@ impl ActuatorLineBuilder {
             sampling_settings: SamplingSettings::default(),
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
-            start_iteration: 0
+            start_iteration: 0,
+            use_lifting_line_correction: false,
+            empirical_circulation_correction: None,
         }
     }
 
@@ -57,6 +66,22 @@ impl ActuatorLineBuilder {
             None
         };
 
+        let lifting_line_correction = if self.use_lifting_line_correction {
+            let viscous_core_length = 0.5 * (
+                self.projection_settings.projection_function.chord_factor +
+                self.projection_settings.projection_function.thickness_factor
+            );
+
+            Some(
+                LiftingLineCorrection::new(
+                    viscous_core_length,
+                    &line_force_model
+                )
+            )
+        } else {
+            None
+        };  
+
         ActuatorLine{
             line_force_model,
             projection_settings: self.projection_settings.clone(),
@@ -68,6 +93,8 @@ impl ActuatorLineBuilder {
             write_iterations_full_result: self.write_iterations_full_result,
             ctrl_points_velocity: vec![SpatialVector::<3>::default(); nr_span_lines],
             simulation_result: None,
+            lifting_line_correction,
+            empirical_circulation_correction: self.empirical_circulation_correction.clone(),
         }
     }
 }
