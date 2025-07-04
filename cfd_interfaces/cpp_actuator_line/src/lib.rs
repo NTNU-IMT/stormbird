@@ -53,7 +53,7 @@ mod ffi {
         fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
         
         // ---- Export data ----
-        fn write_results(&self);
+        fn write_results(&self, folder_path: &str);
     }
 }
 
@@ -156,7 +156,7 @@ impl CppActuatorLine {
         self.model.summed_projection_weights_at_point(SpatialVector::<3>::from(*point))
     }
 
-    pub fn write_results(&self) {
-        self.model.write_results();
+    pub fn write_results(&self, folder_path: &str) {
+        self.model.write_results(folder_path);
     }
 }

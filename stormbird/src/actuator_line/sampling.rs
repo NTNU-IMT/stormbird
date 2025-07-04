@@ -15,10 +15,13 @@ pub struct SamplingSettings {
     pub extrapolate_end_velocities: bool,
     #[serde(default)]
     pub remove_span_velocity: bool,
+    #[serde(default="SamplingSettings::default_one")]
+    pub correction_factor: f64
 
 }
 
 impl SamplingSettings {
+    fn default_one() -> f64 {1.0}
     fn default_span_projection_factor() -> f64 {0.5}
     fn default_weight_limit() -> f64 {0.001}
 }
@@ -32,6 +35,7 @@ impl Default for SamplingSettings {
             weight_limit: Self::default_weight_limit(),
             extrapolate_end_velocities: false,
             remove_span_velocity: false,
+            correction_factor: Self::default_one(),
         }
     }
 }

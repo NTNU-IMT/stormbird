@@ -33,7 +33,7 @@ Foam::fv::ActuatorLine::ActuatorLine(
     coeffs_.readEntry("fields", fieldNames_);
     applied_.setSize(fieldNames_.size(), false);
 
-    this->model = stormbird_interface::new_actuator_line_from_file("actuator_line.json");
+    this->model = stormbird_interface::new_actuator_line_from_file("system/stormbird_actuator_line.json");
 
     this->body_force_field = new volVectorField(
         IOobject(
@@ -154,7 +154,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
     if (Pstream::master()) {
         this->need_update = model->update_controller(time, time_step);
         
-        this->model->write_results();
+        this->model->write_results("postProcessing");
     }
     reduce(this->need_update, orOp<bool>());
 }

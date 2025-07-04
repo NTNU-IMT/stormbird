@@ -14,7 +14,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// Struct to represent fields necessary to define the motion of a rigid body.
 /// 
-/// Reference: https://en.wikipedia.org/wiki/Rigid_body_dynamics
+/// Reference: <https://en.wikipedia.org/wiki/Rigid_body_dynamics>
 pub struct RigidBodyMotion {
     pub translation: SpatialVector<3>,
     pub rotation: SpatialVector<3>,

@@ -28,8 +28,11 @@ use sampling::SamplingSettings;
 use builder::ActuatorLineBuilder;
 use solver::SolverSettings;
 
-use corrections::lifting_line::LiftingLineCorrection;
-use corrections::empirical_circulation::EmpiricalCirculationCorrection;
+use corrections::{
+    lifting_line::LiftingLineCorrection,
+    empirical_circulation::EmpiricalCirculationCorrection,
+    empirical_angle_of_attack::EmpiricalAngleOfAttackCorrection,
+};
 
 #[derive(Debug, Clone)]
 /// Structure for representing an actuator line model. 
@@ -60,7 +63,8 @@ pub struct ActuatorLine {
     pub lifting_line_correction: Option<LiftingLineCorrection>,
     /// Empirical correction for the circulation strength, also known as a tip loss factor
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
-    
+    /// Empirical correction fot the angle of attack
+    pub empirical_angle_of_attack_correction: Option<EmpiricalAngleOfAttackCorrection>,
 }
 
 impl ActuatorLine {
@@ -167,50 +171,6 @@ impl ActuatorLine {
         self.current_iteration += 1;
     }
 
-    pub fn lifting_line_velocity_correction(
-        &mut self, 
-        time_step: f64,
-        circulation_strength: &[f64],
-        ctrl_points_velocity: &[SpatialVector<3>]
-    ) -> Option<Vec<SpatialVector<3>>> {
-        if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
-            if !lifting_line_correction.initialized {
-                let mut wake_building_velocity = SpatialVector::<3>::default();
-
-                for i in 0..ctrl_points_velocity.len() {
-                    wake_building_velocity += ctrl_points_velocity[i];
-                }
-                wake_building_velocity /= ctrl_points_velocity.len() as f64;
-                
-                lifting_line_correction.initialize_with_velocity_and_time_step(
-                    &self.line_force_model, 
-                    wake_building_velocity, 
-                    time_step
-                );
-
-                lifting_line_correction.initialize_line_force_model_data(
-                    &self.line_force_model, 
-                    ctrl_points_velocity
-                );
-            }
-
-            lifting_line_correction.update_before_solving(time_step, &self.line_force_model);
-
-            let velocity_correction = lifting_line_correction
-                .correction_for_lift_induced_velocities(circulation_strength);
-
-            lifting_line_correction.update_after_solving(
-                &self.line_force_model, 
-                circulation_strength,
-                ctrl_points_velocity
-            );
-
-            Some(velocity_correction)
-        } else {
-            None
-        }
-    }
-
     /// Function to update the controller in the model, if the controller is present.
     pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
         if self.current_iteration >= self.start_iteration {
@@ -250,14 +210,27 @@ impl ActuatorLine {
     }
 
     pub fn corrected_ctrl_points_velocity(&self) -> Vec<SpatialVector<3>> {
-        if self.sampling_settings.remove_span_velocity {
+        let mut corrected_velocity = if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
                 &self.ctrl_points_velocity, 
                 CoordinateSystem::Global
             )
         } else {
             self.ctrl_points_velocity.clone()
+        };
+
+        for i in 0..corrected_velocity.len() {
+            corrected_velocity[i] *= self.sampling_settings.correction_factor;
         }
+
+        if let Some(empirical_angle_of_attack_correction) = &self.empirical_angle_of_attack_correction {
+            corrected_velocity = empirical_angle_of_attack_correction.solve_correction(
+                &self.line_force_model, 
+                &corrected_velocity
+            );
+        }
+
+        corrected_velocity
     }
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
@@ -269,35 +242,19 @@ impl ActuatorLine {
             &corrected_ctrl_points_velocity, CoordinateSystem::Global
         );
 
-        if let Some(_) = &self.lifting_line_correction {
-            let ll_damping = 0.1;
-
-            let mut ll_corrected_ctrl_points_velocity = corrected_ctrl_points_velocity.clone();
-
-            for _ in 0..10 {
-                let velocity_correction = self.lifting_line_velocity_correction(
-                    time_step, 
-                    &new_estimated_circulation_strength, 
-                    &corrected_ctrl_points_velocity
-                ).unwrap();
-
-                for j in 0..corrected_ctrl_points_velocity.len() {
-                    ll_corrected_ctrl_points_velocity[j] = corrected_ctrl_points_velocity[j] + velocity_correction[j];
-                }
-
-                let ll_estimated_circulation_strength = self.line_force_model.circulation_strength(
-                    &ll_corrected_ctrl_points_velocity, 
-                    CoordinateSystem::Global
+        if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
+            let (
+                ll_corrected_ctrl_points_velocity, 
+                ll_new_estimated_circulation_strength) = 
+                lifting_line_correction.solve_correction(
+                    time_step,
+                    &self.line_force_model, 
+                    &corrected_ctrl_points_velocity, 
+                    &new_estimated_circulation_strength
                 );
 
-                for j in 0..new_estimated_circulation_strength.len() {
-                    new_estimated_circulation_strength[j] += 
-                        ll_damping * (ll_estimated_circulation_strength[j] - new_estimated_circulation_strength[j]);
-                }
-            }
-
             corrected_ctrl_points_velocity = ll_corrected_ctrl_points_velocity;
-
+            new_estimated_circulation_strength = ll_new_estimated_circulation_strength;
         }
 
         if let Some(empirical_circulation_correction) = &self.empirical_circulation_correction {
@@ -310,20 +267,20 @@ impl ActuatorLine {
             }
         }
 
-        let circulation_strength = if self.solver_settings.strength_damping > 0.0 {
-
-            let previous_strength = if let Some(simulation_result) = &self.simulation_result {
-                simulation_result.force_input.circulation_strength.clone()
-            } else {
-                vec![0.0; self.line_force_model.nr_span_lines()]
-            };
-
-            new_estimated_circulation_strength.iter().zip(previous_strength.iter()).map(|(new, old)| {
-                old + (1.0 - self.solver_settings.strength_damping) * (new - old)
-            }).collect()
+        let previous_strength = if let Some(simulation_result) = &self.simulation_result {
+            simulation_result.force_input.circulation_strength.clone()
         } else {
-            new_estimated_circulation_strength
+            vec![0.0; self.line_force_model.nr_span_lines()]
         };
+
+        let mut circulation_strength = Vec::with_capacity(new_estimated_circulation_strength.len());
+        for i in 0..new_estimated_circulation_strength.len() {
+            let strength_difference = new_estimated_circulation_strength[i] - previous_strength[i];
+
+            circulation_strength.push(
+                previous_strength[i] + self.solver_settings.damping_factor * strength_difference
+            );
+        }
 
         let residual = self.line_force_model.average_residual_absolute(
             &circulation_strength, 
@@ -340,24 +297,30 @@ impl ActuatorLine {
     }
 
     /// Writes the resulting values from the line force model to a file. 
-    pub fn write_results(&self) {
+    pub fn write_results(&self, folder_path: &str) {
         if let Some(simulation_result) = &self.simulation_result {
             let (header, data) = simulation_result.as_reduced_flatten_csv_string();
 
+            let force_file_path = format!("{}/stormbird_forces.csv", folder_path);
+
             let _ = io_utils::csv_data::create_or_append_header_and_data_strings_file(
-                "actuator_line_results.csv", 
+                &force_file_path, 
                 &header, 
                 &data
             );
 
             if self.current_iteration % self.write_iterations_full_result == 0 {
-                let folder_path = "actuator_line_results";
-                io_utils::folder_managment::ensure_folder_exists(&folder_path).unwrap();
+                let result_folder_path = Path::new(folder_path).join("stormbird_full_results");
+                io_utils::folder_management::ensure_folder_exists(&result_folder_path).unwrap();
 
                 let json_string = serde_json::to_string_pretty(&simulation_result).unwrap();
 
                 io_utils::write_text_to_file(
-                    format!("{}/actuator_line_result_{}.json", folder_path, self.current_iteration).as_str(), 
+                    format!(
+                        "{}/full_results_{}.json", 
+                        result_folder_path.to_str().unwrap(), 
+                        self.current_iteration
+                    ).as_str(), 
                     &json_string
                 ).unwrap();
             }

@@ -10,8 +10,11 @@ use super::sampling::SamplingSettings;
 use super::solver::SolverSettings;
 use super::ActuatorLine;
 
-use super::corrections::lifting_line::LiftingLineCorrection;
-use super::corrections::empirical_circulation::EmpiricalCirculationCorrection;
+use super::corrections::{
+    lifting_line::LiftingLineCorrectionBuilder,
+    empirical_circulation::EmpiricalCirculationCorrection,
+    empirical_angle_of_attack::EmpiricalAngleOfAttackCorrection,
+};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,9 +35,11 @@ pub struct ActuatorLineBuilder {
     #[serde(default)]
     pub start_iteration: usize,
     #[serde(default)]
-    pub use_lifting_line_correction: bool,
+    pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>
+    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    #[serde(default)]
+    pub empirical_angle_of_attack_correction: Option<EmpiricalAngleOfAttackCorrection>,
 }
 
 impl ActuatorLineBuilder {
@@ -49,8 +54,9 @@ impl ActuatorLineBuilder {
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
             start_iteration: 0,
-            use_lifting_line_correction: false,
+            lifting_line_correction: None,
             empirical_circulation_correction: None,
+            empirical_angle_of_attack_correction: None,
         }
     }
 
@@ -66,21 +72,18 @@ impl ActuatorLineBuilder {
             None
         };
 
-        let lifting_line_correction = if self.use_lifting_line_correction {
+        let lifting_line_correction = if let Some(lifting_line_correction_builder) = &self.lifting_line_correction {
             let viscous_core_length = 0.5 * (
                 self.projection_settings.projection_function.chord_factor +
                 self.projection_settings.projection_function.thickness_factor
             );
-
+            
             Some(
-                LiftingLineCorrection::new(
-                    viscous_core_length,
-                    &line_force_model
-                )
+                lifting_line_correction_builder.build(viscous_core_length, &line_force_model)
             )
         } else {
             None
-        };  
+        };
 
         ActuatorLine{
             line_force_model,
@@ -95,6 +98,7 @@ impl ActuatorLineBuilder {
             simulation_result: None,
             lifting_line_correction,
             empirical_circulation_correction: self.empirical_circulation_correction.clone(),
+            empirical_angle_of_attack_correction: self.empirical_angle_of_attack_correction.clone(),
         }
     }
 }

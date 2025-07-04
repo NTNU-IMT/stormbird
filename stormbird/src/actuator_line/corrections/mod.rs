@@ -4,3 +4,4 @@
 
 pub mod lifting_line;
 pub mod empirical_circulation;
+pub mod empirical_angle_of_attack;

@@ -429,8 +429,21 @@ impl LineForceModel {
         total_area
     }
 
+    pub fn projected_areas(&self) -> Vec<f64> {
+        let mut areas = vec![0.0; self.nr_wings()];
+
+        for i in 0..self.nr_span_lines() {
+            let wing_index = self.wing_index_from_global(i);
+
+            areas[wing_index] +=
+                self.chord_vectors_local[i].length() * self.span_lines_local[i].length();
+        }
+
+        areas
+    }
+
     /// returns the span length of each wing in the model
-    pub fn wing_span_lengths(&self) -> Vec<f64> {
+    pub fn span_lengths(&self) -> Vec<f64> {
         let mut span_length = vec![0.0; self.nr_wings()];
 
         for i in 0..self.nr_span_lines() {
@@ -440,6 +453,23 @@ impl LineForceModel {
         }
 
         span_length
+    }
+
+    pub fn aspect_ratios(&self) -> Vec<f64> {
+        let areas = self.projected_areas();
+        let span_lengths = self.span_lengths();
+
+        let mut aspect_ratios = vec![0.0; self.nr_wings()];
+
+        for i in 0..self.nr_wings() {
+            if span_lengths[i] > 0.0 {
+                aspect_ratios[i] = (span_lengths[i].powi(2)) / areas[i];
+            } else {
+                aspect_ratios[i] = 0.0;
+            }
+        }
+
+        aspect_ratios
     }
 
     /// Shorthand for quickly calculating the typical force factor used when presenting
