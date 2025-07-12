@@ -235,7 +235,7 @@ impl ActuatorLine {
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn solve(&mut self, time_step: f64) -> SolverResult {
+    pub fn solve(&mut self, _time_step: f64) -> SolverResult {
         let mut corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity();
         
         let mut new_estimated_circulation_strength = self.line_force_model.circulation_strength(
@@ -247,7 +247,6 @@ impl ActuatorLine {
                 ll_corrected_ctrl_points_velocity, 
                 ll_new_estimated_circulation_strength) = 
                 lifting_line_correction.solve_correction(
-                    time_step,
                     &self.line_force_model, 
                     &corrected_ctrl_points_velocity, 
                     &new_estimated_circulation_strength

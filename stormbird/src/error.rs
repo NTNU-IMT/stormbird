@@ -1,11 +1,23 @@
 
+// Copyright (C) 2024, NTNU
+// Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+
+
+//! An implementation of a common error type that is used throughout the library.
+
 use serde_json;
 use std::fmt;
 
 #[derive(Debug)]
+/// A common error type intended to represent the various error that can occur while suing this
+/// library.
 pub enum Error {
+    /// Interface to the standard library IO error
     IoError(std::io::Error),
+    /// Interface to the Serde JSON error
     SerdeJsonError(serde_json::Error),
+    /// A custom error that can be created from a string
     CustomStringError(String),
 }
 

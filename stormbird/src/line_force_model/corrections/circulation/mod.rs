@@ -4,6 +4,7 @@
 
 pub mod prescribed;
 pub mod elliptic_end_correction;
+pub mod remove_stall_saw_tooths;
 
 use serde::{Serialize, Deserialize};
 

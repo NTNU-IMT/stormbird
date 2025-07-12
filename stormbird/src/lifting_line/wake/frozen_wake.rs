@@ -1,5 +1,7 @@
 
 use stormath::spatial_vector::SpatialVector;
+use crate::line_force_model::span_line::SpanLine;
+use crate::lifting_line::singularity_elements::panel::Panel;
 
 use stormath::array2::Array2;
 
@@ -44,6 +46,61 @@ impl FrozenWake {
             fixed_velocities,
             variable_velocity_factors,
         }
+    }
+
+    /// Function to create a steady frozen wake from a set of span lines, a wake direction and a
+    /// wake length.
+    pub fn steady_wake_from_span_lines_and_direction(
+        span_lines: &[SpanLine],
+        wake_vector: SpatialVector<3>,
+        viscous_core_length: f64,
+        far_field_ratio: f64,
+    ) -> Self {
+        let nr_span_lines = span_lines.len();
+
+        let ctrl_points: Vec<SpatialVector<3>> = span_lines.iter().map(
+            |span_line| span_line.ctrl_point()
+        ).collect();
+
+        let fixed_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
+        let mut variable_velocity_factors = Array2::new_default(
+            [nr_span_lines, nr_span_lines]
+        );
+
+        let mut panels: Vec<Panel> = Vec::with_capacity(nr_span_lines);
+
+        for i in 0..nr_span_lines {
+            let points = [
+                span_lines[i].start_point + wake_vector,
+                span_lines[i].start_point,
+                span_lines[i].end_point,
+                span_lines[i].end_point + wake_vector,
+            ];
+            let panel = Panel::new(
+                points,
+                far_field_ratio, 
+                viscous_core_length,
+            );
+            panels.push(panel);
+        }
+
+        for row_index in 0..nr_span_lines {
+            let ctrl_point = ctrl_points[row_index];
+
+            for col_index in 0..nr_span_lines {
+                let panel = &panels[col_index];
+
+                let induced_velocity = panel.induced_velocity_with_unit_strength(ctrl_point);
+
+                variable_velocity_factors[[row_index, col_index]] = induced_velocity;
+            }
+        }
+
+        FrozenWake {
+            fixed_velocities,
+            variable_velocity_factors,
+        }
+
     }
 
     pub fn update(&mut self, wake: &Wake) {

@@ -1,14 +1,7 @@
 
 
-use crate::lifting_line::wake::{
-    Wake,
-    frozen_wake::FrozenWake,
-    builders::SteadyWakeBuilder,
-    builders::ViscousCoreLength,
-    line_force_model_data::LineForceModelData,
-};
 
-use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondition;
+use crate::lifting_line::wake::frozen_wake::FrozenWake;
 
 use crate::line_force_model::LineForceModel;
 
@@ -18,6 +11,8 @@ use stormath::spatial_vector::SpatialVector;
 
 use serde::{Serialize, Deserialize};
 
+/// A builder for the [LiftingLineCorrection] struct. See the documentation for
+/// [LiftingLineCorrection] for more information on how it works.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LiftingLineCorrectionBuilder {
@@ -26,7 +21,7 @@ pub struct LiftingLineCorrectionBuilder {
     #[serde(default = "LiftingLineCorrectionBuilder::default_solver_damping_factor")]
     pub solver_damping_factor: f64,
     #[serde(default = "LiftingLineCorrectionBuilder::default_nr_solver_iterations")]
-    pub nr_solver_iterations: usize,
+    pub nr_solver_iterations: usize
 }
 
 impl LiftingLineCorrectionBuilder {
@@ -36,7 +31,7 @@ impl LiftingLineCorrectionBuilder {
 
     pub fn build(
         &self, 
-        viscous_core_length: f64, 
+        viscous_core_length_factor: f64, 
         line_force_model: &LineForceModel
     ) -> LiftingLineCorrection {
         let chord_lengths: Vec<f64> = line_force_model.chord_vectors_local.iter().map(
@@ -45,43 +40,18 @@ impl LiftingLineCorrectionBuilder {
 
         let average_chord_length = chord_lengths.iter().sum::<f64>() / chord_lengths.len() as f64;
 
-        let wake_viscous_core = SteadyWakeBuilder {
-            wake_length_factor: 100.0,
-            symmetry_condition: SymmetryCondition::NoSymmetry,
-            viscous_core_length: ViscousCoreLength::Absolute(viscous_core_length * average_chord_length),
-        }.build(line_force_model);
-
-        let wake_default = SteadyWakeBuilder {
-            wake_length_factor: 100.0,
-            symmetry_condition: SymmetryCondition::NoSymmetry,
-            viscous_core_length: ViscousCoreLength::default(),
-        }.build(line_force_model);
+        let viscous_core_length = viscous_core_length_factor * average_chord_length;
 
         let nr_of_lines = line_force_model.nr_span_lines();
-
-        let frozen_wake_viscous_core = FrozenWake::initialize(nr_of_lines);
-        let frozen_wake_default = FrozenWake::initialize(nr_of_lines);
-
-        let felt_ctrl_point_freestream = vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines];
-
-        let previous_line_force_model_data = LineForceModelData::new(
-            &line_force_model,
-            &felt_ctrl_point_freestream,
-            &felt_ctrl_point_freestream,
-        );
 
         let velocity_correction_estimate = vec![SpatialVector::default(); nr_of_lines];
 
         LiftingLineCorrection {
-            wake_viscous_core,
-            wake_default,
-            frozen_wake_viscous_core,
-            frozen_wake_default,
-            previous_line_force_model_data,
-            velocity_correction_estimate,
             initialized: false,
+            viscous_core_length,
             nr_solver_iterations: self.nr_solver_iterations,
             solver_damping_factor: self.solver_damping_factor,
+            velocity_correction_estimate
         }
     }
 }
@@ -89,182 +59,80 @@ impl LiftingLineCorrectionBuilder {
 #[derive(Debug, Clone)]
 /// A structure used to compute corrections for the velocity, based on a lifting line model.
 pub struct LiftingLineCorrection {
-    wake_viscous_core: Wake,
-    wake_default: Wake,
-    frozen_wake_viscous_core: FrozenWake,
-    frozen_wake_default: FrozenWake,
-    previous_line_force_model_data: LineForceModelData,
-    velocity_correction_estimate: Vec<SpatialVector<3>>,
     pub initialized: bool,
+    pub viscous_core_length: f64,
     pub nr_solver_iterations: usize,
     pub solver_damping_factor: f64,
+    velocity_correction_estimate: Vec<SpatialVector<3>>
 }
 
 impl LiftingLineCorrection {
-    pub fn initialize_line_force_model_data(
-        &mut self,
-        line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector<3>],
-    ) {
-        self.previous_line_force_model_data = LineForceModelData::new(
-            line_force_model,
-            ctrl_points_velocity,
-            ctrl_points_velocity,
-        );
-    }
-
-    pub fn initialize_with_velocity_and_time_step(
-        &mut self,
-        line_force_model: &LineForceModel,
-        wake_building_velocity: SpatialVector<3>,
-        time_step: f64,
-    ) {
-        self.wake_viscous_core.initialize_with_velocity_and_time_step(
-            line_force_model,
-            wake_building_velocity,
-            time_step,
-        );
-
-        self.wake_default.initialize_with_velocity_and_time_step(
-            line_force_model,
-            wake_building_velocity,
-            time_step,
-        );
-
-        self.frozen_wake_viscous_core.update(&self.wake_viscous_core);
-        self.frozen_wake_default.update(&self.wake_default);
-
-        self.initialized = true;
-    }
-
-    pub fn correction_for_lift_induced_velocities(&self, circulation_strength: &[f64]) -> Vec<SpatialVector<3>> {
-        let u_i_viscous_core = self.frozen_wake_viscous_core
-            .induced_velocities_at_control_points(circulation_strength);
-
-        let u_i_default = self.frozen_wake_default
-            .induced_velocities_at_control_points(circulation_strength);
-
-        let mut u_i_correction = Vec::with_capacity(u_i_viscous_core.len());
-
-        for i in 0..u_i_viscous_core.len() {
-            u_i_correction.push(u_i_default[i] - u_i_viscous_core[i]);
-        }
-
-        u_i_correction
-    }
-
-    pub fn update_before_solving(
-        &mut self, 
-        time_step: f64,
-        line_force_model: &LineForceModel
-    ) {
-        self.wake_viscous_core.update_before_solving(
-            time_step, 
-            line_force_model, 
-            &self.previous_line_force_model_data
-        );
-
-        self.wake_default.update_before_solving(
-            time_step, 
-            line_force_model, 
-            &self.previous_line_force_model_data
-        );
-
-        self.frozen_wake_viscous_core.update(
-            &self.wake_viscous_core
-        );
-
-        self.frozen_wake_default.update(
-            &self.wake_default
-        );
-    }
-
-    pub fn wake_point_freestream_from_ctrl_point_values(
-        &self,
-        ctrl_points_velocity: &[SpatialVector<3>]
-    ) -> Vec<SpatialVector<3>> {
-        let averaged_velocity = ctrl_points_velocity.iter().sum::<SpatialVector<3>>() / ctrl_points_velocity.len() as f64;
-
-        let nr_wake_points = self.wake_viscous_core.points.len();
-
-        let wake_points_freestream = vec![averaged_velocity; nr_wake_points];
-
-        wake_points_freestream
-    }
-
-    pub fn update_after_solving(
-        &mut self, 
-        line_force_model: &LineForceModel,
-        new_circulation_strength: &[f64],
-        ctrl_points_velocity: &[SpatialVector<3>]
-    ) {
-        let wake_points_freestream = self.wake_point_freestream_from_ctrl_point_values(
-            ctrl_points_velocity
-        );
-
-        self.wake_viscous_core.update_after_solving(
-            new_circulation_strength, 
-            &wake_points_freestream
-        );
-
-        self.wake_default.update_after_solving(
-            new_circulation_strength, 
-            &wake_points_freestream
-        );
-
-        self.previous_line_force_model_data = LineForceModelData::new(
-            line_force_model,
-            ctrl_points_velocity,
-            ctrl_points_velocity,
-        );
-    }
-
     pub fn velocity_correction(
         &mut self,
-        time_step: f64,
         line_force_model: &LineForceModel,
-        circulation_strength: &[f64],
         ctrl_points_velocity: &[SpatialVector<3>],
+        circulation_strength: &[f64],
     ) -> Vec<SpatialVector<3>> {
-        if !self.initialized {
-            let mut wake_building_velocity = SpatialVector::<3>::default();
+        let span_lines = line_force_model.span_lines();
 
-            for i in 0..ctrl_points_velocity.len() {
-                wake_building_velocity += ctrl_points_velocity[i];
+        let mut u_i_correction: Vec<SpatialVector<3>> = Vec::with_capacity(span_lines.len());
+
+        for wing_index in 0..line_force_model.nr_wings() {
+            let wind_indices = line_force_model.wing_indices[wing_index].clone();
+
+            let wing_span_lines = &span_lines[
+                wind_indices.clone()
+            ];
+
+            let wing_circulation_strength = &circulation_strength[
+                wind_indices.clone()
+            ];
+
+            let nr_span_lines = wing_span_lines.len();
+
+            let wing_ctrl_points_velocity = &ctrl_points_velocity[
+                wind_indices.clone()
+            ];
+
+            let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector<3>>() 
+                / wing_ctrl_points_velocity.len() as f64;
+
+            let wake_vector = averaged_ctrl_points_velocity.normalize() * 100.0;
+
+            let far_field_ratio = 5.0; // Ratio of far field length to viscous core length
+
+            let frozen_wake_viscous = FrozenWake::steady_wake_from_span_lines_and_direction(
+                wing_span_lines,
+                wake_vector,
+                self.viscous_core_length,
+                far_field_ratio, // far_field_ratio
+            );
+
+            let frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
+                wing_span_lines,
+                wake_vector,
+                self.viscous_core_length / 10.0,
+                far_field_ratio, // far_field_ratio
+            );
+
+            let u_i_viscous = frozen_wake_viscous.induced_velocities_at_control_points(
+                &wing_circulation_strength
+            );
+
+            let u_i_default = frozen_wake_default.induced_velocities_at_control_points(
+                &wing_circulation_strength
+            );
+
+            for i in 0..nr_span_lines {
+                u_i_correction.push(u_i_default[i] - u_i_viscous[i]);
             }
-            wake_building_velocity /= ctrl_points_velocity.len() as f64;
-            
-            self.initialize_with_velocity_and_time_step(
-                &line_force_model, 
-                wake_building_velocity, 
-                time_step
-            );
-
-            self.initialize_line_force_model_data(
-                &line_force_model, 
-                ctrl_points_velocity
-            );
         }
-
-        self.update_before_solving(time_step, &line_force_model);
-
-        let velocity_correction = self
-            .correction_for_lift_induced_velocities(circulation_strength);
-
-        self.update_after_solving(
-            &line_force_model, 
-            circulation_strength,
-            ctrl_points_velocity
-        );
-
-        velocity_correction
-
         
+        u_i_correction   
     }
 
     pub fn solve_correction(
         &mut self,
-        time_step: f64,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector<3>],
         circulation_strength: &[f64],
@@ -277,10 +145,9 @@ impl LiftingLineCorrection {
 
         for _ in 0..self.nr_solver_iterations {
             let new_velocity_correction_estimate: Vec<SpatialVector<3>> = self.velocity_correction(
-                time_step,
                 line_force_model,
-                &corrected_circulation_strength, 
-                &corrected_ctrl_points_velocity
+                ctrl_points_velocity,
+                &corrected_circulation_strength,
             );
 
             for j in 0..corrected_ctrl_points_velocity.len() {

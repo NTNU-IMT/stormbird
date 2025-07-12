@@ -73,13 +73,13 @@ impl ActuatorLineBuilder {
         };
 
         let lifting_line_correction = if let Some(lifting_line_correction_builder) = &self.lifting_line_correction {
-            let viscous_core_length = 0.5 * (
+            let viscous_core_length_factor = 0.5 * (
                 self.projection_settings.projection_function.chord_factor +
                 self.projection_settings.projection_function.thickness_factor
             );
             
             Some(
-                lifting_line_correction_builder.build(viscous_core_length, &line_force_model)
+                lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)
             )
         } else {
             None
