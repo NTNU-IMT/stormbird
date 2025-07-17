@@ -1,5 +1,5 @@
 
-use stormath::optimization::particle_swarm::{
+use stormath::optimize::particle_swarm::{
     SwarmState,
     SwarmResult,
     ParticleSwarm

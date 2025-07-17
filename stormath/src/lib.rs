@@ -19,5 +19,5 @@ pub mod finite_difference;
 pub mod spatial_vector;
 pub mod special_functions;
 pub mod solvers;
-pub mod array2;
-pub mod optimization;
+pub mod matrix;
+pub mod optimize;

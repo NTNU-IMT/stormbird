@@ -1,6 +1,6 @@
 
 
-use crate::array2::Array2;
+use crate::matrix::Matrix;
 
 use serde::{Serialize, Deserialize};
 
@@ -11,9 +11,9 @@ pub struct SwarmState {
     /// The current iteration of the swarm
     pub iteration: usize,
     /// The current position of the particles in the swarm
-    pub position: Array2<f64>,
+    pub position: Matrix<f64>,
     /// The velocity that brought the particles to their current position
-    pub velocity: Array2<f64>,
+    pub velocity: Matrix<f64>,
 }
 
 impl SwarmState {
@@ -31,7 +31,7 @@ pub struct SwarmResult {
     /// The function values of the particles in the swarm
     pub function_values: Vec<f64>,
     /// The historical best position of each particle in the swarm
-    pub local_best_positions: Array2<f64>,
+    pub local_best_positions: Matrix<f64>,
     /// The historical best function value of each particle in the swarm
     pub local_best_function_values: Vec<f64>,
     /// The historical best position of all the particles in the swarm
@@ -44,7 +44,7 @@ impl SwarmResult {
     pub fn new(nr_particles: usize, nr_dimensions: usize) -> Self {
         let mut function_values = Vec::with_capacity(nr_particles);
         let mut global_best_position = Vec::with_capacity(nr_dimensions);
-        let local_best_positions = Array2::new_default(
+        let local_best_positions = Matrix::new_default(
             [nr_particles, nr_dimensions]
         );
         let mut local_best_function_values = Vec::with_capacity(nr_particles);
@@ -133,7 +133,7 @@ impl ParticleSwarm {
     pub fn initial_state(&self) -> SwarmState {
         let mut rng = rand::rng();
 
-        let mut position = Array2::new_default(
+        let mut position = Matrix::new_default(
             [self.nr_particles, self.nr_dimensions]
         );
 
@@ -143,7 +143,7 @@ impl ParticleSwarm {
             }
         }
 
-        let mut velocity = Array2::new_default(
+        let mut velocity = Matrix::new_default(
             [self.nr_particles, self.nr_dimensions]
         );
 
@@ -172,7 +172,7 @@ impl ParticleSwarm {
 
     /// Computes a new velocities for the particles in the swarm, to be used to move them in the 
     /// next generation
-    pub fn compute_velocity(&self, state: &SwarmState, result: &SwarmResult) -> Array2<f64> {
+    pub fn compute_velocity(&self, state: &SwarmState, result: &SwarmResult) -> Matrix<f64> {
         if state.nr_particles() != self.nr_particles {
             panic!(
                 "Particle swarm size mismatch: expected {}, got {}", 
@@ -187,7 +187,7 @@ impl ParticleSwarm {
             );
         }
 
-        let mut velocity = Array2::new_default(
+        let mut velocity = Matrix::new_default(
             [self.nr_particles, self.nr_dimensions]
         );
 

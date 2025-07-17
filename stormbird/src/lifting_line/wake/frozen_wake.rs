@@ -3,7 +3,7 @@ use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 use crate::lifting_line::singularity_elements::panel::Panel;
 
-use stormath::array2::Array2;
+use stormath::matrix::Matrix;
 
 use rayon::prelude::*;
 
@@ -31,14 +31,14 @@ pub struct FrozenWake {
     /// point. Each column for a given row corresponds to the induced velocity from each panel. The 
     /// induced velocity can therefore be calculated as the dot product of the row and the 
     /// circulation strength.
-    pub variable_velocity_factors: Array2<SpatialVector<3>>,
+    pub variable_velocity_factors: Matrix<SpatialVector<3>>,
 }
 
 impl FrozenWake {
     pub fn initialize(nr_span_lines: usize) -> Self {
         let fixed_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
 
-        let variable_velocity_factors = Array2::new_default(
+        let variable_velocity_factors = Matrix::new_default(
             [nr_span_lines, nr_span_lines]
         );
 
@@ -63,7 +63,7 @@ impl FrozenWake {
         ).collect();
 
         let fixed_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
-        let mut variable_velocity_factors = Array2::new_default(
+        let mut variable_velocity_factors = Matrix::new_default(
             [nr_span_lines, nr_span_lines]
         );
 
@@ -117,11 +117,15 @@ impl FrozenWake {
     pub fn update_variable_velocity_factors(&mut self, wake: &Wake) {
         let ctrl_points = wake.ctrl_points();
 
-        let indices_logic = self.variable_velocity_factors.indices.clone();
+        let mut indices_vector: Vec<[usize; 2]> = Vec::with_capacity(self.variable_velocity_factors.data.len());
+
+        for i in 0..self.variable_velocity_factors.data.len() {
+            indices_vector.push(self.variable_velocity_factors.indices_from_index(i));
+        }
 
         if wake.settings.neglect_self_induced_velocities {
             self.variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let indices = indices_logic.indices_from_index(flat_index);
+                let indices = indices_vector[flat_index];
 
                 let ctrl_point_index = indices[0];
                 let panel_index = indices[1];
@@ -141,7 +145,7 @@ impl FrozenWake {
             });
         } else {
             self.variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let indices = indices_logic.indices_from_index(flat_index);
+                let indices = indices_vector[flat_index];
 
                 let ctrl_point_index = indices[0];
                 let panel_index = indices[1];
@@ -168,7 +172,7 @@ impl FrozenWake {
             |(i_row, u_fixed)| {
                 let mut induced_velocity = *u_fixed;
 
-                for i_col in 0..self.variable_velocity_factors.indices.shape[1] {
+                for i_col in 0..self.variable_velocity_factors.shape[1] {
                     induced_velocity += 
                         self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
                 }
