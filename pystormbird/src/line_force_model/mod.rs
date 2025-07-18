@@ -14,11 +14,6 @@ use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
-use stormbird::line_force_model::corrections::smoothing::{
-    ValueTypeToBeSmoothed,
-    GaussianSmoothing
-};
-
 #[pyclass]
 #[derive(Clone)]
 pub struct LineForceModel {
@@ -49,28 +44,6 @@ impl LineForceModel {
         let rust_velocity: Vec<SpatialVectorRust<3>> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
         
         self.data.angles_of_attack(&rust_velocity, CoordinateSystem::Global)
-    }
-
-    #[pyo3(signature = (
-        *,
-        noisy_strength, 
-        length_factor,
-    ))]
-    pub fn gaussian_smoothed_strength(
-        &self, 
-        noisy_strength: Vec<f64>, 
-        length_factor: f64, 
-    ) -> Vec<f64> {
-        let settings = GaussianSmoothing {
-            length_factor,
-            ..Default::default()
-        };
-
-        self.data.gaussian_smoothed_values(
-            &noisy_strength, 
-            &settings, 
-            ValueTypeToBeSmoothed::Circulation
-        )
     }
 
     #[getter]

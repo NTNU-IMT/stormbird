@@ -21,3 +21,4 @@ pub mod special_functions;
 pub mod solvers;
 pub mod matrix;
 pub mod optimize;
+pub mod rigid_body_motion;

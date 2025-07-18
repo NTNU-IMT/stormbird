@@ -13,6 +13,7 @@ use stormath::{
     spatial_vector::transformations::RotationType,
     statistics::mean, 
     interpolation::linear_interpolation,
+    rigid_body_motion::RigidBodyMotion
 };
 
 pub mod builder;
@@ -21,9 +22,6 @@ pub mod span_line;
 
 pub mod corrections;
 pub mod prelude;
-pub mod single_wing;
-
-pub mod rigid_body_motion;
 
 #[cfg(test)]
 mod tests;
@@ -33,13 +31,11 @@ use crate::section_models::SectionModel;
 
 use crate::controllers::LineForceModelState;
 
-use self::rigid_body_motion::RigidBodyMotion;
-
 use corrections::{
     circulation::CirculationCorrection,
     angle_of_attack::AngleOfAttackCorrection,
 };
-use single_wing::SingleWing;
+use builder::single_wing::SingleWing;
 use span_line::*;
 
 #[derive(Clone, Debug)]
@@ -634,5 +630,22 @@ impl LineForceModel {
             local_wing_angles: self.local_wing_angles.clone(),
             section_models_internal_state: self.section_models_internal_state(),
         }
+    }
+
+    /// Returns the effective non-dimensional span distance values for each control point.
+    pub fn effective_relative_span_distance(&self) -> Vec<f64> {
+        let relative_span_distance = self.relative_span_distance();
+
+        relative_span_distance.iter().enumerate().map(
+            |(index, value)| {
+                let wing_index = self.wing_index_from_global(index);
+                    match self.non_zero_circulation_at_ends[wing_index] {
+                        [true, true] => *value, // TODO: consider if this case should behave differently. Not clear how it should be handled....
+                        [true, false] => (value + 0.5) / 2.0,
+                        [false, true] => (value - 0.5) / 2.0,
+                        [false, false] => *value
+                    }
+            }
+        ).collect()
     }
 }

@@ -4,7 +4,7 @@
 
 use std::f64::consts::PI;
 
-use stormath::spatial_vector::{
+use crate::spatial_vector::{
     SpatialVector,
     transformations::RotationType
 };

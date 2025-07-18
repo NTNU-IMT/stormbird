@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 use pyo3::types::PyType;
 
-use stormbird::line_force_model::single_wing::WingBuilder as WingBuilderRust;
+use stormbird::line_force_model::builder::single_wing::WingBuilder as WingBuilderRust;
 use stormbird::line_force_model::builder::LineForceModelBuilder as LineForceModelBuilderRust;
 
 use crate::spatial_vector::SpatialVector;

@@ -2,16 +2,35 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! An implementation block for the [line force model](LineForceModel) that contains the functions 
+//! that calculates the forces on line elements and on the wings. 
+//! 
+//! These are generally used as the last step in a simulation method using the line force model.
+//! 
+//! # Available methods
+//! The methods available in this implementation block are:
+//! - [`felt_ctrl_points_velocity`](LineForceModel::felt_ctrl_points_velocity)
+//! - [`angles_of_attack`](LineForceModel::angles_of_attack)
+//! - [`lift_coefficients`](LineForceModel::lift_coefficients)
+//! - [`circulation_strength`](LineForceModel::circulation_strength)
+//! - [`circulation_strength_raw`](LineForceModel::circulation_strength_raw)
+//! - [`viscous_drag_coefficients`](LineForceModel::viscous_drag_coefficients)
+//! - [`sectional_force_input`](LineForceModel::sectional_force_input)
+//! - [`sectional_forces`](LineForceModel::sectional_forces)
+//! - [`sectional_circulatory_forces`](LineForceModel::sectional_circulatory_forces)
+//! - [`sectional_drag_forces`](LineForceModel::sectional_drag_forces)
+//! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
+//! - [`sectional_gyroscopic_force`](LineForceModel::sectional_gyroscopic_force)
+//! - [`lift_from_circulation`](LineForceModel::lift_from_circulation)
+//! - [`lift_from_coefficients`](LineForceModel::lift_from_coefficients)
+//! - [`residual`](LineForceModel::residual)
+//! - [`residual_absolute`](LineForceModel::residual_absolute)
+//! - [`average_residual_absolute`](LineForceModel::average_residual_absolute)
+//! - [`amount_of_flow_separation`](LineForceModel::amount_of_flow_separation)
+//! - [`calculate_simulation_result`](LineForceModel::calculate_simulation_result)
+
 use super::*;
 
-use super::corrections::{
-    smoothing::ValueTypeToBeSmoothed,
-    circulation::prescribed::PrescribedCirculationShape,
-};
-
-/// This implementation block contains the functions that calculates the forces on line elements and
-/// on the wings. These are generally used as the last step in a simulation method using the
-/// line force model.
 impl LineForceModel {
     /// Function used to calculate the *felt* velocity at each control point. That is, 
     /// the input velocity minus the motion velocity at each control point.
@@ -62,12 +81,8 @@ impl LineForceModel {
 
         match &self.angle_of_attack_correction {
             AngleOfAttackCorrection::None => angles_of_attack,
-            AngleOfAttackCorrection::GaussianSmoothing(settings) => {
-                self.gaussian_smoothed_values(
-                    &angles_of_attack, 
-                    &settings, 
-                    ValueTypeToBeSmoothed::AngleOfAttack
-                )
+            AngleOfAttackCorrection::GaussianSmoothing => {
+                todo!()
             }
         }
     }
@@ -116,60 +131,18 @@ impl LineForceModel {
                 velocity, 
                 input_coordinate_system
             ),
-            CirculationCorrection::PrescribedCirculation(shape) =>
-                self.prescribed_circulation_strength(
-                    &velocity,
-                    &shape, 
-                    input_coordinate_system
+            CirculationCorrection::Prescribed(prescribed_circulation) =>
+                self.circulation_strength_prescribed(
+                    velocity,
+                    input_coordinate_system,
+                    prescribed_circulation,
                 ),
-            CirculationCorrection::GaussianSmoothing(settings) => {
-                let raw_strength = self.circulation_strength_raw(
+            CirculationCorrection::Smoothing(circulation_smoothing) => {
+                self.circulation_strength_smoothed(
                     velocity, 
-                    input_coordinate_system
-                );
-
-                let ideal_shape = PrescribedCirculationShape::default();
-
-                let ideal_strength = self.prescribed_circulation_strength(
-                    &velocity,
-                    &ideal_shape, 
-                    input_coordinate_system
-                );
-
-                let subtracted_raw_strength: Vec<f64> = raw_strength.iter()
-                    .zip(ideal_strength.iter())
-                    .map(|(raw, ideal)| raw - ideal)
-                    .collect();
-
-                let smoothed_strength = self.gaussian_smoothed_values(
-                    &subtracted_raw_strength, 
-                    &settings,
-                    ValueTypeToBeSmoothed::Circulation
-                );
-
-                smoothed_strength.iter()
-                    .zip(ideal_strength.iter())
-                    .map(|(smoothed, ideal)| smoothed + ideal)
-                    .collect()
-            },
-            CirculationCorrection::PolynomialSmoothing => {
-                let raw_strength = self.circulation_strength_raw(
-                    velocity, 
-                    input_coordinate_system
-                );
-
-                self.polynomial_smoothed_values(
-                    &raw_strength,
-                    ValueTypeToBeSmoothed::Circulation
+                    input_coordinate_system,
+                    circulation_smoothing
                 )
-            },
-            CirculationCorrection::EllipticEndCorrection => {
-                let raw_strength = self.circulation_strength_raw(
-                    velocity, 
-                    input_coordinate_system
-                );
-
-                self.apply_elliptic_end_correction_to_strength(&raw_strength)
             }
         }
     }

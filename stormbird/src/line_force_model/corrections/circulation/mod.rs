@@ -3,13 +3,12 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 pub mod prescribed;
-pub mod elliptic_end_correction;
-pub mod remove_stall_saw_tooths;
+pub mod smoothing;
 
 use serde::{Serialize, Deserialize};
 
-use prescribed::PrescribedCirculationShape;
-use super::smoothing::GaussianSmoothing;
+use prescribed::PrescribedCirculation;
+use smoothing::CirculationSmoothing;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Enum for controlling what type of correction to apply to the estimated circulation distribution.
@@ -18,14 +17,9 @@ pub enum CirculationCorrection {
     None,
     /// The circulation distribution will be set to a prescribed shape, which will be scaled based
     /// on the estimated circulation.
-    PrescribedCirculation(PrescribedCirculationShape),
+    Prescribed(PrescribedCirculation),
     /// The raw estimated circulation distribution will be smoothed using a Gaussian kernel.
-    GaussianSmoothing(GaussianSmoothing),
-    /// Polynomial smoothing of the estimated circulation distribution.
-    PolynomialSmoothing,
-    /// Correct the ends of the circulation distribution based on an assumption of an elliptical
-    /// circulation distribution.
-    EllipticEndCorrection,
+    Smoothing(CirculationSmoothing)
 }
 
 impl Default for CirculationCorrection {

@@ -10,7 +10,7 @@
 use crate::lifting_line::prelude::*;
 use crate::line_force_model::corrections::circulation::{
     CirculationCorrection,
-    prescribed::PrescribedCirculationShape,
+    prescribed::PrescribedCirculation,
 };
 
 use super::simulation_builder::SimulationBuilder;
@@ -182,8 +182,8 @@ impl Simulation {
 
         self.initialize_line_force_model_data(&felt_ctrl_points_freestream);
 
-        self.line_force_model.circulation_correction = CirculationCorrection::PrescribedCirculation(
-            PrescribedCirculationShape::default()
+        self.line_force_model.circulation_correction = CirculationCorrection::Prescribed(
+            PrescribedCirculation::default()
         );
         self.solver.damping_factor = 0.25_f64.max(old_damping_factor);
 

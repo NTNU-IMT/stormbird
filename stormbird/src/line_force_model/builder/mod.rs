@@ -2,12 +2,16 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Structures and logic for building a [line force model](crate::line_force_model::LineForceModel).
+
 use serde::{Serialize, Deserialize};
 use serde_json;
 
+pub mod single_wing;
+
 use super::*;
 
-use super::single_wing::WingBuilder;
+use single_wing::WingBuilder;
 
 use crate::error::Error;
 

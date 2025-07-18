@@ -16,7 +16,7 @@ use crate::lifting_line::simulation_builder::{
 };
 use crate::line_force_model::corrections::circulation::{
     CirculationCorrection,
-    prescribed::PrescribedCirculationShape
+    prescribed::PrescribedCirculation
 };
 
 use super::test_setup::RectangularWing;
@@ -45,7 +45,9 @@ fn steady_lift() {
     }.build();
 
     let mut prescribed_wing_builder = wing_builder.clone();
-    prescribed_wing_builder.circulation_correction = CirculationCorrection::PrescribedCirculation(PrescribedCirculationShape::default());
+    prescribed_wing_builder.circulation_correction = CirculationCorrection::Prescribed(
+        PrescribedCirculation::default()
+    );
 
     let steady_settings  = SteadySettings::default();
     let dynamic_settings = UnsteadySettings::default();

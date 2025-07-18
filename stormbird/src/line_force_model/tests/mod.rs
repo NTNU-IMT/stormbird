@@ -4,7 +4,7 @@
 
 pub mod motion;
 
-use crate::line_force_model::single_wing::WingBuilder;
+use crate::line_force_model::builder::single_wing::WingBuilder;
 use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::line_force_model::LineForceModel;
 

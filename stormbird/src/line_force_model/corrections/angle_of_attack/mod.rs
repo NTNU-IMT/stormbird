@@ -4,12 +4,10 @@
 
 use serde::{Serialize, Deserialize};
 
-use super::smoothing::GaussianSmoothing;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AngleOfAttackCorrection {
     None,
-    GaussianSmoothing(GaussianSmoothing)
+    GaussianSmoothing
 }
 
 impl Default for AngleOfAttackCorrection {
