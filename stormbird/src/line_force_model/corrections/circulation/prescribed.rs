@@ -56,14 +56,28 @@ impl PrescribedCirculationShape {
         s.iter().map(|&x| self.value(x)).collect()
     }
 
+    pub fn as_params_vector(&self) -> Vec<f64> {
+        vec![
+            1.0,
+            self.inner_power,
+            self.outer_power
+        ]
+    }
+
     pub fn from_params_vector(params: &[f64]) -> Self {
-        if params.len() != 2 {
-            panic!("PrescribedCirculationShape::from_params_vector expects a vector of length 2");
+        if params.len() != 3 {
+            panic!("PrescribedCirculationShape::from_params_vector expects a vector of length 3");
         }
 
         PrescribedCirculationShape {
-            inner_power: params[0],
-            outer_power: params[1],
+            inner_power: params[1],
+            outer_power: params[2],
         }
+    }
+
+    pub fn function_to_curve_fit(s: f64, params: &[f64]) -> f64 {
+        let shape = PrescribedCirculationShape::from_params_vector(params);
+        
+        params[0] * shape.value(s)
     }
 }

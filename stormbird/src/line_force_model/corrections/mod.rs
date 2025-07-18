@@ -21,7 +21,12 @@ use stormath::smoothing::{
     polynomial::CubicPolynomialSmoothing
 };
 
-use circulation::prescribed::PrescribedCirculation;
+use stormath::optimize::curve_fit::CurveFit;
+
+use circulation::prescribed::{
+    PrescribedCirculation,
+    PrescribedCirculationShape
+};
 use circulation::smoothing::{
     CirculationSmoothing,
     SmoothingType
@@ -182,12 +187,32 @@ impl LineForceModel {
 
         let effective_relative_span_distance = self.effective_relative_span_distance();
 
-        let prescribed_circulation_shape = prescribed_circulation.shape.get_values(
+        let prescribed_circulation_shape = if prescribed_circulation.curve_fit_shape_parameters {
+            let curve_fitter = CurveFit{
+                function: PrescribedCirculationShape::function_to_curve_fit,
+                max_iterations: 10,
+                delta_params: 0.0001
+            };
+
+            let initial_params = prescribed_circulation.shape.as_params_vector();
+
+            let resulting_params = curve_fitter.fit_parameters(
+                &effective_relative_span_distance, 
+                &gamma_divided_by_u2, 
+                &initial_params
+            );
+
+            &PrescribedCirculationShape::from_params_vector(&resulting_params)
+        } else {
+            &prescribed_circulation.shape
+        };
+
+        let prescribed_circulation_shape_values = prescribed_circulation_shape.get_values(
             &effective_relative_span_distance
         );
 
         let averaged_prescribed_circulation_shape = self.wing_averaged_values(
-            &prescribed_circulation_shape
+            &prescribed_circulation_shape_values
         );
 
         let mut out: Vec<f64> = Vec::with_capacity(raw_circulation_strength.len());
@@ -204,7 +229,7 @@ impl LineForceModel {
 
             out.push(
                 factor * 
-                prescribed_circulation_shape[i] * 
+                prescribed_circulation_shape_values[i] * 
                 velocity_squared[i]
             )
         }

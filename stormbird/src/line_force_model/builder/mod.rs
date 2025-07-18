@@ -15,6 +15,8 @@ use single_wing::WingBuilder;
 
 use crate::error::Error;
 
+use corrections::circulation::CirculationCorrectionBuilder;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LineForceModelBuilder {
@@ -25,7 +27,7 @@ pub struct LineForceModelBuilder {
     #[serde(default = "LineForceModel::default_density")]
     pub density: f64,
     #[serde(default)]
-    pub circulation_correction: CirculationCorrection,
+    pub circulation_correction: CirculationCorrectionBuilder,
     #[serde(default)]
     pub angle_of_attack_correction: AngleOfAttackCorrection,
     #[serde(default)]
@@ -79,7 +81,11 @@ impl LineForceModelBuilder {
             line_force_model.add_wing(&wing);
         }
 
-        line_force_model.circulation_correction = self.circulation_correction.clone();
+        let circulation_correction = self.circulation_correction.build(
+            &line_force_model
+        );
+
+        line_force_model.circulation_correction = circulation_correction;
         line_force_model.angle_of_attack_correction = self.angle_of_attack_correction.clone();
         
         line_force_model.output_coordinate_system = self.output_coordinate_system;

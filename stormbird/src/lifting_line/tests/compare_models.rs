@@ -15,7 +15,7 @@ use crate::lifting_line::simulation_builder::{
     UnsteadySettings,
 };
 use crate::line_force_model::corrections::circulation::{
-    CirculationCorrection,
+    CirculationCorrectionBuilder,
     prescribed::PrescribedCirculation
 };
 
@@ -45,8 +45,12 @@ fn steady_lift() {
     }.build();
 
     let mut prescribed_wing_builder = wing_builder.clone();
-    prescribed_wing_builder.circulation_correction = CirculationCorrection::Prescribed(
-        PrescribedCirculation::default()
+
+    let mut prescribed_circulation = PrescribedCirculation::default();
+    prescribed_circulation.curve_fit_shape_parameters = true; 
+
+    prescribed_wing_builder.circulation_correction = CirculationCorrectionBuilder::Prescribed(
+        prescribed_circulation
     );
 
     let steady_settings  = SteadySettings::default();

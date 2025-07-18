@@ -5,9 +5,9 @@ use crate::matrix::Matrix;
 /// Settings for fitting data to a function using non-linear least squares. The implementation 
 /// follows the [Levenberg-Marquard method](https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm)
 pub struct CurveFit {
-    function: fn(f64, &[f64]) -> f64,
-    max_iterations: usize,
-    delta_params: f64,
+    pub function: fn(f64, &[f64]) -> f64,
+    pub max_iterations: usize,
+    pub delta_params: f64,
 }
 
 impl CurveFit {
