@@ -58,3 +58,15 @@ where T: Default + Clone + Copy + Debug,
     }
 }
 
+impl Matrix<f64> {
+    pub fn identity(size: usize) -> Self {
+        let mut out = Self::new_default([size, size]);
+
+        for i in 0..size {
+            out[[i, i]] = 1.0; 
+        }
+
+        out
+    }
+}
+

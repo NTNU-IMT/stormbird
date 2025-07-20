@@ -22,3 +22,4 @@ pub mod solvers;
 pub mod matrix;
 pub mod optimize;
 pub mod rigid_body_motion;
+pub mod error;

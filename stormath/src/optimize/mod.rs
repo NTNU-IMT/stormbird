@@ -6,3 +6,4 @@
 
 pub mod particle_swarm;
 pub mod curve_fit;
+pub mod bounded_variable;

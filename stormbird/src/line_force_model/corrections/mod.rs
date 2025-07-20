@@ -21,8 +21,6 @@ use stormath::smoothing::{
     polynomial::CubicPolynomialSmoothing
 };
 
-use stormath::optimize::curve_fit::CurveFit;
-
 use circulation::prescribed::{
     PrescribedCirculation,
     PrescribedCirculationShape
@@ -162,6 +160,8 @@ impl LineForceModel {
         prescribed_circulation: &PrescribedCirculation, 
     ) -> Vec<f64> {
 
+        let nr_wings = self.nr_wings();
+
         let raw_circulation_strength = self.circulation_strength_raw(
             velocity, 
             input_coordinate_system
@@ -187,51 +187,58 @@ impl LineForceModel {
 
         let effective_relative_span_distance = self.effective_relative_span_distance();
 
-        let prescribed_circulation_shape = if prescribed_circulation.curve_fit_shape_parameters {
-            let curve_fitter = CurveFit{
-                function: PrescribedCirculationShape::function_to_curve_fit,
-                max_iterations: 10,
-                delta_params: 0.0001
-            };
+        let prescribed_shape_vector = if prescribed_circulation.curve_fit_shape_parameters {
+            let mut local_shape_vector = Vec::with_capacity(nr_wings);
+            
+            for wing_index in 0..nr_wings {
+                let wing_indices = self.wing_indices[wing_index.clone()].clone();
 
-            let initial_params = prescribed_circulation.shape.as_params_vector();
+                let local_x_data = effective_relative_span_distance[wing_indices.clone()].to_vec();
+                let local_y_data = gamma_divided_by_u2[wing_indices.clone()].to_vec();
 
-            let resulting_params = curve_fitter.fit_parameters(
-                &effective_relative_span_distance, 
-                &gamma_divided_by_u2, 
-                &initial_params
-            );
+                local_shape_vector.push(
+                    PrescribedCirculationShape::from_curve_fit(
+                        &local_x_data, 
+                        &local_y_data, 
+                        &prescribed_circulation.shape.as_params_vector()
+                    )
+                )
+            }
 
-            &PrescribedCirculationShape::from_params_vector(&resulting_params)
+            local_shape_vector
         } else {
-            &prescribed_circulation.shape
+            vec![prescribed_circulation.shape.clone(); nr_wings]
         };
-
-        let prescribed_circulation_shape_values = prescribed_circulation_shape.get_values(
-            &effective_relative_span_distance
-        );
-
-        let averaged_prescribed_circulation_shape = self.wing_averaged_values(
-            &prescribed_circulation_shape_values
-        );
 
         let mut out: Vec<f64> = Vec::with_capacity(raw_circulation_strength.len());
 
-        for i in 0..raw_circulation_strength.len() {
-            let wing_index = self.wing_index_from_global(i);
+        for wing_index in 0..nr_wings {
+            let wing_indices = self.wing_indices[wing_index].clone();
 
-            let factor = if averaged_prescribed_circulation_shape[wing_index] == 0.0 {
-                0.0
-            } else {
-                averaged_gamma_divided_by_u2[wing_index] / 
-                averaged_prescribed_circulation_shape[wing_index]
-            };
+            let local_effective_relative_span_distance = effective_relative_span_distance[wing_indices.clone()].to_vec();
+            let local_velocity_squared = velocity_squared[wing_indices.clone()].to_vec();
 
-            out.push(
-                factor * 
-                prescribed_circulation_shape_values[i] * 
-                velocity_squared[i]
-            )
+            let local_prescribed_circulation_shape_values = prescribed_shape_vector[wing_index].get_values(
+                &local_effective_relative_span_distance
+            );
+
+            let averaged_averaged_prescribed_circulation_value: f64 = local_prescribed_circulation_shape_values.iter()
+                .sum::<f64>() / (local_prescribed_circulation_shape_values.len() as f64);
+
+            for i in 0..local_effective_relative_span_distance.len() {
+                let factor = if averaged_averaged_prescribed_circulation_value == 0.0 {
+                    0.0
+                } else {
+                    averaged_gamma_divided_by_u2[wing_index] / 
+                    averaged_averaged_prescribed_circulation_value
+                };
+
+                out.push(
+                    factor * 
+                    local_prescribed_circulation_shape_values[i] * 
+                    local_velocity_squared[i]
+                );
+            }
         }
 
         out
