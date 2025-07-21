@@ -15,8 +15,21 @@ pub struct CurveFit {
     pub initial_damping_factor: f64,
     pub damping_change_factor: f64,
     pub param_bounds: Option<Vec<BoundedVariable>>,
-    pub tolerance: f64,
-    pub max_step_size: f64,
+    pub tolerance: f64
+}
+
+impl Default for CurveFit {
+    fn default() -> Self {
+        Self {
+            function: |_, _| 0.0,
+            max_iterations: 1000,
+            delta_params: 0.0001,
+            initial_damping_factor: 1.0,
+            damping_change_factor: 10.0,
+            param_bounds: None,
+            tolerance: 1e-12
+        }
+    }
 }
 
 impl CurveFit {
@@ -154,6 +167,8 @@ impl CurveFit {
         let mut damping_factor = self.initial_damping_factor;
         let mut current_cost = self.cost_function(x_data, y_data, &current_unbounded_params);
 
+        let line_search_step_length_factors = [0.1, 0.25, 0.5, 1.0];
+
         for _ in 0..self.max_iterations {
             let jacobian = self.jacobian_matrix(x_data, &current_unbounded_params);
 
@@ -173,28 +188,27 @@ impl CurveFit {
 
             match change_in_params {
                 Ok(change) => {
-                    let mut change_scaling = 1.0;
+                    let mut best_cost = f64::INFINITY;
+                    let mut best_params = current_unbounded_params.clone();
 
-                    for i in 0..nr_params {
-                        if change[i].abs() > self.max_step_size {
-                            let local_change_scaling = self.max_step_size / change[i].abs();
+                    for factor in &line_search_step_length_factors {
+                        let mut new_unbounded_params = current_unbounded_params.clone();
+                        
+                        for j in 0..nr_params {
+                            new_unbounded_params[j] += factor * change[j];
+                        }
 
-                            if local_change_scaling < change_scaling {
-                                change_scaling = local_change_scaling;
-                            }
+                        let new_cost = self.cost_function(x_data, y_data, &new_unbounded_params);
+
+                        if new_cost < best_cost {
+                            best_cost = new_cost;
+                            best_params = new_unbounded_params;
                         }
                     }
-                    let mut new_unbounded_params = current_unbounded_params.clone();
 
-                    for j in 0..nr_params {
-                        new_unbounded_params[j] += change_scaling * change[j];
-                    }
-
-                    let new_cost = self.cost_function(x_data, y_data, &new_unbounded_params);
-
-                    if new_cost < current_cost {
-                        current_unbounded_params = new_unbounded_params;
-                        current_cost = new_cost;
+                    if best_cost < current_cost {
+                        current_unbounded_params = best_params;
+                        current_cost = best_cost;
                         damping_factor /= self.damping_change_factor;
                     } else {
                         damping_factor *= self.damping_change_factor;
@@ -221,7 +235,17 @@ mod tests {
     use crate::array_generation::linspace;
 
     fn test_function_elliptical(x: f64, params: &[f64]) -> f64 {
-        (1.0 - (2.0 * x.abs())).powf(params[0]).powf(params[1])
+        let scale_factor = params[0];
+        let inner_power = params[1];
+        let outer_power = params[2];
+
+        let base = 1.0 - (2.0 * x.abs()).powf(inner_power);
+
+        if base <= 0.0 {
+            return 0.0;
+        }
+        
+        scale_factor * base.powf(outer_power)
     }
     
     fn test_function_poly(x: f64, params: &[f64]) -> f64 {
@@ -232,17 +256,12 @@ mod tests {
     fn test_polynomial_curve_fit() {
         let curve_fitter = CurveFit {
             function: test_function_poly,
-            max_iterations: 10,
-            delta_params: 0.00001,
-            initial_damping_factor: 100.0,
-            damping_change_factor: 10.0,
             param_bounds: Some(vec![
                 BoundedVariable { min: -10.0, max: 10.0 },
                 BoundedVariable { min: -10.0, max: 10.0 },
                 BoundedVariable { min: -10.0, max: 10.0 },
             ]),
-            tolerance: 1e-6,
-            max_step_size: 0.1,
+            ..Default::default()
         };
 
         let x_data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -260,6 +279,12 @@ mod tests {
             &initial_params
         );
 
+        for i in 0..fitted_params.len() {
+            assert!((fitted_params[i] - params_true[i]).abs() < 1e-6, 
+                "Mismatch at index {}: {} != {}", 
+                i, fitted_params[i], params_true[i]);
+        }
+
         dbg!(&fitted_params);
     }
 
@@ -267,17 +292,11 @@ mod tests {
     fn test_elliptical_curve_fit() {
         let curve_fitter = CurveFit {
             function: test_function_elliptical,
-            max_iterations: 2000,
-            delta_params: 0.000001,
-            initial_damping_factor: 100.0,
-            damping_change_factor: 10.0,
-            param_bounds: None,
-            tolerance: 1e-12,
-            max_step_size: 0.01,
+            ..Default::default()
         };        
 
-        let params_true = vec![2.5, 0.5];
-        let initial_params = vec![2.6, 0.4];
+        let params_true = vec![2.1, 2.5, 0.7];
+        let initial_params = vec![1.0, 2.0, 0.5];
 
         let x_data = linspace(-0.45, 0.45, 100);
 
@@ -292,5 +311,12 @@ mod tests {
         );
 
         dbg!(&fitted_params);
+
+        for i in 0..fitted_params.len() {
+            assert!((fitted_params[i] - params_true[i]).abs() < 1e-5, 
+                "Mismatch at index {}: {} != {}", 
+                i, fitted_params[i], params_true[i]
+            );
+        }
     }
 }

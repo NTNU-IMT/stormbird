@@ -193,13 +193,10 @@ impl LineForceModel {
             for wing_index in 0..nr_wings {
                 let wing_indices = self.wing_indices[wing_index.clone()].clone();
 
-                let local_x_data = effective_relative_span_distance[wing_indices.clone()].to_vec();
-                let local_y_data = gamma_divided_by_u2[wing_indices.clone()].to_vec();
-
                 local_shape_vector.push(
                     PrescribedCirculationShape::from_curve_fit(
-                        &local_x_data, 
-                        &local_y_data, 
+                        &effective_relative_span_distance[wing_indices.clone()], 
+                        &gamma_divided_by_u2[wing_indices.clone()], 
                         &prescribed_circulation.shape.as_params_vector()
                     )
                 )
