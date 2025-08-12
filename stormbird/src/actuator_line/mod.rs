@@ -19,7 +19,7 @@ use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::LineForceModel;
 
 use crate::common_utils::prelude::*;
-use crate::controllers::Controller;
+use crate::controllers::prelude::*;
 
 use crate::io_utils;
 
@@ -175,11 +175,19 @@ impl ActuatorLine {
     pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
         if self.current_iteration >= self.start_iteration {
             let controller_output = if let Some(controller) = &mut self.controller {
-                let model_state = self.line_force_model.model_state();
-
-                let simulation_result = self.simulation_result.as_ref().unwrap();
                 
-                controller.update(time, time_step, &model_state, simulation_result)
+                let simulation_result = self.simulation_result.as_ref().unwrap();
+
+                let measurement_settings = FlowMeasurementSettings::default();
+
+                let input = ControllerInput::new(
+                    &self.line_force_model,
+                    &simulation_result,
+                    &measurement_settings,
+                    None
+                );
+               
+                controller.update(time, time_step, &input)
             } else {
                 None
             };
@@ -187,19 +195,17 @@ impl ActuatorLine {
             let mut need_update = false;
 
             if let Some(controller_output) = controller_output {
-                if let Some(new_angles) = controller_output.local_wing_angles {
-                    self.line_force_model.local_wing_angles = new_angles;
+                if let Some(ref new_angles) = controller_output.local_wing_angles {
+                    self.line_force_model.local_wing_angles = new_angles.to_vec();
                 }
                 
-                if let Some(new_internal_states) = controller_output.section_models_internal_state {
+                if let Some(ref new_internal_states) = controller_output.section_models_internal_state {
                     self.line_force_model.set_section_models_internal_state(&new_internal_states);
                 }
 
                 need_update = true;
 
-                let new_model_state = self.line_force_model.model_state();
-
-                new_model_state.write_to_csv_file("model_state.csv");
+                controller_output.write_to_csv_file("controller_output.csv");
 
             }
 

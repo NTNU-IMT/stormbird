@@ -14,15 +14,15 @@ pub struct FmuParameters {
     /// Path to the JSON file describing the lifting line model.
     pub lifting_line_setup_file_path: String,
     #[serde(default)]
-    /// Path to the JSON file describing the wind environment.
+    /// Path to the JSON file describing the wind environment, if any thing different than the 
+    // default should be used.
     pub wind_environment_setup_file_path: String,
+    #[serde(default)]
+    /// Path to the JSON file describing the controller, if used
+    pub controller_setup_file_path: String,
     #[serde(default)]
     /// Switch to specify if angles is given in degrees or radians.
     pub angles_in_degrees: bool,
-    #[serde(default)]
-    /// Switch to specify if the z-axis is pointing up or down. This is mostly relevant for the
-    /// how to interpret height in the wind environment.
-    pub negative_z_is_up: bool,
     #[serde(default)]
     /// Switch that reversers the wind direction. This is useful as the definition of a positive 
     /// wind direction varies between different applications.

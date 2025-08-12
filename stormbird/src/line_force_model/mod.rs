@@ -31,8 +31,6 @@ mod tests;
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
 
-use crate::controllers::LineForceModelState;
-
 use corrections::{
     circulation::CirculationCorrection,
     angle_of_attack::AngleOfAttackCorrection,

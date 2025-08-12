@@ -204,13 +204,6 @@ impl LineForceModel {
         internal_state
     }
 
-    pub fn model_state(&self) -> LineForceModelState {
-        LineForceModelState {
-            local_wing_angles: self.local_wing_angles.clone(),
-            section_models_internal_state: self.section_models_internal_state(),
-        }
-    }
-
     pub fn span_distance_in_local_coordinates(&self) -> Vec<f64> {
         let mut span_distance: Vec<f64> = Vec::new();
 

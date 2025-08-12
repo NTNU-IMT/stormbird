@@ -8,10 +8,7 @@ use stormath::{
 use crate::error::Error;
 use crate::io_utils::csv_data;
 use crate::common_utils::results::simulation::SimulationResult;
-use super::{
-    LineForceModelState,
-    ControllerOutput
-};
+use super::prelude::*;
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub enum AngleMeasurementType {
@@ -162,12 +159,11 @@ impl EffectiveAngleOfAttackController {
         &mut self, 
         time: f64,
         time_step: f64, 
-        model_state: &LineForceModelState, 
-        simulation_result: &SimulationResult
+        input: &ControllerInput
     ) -> Option<ControllerOutput> {
         self.time_step_index += 1;
 
-        let angle_measurements = self.measure_angles_of_attack(simulation_result);
+        let angle_measurements = self.measure_angles_of_attack(input.simulation_result);
 
         self.update_angle_estimate(&angle_measurements);
 
@@ -180,12 +176,12 @@ impl EffectiveAngleOfAttackController {
         if first_time_step || (time_to_update && initialization_done) {
             let new_local_wing_angles = self.compute_new_local_wing_angles(
                 time_step,
-                model_state,
+                input,
                 first_time_step
             );
 
             let change_necessary = self.check_for_change(
-                &model_state.local_wing_angles,
+                &input.local_wing_angles,
                 &new_local_wing_angles
             );
 
@@ -225,7 +221,7 @@ impl EffectiveAngleOfAttackController {
     fn compute_new_local_wing_angles(
         &self, 
         time_step: f64, 
-        model_state: &LineForceModelState,
+        input: &ControllerInput,
         first_time_step: bool
     ) -> Vec<f64> {
         let mut new_local_wing_angles = vec![0.0; self.nr_of_wings()];
@@ -255,7 +251,7 @@ impl EffectiveAngleOfAttackController {
                 raw_angle_change
             };
 
-            new_local_wing_angles[i] = model_state.local_wing_angles[i] + change_to_apply;
+            new_local_wing_angles[i] = input.local_wing_angles[i] + change_to_apply;
 
             new_local_wing_angles[i] = Self::correct_angle_to_be_between_pi_and_negative_pi(new_local_wing_angles[i]);
         }
