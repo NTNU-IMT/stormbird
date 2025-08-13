@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use stormath::spatial_vector::SpatialVector;
+use stormath::{
+    spatial_vector::SpatialVector,
+    rigid_body_motion::RigidBodyMotion,
+};
 use serde::{Serialize, Deserialize};
 
 use crate::error::Error;
@@ -23,6 +26,7 @@ pub struct SimulationResult {
     pub iterations: usize,
     pub residual: f64,
     pub wing_indices: Vec<Range<usize>>,
+    pub rigid_body_motion: RigidBodyMotion
 }
 
 impl SimulationResult {
@@ -81,6 +85,22 @@ impl SimulationResult {
         }
 
         angles_of_attack
+    }
+
+    /// Returns the felt velocity at each control point, but with the motion due to rotational 
+    /// motion subtracted. 
+    pub fn felt_velocity_minus_rotational_motion(&self) -> Vec<SpatialVector<3>> {
+        let nr_span_lines = self.nr_span_lines();
+        let mut out: Vec<SpatialVector<3>> = Vec::with_capacity(nr_span_lines);
+
+        for i in 0..nr_span_lines {
+            out.push(
+                self.force_input.velocity[i] + 
+                self.rigid_body_motion.rotation_velocity_at_point(self.ctrl_points[i])
+            )
+        }
+
+        out
     }
 
     pub fn as_reduced_flatten_csv_string(&self) -> (String, String) {

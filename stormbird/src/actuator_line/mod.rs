@@ -20,6 +20,7 @@ use crate::line_force_model::LineForceModel;
 
 use crate::common_utils::prelude::*;
 use crate::controllers::prelude::*;
+use crate::wind::environment::WindEnvironment;
 
 use crate::io_utils;
 
@@ -175,16 +176,15 @@ impl ActuatorLine {
     pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
         if self.current_iteration >= self.start_iteration {
             let controller_output = if let Some(controller) = &mut self.controller {
-                
                 let simulation_result = self.simulation_result.as_ref().unwrap();
 
-                let measurement_settings = FlowMeasurementSettings::default();
+                let wind_environment = WindEnvironment::default();
 
                 let input = ControllerInput::new(
                     &self.line_force_model,
                     &simulation_result,
-                    &measurement_settings,
-                    None
+                    &controller.flow_measurement_settings,
+                    &wind_environment
                 );
                
                 controller.update(time, time_step, &input)
@@ -195,18 +195,11 @@ impl ActuatorLine {
             let mut need_update = false;
 
             if let Some(controller_output) = controller_output {
-                if let Some(ref new_angles) = controller_output.local_wing_angles {
-                    self.line_force_model.local_wing_angles = new_angles.to_vec();
-                }
-                
-                if let Some(ref new_internal_states) = controller_output.section_models_internal_state {
-                    self.line_force_model.set_section_models_internal_state(&new_internal_states);
-                }
+                self.line_force_model.set_controller_output(&controller_output);
 
                 need_update = true;
 
                 controller_output.write_to_csv_file("controller_output.csv");
-
             }
 
             need_update

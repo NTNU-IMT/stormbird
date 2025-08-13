@@ -8,6 +8,8 @@ use stormath::spatial_vector::SpatialVector;
 use serde::{Serialize, Deserialize};
 use serde_json;
 
+use crate::error::Error;
+
 use super::height_variation::HeightVariationModel;
 
 #[derive(Debug, Clone, Copy)]
@@ -45,12 +47,15 @@ impl WindEnvironment {
     pub fn default_zero_direction_vector() -> SpatialVector<3> {SpatialVector([-1.0, 0.0, 0.0])}
     pub fn default_up_direction() -> SpatialVector<3> {SpatialVector([0.0, 0.0, 1.0])}
 
-    pub fn from_json_string(json_string: &str) -> Self {
-        serde_json::from_str(json_string).unwrap()
+    pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(json_string)?;
+        
+        Ok(serde_res)
     }
 
-    pub fn from_json_file(file_path: &str) -> Self {
-        let json_string = std::fs::read_to_string(file_path).unwrap();
+    pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
+        let json_string = std::fs::read_to_string(file_path)?;
+        
         Self::from_json_string(&json_string)
     }
 

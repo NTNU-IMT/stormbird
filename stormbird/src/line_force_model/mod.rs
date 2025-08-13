@@ -30,6 +30,7 @@ mod tests;
 
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
+use crate::controllers::output::ControllerOutput;
 
 use corrections::{
     circulation::CirculationCorrection,
@@ -225,14 +226,26 @@ impl LineForceModel {
     pub fn set_section_models_internal_state(&mut self, internal_state: &[f64]) {
         for wing_index in 0..self.nr_wings() {
             match self.section_models[wing_index] {
+                SectionModel::Foil(_) => {}
                 SectionModel::VaryingFoil(ref mut foil) => {
                     foil.current_internal_state = internal_state[wing_index];
                 }
                 SectionModel::RotatingCylinder(ref mut cylinder) => {
                     cylinder.revolutions_per_second = internal_state[wing_index];
                 }
-                _ => {}
             }
+        }
+    }
+
+    pub fn set_controller_output(&mut self, controller_output: &ControllerOutput) {
+        if let Some(local_wing_angles) = &controller_output.local_wing_angles {
+            for (index, angle) in local_wing_angles.iter().enumerate() {
+                self.local_wing_angles[index] = *angle;
+            }
+        }
+
+        if let Some(section_models_internal_state) = &controller_output.section_models_internal_state {
+            self.set_section_models_internal_state(section_models_internal_state);
         }
     }
 }

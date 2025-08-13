@@ -22,7 +22,10 @@ use stormbird::wind::environment::{
     WindCondition
 };
 
-use stormbird::controllers::Controller;
+use stormbird::controllers::{
+    Controller,
+    ControllerBuilder
+};
 
 use fmu_from_struct::FmuInfo;
 
@@ -132,6 +135,7 @@ pub struct StormbirdLiftingLine {
     parameters: FmuParameters,
     stormbird_model: Option<Simulation>,
     wind_environment: Option<WindEnvironment>,
+    controller: Option<Controller>,
     input_filters: Option<InputFilters>,
     iterations_completed: usize,
 }
@@ -142,6 +146,7 @@ impl FmuFunctions for StormbirdLiftingLine {
 
         self.read_parameters();
         self.build_wind_model();
+        self.build_controller();
         self.build_filters();
         self.build_lifting_line_model();
     }
@@ -226,7 +231,9 @@ impl StormbirdLiftingLine {
                 self.stormbird_model = Some(builder.build());
             },
             Err(e) => {
-                log::error!("Error reading lifting line setup file from path: {}. Error: {}", &setup_path.to_string_lossy(), e);
+                log::error!(
+                    "Error reading lifting line setup file from path: {}. Error: {}", &setup_path.to_string_lossy(), e
+                );
             }
         }
     }
@@ -247,12 +254,57 @@ impl StormbirdLiftingLine {
         log::info!("Building wind model");
 
         if !self.parameters.wind_environment_setup_file_path.is_empty() {
-            self.wind_environment = Some(
-                WindEnvironment::from_json_file(&self.parameters.wind_environment_setup_file_path)
-            );
+            let environment = WindEnvironment::from_json_file(&self.parameters.wind_environment_setup_file_path);
+
+            match environment {
+                Ok(env) => {
+                    self.wind_environment = Some(env);
+                },
+                Err(e) => {
+                    log::error!("Error reading wind environment setup file from path: {}. Error: {}", &self.parameters.wind_environment_setup_file_path, e);
+                }
+            }
         } else {
             self.wind_environment = Some(WindEnvironment::default());
         }
+    }
+
+    fn build_controller(&mut self) {
+        log::info!("Building controller");
+
+        if !self.parameters.controller_setup_file_path.is_empty() {
+            let controller_builder = ControllerBuilder::from_json_file(
+                &self.parameters.controller_setup_file_path
+            );
+
+            match controller_builder {
+                Ok(builder) => {
+                    self.controller = Some(builder.build());
+                },
+                Err(e) => {
+                    log::error!("Error reading controller setup file from path: {}. Error: {}", &self.parameters.controller_setup_file_path, e);
+                }
+            }
+        } else {
+            log::warn!("No controller setup file path provided, skipping controller setup.");
+        }
+    }
+
+    fn set_controller_values_from_input(&mut self) {
+        let local_wing_angles = self.local_wing_angles();
+        let section_models_internal_state = self.section_models_internal_state();
+
+        if let Some(model) = &mut self.stormbird_model {
+            
+            model.line_force_model.local_wing_angles = local_wing_angles;
+
+            model.line_force_model
+                .set_section_models_internal_state(&section_models_internal_state);
+        }
+    }
+
+    fn set_controller_values_from_controller(&mut self) {
+
     }
 
     /// Functions that sets the state of the line force model before a step is performed.
@@ -263,16 +315,11 @@ impl StormbirdLiftingLine {
         let motion_velocity_linear = self.motion_velocity_linear_vector();
         let motion_velocity_angular = self.motion_velocity_angular_vector();
 
-        let local_wing_angles = self.local_wing_angles();
-        let section_models_internal_state = self.section_models_internal_state();
+        if self.controller.is_none() || self.iterations_completed == 0 {
+            self.set_controller_values_from_input()
+        }
 
         if let Some(model) = &mut self.stormbird_model {
-            
-            model.line_force_model.local_wing_angles = local_wing_angles;
-
-            model.line_force_model
-                .set_section_models_internal_state(&section_models_internal_state);
-
             model
                 .line_force_model
                 .rigid_body_motion

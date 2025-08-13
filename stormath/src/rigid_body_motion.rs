@@ -45,9 +45,14 @@ impl RigidBodyMotion {
         point - self.translation
     }
 
+    /// Return the velocity due to motion alone at the point
+    pub fn rotation_velocity_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
+        self.velocity_angular.cross(self.point_relative_to_body_center(point))
+    }
+
     /// Computes the velocity at a point due to the motion of the rigid body. 
     pub fn velocity_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
-        self.velocity_linear + self.velocity_angular.cross(self.point_relative_to_body_center(point))
+        self.velocity_linear + self.rotation_velocity_at_point(point)
     }
 
     pub fn velocities_at_points(&self, points: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {

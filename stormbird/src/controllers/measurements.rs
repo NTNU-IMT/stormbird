@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use stormath::statistics;
 
-use crate::common_utils::results::simulation::SimulationResult;
+use crate::{
+    common_utils::results::simulation::SimulationResult,
+    wind::environment::WindEnvironment,
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum MeasurementType {
@@ -80,7 +83,7 @@ pub fn measure_angles_of_attack(
     )
 }
 
-pub fn measure_wind_velocity(
+pub fn measure_wind_velocity_magnitude(
     simulation_result: &SimulationResult,
     measurement_settings: &MeasurementSettings,
 ) -> Vec<f64> {
@@ -91,6 +94,30 @@ pub fn measure_wind_velocity(
 
     measure_float_values(
         &velocity_magnitude,
+        simulation_result.wing_indices.clone(),
+        measurement_settings
+    )
+}
+
+pub fn measure_apparent_wind_direction(
+    simulation_result: &SimulationResult,
+    measurement_settings: &MeasurementSettings,
+    wind_environment: &WindEnvironment
+) -> Vec<f64> {
+    let relevant_velocities = simulation_result.felt_velocity_minus_rotational_motion();
+
+    let wind_directions: Vec<f64> = relevant_velocities.iter()
+        .map(
+            |velocity| {
+                wind_environment.zero_direction_vector.signed_angle_between(
+                    *velocity, 
+                    wind_environment.up_direction
+                )
+            }
+        ).collect();
+
+    measure_float_values(
+        &wind_directions, 
         simulation_result.wing_indices.clone(),
         measurement_settings
     )

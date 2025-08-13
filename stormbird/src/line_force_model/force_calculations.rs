@@ -483,6 +483,7 @@ impl LineForceModel {
             iterations: solver_result.iterations,
             residual: solver_result.residual,
             wing_indices: self.wing_indices.clone(),
+            rigid_body_motion: self.rigid_body_motion.clone()
         }
     }
 }

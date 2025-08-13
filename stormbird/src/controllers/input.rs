@@ -1,10 +1,17 @@
 use serde::{Deserialize, Serialize};
 
-use crate::wind::environment::WindEnvironment;
-use crate::line_force_model::LineForceModel;
-use crate::common_utils::results::simulation::SimulationResult;
+use crate::{
+    wind::environment::WindEnvironment,
+    line_force_model::LineForceModel,
+    common_utils::results::simulation::SimulationResult
+};
 
-use super::measurements::FlowMeasurementSettings;
+use super::measurements::{
+    FlowMeasurementSettings,
+    measure_angles_of_attack,
+    measure_wind_velocity_magnitude,
+    measure_apparent_wind_direction
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 /// Structure containing input values that is used by the controllers to set the local wing angles
@@ -15,7 +22,7 @@ pub struct ControllerInput {
     pub section_models_internal_state: Vec<f64>,
     pub angles_of_attack: Vec<f64>,
     pub velocity: Vec<f64>,
-    pub apparent_wind_directions: Option<Vec<f64>>,
+    pub apparent_wind_directions: Vec<f64>,
 }
 
 impl ControllerInput {
@@ -23,8 +30,16 @@ impl ControllerInput {
         line_force_model: &LineForceModel,
         simulation_result: &SimulationResult,
         measurement_settings: &FlowMeasurementSettings,
-        wind_environment: Option<&WindEnvironment>,
+        wind_environment: &WindEnvironment,
     ) -> Self {
-        todo!()
+        Self {
+            local_wing_angles: line_force_model.local_wing_angles.clone(),
+            section_models_internal_state: line_force_model.section_models_internal_state(),
+            angles_of_attack: measure_angles_of_attack(simulation_result, &measurement_settings.angle_of_attack),
+            velocity: measure_wind_velocity_magnitude(simulation_result, &measurement_settings.wind_velocity),
+            apparent_wind_directions: measure_apparent_wind_direction(
+                simulation_result, &measurement_settings.wind_direction, wind_environment
+            ),
+        }
     }
 }
