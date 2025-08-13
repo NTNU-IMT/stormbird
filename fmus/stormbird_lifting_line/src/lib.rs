@@ -24,7 +24,10 @@ use stormbird::wind::environment::{
 
 use stormbird::controllers::{
     Controller,
-    ControllerBuilder
+    ControllerBuilder,
+    input::ControllerInput,
+    output::ControllerOutput,
+    measurements::FlowMeasurementSettings
 };
 
 use fmu_from_struct::FmuInfo;
@@ -87,6 +90,8 @@ pub struct StormbirdLiftingLine {
     pub section_models_internal_state_8: f64,
     pub section_models_internal_state_9: f64,
     pub section_models_internal_state_10: f64,
+    /// Optional variable to control the amount of thrust from controller
+    pub controller_loading: f64,
     #[output]
     /// Global forces and moments acting on the lifting line model.
     pub force_x: f64,
@@ -95,20 +100,8 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
-    /// Estimation of the apparent wind directions, measured at the same local spanwise position as
-    /// the angle of attack measurements.
-    pub apparent_wind_direction_measurement_1: f64,
-    pub apparent_wind_direction_measurement_2: f64,
-    pub apparent_wind_direction_measurement_3: f64,
-    pub apparent_wind_direction_measurement_4: f64,
-    pub apparent_wind_direction_measurement_5: f64,
-    pub apparent_wind_direction_measurement_6: f64,
-    pub apparent_wind_direction_measurement_7: f64,
-    pub apparent_wind_direction_measurement_8: f64,
-    pub apparent_wind_direction_measurement_9: f64,
-    pub apparent_wind_direction_measurement_10: f64,
-    /// Measurements of the effective angle of attack at the specified non-dimensional spanwise 
-    /// location of each wing.
+    /// Measurements of the effective angle of attack at different wings. Max 10 as output in the 
+    /// FMU
     pub angle_of_attack_measurement_1: f64,
     pub angle_of_attack_measurement_2: f64,
     pub angle_of_attack_measurement_3: f64,
@@ -119,6 +112,41 @@ pub struct StormbirdLiftingLine {
     pub angle_of_attack_measurement_8: f64,
     pub angle_of_attack_measurement_9: f64,
     pub angle_of_attack_measurement_10: f64,
+    /// Measurements of the wind velocity at different wings. Max 10 as output in the FMU
+    pub velocity_measurement_1: f64,
+    pub velocity_measurement_2: f64,
+    pub velocity_measurement_3: f64,
+    pub velocity_measurement_4: f64,
+    pub velocity_measurement_5: f64,
+    pub velocity_measurement_6: f64,
+    pub velocity_measurement_7: f64,
+    pub velocity_measurement_8: f64,
+    pub velocity_measurement_9: f64,
+    pub velocity_measurement_10: f64,
+    /// Measurements of the apparent wind directions at different wings. Max 10 as output in the FMU
+    pub apparent_wind_direction_measurement_1: f64,
+    pub apparent_wind_direction_measurement_2: f64,
+    pub apparent_wind_direction_measurement_3: f64,
+    pub apparent_wind_direction_measurement_4: f64,
+    pub apparent_wind_direction_measurement_5: f64,
+    pub apparent_wind_direction_measurement_6: f64,
+    pub apparent_wind_direction_measurement_7: f64,
+    pub apparent_wind_direction_measurement_8: f64,
+    pub apparent_wind_direction_measurement_9: f64,
+    pub apparent_wind_direction_measurement_10: f64,
+
+    /// Controller variables
+    pub controller_section_models_internal_state_1: f64,
+    pub controller_section_models_internal_state_2: f64,
+    pub controller_section_models_internal_state_3: f64,
+    pub controller_section_models_internal_state_4: f64,
+    pub controller_section_models_internal_state_5: f64,
+    pub controller_section_models_internal_state_6: f64,
+    pub controller_section_models_internal_state_7: f64,
+    pub controller_section_models_internal_state_8: f64,
+    pub controller_section_models_internal_state_9: f64,
+    pub controller_section_models_internal_state_10: f64,
+
     /// Calculated rigid body velocity, primarily used for debugging purposes.
     pub calculated_motion_velocity_linear_x: f64,
     pub calculated_motion_velocity_linear_y: f64,
@@ -132,12 +160,15 @@ pub struct StormbirdLiftingLine {
     /// resource directory which is later used to set a default path to the parameters file.
     pub fmu_info: FmuInfo,
 
+    /// Tracker of number of iterations completed
+    iterations_completed: usize,
+
+    /// Non public variables containing functionality from the Stormbird library
     parameters: FmuParameters,
     stormbird_model: Option<Simulation>,
     wind_environment: Option<WindEnvironment>,
     controller: Option<Controller>,
     input_filters: Option<InputFilters>,
-    iterations_completed: usize,
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
@@ -171,7 +202,13 @@ impl FmuFunctions for StormbirdLiftingLine {
             };
 
             if let Some(result) = result {
-                self.set_output(&result, &freestream_velocity);
+                let controller_input = self.controller_input(&result);
+
+                self.set_force_output(&result);
+
+                self.set_controller_input_output(&controller_input);
+
+                self.apply_controller(current_time, time_step, &controller_input)
             }
         }
 
@@ -232,7 +269,9 @@ impl StormbirdLiftingLine {
             },
             Err(e) => {
                 log::error!(
-                    "Error reading lifting line setup file from path: {}. Error: {}", &setup_path.to_string_lossy(), e
+                    "Error reading lifting line setup file from path: {}. Error: {}", 
+                    &setup_path.to_string_lossy(), 
+                    e
                 );
             }
         }
@@ -241,7 +280,10 @@ impl StormbirdLiftingLine {
     /// Builds filters for the input
     fn build_filters(&mut self) {
         if self.parameters.input_moving_average_window_size > 0 {
-            log::info!("Building input filters with window size: {}", self.parameters.input_moving_average_window_size);
+            log::info!(
+                "Building input filters with window size: {}", 
+                self.parameters.input_moving_average_window_size
+            );
 
             self.input_filters = Some(
                 InputFilters::new(self.parameters.input_moving_average_window_size)
@@ -254,14 +296,22 @@ impl StormbirdLiftingLine {
         log::info!("Building wind model");
 
         if !self.parameters.wind_environment_setup_file_path.is_empty() {
-            let environment = WindEnvironment::from_json_file(&self.parameters.wind_environment_setup_file_path);
+            let mut setup_path = self.parameters_path();
+            setup_path.pop();
+            setup_path.push(self.parameters.wind_environment_setup_file_path.clone());
+
+            let environment = WindEnvironment::from_json_file(&setup_path.to_string_lossy());
 
             match environment {
                 Ok(env) => {
                     self.wind_environment = Some(env);
                 },
                 Err(e) => {
-                    log::error!("Error reading wind environment setup file from path: {}. Error: {}", &self.parameters.wind_environment_setup_file_path, e);
+                    log::error!(
+                        "Error reading wind environment setup file from path: {}. Error: {}", 
+                        &self.parameters.wind_environment_setup_file_path, 
+                        e
+                    );
                 }
             }
         } else {
@@ -273,8 +323,12 @@ impl StormbirdLiftingLine {
         log::info!("Building controller");
 
         if !self.parameters.controller_setup_file_path.is_empty() {
+            let mut setup_path = self.parameters_path();
+            setup_path.pop();
+            setup_path.push(self.parameters.controller_setup_file_path.clone());
+            
             let controller_builder = ControllerBuilder::from_json_file(
-                &self.parameters.controller_setup_file_path
+                &setup_path.to_string_lossy()
             );
 
             match controller_builder {
@@ -282,7 +336,11 @@ impl StormbirdLiftingLine {
                     self.controller = Some(builder.build());
                 },
                 Err(e) => {
-                    log::error!("Error reading controller setup file from path: {}. Error: {}", &self.parameters.controller_setup_file_path, e);
+                    log::error!(
+                        "Error reading controller setup file from path: {}. Error: {}", 
+                        &self.parameters.controller_setup_file_path, 
+                        e
+                    );
                 }
             }
         } else {
@@ -290,7 +348,26 @@ impl StormbirdLiftingLine {
         }
     }
 
-    fn set_controller_values_from_input(&mut self) {
+    fn apply_controller(
+        &mut self,
+        current_time: f64, 
+        time_step: f64, 
+        controller_input: &ControllerInput
+    ) {
+        if let Some(controller) = &self.controller {
+            let controller_output = controller.update(
+                current_time,
+                time_step,
+                &controller_input
+            );
+            
+            if let Some(output) = &controller_output {
+                self.set_model_control_values_from_controller_output(output);
+            } 
+        }
+    }
+
+    fn set_model_control_values_from_input(&mut self) {
         let local_wing_angles = self.local_wing_angles();
         let section_models_internal_state = self.section_models_internal_state();
 
@@ -303,20 +380,22 @@ impl StormbirdLiftingLine {
         }
     }
 
-    fn set_controller_values_from_controller(&mut self) {
-
+    fn set_model_control_values_from_controller_output(&mut self, controller_output: &ControllerOutput) {
+        if let Some(model) = &mut self.stormbird_model {
+            model.line_force_model.set_controller_output(controller_output)
+        }
     }
 
     /// Functions that sets the state of the line force model before a step is performed.
     fn set_line_force_model_state(&mut self, time_step: f64) {
         let translation = self.translation_vector();
-        let rotation = self.rotation_vector();
+        let rotation    = self.rotation_vector();
 
-        let motion_velocity_linear = self.motion_velocity_linear_vector();
+        let motion_velocity_linear  = self.motion_velocity_linear_vector();
         let motion_velocity_angular = self.motion_velocity_angular_vector();
 
         if self.controller.is_none() || self.iterations_completed == 0 {
-            self.set_controller_values_from_input()
+            self.set_model_control_values_from_input()
         }
 
         if let Some(model) = &mut self.stormbird_model {
@@ -412,7 +491,11 @@ impl StormbirdLiftingLine {
                 self.rotation_z.to_radians(),
             ])
         } else {
-            SpatialVector([self.rotation_x, self.rotation_y, self.rotation_z])
+            SpatialVector([
+                self.rotation_x, 
+                self.rotation_y, 
+                self.rotation_z
+            ])
         }
     }
 
@@ -484,6 +567,7 @@ impl StormbirdLiftingLine {
     /// Function that returns the velocity inflow to the lifting line model. The function combines
     /// the wind velocity and the translational velocity of the model.
     fn freestream_velocity(&self) -> Vec<SpatialVector<3>> {
+        // Collect the relevant points to calculate the wind condition for
         let freestream_velocity_points: Vec<SpatialVector<3>> =
             if let Some(model) = &self.stormbird_model {
                 model.get_freestream_velocity_points()
@@ -492,15 +576,16 @@ impl StormbirdLiftingLine {
             };
 
         let mut out = vec![SpatialVector([0.0, 0.0, 0.0]); freestream_velocity_points.len()];
-
+        
+        // Get the wind field from the wind environment, based on the wind condition
         let wind_condition = WindCondition {
             reference_velocity: self.wind_velocity,
             direction_coming_from: self.wind_direction()
         };
 
         for i in 0..freestream_velocity_points.len() {
-            if let Some(model) = &self.wind_environment {
-                out[i] = model.true_wind_velocity_vector_at_location(
+            if let Some(env) = &self.wind_environment {
+                out[i] = env.true_wind_velocity_vector_at_location(
                     wind_condition,
                     freestream_velocity_points[i]
                 )
@@ -509,6 +594,7 @@ impl StormbirdLiftingLine {
             }
         }
 
+        // Apply the linear motion of the wings to the freestream if this option is activated
         if self.parameters.use_motion_velocity_linear_as_freestream {
             let motion_velocity = self.motion_velocity_linear_vector();
 
@@ -555,7 +641,7 @@ impl StormbirdLiftingLine {
         local_wing_angles
     }
 
-    pub fn section_models_internal_state(&self) -> Vec<f64> {
+    fn section_models_internal_state(&self) -> Vec<f64> {
         let nr_wings = self.nr_wings();
 
         if nr_wings == 0 {
@@ -584,92 +670,7 @@ impl StormbirdLiftingLine {
         section_models_internal_state
     }
 
-    /// Function that measures the apparent wind direction on each wing
-    pub fn measure_apparent_wind_direction(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
-        let mut apparent_wind_direction = if let Some(model) = &self.stormbird_model {
-            let felt_velocity = model.line_force_model.felt_ctrl_points_velocity(velocity);
-
-            let relevant_velocities = model.line_force_model.interpolate_values_to_spanwise_location(
-                self.parameters.non_dim_spanwise_measurement_position,
-                &felt_velocity
-            );
-
-            let (up_direction, zero_direction_vector) = if let Some(environment) = &self.wind_environment {
-                (environment.up_direction, environment.zero_direction_vector)
-            } else {
-                (SpatialVector([0.0, 0.0, 1.0]), SpatialVector([-1.0, 0.0, 0.0]))
-            };
-
-            relevant_velocities.iter().map(
-                |velocity| {
-                    zero_direction_vector.signed_angle_between(*velocity, up_direction)
-                }
-            ).collect()
-        } else {
-            vec![0.0; self.nr_wings()]
-        };
-
-        if self.parameters.angles_in_degrees {
-            for i in 0..apparent_wind_direction.len() {
-                apparent_wind_direction[i] = apparent_wind_direction[i].to_degrees();
-            }
-        }
-
-        apparent_wind_direction
-    }
-
-    /// Function that measures the angle of attack on each wing.
-    fn measure_angles_of_attack(&self, angles_of_attack: &[f64]) -> Vec<f64> {
-        let nr_wings = self.nr_wings();
-
-        if nr_wings == 0 {
-            return vec![];
-        }
-
-        let mut angles_of_attack = if let Some(model) = &self.stormbird_model {
-            model.line_force_model.interpolate_values_to_spanwise_location(
-                self.parameters.non_dim_spanwise_measurement_position,
-                angles_of_attack
-            )
-        } else {
-            vec![0.0; nr_wings]
-        };
-
-        if self.parameters.angles_in_degrees {
-            for i in 0..angles_of_attack.len() {
-                angles_of_attack[i] = angles_of_attack[i].to_degrees();
-            }
-        }
-
-        angles_of_attack
-    }
-
-    fn set_output(&mut self, result: &SimulationResult, velocity_input: &[SpatialVector<3>]) {
-        if let Some(model) = &self.stormbird_model {
-            let velocity_input_at_line_force_models = &velocity_input[0..model.line_force_model.nr_span_lines()];
-
-            let apparent_wind_directions = self.measure_apparent_wind_direction(
-                velocity_input_at_line_force_models
-            );
-
-            let mut apparent_wind_directions_extended = vec![0.0; 10];
-
-            for i in 0..apparent_wind_directions.len() {
-                apparent_wind_directions_extended[i] = apparent_wind_directions[i]
-            }
-
-            self.apparent_wind_direction_measurement_1  = apparent_wind_directions_extended[0];
-            self.apparent_wind_direction_measurement_2  = apparent_wind_directions_extended[1];
-            self.apparent_wind_direction_measurement_3  = apparent_wind_directions_extended[2];
-            self.apparent_wind_direction_measurement_4  = apparent_wind_directions_extended[3];
-            self.apparent_wind_direction_measurement_5  = apparent_wind_directions_extended[4];
-            self.apparent_wind_direction_measurement_6  = apparent_wind_directions_extended[5];
-            self.apparent_wind_direction_measurement_7  = apparent_wind_directions_extended[6];
-            self.apparent_wind_direction_measurement_8  = apparent_wind_directions_extended[7];
-            self.apparent_wind_direction_measurement_9  = apparent_wind_directions_extended[8];
-            self.apparent_wind_direction_measurement_10 = apparent_wind_directions_extended[9];
-        }
-        
+    fn set_force_output(&mut self, result: &SimulationResult) {
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
@@ -680,24 +681,103 @@ impl StormbirdLiftingLine {
         self.moment_x = integrated_moments[0];
         self.moment_y = integrated_moments[1];
         self.moment_z = integrated_moments[2];
+    }
 
-        let angles_of_attack_measurement = self.measure_angles_of_attack(&result.force_input.angles_of_attack);
+    fn controller_input(&self, result: &SimulationResult) -> ControllerInput {
+        match (&self.stormbird_model, &self.wind_environment, &self.controller) {
+            (Some(model), Some(environment), Some(controller)) => {
+                return ControllerInput::new(
+                    self.controller_loading,
+                    &model.line_force_model,
+                    result,
+                    &controller.flow_measurement_settings,
+                    environment
+                )
+            },
+            (Some(model), Some(environment), None) => {
+                return ControllerInput::new(
+                    self.controller_loading,
+                    &model.line_force_model,
+                    result,
+                    &FlowMeasurementSettings::default(),
+                    environment
+                )
+            },
+            _ => {
+                panic!("Missing either lifting line model or wind environment")
+            }
+        }
+    }
 
-        let mut angle_of_attack_measurement_extended = vec![0.0; 10];
+    /// Takes a ControllerInput variable as input, an applies the data to the output variables in 
+    /// the FMU
+    fn set_controller_input_output(&mut self, controller_input: &ControllerInput) {
+        let output_size = 10;
 
-        for i in 0..angles_of_attack_measurement.len() {
-            angle_of_attack_measurement_extended[i] = angles_of_attack_measurement[i];
+        let mut angles_of_attack_extended = vec![0.0; output_size];
+        let mut velocity_extended = vec![0.0; output_size];
+        let mut apparent_wind_directions_extended = vec![0.0; output_size];
+        let mut section_models_internal_state = vec![0.0; output_size];
+        
+        let nr_wings = self.nr_wings();
+
+        for i in 0..nr_wings {
+            velocity_extended[i] = controller_input.velocity[i];
+            section_models_internal_state[i] = controller_input.current_section_models_internal_state[i];
+
+            if self.parameters.angles_in_degrees {
+                angles_of_attack_extended[i] = controller_input.angles_of_attack[i].to_degrees();
+                apparent_wind_directions_extended[i] = controller_input.apparent_wind_directions[i].to_degrees();
+            } else {
+                angles_of_attack_extended[i] = controller_input.angles_of_attack[i];
+                apparent_wind_directions_extended[i] = controller_input.apparent_wind_directions[i];
+            }
+            
         }
 
-        self.angle_of_attack_measurement_1  = angle_of_attack_measurement_extended[0];
-        self.angle_of_attack_measurement_2  = angle_of_attack_measurement_extended[1];
-        self.angle_of_attack_measurement_3  = angle_of_attack_measurement_extended[2];
-        self.angle_of_attack_measurement_4  = angle_of_attack_measurement_extended[3];
-        self.angle_of_attack_measurement_5  = angle_of_attack_measurement_extended[4];
-        self.angle_of_attack_measurement_6  = angle_of_attack_measurement_extended[5];
-        self.angle_of_attack_measurement_7  = angle_of_attack_measurement_extended[6];
-        self.angle_of_attack_measurement_8  = angle_of_attack_measurement_extended[7];
-        self.angle_of_attack_measurement_9  = angle_of_attack_measurement_extended[8];
-        self.angle_of_attack_measurement_10 = angle_of_attack_measurement_extended[9];
+        self.angle_of_attack_measurement_1  = angles_of_attack_extended[0];
+        self.angle_of_attack_measurement_2  = angles_of_attack_extended[1];
+        self.angle_of_attack_measurement_3  = angles_of_attack_extended[2];
+        self.angle_of_attack_measurement_4  = angles_of_attack_extended[3];
+        self.angle_of_attack_measurement_5  = angles_of_attack_extended[4];
+        self.angle_of_attack_measurement_6  = angles_of_attack_extended[5];
+        self.angle_of_attack_measurement_7  = angles_of_attack_extended[6];
+        self.angle_of_attack_measurement_8  = angles_of_attack_extended[7];
+        self.angle_of_attack_measurement_9  = angles_of_attack_extended[8];
+        self.angle_of_attack_measurement_10 = angles_of_attack_extended[9];
+
+        self.velocity_measurement_1  = velocity_extended[0];
+        self.velocity_measurement_2  = velocity_extended[1];
+        self.velocity_measurement_3  = velocity_extended[2];
+        self.velocity_measurement_4  = velocity_extended[3];
+        self.velocity_measurement_5  = velocity_extended[4];
+        self.velocity_measurement_6  = velocity_extended[5];
+        self.velocity_measurement_7  = velocity_extended[6];
+        self.velocity_measurement_8  = velocity_extended[7];
+        self.velocity_measurement_9  = velocity_extended[8];
+        self.velocity_measurement_10 = velocity_extended[9];
+
+        self.apparent_wind_direction_measurement_1  = apparent_wind_directions_extended[0];
+        self.apparent_wind_direction_measurement_2  = apparent_wind_directions_extended[1];
+        self.apparent_wind_direction_measurement_3  = apparent_wind_directions_extended[2];
+        self.apparent_wind_direction_measurement_4  = apparent_wind_directions_extended[3];
+        self.apparent_wind_direction_measurement_5  = apparent_wind_directions_extended[4];
+        self.apparent_wind_direction_measurement_6  = apparent_wind_directions_extended[5];
+        self.apparent_wind_direction_measurement_7  = apparent_wind_directions_extended[6];
+        self.apparent_wind_direction_measurement_8  = apparent_wind_directions_extended[7];
+        self.apparent_wind_direction_measurement_9  = apparent_wind_directions_extended[8];
+        self.apparent_wind_direction_measurement_10 = apparent_wind_directions_extended[9];
+
+        self.controller_section_models_internal_state_1  = section_models_internal_state[0];
+        self.controller_section_models_internal_state_2  = section_models_internal_state[1];
+        self.controller_section_models_internal_state_3  = section_models_internal_state[2];
+        self.controller_section_models_internal_state_4  = section_models_internal_state[3];
+        self.controller_section_models_internal_state_5  = section_models_internal_state[4];
+        self.controller_section_models_internal_state_6  = section_models_internal_state[5];
+        self.controller_section_models_internal_state_7  = section_models_internal_state[6];
+        self.controller_section_models_internal_state_8  = section_models_internal_state[7];
+        self.controller_section_models_internal_state_9  = section_models_internal_state[8];
+        self.controller_section_models_internal_state_10 = section_models_internal_state[9];
+
     }
 }

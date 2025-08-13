@@ -19,6 +19,7 @@ pub struct WindCondition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Structure used to represent a wind environment. Can be used to query about the wind velocity at 
 /// different locations
 pub struct WindEnvironment {

@@ -4,6 +4,7 @@ use super::prelude::*;
 
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// A sail controller that attempts to set the wing angles to achieve a target effective angle of 
 /// attack. 
 pub struct EffectiveAngleOfAttackController {
@@ -14,6 +15,7 @@ pub struct EffectiveAngleOfAttackController {
 impl EffectiveAngleOfAttackController {
     pub fn get_new_output(
         &self,
+        loading: f64,
         angle_measurements: &[f64]
     ) -> ControllerOutput {
         let nr_of_wings = angle_measurements.len();
@@ -21,7 +23,7 @@ impl EffectiveAngleOfAttackController {
         let mut new_local_wing_angles = vec![0.0; nr_of_wings];
 
         for i in 0..nr_of_wings {
-            let mut angle_error = angle_measurements[i] - self.target_angles_of_attack[i];
+            let mut angle_error = angle_measurements[i] - self.target_angles_of_attack[i] * loading;
 
             angle_error = Self::correct_angle_to_be_between_pi_and_negative_pi(angle_error);
 

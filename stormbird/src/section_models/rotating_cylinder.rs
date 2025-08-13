@@ -13,6 +13,7 @@ use stormath::interpolation;
 /// Model representing a rotating cylinder. The lift, drag and moment can be calculated based on how 
 /// fast the cylinder is spinning. 
 pub struct RotatingCylinder {
+    #[serde(default)]
     /// The rotational speed of the rotor, in revolutions per second.
     pub revolutions_per_second: f64,
     #[serde(default = "RotatingCylinder::default_spin_ratio_data")]

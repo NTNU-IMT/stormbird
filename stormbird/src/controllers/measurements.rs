@@ -30,6 +30,7 @@ pub struct MeasurementSettings {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FlowMeasurementSettings {
     #[serde(default)]
     pub angle_of_attack: MeasurementSettings,

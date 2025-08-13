@@ -36,6 +36,7 @@ pub enum ControllerLogic {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ControllerBuilder {
     pub logic: ControllerLogic,
     #[serde(default)]
@@ -111,10 +112,10 @@ impl Controller {
         if first_time_step || (time_to_update && initialization_done) {
             let new_output_raw = match &self.logic {
                 ControllerLogic::EffectiveAngleOfAttack(controller) => {
-                    controller.get_new_output(&input.angles_of_attack)
+                    controller.get_new_output(input.loading, &input.angles_of_attack)
                 },
                 ControllerLogic::WeatherDependentSetPoints(controller) => {
-                    controller.get_new_output(&input.apparent_wind_directions)
+                    controller.get_new_output(input)
                 }
             };
 

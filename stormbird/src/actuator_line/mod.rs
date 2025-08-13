@@ -181,6 +181,7 @@ impl ActuatorLine {
                 let wind_environment = WindEnvironment::default();
 
                 let input = ControllerInput::new(
+                    1.0,
                     &self.line_force_model,
                     &simulation_result,
                     &controller.flow_measurement_settings,

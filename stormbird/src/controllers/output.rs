@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::io_utils::csv_data;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ControllerOutput {
     pub local_wing_angles: Option<Vec<f64>>,
     pub section_models_internal_state: Option<Vec<f64>>,
