@@ -4,6 +4,7 @@
 
 mod input_filters;
 mod parameters;
+mod model_scaling;
 
 use std::f64::consts::PI;
 use std::path::PathBuf;
@@ -34,6 +35,7 @@ use fmu_from_struct::FmuInfo;
 
 use input_filters::InputFilters;
 use parameters::FmuParameters;
+use model_scaling::ModelScaling;
 
 #[derive(Debug, Default, Clone, Fmu)]
 #[fmi_version = 2]
@@ -43,6 +45,7 @@ pub struct StormbirdLiftingLine {
     /// Path to the parameters file. If empty, the parameters file is expected to be in the resource
     /// directory of the FMU.
     pub parameters_path: String,
+    pub time_model_scale: f64,
     #[input]
     /// Variables specifying the wind conditions.
     pub wind_velocity: f64,
@@ -169,6 +172,7 @@ pub struct StormbirdLiftingLine {
     wind_environment: Option<WindEnvironment>,
     controller: Option<Controller>,
     input_filters: Option<InputFilters>,
+    time_model_scaling: Option<ModelScaling>
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
@@ -180,9 +184,23 @@ impl FmuFunctions for StormbirdLiftingLine {
         self.build_controller();
         self.build_filters();
         self.build_lifting_line_model();
+
+        if self.time_model_scale > 0.0 {
+            self.time_model_scaling = Some(
+                ModelScaling{
+                    scale: self.time_model_scale
+                }
+            );
+        }
     }
 
-    fn do_step(&mut self, current_time: f64, time_step: f64) {
+    fn do_step(&mut self, current_time_in: f64, time_step_in: f64) {
+        let (current_time, time_step) = if let Some(scaling) = self.time_model_scaling {
+            (scaling.upscale_time(current_time_in), scaling.upscale_time(time_step_in))
+        } else {
+            (current_time_in, time_step_in)
+        };
+        
         self.apply_filters_to_input_if_activated();
 
         let waiting_iterations_is_done = 
@@ -206,7 +224,7 @@ impl FmuFunctions for StormbirdLiftingLine {
 
                 self.set_force_output(&result);
 
-                self.set_controller_input_output(&controller_input);
+                self.set_controller_measurement_output(&controller_input);
 
                 self.apply_controller(current_time, time_step, &controller_input)
             }
@@ -711,7 +729,7 @@ impl StormbirdLiftingLine {
 
     /// Takes a ControllerInput variable as input, an applies the data to the output variables in 
     /// the FMU
-    fn set_controller_input_output(&mut self, controller_input: &ControllerInput) {
+    fn set_controller_measurement_output(&mut self, controller_input: &ControllerInput) {
         let output_size = 10;
 
         let mut angles_of_attack_extended = vec![0.0; output_size];

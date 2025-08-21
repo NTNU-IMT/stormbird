@@ -73,10 +73,15 @@ impl LineForceModel {
         };
 
         let angles_of_attack: Vec<f64> = (0..velocity.len()).map(|index| {
-            chord_vectors[index].signed_angle_between(
-                velocity[index],
-                span_lines[index].direction()
-            )
+            if velocity[index].length() > std::f64::MIN_POSITIVE {
+                chord_vectors[index].signed_angle_between(
+                    velocity[index],
+                    span_lines[index].direction()
+                )
+            } else {
+                0.0
+            }
+            
         }).collect();
 
         match &self.angle_of_attack_correction {
