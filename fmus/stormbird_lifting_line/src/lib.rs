@@ -592,8 +592,6 @@ impl StormbirdLiftingLine {
             } else {
                 vec![]
             };
-
-        let mut out = vec![SpatialVector([0.0, 0.0, 0.0]); freestream_velocity_points.len()];
         
         // Get the wind field from the wind environment, based on the wind condition
         let wind_condition = WindCondition {
@@ -601,16 +599,11 @@ impl StormbirdLiftingLine {
             direction_coming_from: self.wind_direction()
         };
 
-        for i in 0..freestream_velocity_points.len() {
-            if let Some(env) = &self.wind_environment {
-                out[i] = env.true_wind_velocity_vector_at_location(
-                    wind_condition,
-                    freestream_velocity_points[i]
-                )
-            } else {
-                panic!("Wind environment is not defined!")
-            }
-        }
+        let mut out = if let Some(env) = &self.wind_environment {
+            env.true_wind_velocity_vectors_at_locations(wind_condition, &freestream_velocity_points)
+        } else {
+            panic!("Wind environment is not defined!")
+        };
 
         // Apply the linear motion of the wings to the freestream if this option is activated
         if self.parameters.use_motion_velocity_linear_as_freestream {

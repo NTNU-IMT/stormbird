@@ -103,6 +103,27 @@ impl WindEnvironment {
 
         velocity * direction_vector
     }
+
+    pub fn true_wind_velocity_vectors_at_locations(
+        &self,
+        condition: WindCondition,
+        locations: &[SpatialVector<3>]
+    ) -> Vec<SpatialVector<3>> {
+        locations.iter()
+            .map(
+                |&location| self.true_wind_velocity_vector_at_location(condition, location)
+            )
+            .collect()
+    }
+
+    pub fn apparent_wind_velocity_vectors_at_locations(
+        &self,
+        condition: WindCondition,
+        locations: &[SpatialVector<3>],
+        linear_velocity: SpatialVector<3>
+    ) -> Vec<SpatialVector<3>> {
+        todo!()
+    }
 }
 
     
