@@ -50,7 +50,7 @@ impl Simulation {
     /// simulation, the points are only the control points of the line force model. In case of a
     /// dynamic simulation, the points are the control points of the line force model and the
     /// points in the wake.
-    pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector<3>> {
+    pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector> {
         let total_nr_popints = self.line_force_model.nr_span_lines() + self.wake.points.len();
 
         let mut points = Vec::with_capacity(total_nr_popints);
@@ -79,7 +79,7 @@ impl Simulation {
         &mut self,
         time: f64,
         time_step: f64,
-        freestream_velocity: &[SpatialVector<3>],
+        freestream_velocity: &[SpatialVector],
     ) -> SimulationResult {
         let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
         let wake_points_freestream = freestream_velocity[self.line_force_model.nr_span_lines()..].to_vec();
@@ -90,7 +90,7 @@ impl Simulation {
 
         if !self.first_time_step_completed {
             let averaged_ctrl_points_freesteream = ctrl_points_freestream.iter()
-                .sum::<SpatialVector<3>>() / ctrl_points_freestream.len() as f64;
+                .sum::<SpatialVector>() / ctrl_points_freestream.len() as f64;
 
             self.wake.initialize_with_velocity_and_time_step(
                 &self.line_force_model,
@@ -146,14 +146,14 @@ impl Simulation {
     /// Interface function to calculate the induced velocities from the wake at the given points.
     pub fn induced_velocities(
         &self,
-        points: &[SpatialVector<3>],
-    ) -> Vec<SpatialVector<3>> {
+        points: &[SpatialVector],
+    ) -> Vec<SpatialVector> {
         self.wake.induced_velocities(points)
     }
 
     pub fn initialize_line_force_model_data(
         &mut self,
-        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        felt_ctrl_points_freestream: &[SpatialVector],
     ) {
         self.previous_line_force_model_data = LineForceModelData::new(
             &self.line_force_model,
@@ -167,7 +167,7 @@ impl Simulation {
         &mut self,
         time: f64,
         time_step: f64,
-        freestream_velocity: &[SpatialVector<3>],
+        freestream_velocity: &[SpatialVector],
     ) {
         let old_circulation_correction = self.line_force_model.circulation_correction.clone();
         let old_damping_factor = self.solver.damping_factor;

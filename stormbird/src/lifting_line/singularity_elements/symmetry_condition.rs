@@ -24,21 +24,21 @@ impl Default for SymmetryCondition {
 }
 
 impl SymmetryCondition {
-    pub fn mirrored_point(&self, point: SpatialVector<3>) -> Option<SpatialVector<3>> {
+    pub fn mirrored_point(&self, point: SpatialVector) -> Option<SpatialVector> {
         match self {
             SymmetryCondition::NoSymmetry => None,
-            SymmetryCondition::X => Some(SpatialVector::<3>::new(-point[0], point[1], point[2])),
-            SymmetryCondition::Y => Some(SpatialVector::<3>::new(point[0], -point[1], point[2])),
-            SymmetryCondition::Z => Some(SpatialVector::<3>::new(point[0], point[1], -point[2])),
+            SymmetryCondition::X => Some(SpatialVector::new(-point[0], point[1], point[2])),
+            SymmetryCondition::Y => Some(SpatialVector::new(point[0], -point[1], point[2])),
+            SymmetryCondition::Z => Some(SpatialVector::new(point[0], point[1], -point[2])),
         }
     }
 
-    pub fn corrected_velocity(&self, u_i: SpatialVector<3>, u_i_m: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn corrected_velocity(&self, u_i: SpatialVector, u_i_m: SpatialVector) -> SpatialVector {
         match self {
             SymmetryCondition::NoSymmetry => u_i,
-            SymmetryCondition::X => SpatialVector::<3>::new(u_i[0] - u_i_m[0], u_i[1] + u_i_m[1], u_i[2] + u_i_m[2]),
-            SymmetryCondition::Y => SpatialVector::<3>::new(u_i[0] + u_i_m[0], u_i[1] - u_i_m[1], u_i[2] + u_i_m[2]),
-            SymmetryCondition::Z => SpatialVector::<3>::new(u_i[0] + u_i_m[0], u_i[1] + u_i_m[1], u_i[2] - u_i_m[2]),
+            SymmetryCondition::X => SpatialVector::new(u_i[0] - u_i_m[0], u_i[1] + u_i_m[1], u_i[2] + u_i_m[2]),
+            SymmetryCondition::Y => SpatialVector::new(u_i[0] + u_i_m[0], u_i[1] - u_i_m[1], u_i[2] + u_i_m[2]),
+            SymmetryCondition::Z => SpatialVector::new(u_i[0] + u_i_m[0], u_i[1] + u_i_m[1], u_i[2] - u_i_m[2]),
         }
     }
 }

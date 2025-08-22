@@ -48,7 +48,7 @@ pub struct QuasiNewton {
 impl QuasiNewton {
     pub fn initialize_jacobian(&mut self,
         line_force_model: &LineForceModel,
-        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        felt_ctrl_points_freestream: &[SpatialVector],
         frozen_wake: &FrozenWake
     ) {
         let nr_span_lines = line_force_model.nr_span_lines();
@@ -81,13 +81,13 @@ impl QuasiNewton {
         &self,
         line_force_model: &LineForceModel,
         previous_circulation_strength: &[f64],
-        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        felt_ctrl_points_freestream: &[SpatialVector],
         frozen_wake: &FrozenWake,
-    ) -> (Array1<f64>, Vec<SpatialVector<3>>) {
+    ) -> (Array1<f64>, Vec<SpatialVector>) {
         let induced_velocities = 
             frozen_wake.induced_velocities_at_control_points(&previous_circulation_strength);
 
-        let mut ctrl_point_velocity: Vec<SpatialVector<3>> = induced_velocities.iter()
+        let mut ctrl_point_velocity: Vec<SpatialVector> = induced_velocities.iter()
             .zip(felt_ctrl_points_freestream.iter())
                 .map(
                     |(u_i, u_inf)| {
@@ -112,7 +112,7 @@ impl QuasiNewton {
     pub fn do_step(
         &mut self,
         line_force_model: &LineForceModel,
-        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        felt_ctrl_points_freestream: &[SpatialVector],
         frozen_wake: &FrozenWake,
         initial_solution: &[f64],
     ) -> SolverResult {

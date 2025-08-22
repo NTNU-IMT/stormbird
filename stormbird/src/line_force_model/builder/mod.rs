@@ -37,9 +37,9 @@ pub struct LineForceModelBuilder {
     #[serde(default)]
     pub local_wing_angles: Vec<f64>,
     #[serde(default)]
-    pub rotation: SpatialVector<3>,
+    pub rotation: SpatialVector,
     #[serde(default)]
-    pub translation: SpatialVector<3>,
+    pub translation: SpatialVector,
 }
 
 impl LineForceModelBuilder {

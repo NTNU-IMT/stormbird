@@ -55,9 +55,9 @@ pub struct Wake {
     /// The indices for the wake
     pub indices: WakeIndices,
     /// The points making up the vortex wake
-    pub points: Vec<SpatialVector<3>>,
+    pub points: Vec<SpatialVector>,
     /// The velocity at each point in the wake
-    pub velocity_at_points: Vec<SpatialVector<3>>,
+    pub velocity_at_points: Vec<SpatialVector>,
     /// The strengths of the panels
     pub strengths: Vec<f64>,
     /// The viscous core length of each panel
@@ -75,8 +75,8 @@ pub struct Wake {
 }
 
 impl Wake {
-    pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
-        let mut ctrl_points: Vec<SpatialVector::<3>> = Vec::with_capacity(self.indices.nr_panels_along_span);
+    pub fn ctrl_points(&self) -> Vec<SpatialVector> {
+        let mut ctrl_points: Vec<SpatialVector> = Vec::with_capacity(self.indices.nr_panels_along_span);
 
         for i in 0..self.indices.nr_panels_along_span {
             ctrl_points.push(
@@ -114,7 +114,7 @@ impl Wake {
     }
 
     /// Returns the four points that make up a panel at the given indices
-    fn panel_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector<3>; 4] {
+    fn panel_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector; 4] {
         let point_indices = self.panel_point_indices(panel_stream_index, panel_span_index);
 
         [

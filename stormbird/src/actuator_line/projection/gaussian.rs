@@ -29,8 +29,8 @@ impl Default for Gaussian {
 impl Gaussian {
     pub fn projection_value_at_point(
         &self, 
-        point: SpatialVector<3>, 
-        chord_vector: SpatialVector<3>, 
+        point: SpatialVector, 
+        chord_vector: SpatialVector, 
         span_line: &SpanLine
     ) -> f64 {
         let chord_length = chord_vector.length();

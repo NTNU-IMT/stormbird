@@ -154,7 +154,7 @@ impl WakeBuilder {
 
         let indices = self.get_wake_indices(line_force_model);
 
-        let mut points = vec![SpatialVector::<3>::default(); indices.nr_points()];
+        let mut points = vec![SpatialVector::default(); indices.nr_points()];
 
         for i_stream in 0..indices.nr_points_per_line_element {
             for i_span in 0..span_points.len() {
@@ -197,7 +197,7 @@ impl WakeBuilder {
 
         let panels = vec![Panel::default(); nr_panels];
 
-        let velocity_at_points = vec![SpatialVector::<3>::default(); indices.nr_points()];
+        let velocity_at_points = vec![SpatialVector::default(); indices.nr_points()];
 
         let mut wake = Wake {
             indices,

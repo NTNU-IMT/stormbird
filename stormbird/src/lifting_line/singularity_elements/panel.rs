@@ -11,17 +11,17 @@ use super::vortex_line;
 
 #[derive(Clone, Debug, Default)]
 pub struct Panel {
-    points: [SpatialVector<3>; 4],
-    center: SpatialVector<3>,
+    points: [SpatialVector; 4],
+    center: SpatialVector,
     area: f64,
-    normal: SpatialVector<3>,
+    normal: SpatialVector,
     far_field_length: f64,
     viscous_core_length: f64,
 }
 
 impl Panel {
     pub fn new(
-        points: [SpatialVector<3>; 4],
+        points: [SpatialVector; 4],
         far_field_ratio: f64,
         viscous_core_length: f64,
     ) -> Self {
@@ -50,8 +50,8 @@ impl Panel {
     /// given as input
     pub fn induced_velocity_with_unit_strength(
         &self, 
-        ctrl_point: SpatialVector<3>,
-    ) -> SpatialVector<3> {
+        ctrl_point: SpatialVector,
+    ) -> SpatialVector {
         let distance_to_ctrl_point = (ctrl_point - self.center).length();
 
         if distance_to_ctrl_point > self.far_field_length {
@@ -70,8 +70,8 @@ impl Panel {
     /// <https://ntrs.nasa.gov/api/citations/19900004884/downloads/19900004884.pdf>, page 38
     pub fn induced_velocity_as_point_doublet_with_unit_strength(
         &self, 
-        ctrl_point: SpatialVector<3>
-    ) -> SpatialVector<3> {
+        ctrl_point: SpatialVector
+    ) -> SpatialVector {
         let area_term = self.area / (4.0 * PI);
 
         let translated_point = ctrl_point - self.center;
@@ -87,12 +87,12 @@ impl Panel {
 
     pub fn induced_velocity_as_vortex_lines_with_unit_strength(
         &self, 
-        ctrl_point: SpatialVector<3>,
-    ) -> SpatialVector<3> {
-        let mut u_i: SpatialVector<3> = SpatialVector::<3>::default();
+        ctrl_point: SpatialVector,
+    ) -> SpatialVector {
+        let mut u_i: SpatialVector = SpatialVector::default();
 
         for i_point in 0..self.points.len() {
-            let line_points: [SpatialVector<3>; 2] = if i_point == self.points.len() - 1 {
+            let line_points: [SpatialVector; 2] = if i_point == self.points.len() - 1 {
                 [self.points[i_point], self.points[0]]
             } else {
                 [self.points[i_point], self.points[i_point + 1]]

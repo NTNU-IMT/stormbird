@@ -15,7 +15,7 @@ pub enum RotationType {
     YawPitchRoll,
 }
 
-impl SpatialVector<3> {
+impl SpatialVector {
     #[inline(always)]
     /// Translates the vector by the given translation vector
     pub fn translate(self, translation: Self) -> Self {
@@ -99,12 +99,12 @@ impl SpatialVector<3> {
     #[inline(always)]
     /// Rotates the vector around the yaw, pitch, and roll angles specified in the rotation vector
     pub fn rotate_yaw_pitch_roll(self, rotation: Self) -> Self {
-        let yaw_axis = SpatialVector::<3>::unit_z();
+        let yaw_axis = SpatialVector::unit_z();
 
-        let pitch_axis = SpatialVector::<3>::unit_y()
+        let pitch_axis = SpatialVector::unit_y()
             .rotate_around_axis(rotation[2], yaw_axis);
 
-        let roll_axis = SpatialVector::<3>::unit_x()
+        let roll_axis = SpatialVector::unit_x()
             .rotate_around_axis(rotation[2], yaw_axis)
             .rotate_around_axis(rotation[1], pitch_axis);
 
@@ -121,9 +121,9 @@ impl SpatialVector<3> {
 
     #[inline(always)]
     pub fn rotated_system_axes(&self, rotation: Self, rotation_type: RotationType) -> [Self; 3] {
-        let x_axis = SpatialVector::<3>::unit_x().rotate(rotation, rotation_type);
-        let y_axis = SpatialVector::<3>::unit_y().rotate(rotation, rotation_type);
-        let z_axis = SpatialVector::<3>::unit_z().rotate(rotation, rotation_type);
+        let x_axis = SpatialVector::unit_x().rotate(rotation, rotation_type);
+        let y_axis = SpatialVector::unit_y().rotate(rotation, rotation_type);
+        let z_axis = SpatialVector::unit_z().rotate(rotation, rotation_type);
 
         [x_axis, y_axis, z_axis]
     }
@@ -134,7 +134,7 @@ impl SpatialVector<3> {
     pub fn from_rotated_to_global_system(self, system_rotation: Self, rotation_type: RotationType) -> Self {
         let rotated_system_axes = self.rotated_system_axes(system_rotation, rotation_type);
 
-        Self([
+        Self::from([
             self[0] * rotated_system_axes[0][0] + self[1] * rotated_system_axes[1][0] + self[2] * rotated_system_axes[2][0],
             self[0] * rotated_system_axes[0][1] + self[1] * rotated_system_axes[1][1] + self[2] * rotated_system_axes[2][1],
             self[0] * rotated_system_axes[0][2] + self[1] * rotated_system_axes[1][2] + self[2] * rotated_system_axes[2][2],
@@ -147,7 +147,7 @@ impl SpatialVector<3> {
     pub fn in_rotated_coordinate_system(self, system_rotation: Self, rotation_type: RotationType  ) -> Self {
         let rotated_system_axes = self.rotated_system_axes(system_rotation, rotation_type);
 
-        Self([
+        Self::from([
             self.dot(rotated_system_axes[0]),
             self.dot(rotated_system_axes[1]),
             self.dot(rotated_system_axes[2]),
@@ -191,7 +191,7 @@ mod tests {
     /// The spatial vector implements to different algorithms for rotations, with slightly different
     /// use cases. This test compares the two algorithms to ensure they produce the same result.
     fn compare_rotations() {
-        let rotation = SpatialVector::<3>::new(
+        let rotation = SpatialVector::new(
             30.0_f64.to_radians(),
             21.2_f64.to_radians(),
             -16.1_f64.to_radians(),
@@ -199,13 +199,13 @@ mod tests {
 
         let rotation_type = RotationType::XYZ;
 
-        let original_vector = SpatialVector::<3>::new(1.3, 1.2, 1.5);
+        let original_vector = SpatialVector::new(1.3, 1.2, 1.5);
 
         let rotated_vector_1 = original_vector.rotate(rotation, rotation_type);
         let rotated_vector_2 = original_vector
-            .rotate_around_axis(rotation[0], SpatialVector::<3>::unit_x())
-            .rotate_around_axis(rotation[1], SpatialVector::<3>::unit_y())
-            .rotate_around_axis(rotation[2], SpatialVector::<3>::unit_z());
+            .rotate_around_axis(rotation[0], SpatialVector::unit_x())
+            .rotate_around_axis(rotation[1], SpatialVector::unit_y())
+            .rotate_around_axis(rotation[2], SpatialVector::unit_z());
 
         dbg!(rotated_vector_1, rotated_vector_2);
 
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn moment_transformation() {
-        let rotation = SpatialVector::<3>::default();
+        let rotation = SpatialVector::default();
         let location = SpatialVector([1.2, 0.0, 0.0]);
         let force = SpatialVector([0.0, 2.0, 0.0]);
 

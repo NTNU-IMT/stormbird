@@ -18,7 +18,7 @@ use crate::common_utils::forces_and_moments::{
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
     pub time: f64,
-    pub ctrl_points: Vec<SpatialVector<3>>,
+    pub ctrl_points: Vec<SpatialVector>,
     pub force_input: SectionalForcesInput,
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
@@ -40,8 +40,8 @@ impl SimulationResult {
         Ok(serde_res)
     }
 
-    pub fn integrated_forces_sum(&self) -> SpatialVector<3> {
-        let mut sum = SpatialVector::<3>::default();
+    pub fn integrated_forces_sum(&self) -> SpatialVector {
+        let mut sum = SpatialVector::default();
 
         for i in 0..self.integrated_forces.len() {
             sum += self.integrated_forces[i].total;
@@ -50,8 +50,8 @@ impl SimulationResult {
         sum
     }
 
-    pub fn integrated_moments_sum(&self) -> SpatialVector<3> {
-        let mut sum = SpatialVector::<3>::default();
+    pub fn integrated_moments_sum(&self) -> SpatialVector {
+        let mut sum = SpatialVector::default();
 
         for i in 0..self.integrated_moments.len() {
             sum += self.integrated_moments[i].total;
@@ -89,9 +89,9 @@ impl SimulationResult {
 
     /// Returns the felt velocity at each control point, but with the motion due to rotational 
     /// motion subtracted. 
-    pub fn felt_velocity_minus_rotational_motion(&self) -> Vec<SpatialVector<3>> {
+    pub fn felt_velocity_minus_rotational_motion(&self) -> Vec<SpatialVector> {
         let nr_span_lines = self.nr_span_lines();
-        let mut out: Vec<SpatialVector<3>> = Vec::with_capacity(nr_span_lines);
+        let mut out: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines);
 
         for i in 0..nr_span_lines {
             out.push(

@@ -24,10 +24,10 @@ fn compare_near_and_far_field() {
     ];
 
     // Set a control point in the local coordinate system
-    let ctrl_point_0 = SpatialVector::<3>::new(5.0, 2.0, 1.0);
+    let ctrl_point_0 = SpatialVector::new(5.0, 2.0, 1.0);
 
     // Add some rotation to test a "arbitrary" oriented panel (the angles should not matter)
-    let rotation = SpatialVector::<3>::new(
+    let rotation = SpatialVector::new(
         45.0_f64.to_radians(),
         -10.0_f64.to_radians(),
         0.0,

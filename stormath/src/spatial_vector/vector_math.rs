@@ -1,12 +1,12 @@
 use super::*;
 
-impl<const N: usize> SpatialVector<N> {
+impl SpatialVector {
     #[inline(always)]
     /// Returns the dot product of two vectors
     pub fn dot(self, rhs: Self) -> f64 {
         let mut result = 0.0;
 
-        for i in 0..N {
+        for i in 0..3 {
             result += self[i] * rhs[i];
         }
 
@@ -32,9 +32,9 @@ impl<const N: usize> SpatialVector<N> {
         let length: f64 = self.length();
 
         if length > 0.0 {
-            let mut result = [0.0; N];
+            let mut result = [0.0; 4];
 
-            for i in 0..N {
+            for i in 0..3 {
                 result[i] = self[i] / length;
             }
 
@@ -51,9 +51,6 @@ impl<const N: usize> SpatialVector<N> {
         (self - rhs).length()
     }
 
-}
-
-impl SpatialVector<3> {
     #[inline(always)]
     /// Returns the cross product of two vectors
     pub fn cross(self, rhs: Self) -> Self {
@@ -108,4 +105,5 @@ impl SpatialVector<3> {
     pub fn project_on_plane(self, plane_normal: Self) -> Self {
         self - self.project(plane_normal)
     }
+
 }

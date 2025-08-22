@@ -42,7 +42,7 @@ impl LineForceModel {
     ///   strength.
     pub fn circulation_strength_smoothed(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem,
         circulation_smoothing: &CirculationSmoothing,
     ) -> Vec<f64> {
@@ -155,7 +155,7 @@ impl LineForceModel {
     /// * `input_coordinate_system` - The coordinate system in which the input velocity is given.
     pub fn circulation_strength_prescribed(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem,
         prescribed_circulation: &PrescribedCirculation, 
     ) -> Vec<f64> {

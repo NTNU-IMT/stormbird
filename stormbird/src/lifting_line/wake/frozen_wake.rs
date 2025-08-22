@@ -23,7 +23,7 @@ pub struct FrozenWake {
     /// Vector containing values for the induced velocities that are constant for each control point 
     /// in the simulation. That is, velocities that do not depend on the circulation strength of the
     /// panels right behind the line model.
-    pub fixed_velocities: Vec<SpatialVector<3>>,
+    pub fixed_velocities: Vec<SpatialVector>,
     /// Matrix containing coefficients that can be used to calculate induced velocities as a 
     /// function of the strength of each vortex line. 
     /// 
@@ -31,12 +31,12 @@ pub struct FrozenWake {
     /// point. Each column for a given row corresponds to the induced velocity from each panel. The 
     /// induced velocity can therefore be calculated as the dot product of the row and the 
     /// circulation strength.
-    pub variable_velocity_factors: Matrix<SpatialVector<3>>,
+    pub variable_velocity_factors: Matrix<SpatialVector>,
 }
 
 impl FrozenWake {
     pub fn initialize(nr_span_lines: usize) -> Self {
-        let fixed_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
+        let fixed_velocities = vec![SpatialVector::default(); nr_span_lines];
 
         let variable_velocity_factors = Matrix::new_default(
             [nr_span_lines, nr_span_lines]
@@ -52,17 +52,17 @@ impl FrozenWake {
     /// wake length.
     pub fn steady_wake_from_span_lines_and_direction(
         span_lines: &[SpanLine],
-        wake_vector: SpatialVector<3>,
+        wake_vector: SpatialVector,
         viscous_core_length: f64,
         far_field_ratio: f64,
     ) -> Self {
         let nr_span_lines = span_lines.len();
 
-        let ctrl_points: Vec<SpatialVector<3>> = span_lines.iter().map(
+        let ctrl_points: Vec<SpatialVector> = span_lines.iter().map(
             |span_line| span_line.ctrl_point()
         ).collect();
 
-        let fixed_velocities = vec![SpatialVector::<3>::default(); nr_span_lines];
+        let fixed_velocities = vec![SpatialVector::default(); nr_span_lines];
         let mut variable_velocity_factors = Matrix::new_default(
             [nr_span_lines, nr_span_lines]
         );
@@ -134,7 +134,7 @@ impl FrozenWake {
                 let panel_wing_index      = wake.wing_index(panel_index);
     
                 if ctrl_point_wing_index == panel_wing_index {
-                    *factor = SpatialVector::<3>::default();
+                    *factor = SpatialVector::default();
                 } else {
                     *factor = wake.unit_strength_induced_velocity_from_panel(
                         0, 
@@ -167,7 +167,7 @@ impl FrozenWake {
     pub fn induced_velocities_at_control_points(
         &self,
         circulation_strength: &[f64],
-    ) -> Vec<SpatialVector<3>> {
+    ) -> Vec<SpatialVector> {
         let n = self.fixed_velocities.len();
 
         let mut results = Vec::with_capacity(n);
@@ -181,7 +181,7 @@ impl FrozenWake {
             }
 
             if induced_velocity[0].is_nan() || induced_velocity[1].is_nan() || induced_velocity[2].is_nan() {
-                induced_velocity = SpatialVector::<3>::default();
+                induced_velocity = SpatialVector::default();
             }
 
             results.push(induced_velocity)

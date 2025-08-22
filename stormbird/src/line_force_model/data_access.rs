@@ -19,36 +19,36 @@ impl LineForceModel {
     }
 
     /// Returns the axis of rotation for the wing at the input index.
-    pub fn wing_rotation_axis(&self, wing_index: usize) -> SpatialVector<3> {
+    pub fn wing_rotation_axis(&self, wing_index: usize) -> SpatialVector {
         self.span_lines_local[self.wing_indices[wing_index].start].relative_vector()
     }
 
-    pub fn wing_rotation_axis_from_global(&self, global_index: usize) -> SpatialVector<3> {
+    pub fn wing_rotation_axis_from_global(&self, global_index: usize) -> SpatialVector {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_axis(wing_index)
     }
 
     /// Returns both angle and axis of rotation for the wing at the input index.
-    pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, SpatialVector<3>) {
+    pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, SpatialVector) {
         let axis = self.wing_rotation_axis(wing_index);
         let angle = self.local_wing_angles[wing_index];
 
         (angle, axis)
     }
 
-    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (f64, SpatialVector<3>) {
+    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (f64, SpatialVector) {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_data(wing_index)
     }
 
-    pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+    pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector {
         self.rigid_body_motion.transform_vector(self.local_chord_vector_at_index(index))
     }
 
     /// Returns the chord vectors in global coordinates.
-    pub fn local_chord_vectors(&self) -> Vec<SpatialVector<3>> {
+    pub fn local_chord_vectors(&self) -> Vec<SpatialVector> {
         self.chord_vectors_local
             .iter()
             .enumerate()
@@ -60,7 +60,7 @@ impl LineForceModel {
             .collect()
     }
 
-    pub fn global_chord_vectors(&self) -> Vec<SpatialVector<3>> {
+    pub fn global_chord_vectors(&self) -> Vec<SpatialVector> {
         let local_chord_vectors = self.local_chord_vectors();
 
         local_chord_vectors
@@ -71,7 +71,7 @@ impl LineForceModel {
 
     /// Returns the control points of each line element. This is calculated as the midpoint of each
     /// span line
-    pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
+    pub fn ctrl_points(&self) -> Vec<SpatialVector> {
         let span_lines = self.span_lines();
 
         span_lines
@@ -82,7 +82,7 @@ impl LineForceModel {
 
     /// Returns the control points of each line element in local coordinates. This is calculated as
     /// the midpoint of each span line
-    pub fn ctrl_points_local(&self) -> Vec<SpatialVector<3>> {
+    pub fn ctrl_points_local(&self) -> Vec<SpatialVector> {
         self.span_lines_local
             .iter()
             .map(|line| line.ctrl_point())
@@ -91,9 +91,9 @@ impl LineForceModel {
 
     /// Returns the points making up the line geometry of the wings as a vector of spatial vectors,
     /// as opposed to a vector of span lines.
-    pub fn span_points(&self) -> Vec<SpatialVector<3>> {
+    pub fn span_points(&self) -> Vec<SpatialVector> {
         let span_lines = self.span_lines();
-        let mut span_points: Vec<SpatialVector<3>> = Vec::new();
+        let mut span_points: Vec<SpatialVector> = Vec::new();
 
         for wing_index in 0..self.wing_indices.len() {
             for i in self.wing_indices[wing_index].clone() {
@@ -125,7 +125,7 @@ impl LineForceModel {
             .collect()
     }
 
-    pub fn local_chord_vector_at_index(&self, index: usize) -> SpatialVector<3> {
+    pub fn local_chord_vector_at_index(&self, index: usize) -> SpatialVector {
         let (angle, axis) = self.wing_rotation_data_from_global(index);
 
         self.chord_vectors_local[index].rotate_around_axis(angle, axis)

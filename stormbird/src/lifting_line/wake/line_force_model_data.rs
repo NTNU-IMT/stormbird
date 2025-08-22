@@ -15,13 +15,13 @@ pub struct LineForceModelData {
     /// The span lines of the line force model, with both translation and rotation applied.
     pub span_lines: Vec<SpanLine>,
     /// The chord vectors of the line force model, with both translation and rotation applied.
-    pub chord_vectors: Vec<SpatialVector<3>>,
+    pub chord_vectors: Vec<SpatialVector>,
     /// The felt freestream velocity at the control points of the line force model. That is, 
     /// velocity due to the inflow free stream AND the motion of the line force model.
-    pub felt_ctrl_points_freestream: Vec<SpatialVector<3>>,
+    pub felt_ctrl_points_freestream: Vec<SpatialVector>,
     /// The felt velocity at the control points of the line force model. That is, velocity due to 
     /// the inflow free stream AND the motion of the line force model AND the induced velocities
-    pub felt_ctrl_points_velocity: Vec<SpatialVector<3>>,
+    pub felt_ctrl_points_velocity: Vec<SpatialVector>,
     /// The effective angles of attack at the control points of the line force model. 
     pub angles_of_attack: Vec<f64>,
     /// The amount of flow separation at the control points of the line force model. 
@@ -43,8 +43,8 @@ impl LineForceModelData {
     /// model, including the induced velocities.
     pub fn new(
         line_force_model: &LineForceModel,
-        felt_ctrl_points_freestream: &[SpatialVector<3>],
-        felt_ctrl_points_velocity: &[SpatialVector<3>]
+        felt_ctrl_points_freestream: &[SpatialVector],
+        felt_ctrl_points_velocity: &[SpatialVector]
     ) -> Self {
         let span_lines = line_force_model.span_lines();
         let chord_vectors = line_force_model.global_chord_vectors();

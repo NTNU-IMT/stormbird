@@ -48,7 +48,7 @@ pub struct LineForceModel {
     /// and end point, to allow for uncoupled analysis
     pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
-    pub chord_vectors_local: Vec<SpatialVector<3>>,
+    pub chord_vectors_local: Vec<SpatialVector>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
@@ -180,9 +180,9 @@ impl LineForceModel {
     /// Removes the velocity in the span direction from the input velocity vector.
     pub fn remove_span_velocity(
         &self,
-        velocity: &[SpatialVector<3>],
+        velocity: &[SpatialVector],
         input_coordinate_system: CoordinateSystem,
-    ) -> Vec<SpatialVector<3>> {
+    ) -> Vec<SpatialVector> {
         let span_lines = match input_coordinate_system {
             CoordinateSystem::Global => self.span_lines(),
             CoordinateSystem::Body => self.span_lines_local.clone(),
@@ -200,7 +200,7 @@ impl LineForceModel {
     }
 
     /// Calculates the wake angle behind each line element.
-    pub fn wake_angles(&self, velocity: &[SpatialVector<3>]) -> Vec<f64> {
+    pub fn wake_angles(&self, velocity: &[SpatialVector]) -> Vec<f64> {
         (0..self.nr_span_lines())
             .map(|index| {
                 let wing_index = self.wing_index_from_global(index);

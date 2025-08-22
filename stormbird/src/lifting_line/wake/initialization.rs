@@ -6,7 +6,7 @@
     pub fn initialize_with_velocity_and_time_step(
         &mut self, 
         line_force_model: &LineForceModel, 
-        wake_building_velocity: SpatialVector<3>, 
+        wake_building_velocity: SpatialVector, 
         time_step: f64
     ) {
         let nr_panels = self.indices.nr_panels();
@@ -51,7 +51,7 @@
         let chord_vectors = line_force_model.global_chord_vectors();
 
         let average_chord_vector = chord_vectors.iter()
-            .sum::<SpatialVector<3>>() / chord_vectors.len() as f64;
+            .sum::<SpatialVector>() / chord_vectors.len() as f64;
 
         let average_chord_length = average_chord_vector.length();
 

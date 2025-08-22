@@ -21,7 +21,7 @@ pub struct ParticleSwarmOptimizer {
     pub initialization_time: f64,
     pub time_between_evaluations: f64,
     pub averaging_time: f64,
-    pub thrust_direction: SpatialVector<3>,
+    pub thrust_direction: SpatialVector,
     pub optimizer: ParticleSwarm,
     #[serde(default)]
     pub current_particle: usize,

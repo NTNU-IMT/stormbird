@@ -28,9 +28,9 @@ pub struct WindEnvironment {
     #[serde(default)]
     pub height_variation_model: Option<HeightVariationModel>,
     #[serde(default="WindEnvironment::default_up_direction")]
-    pub up_direction: SpatialVector<3>,
+    pub up_direction: SpatialVector,
     #[serde(default="WindEnvironment::default_zero_direction_vector")]
-    pub zero_direction_vector: SpatialVector<3>,
+    pub zero_direction_vector: SpatialVector,
     #[serde(default)]
     pub water_plane_height: f64,
 }
@@ -47,8 +47,8 @@ impl Default for WindEnvironment {
 }
 
 impl WindEnvironment {
-    pub fn default_zero_direction_vector() -> SpatialVector<3> {SpatialVector([-1.0, 0.0, 0.0])}
-    pub fn default_up_direction() -> SpatialVector<3> {SpatialVector([0.0, 0.0, 1.0])}
+    pub fn default_zero_direction_vector() -> SpatialVector {SpatialVector([-1.0, 0.0, 0.0])}
+    pub fn default_up_direction() -> SpatialVector {SpatialVector([0.0, 0.0, 1.0])}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
@@ -81,7 +81,7 @@ impl WindEnvironment {
     pub fn true_wind_velocity_at_location(
         &self,
         condition: WindCondition,
-        location: SpatialVector<3>,
+        location: SpatialVector,
     ) -> f64 {
         let height = (
             location.dot(self.up_direction) - self.water_plane_height
@@ -94,8 +94,8 @@ impl WindEnvironment {
     pub fn true_wind_velocity_vector_at_location(
         &self,
         condition: WindCondition,
-        location: SpatialVector<3>
-    ) -> SpatialVector<3> {
+        location: SpatialVector
+    ) -> SpatialVector {
         let velocity = self.true_wind_velocity_at_location(condition, location);
 
         let direction_vector = self.zero_direction_vector.rotate_around_axis(
@@ -109,8 +109,8 @@ impl WindEnvironment {
     pub fn true_wind_velocity_vectors_at_locations(
         &self,
         condition: WindCondition,
-        locations: &[SpatialVector<3>]
-    ) -> Vec<SpatialVector<3>> {
+        locations: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
         locations.iter()
             .map(
                 |&location| self.true_wind_velocity_vector_at_location(condition, location)
@@ -121,9 +121,9 @@ impl WindEnvironment {
     pub fn apparent_wind_velocity_vectors_at_locations(
         &self,
         condition: WindCondition,
-        locations: &[SpatialVector<3>],
-        linear_velocity: SpatialVector<3>
-    ) -> Vec<SpatialVector<3>> {
+        locations: &[SpatialVector],
+        linear_velocity: SpatialVector
+    ) -> Vec<SpatialVector> {
         let mut true_wind = self.true_wind_velocity_vectors_at_locations(
             condition, 
             locations
@@ -139,11 +139,11 @@ impl WindEnvironment {
     pub fn effective_wind_velocity_at_ctrl_points(
         &self,
         condition: WindCondition,
-        ctrl_points: &[SpatialVector<3>],
+        ctrl_points: &[SpatialVector],
         non_dimensional_span_distances: &[f64],
-        linear_velocity: SpatialVector<3>,
+        linear_velocity: SpatialVector,
         wing_indices: Vec<Range<usize>>,
-    ) -> Vec<SpatialVector<3>> {
+    ) -> Vec<SpatialVector> {
         todo!()
     }
 }

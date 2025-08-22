@@ -36,8 +36,8 @@ impl LineForceModel {
     /// the input velocity minus the motion velocity at each control point.
     pub fn felt_ctrl_points_velocity(
         &self, 
-        ctrl_points_velocity_no_motion: &[SpatialVector<3>]
-    ) -> Vec<SpatialVector<3>> {
+        ctrl_points_velocity_no_motion: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
         let ctrl_points = self.ctrl_points();
 
         let mut ctrl_point_velocity = Vec::with_capacity(ctrl_points.len());
@@ -64,7 +64,7 @@ impl LineForceModel {
     /// * `velocity` - the velocity vector at each control point
     pub fn angles_of_attack(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         let (span_lines, chord_vectors) = match input_coordinate_system {
@@ -98,7 +98,7 @@ impl LineForceModel {
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         let angles_of_attack = self.angles_of_attack(velocity, input_coordinate_system);
@@ -128,7 +128,7 @@ impl LineForceModel {
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         match &self.circulation_correction {
@@ -158,7 +158,7 @@ impl LineForceModel {
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength_raw(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         let cl = self.lift_coefficients(&velocity, input_coordinate_system);
@@ -175,7 +175,7 @@ impl LineForceModel {
     /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(
         &self, 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         let angles_of_attack = self.angles_of_attack(velocity, input_coordinate_system);
@@ -206,8 +206,8 @@ impl LineForceModel {
         let nr_span_lines = self.nr_span_lines();
 
         // TODO: these must be calculated somehow... Must be moved probably
-        let mut acceleration = vec![SpatialVector::<3>::default(); nr_span_lines];
-        let mut rotation_velocity = SpatialVector::<3>::default(); 
+        let mut acceleration = vec![SpatialVector::default(); nr_span_lines];
+        let mut rotation_velocity = SpatialVector::default(); 
 
         let mut velocity = solver_result.ctrl_point_velocity.clone();
 
@@ -240,7 +240,7 @@ impl LineForceModel {
             sectional_drag: self.sectional_drag_forces(&input.velocity),
             added_mass: self.sectional_added_mass_force(&input.acceleration),
             gyroscopic: self.sectional_gyroscopic_force(input.rotation_velocity),
-            total: vec![SpatialVector::<3>::default(); self.nr_span_lines()],
+            total: vec![SpatialVector::default(); self.nr_span_lines()],
             coordinate_system: input.coordinate_system
         };
 
@@ -250,7 +250,7 @@ impl LineForceModel {
     }
 
     /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
-    pub fn sectional_circulatory_forces(&self, strength: &[f64], velocity: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
+    pub fn sectional_circulatory_forces(&self, strength: &[f64], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
         let span_lines = match self.output_coordinate_system {
             CoordinateSystem::Global => self.span_lines(),
             CoordinateSystem::Body => self.span_lines_local.clone(),
@@ -259,7 +259,7 @@ impl LineForceModel {
         (0..self.nr_span_lines()).map(
             |index| {
                 if velocity[index].length() == 0.0 {
-                    SpatialVector::<3>::default()
+                    SpatialVector::default()
                 } else {
                     strength[index] * velocity[index].cross(span_lines[index].relative_vector()) * self.density
                 }
@@ -270,7 +270,7 @@ impl LineForceModel {
     /// Calculates the forces on each line element due to the sectional drag model. This is most
     /// often the viscous drag, but it can also include other physical effects if that is included
     /// in the sectional drag model.
-    pub fn sectional_drag_forces(&self, velocity: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
+    pub fn sectional_drag_forces(&self, velocity: &[SpatialVector]) -> Vec<SpatialVector> {
         let cd = self.viscous_drag_coefficients(velocity, self.output_coordinate_system);
 
         (0..self.nr_span_lines()).map(
@@ -301,8 +301,8 @@ impl LineForceModel {
     /// of the wings.
     pub fn sectional_added_mass_force(
         &self, 
-        acceleration: &[SpatialVector<3>]
-    ) -> Vec<SpatialVector<3>> {
+        acceleration: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
         let (span_lines, chord_vectors) = match self.output_coordinate_system {
             CoordinateSystem::Global => (self.span_lines(), self.global_chord_vectors()),
             CoordinateSystem::Body => (self.span_lines_local.clone(), self.local_chord_vectors())
@@ -326,7 +326,7 @@ impl LineForceModel {
                 }
 
                 if relevant_acceleration.length() == 0.0 {
-                    SpatialVector::<3>::default()
+                    SpatialVector::default()
                 } else {
                     let added_mass_coefficient = match &self.section_models[wing_index] {
                         SectionModel::Foil(foil) => {
@@ -353,8 +353,8 @@ impl LineForceModel {
     /// pitch motion of the boat.
     pub fn sectional_gyroscopic_force(
         &self, 
-        rotation_velocity: SpatialVector<3>
-    ) -> Vec<SpatialVector<3>> {
+        rotation_velocity: SpatialVector
+    ) -> Vec<SpatialVector> {
         let span_lines = match self.output_coordinate_system {
             CoordinateSystem::Global => self.span_lines(),
             CoordinateSystem::Body => self.span_lines_local.clone(),
@@ -365,7 +365,7 @@ impl LineForceModel {
                 let wing_index = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
-                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => SpatialVector::<3>::default(),
+                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => SpatialVector::default(),
                     SectionModel::RotatingCylinder(cylinder) => {
                         let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
 
@@ -386,7 +386,7 @@ impl LineForceModel {
     pub fn lift_from_circulation(
         &self, 
         strength: &[f64], 
-        velocity: &[SpatialVector<3>]
+        velocity: &[SpatialVector]
     ) -> Vec<f64> {
         let force = self.sectional_circulatory_forces(strength, velocity);
 
@@ -395,7 +395,7 @@ impl LineForceModel {
 
     /// Calculates the magnitude of the lift force on each line element based on the given
     /// coefficients and velocity
-    pub fn lift_from_coefficients(&self, velocity: &[SpatialVector<3>], input_coordinate_system: CoordinateSystem) -> Vec<f64> {
+    pub fn lift_from_coefficients(&self, velocity: &[SpatialVector], input_coordinate_system: CoordinateSystem) -> Vec<f64> {
         let cl = self.lift_coefficients(velocity, input_coordinate_system);
 
         (0..self.nr_span_lines()).map(
@@ -413,7 +413,7 @@ impl LineForceModel {
     pub fn residual(
         &self, 
         strength: &[f64], 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         let circulation_lift = self.lift_from_circulation(strength, velocity);
@@ -436,7 +436,7 @@ impl LineForceModel {
     pub fn residual_absolute(
         &self, 
         strength: &[f64], 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> Vec<f64> {
         self.residual(strength, velocity, input_coordinate_system).iter().map(|r| r.abs()).collect()
@@ -445,7 +445,7 @@ impl LineForceModel {
     pub fn average_residual_absolute(
         &self, 
         strength: &[f64], 
-        velocity: &[SpatialVector<3>], 
+        velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
     ) -> f64 {
         let residuals = self.residual_absolute(strength, velocity, input_coordinate_system);

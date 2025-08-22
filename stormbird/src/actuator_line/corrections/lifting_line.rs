@@ -63,19 +63,19 @@ pub struct LiftingLineCorrection {
     pub viscous_core_length: f64,
     pub nr_solver_iterations: usize,
     pub solver_damping_factor: f64,
-    velocity_correction_estimate: Vec<SpatialVector<3>>
+    velocity_correction_estimate: Vec<SpatialVector>
 }
 
 impl LiftingLineCorrection {
     pub fn velocity_correction(
         &mut self,
         line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector<3>],
+        ctrl_points_velocity: &[SpatialVector],
         circulation_strength: &[f64],
-    ) -> Vec<SpatialVector<3>> {
+    ) -> Vec<SpatialVector> {
         let span_lines = line_force_model.span_lines();
 
-        let mut u_i_correction: Vec<SpatialVector<3>> = Vec::with_capacity(span_lines.len());
+        let mut u_i_correction: Vec<SpatialVector> = Vec::with_capacity(span_lines.len());
 
         for wing_index in 0..line_force_model.nr_wings() {
             let wind_indices = line_force_model.wing_indices[wing_index].clone();
@@ -94,7 +94,7 @@ impl LiftingLineCorrection {
                 wind_indices.clone()
             ];
 
-            let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector<3>>() 
+            let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector>() 
                 / wing_ctrl_points_velocity.len() as f64;
 
             let wake_vector = averaged_ctrl_points_velocity.normalize() * 100.0;
@@ -134,17 +134,17 @@ impl LiftingLineCorrection {
     pub fn solve_correction(
         &mut self,
         line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector<3>],
+        ctrl_points_velocity: &[SpatialVector],
         circulation_strength: &[f64],
     ) -> (
-        Vec<SpatialVector<3>>,
+        Vec<SpatialVector>,
         Vec<f64>
     ) {
         let mut corrected_ctrl_points_velocity = ctrl_points_velocity.to_vec();
         let mut corrected_circulation_strength = circulation_strength.to_vec();
 
         for _ in 0..self.nr_solver_iterations {
-            let new_velocity_correction_estimate: Vec<SpatialVector<3>> = self.velocity_correction(
+            let new_velocity_correction_estimate: Vec<SpatialVector> = self.velocity_correction(
                 line_force_model,
                 ctrl_points_velocity,
                 &corrected_circulation_strength,

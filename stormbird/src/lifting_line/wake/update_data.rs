@@ -38,7 +38,7 @@ impl Wake {
     pub fn update_after_solving(
         &mut self,
         new_circulation_strength: &[f64],
-        wake_points_freestream: &[SpatialVector<3>],
+        wake_points_freestream: &[SpatialVector],
     ) {
         self.update_wing_strength(new_circulation_strength);
 
@@ -94,7 +94,7 @@ impl Wake {
     }
 
     /// Calculates the velocity at the wake points based on the current state of the wake.
-    pub fn update_velocity_at_points(&mut self, wake_points_freestream: &[SpatialVector<3>]) {
+    pub fn update_velocity_at_points(&mut self, wake_points_freestream: &[SpatialVector]) {
         self.velocity_at_points = self.velocity_at_wake_points(wake_points_freestream);
     }
 
@@ -121,7 +121,7 @@ impl Wake {
         line_force_model_data: &LineForceModelData,
     ) {
         // Compute a change vector based on ctrl point data
-        let mut ctrl_points_change_vector: Vec<SpatialVector<3>> = Vec::with_capacity(
+        let mut ctrl_points_change_vector: Vec<SpatialVector> = Vec::with_capacity(
             self.indices.nr_points_along_span
         );
 

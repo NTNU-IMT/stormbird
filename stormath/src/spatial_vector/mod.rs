@@ -15,65 +15,62 @@ pub mod geometry_functions;
 pub mod iterators;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[repr(C, align(32))]
 /// A 2D or 3D vector with typical geometric functions implemented
-pub struct SpatialVector<const N: usize>(pub [f64; N]);
+pub struct SpatialVector(pub [f64; 4]);
 
 
 /// Convert from a 3-element array to a Vec3
-impl<const N: usize> From<[f64; N]> for SpatialVector<N> {
-    fn from(array: [f64; N]) -> Self {
-        Self(array)
+impl From<[f64; 3]> for SpatialVector {
+    fn from(array: [f64; 3]) -> Self {
+        let mut data = [0.0; 4];
+        
+        for i in 0..3 {
+            data[i] = array[i];
+        }
+
+        Self(data)
     }
 }
 
 /// Convert from a Vec3 to a 3-element array
-impl<const N: usize> From<SpatialVector<N>> for [f64; N] {
-    fn from(vector: SpatialVector<N>) -> [f64; N] {
-        vector.0
+impl From<SpatialVector> for [f64; 3] {
+    fn from(vector: SpatialVector) -> [f64; 3] {
+        let mut out = [0.0; 3];
+
+        for i in 0..3 {
+            out[i] = vector.0[i]
+        }
+
+        out
     }
 }
 
 
-impl SpatialVector<2> {
-    pub fn new(x: f64, y: f64) -> Self {
-        Self([x, y])
-    }
-
-    pub fn unit_x() -> Self {
-        Self([1.0, 0.0])
-    }
-
-    pub fn unit_y() -> Self {
-        Self([0.0, 1.0])
-    }
-}
-
-impl SpatialVector<3> {
+impl SpatialVector {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
-        Self([x, y, z])
+        Self([x, y, z, 0.0])
     }
 
     pub fn unit_x() -> Self {
-        Self([1.0, 0.0, 0.0])
+        Self([1.0, 0.0, 0.0, 0.0])
     }
 
     pub fn unit_y() -> Self {
-        Self([0.0, 1.0, 0.0])
+        Self([0.0, 1.0, 0.0, 0.0])
     }
 
     pub fn unit_z() -> Self {
-        Self([0.0, 0.0, 1.0])
+        Self([0.0, 0.0, 1.0, 0.0])
     }
 }
 
-impl<const N: usize> Default for SpatialVector<N> {
+impl Default for SpatialVector {
     fn default() -> Self {
-        Self([0.0; N])
+        Self([0.0; 4])
     }
 }
 
-impl<const N: usize> std::fmt::Display for SpatialVector<N> {
+impl std::fmt::Display for SpatialVector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.0)
     }

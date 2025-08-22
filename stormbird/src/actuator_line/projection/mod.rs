@@ -41,8 +41,8 @@ impl ProjectionSettings {
 
     pub fn projection_value_at_point(
         &self, 
-        point: SpatialVector<3>, 
-        chord_vector: SpatialVector<3>, 
+        point: SpatialVector, 
+        chord_vector: SpatialVector, 
         span_line: &SpanLine
     ) -> f64 {
         self.projection_function.projection_value_at_point(

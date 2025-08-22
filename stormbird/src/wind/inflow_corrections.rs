@@ -14,9 +14,9 @@ impl InflowCorrectionSingleSail {
     pub fn correct_velocity(
         &self,
         non_dimensional_span_distance: f64,
-        velocity: SpatialVector<3>, 
-        up_vector: SpatialVector<3>
-    ) -> SpatialVector<3> {
+        velocity: SpatialVector, 
+        up_vector: SpatialVector
+    ) -> SpatialVector {
         let wake_factor_magnitude = linear_interpolation(
             non_dimensional_span_distance, 
             &self.non_dimensional_span_distances, 

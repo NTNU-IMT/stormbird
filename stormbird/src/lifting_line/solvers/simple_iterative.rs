@@ -71,14 +71,14 @@ impl SimpleIterative {
     pub fn do_step(
         &self,
         line_force_model: &LineForceModel,
-        felt_ctrl_points_freestream: &[SpatialVector<3>],
+        felt_ctrl_points_freestream: &[SpatialVector],
         frozen_wake: &FrozenWake,
         initial_solution: &[f64],
     ) -> SolverResult {
         let ctrl_points = line_force_model.ctrl_points();
     
         let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
-        let mut ctrl_point_velocity = vec![SpatialVector::<3>::default(); ctrl_points.len()];
+        let mut ctrl_point_velocity = vec![SpatialVector::default(); ctrl_points.len()];
         let mut residual = line_force_model.average_residual_absolute(
             &circulation_strength, 
             &ctrl_point_velocity,

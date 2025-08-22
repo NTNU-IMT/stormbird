@@ -20,12 +20,12 @@ pub struct LineCoordinates {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// A line segment of a wing span
 pub struct SpanLine {
-    pub start_point: SpatialVector<3>,
-    pub end_point: SpatialVector<3>
+    pub start_point: SpatialVector,
+    pub end_point: SpatialVector
 }
 
 impl SpanLine {
-    pub fn relative_vector(&self) -> SpatialVector<3> {
+    pub fn relative_vector(&self) -> SpatialVector {
         self.end_point - self.start_point
     }
 
@@ -33,21 +33,21 @@ impl SpanLine {
         self.relative_vector().length()
     }
 
-    pub fn direction(&self) -> SpatialVector<3> {
+    pub fn direction(&self) -> SpatialVector {
         self.relative_vector().normalize()
     }
 
-    pub fn as_array(&self) -> [SpatialVector<3>; 2] {
+    pub fn as_array(&self) -> [SpatialVector; 2] {
         [self.start_point, self.end_point]
     }
 
     /// Return the control point of the line segment, which corresponds to the average point along 
     /// the line segment. 
-    pub fn ctrl_point(&self) -> SpatialVector<3> {
+    pub fn ctrl_point(&self) -> SpatialVector {
         0.5 * (self.start_point + self.end_point)
     }
 
-    pub fn distance(&self, point: SpatialVector<3>) -> f64 {
+    pub fn distance(&self, point: SpatialVector) -> f64 {
         let relative_vector = self.relative_vector();
         let start_to_point  = point - self.start_point;
         let end_to_point    = point - self.end_point;
@@ -66,7 +66,7 @@ impl SpanLine {
     /// 
     /// The chord and span direction is given directly by Self and the input. The thickness 
     /// direction is assumed to be normal to the two other directions.
-    pub fn line_coordinates(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>) -> LineCoordinates {
+    pub fn line_coordinates(&self, point: SpatialVector, chord_vector: SpatialVector) -> LineCoordinates {
         let translated_point = point - self.ctrl_point();
 
         let span_direction      = self.relative_vector().normalize();

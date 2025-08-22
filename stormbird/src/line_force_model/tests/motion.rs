@@ -13,7 +13,7 @@ fn test_rigid_body_motion() {
     let translation_motion_period = 2.0;
 
     // Sway motion
-    let translation_func = |time: f64| -> SpatialVector<3> {
+    let translation_func = |time: f64| -> SpatialVector {
         let frequency = 1.0 / translation_motion_period;
         let amplitude = 1.0;
         let omega = 2.0 * PI * frequency;
@@ -22,7 +22,7 @@ fn test_rigid_body_motion() {
     };
 
     // Roll motion
-    let rotation_func = |time: f64| -> SpatialVector<3> {
+    let rotation_func = |time: f64| -> SpatialVector {
         let frequency = 1.0 / rotation_motion_period;
         let amplitude = 45.0_f64.to_radians();
         let omega = 2.0 * PI * frequency;
@@ -51,7 +51,7 @@ fn test_rigid_body_motion() {
 
         let ctrl_points = line_force_model.ctrl_points();
 
-        let ctrl_points_velocity_fd: Vec<SpatialVector::<3>> = ctrl_points.iter()
+        let ctrl_points_velocity_fd: Vec<SpatialVector> = ctrl_points.iter()
             .zip(previous_ctrl_points.iter())
             .map(|(current, previous)| (*current - *previous) / time_step)
             .collect();

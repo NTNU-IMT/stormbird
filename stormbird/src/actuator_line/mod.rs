@@ -57,7 +57,7 @@ pub struct ActuatorLine {
     /// The number of iterations between each time a full simulation result is written to file
     pub write_iterations_full_result: usize,
     /// Vector to store interpolated velocity values for each control point
-    pub ctrl_points_velocity: Vec<SpatialVector<3>>,
+    pub ctrl_points_velocity: Vec<SpatialVector>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
     /// Corrections based on the lifting line model
@@ -108,10 +108,10 @@ impl ActuatorLine {
     pub fn get_weighted_velocity_sampling_integral_terms_for_cell(
         &self, 
         line_index: usize, 
-        velocity: SpatialVector<3>, 
-        cell_center: SpatialVector<3>, 
+        velocity: SpatialVector, 
+        cell_center: SpatialVector, 
         cell_volume: f64
-    ) -> (SpatialVector<3>, f64) {
+    ) -> (SpatialVector, f64) {
         let span_line = self.line_force_model.span_line_at_index(line_index);
         let chord_vector = self.line_force_model.global_chord_vector_at_index(line_index);
 
@@ -209,7 +209,7 @@ impl ActuatorLine {
         }
     }
 
-    pub fn corrected_ctrl_points_velocity(&self) -> Vec<SpatialVector<3>> {
+    pub fn corrected_ctrl_points_velocity(&self) -> Vec<SpatialVector> {
         let mut corrected_velocity = if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
                 &self.ctrl_points_velocity, 
@@ -335,15 +335,15 @@ impl ActuatorLine {
     pub fn force_to_project(
         &self, 
         line_index: usize, 
-        velocity: SpatialVector<3>
-    ) -> SpatialVector<3> {
+        velocity: SpatialVector
+    ) -> SpatialVector {
         if let Some(simulation_result) = &self.simulation_result {
             let raw_lift_force = simulation_result.sectional_forces.circulatory[line_index];
 
             let raw_drag_force = if self.projection_settings.project_sectional_drag {
                 simulation_result.sectional_forces.sectional_drag[line_index]
             } else {
-                SpatialVector::<3>::default()
+                SpatialVector::default()
             };
 
             if self.projection_settings.project_normal_to_velocity {
@@ -361,12 +361,12 @@ impl ActuatorLine {
                 raw_lift_force + raw_drag_force
             }
         } else {
-            SpatialVector::<3>::default()
+            SpatialVector::default()
         }        
     }
 
     /// Computes the body force weights for each line element at a given point in space.
-    pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector<3>) -> Vec<f64> {
+    pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector) -> Vec<f64> {
         let span_lines = self.line_force_model.span_lines();
         let chord_vectors = self.line_force_model.global_chord_vectors();
         
@@ -386,13 +386,13 @@ impl ActuatorLine {
     }
 
     /// Computes the sum of the projection weights for all line elements at a given point in space.
-    pub fn summed_projection_weights_at_point(&self, point: SpatialVector<3>) -> f64 {
+    pub fn summed_projection_weights_at_point(&self, point: SpatialVector) -> f64 {
         self.line_segments_projection_weights_at_point(point).iter().sum()
     }
 
     /// Checks which line element is dominating at a given point in space by comparing the 
     /// projection weights of each line element.
-    pub fn dominating_line_element_index_at_point(&self, point: SpatialVector<3>) -> usize {
+    pub fn dominating_line_element_index_at_point(&self, point: SpatialVector) -> usize {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
         let mut max_weight = -1.0;

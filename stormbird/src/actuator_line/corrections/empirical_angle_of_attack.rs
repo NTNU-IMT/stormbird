@@ -18,7 +18,7 @@ impl EmpiricalAngleOfAttackCorrection {
     pub fn angles_of_attack_correction(
         &self,
         line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector<3>],
+        ctrl_points_velocity: &[SpatialVector],
     ) -> Vec<f64> {
         let section_cl = line_force_model.lift_coefficients(
             ctrl_points_velocity, 
@@ -50,8 +50,8 @@ impl EmpiricalAngleOfAttackCorrection {
     pub fn solve_correction(
         &self, 
         line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector<3>]
-    ) -> Vec<SpatialVector<3>> {
+        ctrl_points_velocity: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
 
         let nr_span_lines = line_force_model.nr_span_lines();
         let span_lines = line_force_model.span_lines();

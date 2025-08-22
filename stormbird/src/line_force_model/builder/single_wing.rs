@@ -12,7 +12,7 @@ use crate::line_force_model::span_line::SpanLine;
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
     pub span_lines_local: Vec<SpanLine>,
-    pub chord_vectors_local: Vec<SpatialVector<3>>,
+    pub chord_vectors_local: Vec<SpatialVector>,
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
 }
@@ -23,8 +23,8 @@ pub struct SingleWing {
 /// section model is set. Between these points the chord length and section model is linearly 
 /// interpolated 
 pub struct WingBuilder {
-    pub section_points: Vec<SpatialVector<3>>,
-    pub chord_vectors: Vec<SpatialVector<3>>,
+    pub section_points: Vec<SpatialVector>,
+    pub chord_vectors: Vec<SpatialVector>,
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
     #[serde(default)]
@@ -63,7 +63,7 @@ impl WingBuilder {
         let delta_span_distance = total_span_distance / (nr_sections as f64);        
 
         let mut span_lines_local: Vec<SpanLine> = Vec::new();
-        let mut chord_vectors_local: Vec<SpatialVector<3>> = Vec::new();
+        let mut chord_vectors_local: Vec<SpatialVector> = Vec::new();
 
         for i in 0..nr_sections {
             let start_distance = i as f64 * delta_span_distance;

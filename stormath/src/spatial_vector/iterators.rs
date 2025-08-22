@@ -5,16 +5,16 @@
 use std::iter;
 use super::*;
 
-impl<const N: usize> iter::Sum for SpatialVector<N> {
+impl iter::Sum for SpatialVector {
     fn sum<I>(iter: I) -> Self 
     where 
         I: Iterator<Item = Self> 
     {
         iter.fold(
-            Self([0.0; N]), |a, b| {
-                let mut result = [0.0; N];
+            Self([0.0; 4]), |a, b| {
+                let mut result = [0.0; 4];
 
-                for i in 0..N {
+                for i in 0..3 {
                     result[i] = a[i] + b[i];
                 }
 
@@ -24,16 +24,16 @@ impl<const N: usize> iter::Sum for SpatialVector<N> {
     }
 }
 
-impl<'a, const N: usize> iter::Sum<&'a Self> for SpatialVector<N> {
+impl<'a> iter::Sum<&'a Self> for SpatialVector {
     fn sum<I>(iter: I) -> Self
     where
         I: Iterator<Item = &'a Self>,
     {
         iter.fold(
-            Self([0.0; N]), |a, b| {
-                let mut result = [0.0; N];
+            Self([0.0; 4]), |a, b| {
+                let mut result = [0.0; 4];
 
-                for i in 0..N {
+                for i in 0..3 {
                     result[i] = a[i] + b[i];
                 }
 

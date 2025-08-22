@@ -16,46 +16,46 @@ use serde::{Serialize, Deserialize};
 /// 
 /// Reference: <https://en.wikipedia.org/wiki/Rigid_body_dynamics>
 pub struct RigidBodyMotion {
-    pub translation: SpatialVector<3>,
-    pub rotation: SpatialVector<3>,
-    pub velocity_linear: SpatialVector<3>,
-    pub velocity_angular: SpatialVector<3>,
+    pub translation: SpatialVector,
+    pub rotation: SpatialVector,
+    pub velocity_linear: SpatialVector,
+    pub velocity_angular: SpatialVector,
     pub rotation_type: RotationType,
 }
 
 impl RigidBodyMotion {
     /// Applies the rigid body motion to a point in space
-    pub fn transform_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn transform_point(&self, point: SpatialVector) -> SpatialVector {
         point.rotate(self.rotation, self.rotation_type) + self.translation
     }
 
     /// Applies the rigid body motion to a vector in space. That is, it applies the rotation.
-    pub fn transform_vector(&self, vector: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn transform_vector(&self, vector: SpatialVector) -> SpatialVector {
         vector.rotate(self.rotation, self.rotation_type)
     }
 
     /// Returns the input vector in the body fixed coordinate system defined by the rigid body 
     /// motion.
-    pub fn vector_in_body_fixed_coordinate_system(&self, vector: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn vector_in_body_fixed_coordinate_system(&self, vector: SpatialVector) -> SpatialVector {
         vector.in_rotated_coordinate_system(self.rotation, self.rotation_type)
     }
     
     /// Returns the relative position of the point to the center of the body.
-    pub fn point_relative_to_body_center(&self, point: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn point_relative_to_body_center(&self, point: SpatialVector) -> SpatialVector {
         point - self.translation
     }
 
     /// Return the velocity due to motion alone at the point
-    pub fn rotation_velocity_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn rotation_velocity_at_point(&self, point: SpatialVector) -> SpatialVector {
         self.velocity_angular.cross(self.point_relative_to_body_center(point))
     }
 
     /// Computes the velocity at a point due to the motion of the rigid body. 
-    pub fn velocity_at_point(&self, point: SpatialVector<3>) -> SpatialVector<3> {
+    pub fn velocity_at_point(&self, point: SpatialVector) -> SpatialVector {
         self.velocity_linear + self.rotation_velocity_at_point(point)
     }
 
-    pub fn velocities_at_points(&self, points: &[SpatialVector<3>]) -> Vec<SpatialVector<3>> {
+    pub fn velocities_at_points(&self, points: &[SpatialVector]) -> Vec<SpatialVector> {
         points.iter()
             .map(|point| self.velocity_at_point(*point))
             .collect()
@@ -63,7 +63,7 @@ impl RigidBodyMotion {
 
     pub fn update_translation_with_velocity_using_finite_difference(
         &mut self, 
-        translation: SpatialVector<3>, 
+        translation: SpatialVector, 
         time_step: f64
     ) {
         let old_translation = self.translation.clone();
@@ -75,7 +75,7 @@ impl RigidBodyMotion {
 
     pub fn update_rotation_with_velocity_using_finite_difference(
         &mut self, 
-        rotation: SpatialVector<3>, 
+        rotation: SpatialVector, 
         time_step: f64
     ) {
         let old_rotation = self.rotation.clone();
@@ -128,11 +128,11 @@ mod tests {
         let translation_motion = |t: f64| translation_amplitude * (angular_frequency * t).sin();
         let translation_motion_derivative = |t: f64| translation_amplitude * angular_frequency * (angular_frequency * t).cos();
     
-        let initial_point_to_check = SpatialVector::<3>::new(0.0, 1.3, 0.8);
+        let initial_point_to_check = SpatialVector::new(0.0, 1.3, 0.8);
 
         let max_rotational_velocity = rotation_amplitude * angular_frequency;
 
-        let mut transformed_points: Vec<SpatialVector<3>> = Vec::new();
+        let mut transformed_points: Vec<SpatialVector> = Vec::new();
         let mut motions: Vec<RigidBodyMotion> = Vec::new();
         
         let mut t = 0.0;
