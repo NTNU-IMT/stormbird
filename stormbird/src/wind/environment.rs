@@ -4,6 +4,8 @@
 
 /// Functionality to represent the a wind environment
 
+use std::ops::Range;
+
 use stormath::spatial_vector::SpatialVector;
 use serde::{Serialize, Deserialize};
 use serde_json;
@@ -121,6 +123,26 @@ impl WindEnvironment {
         condition: WindCondition,
         locations: &[SpatialVector<3>],
         linear_velocity: SpatialVector<3>
+    ) -> Vec<SpatialVector<3>> {
+        let mut true_wind = self.true_wind_velocity_vectors_at_locations(
+            condition, 
+            locations
+        );
+
+        for i in 0..true_wind.len() {
+            true_wind[i] += linear_velocity;
+        }
+
+        true_wind
+    }
+
+    pub fn effective_wind_velocity_at_ctrl_points(
+        &self,
+        condition: WindCondition,
+        ctrl_points: &[SpatialVector<3>],
+        non_dimensional_span_distances: &[f64],
+        linear_velocity: SpatialVector<3>,
+        wing_indices: Vec<Range<usize>>,
     ) -> Vec<SpatialVector<3>> {
         todo!()
     }
