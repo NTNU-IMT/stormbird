@@ -15,7 +15,8 @@ pub mod geometry_functions;
 pub mod iterators;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-/// A 3D vector with typical geometric functions implemented
+#[repr(C, align(32))]
+/// A 2D or 3D vector with typical geometric functions implemented
 pub struct SpatialVector<const N: usize>(pub [f64; N]);
 
 

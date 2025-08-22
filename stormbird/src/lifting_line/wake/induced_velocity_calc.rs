@@ -60,12 +60,27 @@ impl Wake {
         end_index: usize
     ) -> Vec<SpatialVector<3>> {
         // Could be par_iter
-        points.iter()
+
+        let mut results = Vec::with_capacity(points.len());
+
+        for point in points {
+            let mut velocity = SpatialVector::<3>::default();
+
+            for panel_index in start_index..end_index {
+                velocity += self.induced_velocity_from_panel(panel_index, *point)
+            }
+
+            results.push(velocity)
+        }
+        
+        /*points.iter()
         .map(|point| {
             (start_index..end_index).into_iter().map(|i_panel| {
                 self.induced_velocity_from_panel(i_panel, *point)
             }).sum()
-        }).collect()
+        }).collect()*/
+
+        results
     }
 
     fn induced_velocity_local_neglect_self_induced(

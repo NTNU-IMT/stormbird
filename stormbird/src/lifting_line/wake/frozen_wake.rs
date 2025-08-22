@@ -168,21 +168,25 @@ impl FrozenWake {
         &self,
         circulation_strength: &[f64],
     ) -> Vec<SpatialVector<3>> {
-        self.fixed_velocities.iter().enumerate().map(
-            |(i_row, u_fixed)| {
-                let mut induced_velocity = *u_fixed;
+        let n = self.fixed_velocities.len();
 
-                for i_col in 0..self.variable_velocity_factors.shape[1] {
-                    induced_velocity += 
+        let mut results = Vec::with_capacity(n);
+
+        for i_row in 0..n {
+            let mut induced_velocity = self.fixed_velocities[i_row];
+
+            for i_col in 0..self.variable_velocity_factors.shape[1] {
+                induced_velocity += 
                         self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
-                }
-
-                if induced_velocity[0].is_nan() || induced_velocity[1].is_nan() || induced_velocity[2].is_nan() {
-                    induced_velocity = SpatialVector::<3>::default();
-                }
-
-                induced_velocity
             }
-        ).collect()
+
+            if induced_velocity[0].is_nan() || induced_velocity[1].is_nan() || induced_velocity[2].is_nan() {
+                induced_velocity = SpatialVector::<3>::default();
+            }
+
+            results.push(induced_velocity)
+        }
+
+        results
     }
 }

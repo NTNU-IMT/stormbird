@@ -16,13 +16,13 @@ pub enum RotationType {
 }
 
 impl SpatialVector<3> {
-    #[inline]
+    #[inline(always)]
     /// Translates the vector by the given translation vector
     pub fn translate(self, translation: Self) -> Self {
         self + translation
     }
 
-    #[inline]
+    #[inline(always)]
     /// Uses the Rodrigues' rotation formmula to rotate the vector around the given axis.
     /// 
     /// Source: <https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula>
@@ -46,7 +46,7 @@ impl SpatialVector<3> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     /// performs rotation of the vector based on Euler angles specified in the rotation vector
     /// 
     /// # Operation
@@ -96,7 +96,7 @@ impl SpatialVector<3> {
         new_vector
     }
 
-    #[inline]
+    #[inline(always)]
     /// Rotates the vector around the yaw, pitch, and roll angles specified in the rotation vector
     pub fn rotate_yaw_pitch_roll(self, rotation: Self) -> Self {
         let yaw_axis = SpatialVector::<3>::unit_z();
@@ -113,12 +113,13 @@ impl SpatialVector<3> {
             .rotate_around_axis(rotation[0], roll_axis)
     }
 
-    #[inline]
+    #[inline(always)]
     /// Rotates the vector around a point in space
     pub fn rotate_around_point(self, rotation: Self, point: Self, rotation_type: RotationType) -> Self {
         (self - point).rotate(rotation, rotation_type) + point
     }
 
+    #[inline(always)]
     pub fn rotated_system_axes(&self, rotation: Self, rotation_type: RotationType) -> [Self; 3] {
         let x_axis = SpatialVector::<3>::unit_x().rotate(rotation, rotation_type);
         let y_axis = SpatialVector::<3>::unit_y().rotate(rotation, rotation_type);
@@ -127,6 +128,7 @@ impl SpatialVector<3> {
         [x_axis, y_axis, z_axis]
     }
 
+    #[inline(always)]
     /// Assumes self is expressed in a rotated coordinate system, specified by the system rotation
     /// input, and transforms it back to the global coordinate system.
     pub fn from_rotated_to_global_system(self, system_rotation: Self, rotation_type: RotationType) -> Self {
@@ -139,6 +141,7 @@ impl SpatialVector<3> {
         ])
     }
 
+    #[inline(always)]
     /// Expresses the vector in a coordinate system that is rotated by the input rotation, relative
     /// to the original coordinate system for the vector.
     pub fn in_rotated_coordinate_system(self, system_rotation: Self, rotation_type: RotationType  ) -> Self {
@@ -151,6 +154,7 @@ impl SpatialVector<3> {
         ])
     }
 
+    #[inline(always)]
     /// Special function for transforming a vector representing a moment to a new coordinate system.
     /// 
     /// The transformation consists of two steps:
