@@ -5,7 +5,7 @@ use crate::lifting_line::singularity_elements::panel::Panel;
 
 use stormath::matrix::Matrix;
 
-use rayon::prelude::*;
+//use rayon::prelude::*;
 
 use crate::lifting_line::wake::Wake;
 #[derive(Debug, Clone)]
@@ -124,7 +124,7 @@ impl FrozenWake {
         }
 
         if wake.settings.neglect_self_induced_velocities {
-            self.variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
+            self.variable_velocity_factors.data.iter_mut().enumerate().for_each(|(flat_index, factor)| {
                 let indices = indices_vector[flat_index];
 
                 let ctrl_point_index = indices[0];
@@ -144,7 +144,7 @@ impl FrozenWake {
                 }
             });
         } else {
-            self.variable_velocity_factors.data.par_iter_mut().enumerate().for_each(|(flat_index, factor)| {
+            self.variable_velocity_factors.data.iter_mut().enumerate().for_each(|(flat_index, factor)| {
                 let indices = indices_vector[flat_index];
 
                 let ctrl_point_index = indices[0];

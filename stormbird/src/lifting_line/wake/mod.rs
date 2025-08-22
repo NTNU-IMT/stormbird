@@ -22,8 +22,8 @@ use stormath::spatial_vector::SpatialVector;
 
 use crate::line_force_model::LineForceModel;
 
-use rayon::prelude::*;
-use rayon::iter::ParallelIterator;
+//use rayon::prelude::*;
+//use rayon::iter::ParallelIterator;
 
 use std::ops::Range;
 

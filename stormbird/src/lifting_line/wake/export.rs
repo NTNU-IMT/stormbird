@@ -14,7 +14,7 @@ impl Wake {
             match write_result {
                 Ok(_) => {},
                 Err(e) => {
-                    log::error!("Error writing wake data to file: {}", e);
+                    println!("Error writing wake data to file: {}", e);
                 }
             }
         }

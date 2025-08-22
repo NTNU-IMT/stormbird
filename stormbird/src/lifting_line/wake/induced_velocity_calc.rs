@@ -60,7 +60,7 @@ impl Wake {
         end_index: usize
     ) -> Vec<SpatialVector<3>> {
         // Could be par_iter
-        points.par_iter()
+        points.iter()
         .map(|point| {
             (start_index..end_index).into_iter().map(|i_panel| {
                 self.induced_velocity_from_panel(i_panel, *point)
@@ -75,7 +75,7 @@ impl Wake {
         end_index: usize, 
     ) -> Vec<SpatialVector<3>> {
         // Could be par_iter
-        points.par_iter()
+        points.iter()
         .enumerate()
         .map(|(point_index, point)| {
             (start_index..end_index).into_iter().map(|i_panel| {

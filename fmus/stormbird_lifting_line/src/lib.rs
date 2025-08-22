@@ -13,7 +13,6 @@ use fmu_from_struct::prelude::*;
 
 use stormath::spatial_vector::SpatialVector;
 
-
 use stormbird::common_utils::results::simulation::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
@@ -177,8 +176,6 @@ pub struct StormbirdLiftingLine {
 
 impl FmuFunctions for StormbirdLiftingLine {
     fn exit_initialization_mode(&mut self) {
-        env_logger::init();
-
         self.read_parameters();
         self.build_wind_model();
         self.build_controller();
@@ -248,14 +245,11 @@ impl StormbirdLiftingLine {
             PathBuf::from(&self.parameters_path)
         };
 
-        log::info!("Parameters path: {:?}", parameters_path);
-
         parameters_path
     }
 
     /// Function that reads the parameters from the parameters file.
     fn read_parameters(&mut self) {
-        log::info!("Reading parameters from file");
         let parameters_path = self.parameters_path();
 
         let parameters = FmuParameters::from_json_file(&parameters_path);
@@ -265,15 +259,13 @@ impl StormbirdLiftingLine {
                 self.parameters = parameters;
             },
             Err(e) => {
-                log::error!("Error reading parameters file: {}", e);
+                println!("Error reading parameters file: {}", e);
             }
         }
     }
 
     /// Builds the sail model using the lifting liner setup file
     fn build_lifting_line_model(&mut self) {
-        log::info!("Building lifting line model for the sails");
-
         let mut setup_path = self.parameters_path();
         setup_path.pop();
         setup_path.push(self.parameters.lifting_line_setup_file_path.clone());
@@ -286,7 +278,7 @@ impl StormbirdLiftingLine {
                 self.stormbird_model = Some(builder.build());
             },
             Err(e) => {
-                log::error!(
+                println!(
                     "Error reading lifting line setup file from path: {}. Error: {}", 
                     &setup_path.to_string_lossy(), 
                     e
@@ -298,11 +290,6 @@ impl StormbirdLiftingLine {
     /// Builds filters for the input
     fn build_filters(&mut self) {
         if self.parameters.input_moving_average_window_size > 0 {
-            log::info!(
-                "Building input filters with window size: {}", 
-                self.parameters.input_moving_average_window_size
-            );
-
             self.input_filters = Some(
                 InputFilters::new(self.parameters.input_moving_average_window_size)
             );
@@ -311,8 +298,6 @@ impl StormbirdLiftingLine {
 
     /// Builds a wind environment model
     fn build_wind_model(&mut self) {
-        log::info!("Building wind model");
-
         if !self.parameters.wind_environment_setup_file_path.is_empty() {
             let mut setup_path = self.parameters_path();
             setup_path.pop();
@@ -325,7 +310,7 @@ impl StormbirdLiftingLine {
                     self.wind_environment = Some(env);
                 },
                 Err(e) => {
-                    log::error!(
+                    println!(
                         "Error reading wind environment setup file from path: {}. Error: {}", 
                         &self.parameters.wind_environment_setup_file_path, 
                         e
@@ -338,8 +323,6 @@ impl StormbirdLiftingLine {
     }
 
     fn build_controller(&mut self) {
-        log::info!("Building controller");
-
         if !self.parameters.controller_setup_file_path.is_empty() {
             let mut setup_path = self.parameters_path();
             setup_path.pop();
@@ -354,15 +337,13 @@ impl StormbirdLiftingLine {
                     self.controller = Some(builder.build());
                 },
                 Err(e) => {
-                    log::error!(
+                    println!(
                         "Error reading controller setup file from path: {}. Error: {}", 
                         &self.parameters.controller_setup_file_path, 
                         e
                     );
                 }
             }
-        } else {
-            log::warn!("No controller setup file path provided, skipping controller setup.");
         }
     }
 
