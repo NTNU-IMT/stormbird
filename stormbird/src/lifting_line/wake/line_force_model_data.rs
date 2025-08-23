@@ -23,11 +23,11 @@ pub struct LineForceModelData {
     /// the inflow free stream AND the motion of the line force model AND the induced velocities
     pub felt_ctrl_points_velocity: Vec<SpatialVector>,
     /// The effective angles of attack at the control points of the line force model. 
-    pub angles_of_attack: Vec<f64>,
+    pub angles_of_attack: Vec<Float>,
     /// The amount of flow separation at the control points of the line force model. 
-    pub amount_of_flow_separation: Vec<f64>,
+    pub amount_of_flow_separation: Vec<Float>,
     /// The angles of the wake at the control points of the line force model.
-    pub wake_angles: Vec<f64>,
+    pub wake_angles: Vec<Float>,
     pub wing_indices: Vec<Range<usize>>,
 }
 
@@ -92,7 +92,7 @@ impl LineForceModelData {
     where
         T: std::ops::Add<T, Output = T>
             + std::ops::Sub<T, Output = T>
-            + std::ops::Mul<f64, Output = T>
+            + std::ops::Mul<Float, Output = T>
             + Copy,
     {
         LineForceModel::span_point_values_from_ctrl_point_values(

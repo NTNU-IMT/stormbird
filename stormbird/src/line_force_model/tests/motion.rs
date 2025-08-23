@@ -1,7 +1,9 @@
 
 use super::*;
 
-use std::f64::consts::PI;
+use stormath::type_aliases::Float;
+use stormath::consts::PI;
+
 
 #[test]
 /// Tests the rigid body motion of the line force model by comparing the computed velocity at the 
@@ -13,21 +15,21 @@ fn test_rigid_body_motion() {
     let translation_motion_period = 2.0;
 
     // Sway motion
-    let translation_func = |time: f64| -> SpatialVector {
+    let translation_func = |time: Float| -> SpatialVector {
         let frequency = 1.0 / translation_motion_period;
         let amplitude = 1.0;
         let omega = 2.0 * PI * frequency;
 
-        SpatialVector([0.0, amplitude * (omega * time).sin(), 0.0])
+        SpatialVector::from([0.0, amplitude * (omega * time).sin(), 0.0])
     };
 
     // Roll motion
-    let rotation_func = |time: f64| -> SpatialVector {
+    let rotation_func = |time: Float| -> SpatialVector {
         let frequency = 1.0 / rotation_motion_period;
-        let amplitude = 45.0_f64.to_radians();
+        let amplitude = Float::from(45.0).to_radians();
         let omega = 2.0 * PI * frequency;
 
-        SpatialVector([amplitude * (omega * time).sin(), 0.0, 0.0])
+        SpatialVector::from([amplitude * (omega * time).sin(), 0.0, 0.0])
     };
 
     let mut time = 0.0;
@@ -85,11 +87,11 @@ fn test_wing_angles() {
 
     let chord_vector = line_force_model.chord_vectors_local[0].clone();
 
-    let rotation_angle = 45.0_f64.to_radians();
+    let rotation_angle = Float::from(45.0).to_radians();
 
     let rotated_chord_vector = chord_vector.rotate_around_axis(
         rotation_angle, 
-        SpatialVector([0.0, 0.0, 1.0])
+        SpatialVector::from([0.0, 0.0, 1.0])
     );
 
     let original_span_points = line_force_model.span_points();

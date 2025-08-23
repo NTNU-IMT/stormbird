@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use stormath::{
+    type_aliases::Float,
     spatial_vector::SpatialVector,
     rigid_body_motion::RigidBodyMotion,
 };
@@ -17,14 +18,14 @@ use crate::common_utils::forces_and_moments::{
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
-    pub time: f64,
+    pub time: Float,
     pub ctrl_points: Vec<SpatialVector>,
     pub force_input: SectionalForcesInput,
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
     pub integrated_moments: Vec<IntegratedValues>,
     pub iterations: usize,
-    pub residual: f64,
+    pub residual: Float,
     pub wing_indices: Vec<Range<usize>>,
     pub rigid_body_motion: RigidBodyMotion
 }
@@ -77,7 +78,7 @@ impl SimulationResult {
         self.integrated_forces.len()
     }
 
-    pub fn angles_of_attack_for_wing(&self, wing_index: usize) -> Vec<f64> {
+    pub fn angles_of_attack_for_wing(&self, wing_index: usize) -> Vec<Float> {
         let mut angles_of_attack = Vec::new();
 
         for i in self.wing_indices[wing_index].start..self.wing_indices[wing_index].end {

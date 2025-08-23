@@ -30,14 +30,14 @@ impl LineForceModel {
     }
 
     /// Returns both angle and axis of rotation for the wing at the input index.
-    pub fn wing_rotation_data(&self, wing_index: usize) -> (f64, SpatialVector) {
+    pub fn wing_rotation_data(&self, wing_index: usize) -> (Float, SpatialVector) {
         let axis = self.wing_rotation_axis(wing_index);
         let angle = self.local_wing_angles[wing_index];
 
         (angle, axis)
     }
 
-    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (f64, SpatialVector) {
+    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (Float, SpatialVector) {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_data(wing_index)
@@ -131,7 +131,7 @@ impl LineForceModel {
         self.chord_vectors_local[index].rotate_around_axis(angle, axis)
     }
 
-    pub fn projected_areas(&self) -> Vec<f64> {
+    pub fn projected_areas(&self) -> Vec<Float> {
         let mut areas = vec![0.0; self.nr_wings()];
 
         for i in 0..self.nr_span_lines() {
@@ -145,7 +145,7 @@ impl LineForceModel {
     }
 
     /// returns the span length of each wing in the model
-    pub fn span_lengths(&self) -> Vec<f64> {
+    pub fn span_lengths(&self) -> Vec<Float> {
         let mut span_length = vec![0.0; self.nr_wings()];
 
         for i in 0..self.nr_span_lines() {
@@ -157,7 +157,7 @@ impl LineForceModel {
         span_length
     }
 
-    pub fn aspect_ratios(&self) -> Vec<f64> {
+    pub fn aspect_ratios(&self) -> Vec<Float> {
         let areas = self.projected_areas();
         let span_lengths = self.span_lengths();
 
@@ -176,7 +176,7 @@ impl LineForceModel {
 
     /// Integrates the chord length along the span of all wings in the model to return the total
     /// projected area of the wing.
-    pub fn total_projected_area(&self) -> f64 {
+    pub fn total_projected_area(&self) -> Float {
         let mut total_area = 0.0;
 
         for i in 0..self.nr_span_lines() {
@@ -186,8 +186,8 @@ impl LineForceModel {
         total_area
     }
 
-    pub fn section_models_internal_state(&self) -> Vec<f64> {
-        let mut internal_state: Vec<f64> = vec![0.0; self.nr_wings()];
+    pub fn section_models_internal_state(&self) -> Vec<Float> {
+        let mut internal_state: Vec<Float> = vec![0.0; self.nr_wings()];
 
         for wing_index in 0..self.nr_wings() {
             match self.section_models[wing_index] {
@@ -204,8 +204,8 @@ impl LineForceModel {
         internal_state
     }
 
-    pub fn span_distance_in_local_coordinates(&self) -> Vec<f64> {
-        let mut span_distance: Vec<f64> = Vec::new();
+    pub fn span_distance_in_local_coordinates(&self) -> Vec<Float> {
+        let mut span_distance: Vec<Float> = Vec::new();
 
         for wing_index in 0..self.wing_indices.len() {
             let start_point =
@@ -214,7 +214,7 @@ impl LineForceModel {
             let mut previous_point = start_point;
             let mut previous_distance = 0.0;
 
-            let mut current_wing_span_distance: Vec<f64> = Vec::new();
+            let mut current_wing_span_distance: Vec<Float> = Vec::new();
 
             for i in self.wing_indices[wing_index].clone() {
                 let line = &self.span_lines_local[i];
@@ -245,8 +245,8 @@ impl LineForceModel {
     /// Calculates the relative distance from the center off each wing for each control point.
     /// The absolute values are divided with the span of each wing. In other words, the
     /// return value will vary between -0.5 and 0.5, where 0 is the center of the wing.
-    pub fn relative_span_distance(&self) -> Vec<f64> {
-        let mut relative_span_distance: Vec<f64> = Vec::new();
+    pub fn relative_span_distance(&self) -> Vec<Float> {
+        let mut relative_span_distance: Vec<Float> = Vec::new();
 
         for wing_index in 0..self.wing_indices.len() {
             let start_point =
@@ -255,7 +255,7 @@ impl LineForceModel {
             let mut previous_point = start_point;
             let mut previous_distance = 0.0;
 
-            let mut current_wing_span_distance: Vec<f64> = Vec::new();
+            let mut current_wing_span_distance: Vec<Float> = Vec::new();
 
             for i in self.wing_indices[wing_index].clone() {
                 let line = &self.span_lines_local[i];
@@ -284,7 +284,7 @@ impl LineForceModel {
     }
 
     /// Returns the effective non-dimensional span distance values for each control point.
-    pub fn effective_relative_span_distance(&self) -> Vec<f64> {
+    pub fn effective_relative_span_distance(&self) -> Vec<Float> {
         let relative_span_distance = self.relative_span_distance();
 
         relative_span_distance.iter().enumerate().map(

@@ -24,7 +24,7 @@ impl LineForceModel {
     /// The values are calculated by averaging the sectional values for each wing.
     pub fn wing_averaged_values<T>(&self, sectional_values: &[T]) -> Vec<T>
     where
-        T: std::ops::Div<f64, Output = T> + std::ops::Add<T, Output = T> + Copy,
+        T: std::ops::Div<Float, Output = T> + std::ops::Add<T, Output = T> + Copy,
     {
         let mut result: Vec<T> = Vec::new();
 
@@ -37,9 +37,9 @@ impl LineForceModel {
 
     /// Function for interpolating vector values to a specified relative spanwise distance for each
     /// wing.
-    pub fn interpolate_values_to_spanwise_location<T>(&self, spanwise_location: f64, sectional_values: &[T]) -> Vec<T>
+    pub fn interpolate_values_to_spanwise_location<T>(&self, spanwise_location: Float, sectional_values: &[T]) -> Vec<T>
     where T:
-        std::ops::Mul<f64, Output = T> +
+        std::ops::Mul<Float, Output = T> +
         std::ops::Add<T, Output = T> +
         std::ops::Sub<T, Output = T> +
         Copy
@@ -89,7 +89,7 @@ impl LineForceModel {
     where
         T: std::ops::Add<T, Output = T>
             + std::ops::Sub<T, Output = T>
-            + std::ops::Mul<f64, Output = T>
+            + std::ops::Mul<Float, Output = T>
             + Copy,
     {   
         let nr_span_lines = ctrl_point_values.len();

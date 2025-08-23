@@ -25,7 +25,7 @@ pub struct LineForceModelBuilder {
     /// end up having a number of sections equal to this variable.
     pub nr_sections: usize,
     #[serde(default = "LineForceModel::default_density")]
-    pub density: f64,
+    pub density: Float,
     #[serde(default)]
     pub circulation_correction: CirculationCorrectionBuilder,
     #[serde(default)]
@@ -35,7 +35,7 @@ pub struct LineForceModelBuilder {
     #[serde(default)]
     pub rotation_type: RotationType,
     #[serde(default)]
-    pub local_wing_angles: Vec<f64>,
+    pub local_wing_angles: Vec<Float>,
     #[serde(default)]
     pub rotation: SpatialVector,
     #[serde(default)]
@@ -53,8 +53,8 @@ impl LineForceModelBuilder {
             output_coordinate_system: CoordinateSystem::Global,
             rotation_type: RotationType::XYZ,
             local_wing_angles: Vec::new(),
-            rotation: SpatialVector([0.0, 0.0, 0.0]),
-            translation: SpatialVector([0.0, 0.0, 0.0]),
+            rotation: SpatialVector::from([0.0, 0.0, 0.0]),
+            translation: SpatialVector::from([0.0, 0.0, 0.0]),
         }
     }
 

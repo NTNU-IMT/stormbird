@@ -26,7 +26,7 @@ impl SpatialVector {
     /// Uses the Rodrigues' rotation formmula to rotate the vector around the given axis.
     /// 
     /// Source: <https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula>
-    pub fn rotate_around_axis(self, angle: f64, axis: Self) -> Self {
+    pub fn rotate_around_axis(self, angle: Float, axis: Self) -> Self {
         let axis_normalized = axis.normalize();
 
         let cos_angle = angle.cos();
@@ -192,9 +192,9 @@ mod tests {
     /// use cases. This test compares the two algorithms to ensure they produce the same result.
     fn compare_rotations() {
         let rotation = SpatialVector::new(
-            30.0_f64.to_radians(),
-            21.2_f64.to_radians(),
-            -16.1_f64.to_radians(),
+            Float::from(30.0).to_radians(),
+            Float::from(21.2).to_radians(),
+            Float::from(-16.1).to_radians(),
         );
 
         let rotation_type = RotationType::XYZ;
@@ -215,8 +215,8 @@ mod tests {
     #[test]
     fn moment_transformation() {
         let rotation = SpatialVector::default();
-        let location = SpatialVector([1.2, 0.0, 0.0]);
-        let force = SpatialVector([0.0, 2.0, 0.0]);
+        let location = SpatialVector::from([1.2, 0.0, 0.0]);
+        let force = SpatialVector::from([0.0, 2.0, 0.0]);
 
         let moment = location.cross(force);
 
@@ -236,12 +236,12 @@ mod tests {
 
     #[test]
     fn negative_rotation() {
-        let vector = SpatialVector([-1.0, 0.0, 0.0]);
-        
-        let negative_axis = SpatialVector([0.0, 0.0, -1.0]);
-        let positive_axis = SpatialVector([0.0, 0.0, 1.0]);
+        let vector = SpatialVector::from([-1.0, 0.0, 0.0]);
 
-        let rotation_angle = 90.0_f64.to_radians();
+        let negative_axis = SpatialVector::from([0.0, 0.0, -1.0]);
+        let positive_axis = SpatialVector::from([0.0, 0.0, 1.0]);
+
+        let rotation_angle = Float::from(90.0).to_radians();
 
         let rotated_vector_1 = vector.rotate_around_axis(-rotation_angle, negative_axis);
         let rotated_vector_2 = vector.rotate_around_axis(rotation_angle, positive_axis);
@@ -255,17 +255,17 @@ mod tests {
 
     #[test]
     fn xyz_rotation_compared_against_blender(){
-        let vector = SpatialVector([1.0, 1.0, 1.0]);
+        let vector = SpatialVector::from([1.0, 1.0, 1.0]);
 
-        let rotation = SpatialVector(
+        let rotation = SpatialVector::from(
             [
-                30.0_f64.to_radians(),
-                21.2_f64.to_radians(),
-                -16.1_f64.to_radians(),
+                Float::from(30.0).to_radians(),
+                Float::from(21.2).to_radians(),
+                Float::from(-16.1).to_radians(),
             ]
         );
 
-        let expected_result = SpatialVector([1.47188, -0.043868, 0.91195]); // From blender
+        let expected_result = SpatialVector::from([1.47188, -0.043868, 0.91195]); // From blender
 
         let calculated_result = vector.rotate_xyz(rotation);
 
@@ -279,11 +279,11 @@ mod tests {
 
     #[test]
     fn yaw_pitch_roll_rotation() {
-        let vector = SpatialVector([1.2, 0.0, 0.0]);
+        let vector = SpatialVector::from([1.2, 0.0, 0.0]);
 
-        let pure_yaw_rotation = SpatialVector([0.0, 0.0, 90.0_f64.to_radians()]);
-        let pure_pitch_rotation = SpatialVector([0.0, 90.0_f64.to_radians(), 0.0]);
-        let combined_rotation = SpatialVector([0.0, -90.0_f64.to_radians(), 90.0_f64.to_radians()]);
+        let pure_yaw_rotation = SpatialVector::from([0.0, 0.0, Float::from(90.0).to_radians()]);
+        let pure_pitch_rotation = SpatialVector::from([0.0, Float::from(90.0).to_radians(), 0.0]);
+        let combined_rotation = SpatialVector::from([0.0, Float::from(-90.0).to_radians(), Float::from(90.0).to_radians()]);
 
         let yaw_rotated_vector = vector.rotate_yaw_pitch_roll(pure_yaw_rotation);
         let pitch_rotated_vector = vector.rotate_yaw_pitch_roll(pure_pitch_rotation);
@@ -296,13 +296,13 @@ mod tests {
         dbg!(yaw_rotated_vector, pitch_rotated_vector, combined_rotated_vector);
 
         // Extrinsic xyz rotation should be the same as intrinsic yaw-pitch-roll rotation
-        let vector = SpatialVector([1.2, 4.0, 2.0]);
+        let vector = SpatialVector::from([1.2, 4.0, 2.0]);
 
-        let yaw_angle = 30.0_f64.to_radians();
-        let pitch_angle = 21.2_f64.to_radians();
-        let roll_angle = -16.1_f64.to_radians();
+        let yaw_angle = Float::from(30.0).to_radians();
+        let pitch_angle = Float::from(21.2).to_radians();
+        let roll_angle = Float::from(-16.1).to_radians();
 
-        let rotation = SpatialVector([roll_angle, pitch_angle, yaw_angle]);
+        let rotation = SpatialVector::from([roll_angle, pitch_angle, yaw_angle]);
 
         let test_1 = vector.rotate_xyz(rotation);
         let test_2 = vector.rotate_yaw_pitch_roll(rotation);

@@ -7,6 +7,7 @@
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::finite_difference;
+use stormath::type_aliases::Float;
 
 
 
@@ -27,7 +28,7 @@ impl FlowDerivatives {
     }
 
     /// Calculates the *flow acceleration* based on the stored history
-    pub fn acceleration(&self, current_velocity: &[SpatialVector], time_step: f64) -> Vec<SpatialVector> {
+    pub fn acceleration(&self, current_velocity: &[SpatialVector], time_step: Float) -> Vec<SpatialVector> {
         if self.update_count < 2 {
             return vec![SpatialVector::default(); current_velocity.len()];
         }

@@ -29,6 +29,8 @@ use weather_dependent_set_points::{
     WeatherDependentSetPoints
 };
 
+use stormath::type_aliases::Float;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ControllerLogic {
     EffectiveAngleOfAttack(EffectiveAngleOfAttackController),
@@ -44,20 +46,20 @@ pub struct ControllerBuilder {
     #[serde(default = "ControllerBuilder::default_time_steps_between_updates")]
     pub time_steps_between_updates: usize,
     #[serde(default)]
-    pub start_time: f64,
+    pub start_time: Float,
     #[serde(default)]
-    pub max_local_wing_angle_change_rate: Option<f64>,
+    pub max_local_wing_angle_change_rate: Option<Float>,
     #[serde(default)]
-    pub max_internal_section_state_change_rate: Option<f64>,
+    pub max_internal_section_state_change_rate: Option<Float>,
     #[serde(default)]
     pub moving_average_window_size: Option<usize>,
     #[serde(default = "ControllerBuilder::default_update_factor")]
-    pub update_factor: f64,
+    pub update_factor: Float,
 }
 
 impl ControllerBuilder {
     pub fn default_time_steps_between_updates() -> usize {1}
-    pub fn default_update_factor() -> f64 {1.0}
+    pub fn default_update_factor() -> Float {1.0}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
@@ -90,19 +92,18 @@ pub struct Controller {
     pub logic: ControllerLogic,
     pub flow_measurement_settings: FlowMeasurementSettings,
     pub time_steps_between_updates: usize,
-    pub start_time: f64,
-    pub max_local_wing_angle_change_rate: Option<f64>,
-    pub max_internal_section_state_change_rate: Option<f64>,
-    pub update_factor: f64,
+    pub start_time: Float,
+    pub max_local_wing_angle_change_rate: Option<Float>,
+    pub max_internal_section_state_change_rate: Option<Float>,
+    pub update_factor: Float,
     pub time_step_index: usize
 }
-
 
 impl Controller {
     pub fn update(
         &self,
-        time: f64,
-        time_step: f64, 
+        time: Float,
+        time_step: Float, 
         input: &ControllerInput,
     ) -> Option<ControllerOutput> {
         let initialization_done = time >= self.start_time;

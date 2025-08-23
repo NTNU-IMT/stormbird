@@ -7,6 +7,7 @@
 use crate::line_force_model::LineForceModel;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use serde::{Deserialize, Serialize};
 
@@ -31,12 +32,12 @@ pub struct IntegratedValues {
 /// Input data to calculate sectional forces.
 pub struct SectionalForcesInput {
     /// Circulation strength of each line element
-    pub circulation_strength: Vec<f64>,
+    pub circulation_strength: Vec<Float>,
     /// The *felt* velocity at each control point, meaning the velocity of the fluid from the 
     /// perspective of the wings, **not** the velocity of the wings themselves.  
     pub velocity: Vec<SpatialVector>,
     /// The estimated angle of attack at each control point.
-    pub angles_of_attack: Vec<f64>,
+    pub angles_of_attack: Vec<Float>,
     /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
     /// the perspective of the wings, **not** the acceleration of the wings themselves.
     pub acceleration: Vec<SpatialVector>,

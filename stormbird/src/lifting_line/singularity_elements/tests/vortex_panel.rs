@@ -9,6 +9,8 @@ use stormath::spatial_vector::{
     geometry_functions,
 };
 
+use stormath::type_aliases::Float;
+
 use super::super::panel::Panel;
 
 #[test]
@@ -17,10 +19,10 @@ use super::super::panel::Panel;
 fn compare_near_and_far_field() {
     // Set up a panel in a local coordinate system
     let panel_points_0 = [
-        SpatialVector([0.0, 0.0, 0.0]),
-        SpatialVector([1.0, 0.0, 0.0]),
-        SpatialVector([1.0, 1.0, 0.0]),
-        SpatialVector([0.0, 1.0, 0.0]),
+        SpatialVector::from([0.0, 0.0, 0.0]),
+        SpatialVector::from([1.0, 0.0, 0.0]),
+        SpatialVector::from([1.0, 1.0, 0.0]),
+        SpatialVector::from([0.0, 1.0, 0.0]),
     ];
 
     // Set a control point in the local coordinate system
@@ -28,8 +30,8 @@ fn compare_near_and_far_field() {
 
     // Add some rotation to test a "arbitrary" oriented panel (the angles should not matter)
     let rotation = SpatialVector::new(
-        45.0_f64.to_radians(),
-        -10.0_f64.to_radians(),
+        Float::from(45.0).to_radians(),
+        Float::from(-10.0).to_radians(),
         0.0,
     );
 

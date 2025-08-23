@@ -20,7 +20,7 @@ impl Wake {
     /// current time step
     pub fn update_before_solving(
         &mut self,
-        time_step: f64,
+        time_step: Float,
         line_force_model: &LineForceModel,
         line_force_model_data: &LineForceModelData,
     ) {
@@ -37,7 +37,7 @@ impl Wake {
     /// 2) stream the strength downstream
     pub fn update_after_solving(
         &mut self,
-        new_circulation_strength: &[f64],
+        new_circulation_strength: &[Float],
         wake_points_freestream: &[SpatialVector],
     ) {
         self.update_wing_strength(new_circulation_strength);
@@ -53,7 +53,7 @@ impl Wake {
     /// are treaded as special cases. The rest are moved based on the euler method
     pub fn update_wake_points(
         &mut self,
-        time_step: f64,
+        time_step: Float,
         line_force_model: &LineForceModel,
         line_force_model_data: &LineForceModelData,
     ) {
@@ -101,7 +101,7 @@ impl Wake {
     /// Update the strength of the wake panels closest to the wing geometry.
     ///
     /// This is the same as updating the circulation strength on the first panels in the wake.
-    pub fn update_wing_strength(&mut self, new_circulation_strength: &[f64]) {
+    pub fn update_wing_strength(&mut self, new_circulation_strength: &[Float]) {
         for i in 0..new_circulation_strength.len() {
             self.strengths[i] = new_circulation_strength[i];
         }
@@ -222,7 +222,7 @@ impl Wake {
     }
 
     /// Stream all free wake points based on the Euler method.
-    fn stream_free_wake_points_based_on_stored_velocity(&mut self, time_step: f64) {
+    fn stream_free_wake_points_based_on_stored_velocity(&mut self, time_step: Float) {
         for i_stream in (2..self.indices.nr_points_per_line_element).rev() {
             for i_span in 0..self.indices.nr_points_along_span {
                 let previous_flat_index = self.indices.point_index(i_stream - 1, i_span);

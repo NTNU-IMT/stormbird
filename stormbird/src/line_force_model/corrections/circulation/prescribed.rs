@@ -1,7 +1,8 @@
-use core::f64;
 
 use serde::{Serialize, Deserialize};
 
+use stormath::type_aliases::Float;
+use stormath::consts::INFINITY;
 use stormath::optimize::{
     curve_fit::CurveFit,
     bounded_variable::BoundedVariable,
@@ -30,9 +31,9 @@ impl Default for PrescribedCirculation {
 /// Parametric model used to calculate the circulation distribution 
 pub struct PrescribedCirculationShape {
     #[serde(default = "PrescribedCirculationShape::default_inner_power")]
-    pub inner_power: f64,
+    pub inner_power: Float,
     #[serde(default = "PrescribedCirculationShape::default_outer_power")]
-    pub outer_power: f64,
+    pub outer_power: Float,
 }
 
 impl Default for PrescribedCirculationShape {
@@ -46,10 +47,10 @@ impl Default for PrescribedCirculationShape {
 }
 
 impl PrescribedCirculationShape {
-    pub fn default_inner_power() -> f64 {2.0}
-    pub fn default_outer_power() -> f64 {0.5}
+    pub fn default_inner_power() -> Float {2.0}
+    pub fn default_outer_power() -> Float {0.5}
 
-    pub fn value(&self, s: f64) -> f64 {
+    pub fn value(&self, s: Float) -> Float {
         let base = 1.0 - (2.0 * s.abs()).powf(self.inner_power);
 
         if base <= 0.0 {
@@ -60,11 +61,11 @@ impl PrescribedCirculationShape {
     }
 
     /// Returns the circulation distribution based on the relative span distance
-    pub fn get_values(&self, s: &[f64]) -> Vec<f64> {
+    pub fn get_values(&self, s: &[Float]) -> Vec<Float> {
         s.iter().map(|&x| self.value(x)).collect()
     }
 
-    pub fn as_params_vector(&self) -> Vec<f64> {
+    pub fn as_params_vector(&self) -> Vec<Float> {
         vec![
             1.0,
             self.inner_power,
@@ -72,7 +73,7 @@ impl PrescribedCirculationShape {
         ]
     }
 
-    pub fn from_params_vector(params: &[f64]) -> Self {
+    pub fn from_params_vector(params: &[Float]) -> Self {
         if params.len() != 3 {
             panic!("PrescribedCirculationShape::from_params_vector expects a vector of length 3");
         }
@@ -83,20 +84,20 @@ impl PrescribedCirculationShape {
         }
     }
 
-    pub fn function_to_curve_fit(s: f64, params: &[f64]) -> f64 {
+    pub fn function_to_curve_fit(s: Float, params: &[Float]) -> Float {
         let shape = PrescribedCirculationShape::from_params_vector(params);
         
         params[0] * shape.value(s)
     }
 
-    pub fn from_curve_fit(x_data: &[f64], y_data: &[f64], initial_params: &[f64]) -> Self {       
-        let y_data_abs: Vec<f64> = y_data.iter().map(|&y| y.abs()).collect();
+    pub fn from_curve_fit(x_data: &[Float], y_data: &[Float], initial_params: &[Float]) -> Self {       
+        let y_data_abs: Vec<Float> = y_data.iter().map(|&y| y.abs()).collect();
         
         let curve_fitter = CurveFit{
             function: PrescribedCirculationShape::function_to_curve_fit,
             max_iterations: 10,
             param_bounds: Some(vec![
-                BoundedVariable { min: 1e-6, max: f64::INFINITY }, // scale factor
+                BoundedVariable { min: 1e-6, max: INFINITY }, // scale factor
                 BoundedVariable { min: 2.0, max: 4.0 }, // inner power
                 BoundedVariable { min: 0.1, max: 1.0 }, // outer power
             ]),

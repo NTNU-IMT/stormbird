@@ -36,12 +36,12 @@ impl LineForceModel {
     }
 
     pub fn circulation_strength(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
-        let rust_velocity: Vec<SpatialVectorRust<3>> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
+        let rust_velocity: Vec<SpatialVectorRust> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
         self.data.circulation_strength(&rust_velocity, CoordinateSystem::Global)
     }
 
     pub fn angles_of_attack(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
-        let rust_velocity: Vec<SpatialVectorRust<3>> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
+        let rust_velocity: Vec<SpatialVectorRust> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
         
         self.data.angles_of_attack(&rust_velocity, CoordinateSystem::Global)
     }

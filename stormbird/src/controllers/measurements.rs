@@ -3,6 +3,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 
 use stormath::statistics;
+use stormath::type_aliases::Float;
 
 use crate::{
     common_utils::results::simulation::SimulationResult,
@@ -41,10 +42,10 @@ pub struct FlowMeasurementSettings {
 }
 
 fn measure_float_values(
-    values: &[f64],
+    values: &[Float],
     wing_indices: Vec<Range<usize>>,
     measurement_settings: &MeasurementSettings,
-) -> Vec<f64> {
+) -> Vec<Float> {
 
     let nr_wings = wing_indices.len();
 
@@ -76,7 +77,7 @@ fn measure_float_values(
 pub fn measure_angles_of_attack(
     simulation_result: &SimulationResult,
     measurement_settings: &MeasurementSettings,
-) -> Vec<f64> {
+) -> Vec<Float> {
     measure_float_values(
         &simulation_result.force_input.angles_of_attack,
         simulation_result.wing_indices.clone(),
@@ -87,8 +88,8 @@ pub fn measure_angles_of_attack(
 pub fn measure_wind_velocity_magnitude(
     simulation_result: &SimulationResult,
     measurement_settings: &MeasurementSettings,
-) -> Vec<f64> {
-    let velocity_magnitude: Vec<f64> = simulation_result.force_input.velocity
+) -> Vec<Float> {
+    let velocity_magnitude: Vec<Float> = simulation_result.force_input.velocity
         .iter()
         .map(|v| v.length())
         .collect();
@@ -104,10 +105,10 @@ pub fn measure_apparent_wind_direction(
     simulation_result: &SimulationResult,
     measurement_settings: &MeasurementSettings,
     wind_environment: &WindEnvironment
-) -> Vec<f64> {
+) -> Vec<Float> {
     let relevant_velocities = simulation_result.felt_velocity_minus_rotational_motion();
 
-    let wind_directions: Vec<f64> = relevant_velocities.iter()
+    let wind_directions: Vec<Float> = relevant_velocities.iter()
         .map(
             |velocity| {
                 wind_environment.zero_direction_vector.signed_angle_between(

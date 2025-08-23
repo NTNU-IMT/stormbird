@@ -1,17 +1,19 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::type_aliases::Float;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// A structure used to represent a bounded variable to be used within optimization algorithms.
 pub struct BoundedVariable {
-    pub min: f64,
-    pub max: f64,
+    pub min: Float,
+    pub max: Float,
 }
 
 impl BoundedVariable {
      /// Transform unbounded parameter to bounded using logistic function
-    pub fn transform_to_bounded(&self, unbounded: f64) -> f64 {
+    pub fn transform_to_bounded(&self, unbounded: Float) -> Float {
         if self.min.is_infinite() && self.max.is_infinite() {
             unbounded
         } else if self.min.is_infinite() {
@@ -24,7 +26,7 @@ impl BoundedVariable {
     }
 
     /// Transform bounded parameter back to unbounded space
-    pub fn transform_to_unbounded(&self, bounded: f64) -> f64 {
+    pub fn transform_to_unbounded(&self, bounded: Float) -> Float {
         if self.min.is_infinite() && self.max.is_infinite() {
             bounded
         } else if self.min.is_infinite() {

@@ -1,6 +1,6 @@
 
-use core::f64;
 
+use crate::type_aliases::Float;
 use crate::matrix::Matrix;
 
 use super::bounded_variable::BoundedVariable;
@@ -9,13 +9,13 @@ use super::bounded_variable::BoundedVariable;
 /// Settings for fitting data to a function using non-linear least squares. The implementation 
 /// follows the [Levenberg-Marquard method](https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm)
 pub struct CurveFit {
-    pub function: fn(f64, &[f64]) -> f64,
+    pub function: fn(Float, &[Float]) -> Float,
     pub max_iterations: usize,
-    pub delta_params: f64,
-    pub initial_damping_factor: f64,
-    pub damping_change_factor: f64,
+    pub delta_params: Float,
+    pub initial_damping_factor: Float,
+    pub damping_change_factor: Float,
     pub param_bounds: Option<Vec<BoundedVariable>>,
-    pub tolerance: f64
+    pub tolerance: Float
 }
 
 impl Default for CurveFit {
@@ -34,7 +34,7 @@ impl Default for CurveFit {
 
 impl CurveFit {
     /// Transform parameters from unbounded to bounded space
-    fn transform_params_to_bounded(&self, unbounded_params: &[f64]) -> Vec<f64> {
+    fn transform_params_to_bounded(&self, unbounded_params: &[Float]) -> Vec<Float> {
         if let Some(bounds) = &self.param_bounds {
             unbounded_params.iter().enumerate().map(|(i, &param)| {
                 if i < bounds.len() {
@@ -49,7 +49,7 @@ impl CurveFit {
     }
 
     /// Transform parameters from bounded to unbounded space
-    fn transform_params_to_unbounded(&self, bounded_params: &[f64]) -> Vec<f64> {
+    fn transform_params_to_unbounded(&self, bounded_params: &[Float]) -> Vec<Float> {
         if let Some(bounds) = &self.param_bounds {
             bounded_params.iter().enumerate().map(|(i, &param)| {
                 if i < bounds.len() {
@@ -66,14 +66,14 @@ impl CurveFit {
 
     /// Calculates the Jacobian matrix for the given function and data points.
     /// # Arguments:
-    /// - `function`: A function that takes a single `f64` and a slice of `f64` parameters, returning a
-    ///   `f64` value representing the output of the function.
-    /// - `x_data`: a slice of `f64` representing the independent variable data points.
+    /// - `function`: A function that takes a single `Float` and a slice of `Float` parameters, returning a
+    ///   `Float` value representing the output of the function.
+    /// - `x_data`: a slice of `Float` representing the independent variable data points.
     pub fn jacobian_matrix(
         &self,
-        x_data: &[f64], 
-        unbounded_params: &[f64]
-    ) -> Matrix<f64> {
+        x_data: &[Float], 
+        unbounded_params: &[Float]
+    ) -> Matrix<Float> {
         let nr_data_points = x_data.len();
         let nr_params = unbounded_params.len();
         
@@ -104,21 +104,21 @@ impl CurveFit {
 
     /// Calculates the residual vector for the given function and data points.
     /// # Arguments:
-    /// - `function`: A function that takes a single `f64` and a slice of `f64` parameters, returning a
-    ///   `f64` value representing the output of the function.
-    /// - `x_data`: a slice of `f64` representing the independent variable data points.
-    /// - `y_data`: a slice of `f64` representing the dependent variable data points.
-    /// - `params`: a slice of `f64` representing the parameters of the function.
+    /// - `function`: A function that takes a single `Float` and a slice of `Float` parameters, returning a
+    ///   `Float` value representing the output of the function.
+    /// - `x_data`: a slice of `Float` representing the independent variable data points.
+    /// - `y_data`: a slice of `Float` representing the dependent variable data points.
+    /// - `params`: a slice of `Float` representing the parameters of the function.
     /// # Returns:
     /// A vector of residuals, where each element is the difference between the observed value and 
     /// the predicted value from the function. The length of the vector is equal to the number of 
     /// data points.
     pub fn residual_vector(
         &self, 
-        x_data: &[f64], 
-        y_data: &[f64], 
-        unbounded_params: &[f64]
-    ) -> Vec<f64> {
+        x_data: &[Float], 
+        y_data: &[Float], 
+        unbounded_params: &[Float]
+    ) -> Vec<Float> {
         let nr_data_points = x_data.len();
         let mut residuals = vec![0.0; nr_data_points];
 
@@ -137,10 +137,10 @@ impl CurveFit {
 
     pub fn cost_function(
         &self, 
-        x_data: &[f64], 
-        y_data: &[f64], 
-        unbounded_params: &[f64]
-    ) -> f64 {
+        x_data: &[Float], 
+        y_data: &[Float], 
+        unbounded_params: &[Float]
+    ) -> Float {
         let residuals = self.residual_vector(x_data, y_data, unbounded_params);
         
         residuals.iter().map(|&r| r * r).sum()
@@ -148,18 +148,18 @@ impl CurveFit {
 
     /// Run the Levenberg-Marquardt algorithm to fit a function to data points.
     /// # Arguments:
-    /// - `function`: A function that takes a single `f64` and a slice of `f64` parameters, 
-    ///    returning a `f64` value representing the output of the function.
-    /// - `x_data`: a slice of `f64` representing the independent variable data points.
-    /// - `y_data`: a slice of `f64` representing the dependent variable data points.
-    /// - `initial_params`: a slice of `f64` representing the initial guess for the parameters of the
+    /// - `function`: A function that takes a single `Float` and a slice of `Float` parameters, 
+    ///    returning a `Float` value representing the output of the function.
+    /// - `x_data`: a slice of `Float` representing the independent variable data points.
+    /// - `y_data`: a slice of `Float` representing the dependent variable data points.
+    /// - `initial_params`: a slice of `Float` representing the initial guess for the parameters of the
     ///   function.
     pub fn fit_parameters(
         &self,
-        x_data: &[f64],
-        y_data: &[f64],
-        initial_params: &[f64],
-    ) -> Vec<f64> {
+        x_data: &[Float],
+        y_data: &[Float],
+        initial_params: &[Float],
+    ) -> Vec<Float> {
         let nr_params = initial_params.len();
         
         let mut current_unbounded_params = self.transform_params_to_unbounded(initial_params);
@@ -188,7 +188,7 @@ impl CurveFit {
 
             match change_in_params {
                 Ok(change) => {
-                    let mut best_cost = f64::INFINITY;
+                    let mut best_cost = Float::INFINITY;
                     let mut best_params = current_unbounded_params.clone();
 
                     for factor in &line_search_step_length_factors {
@@ -234,7 +234,7 @@ mod tests {
 
     use crate::array_generation::linspace;
 
-    fn test_function_elliptical(x: f64, params: &[f64]) -> f64 {
+    fn test_function_elliptical(x: Float, params: &[Float]) -> Float {
         let scale_factor = params[0];
         let inner_power = params[1];
         let outer_power = params[2];
@@ -248,7 +248,7 @@ mod tests {
         scale_factor * base.powf(outer_power)
     }
     
-    fn test_function_poly(x: f64, params: &[f64]) -> f64 {
+    fn test_function_poly(x: Float, params: &[Float]) -> Float {
         params[0]  + params[1] * x + params[2] * x.powi(2)
     }
 
@@ -269,7 +269,7 @@ mod tests {
         let params_true = vec![1.0, 2.0, 3.0];
         let initial_params = vec![0.0, 0.0, 0.0];
 
-        let y_data: Vec<f64> = x_data.iter()
+        let y_data: Vec<Float> = x_data.iter()
             .map(|&x| test_function_poly(x, &params_true))
             .collect();
 
@@ -280,7 +280,7 @@ mod tests {
         );
 
         for i in 0..fitted_params.len() {
-            assert!((fitted_params[i] - params_true[i]).abs() < 1e-6, 
+            assert!((fitted_params[i] - params_true[i]).abs() < 1e-5, 
                 "Mismatch at index {}: {} != {}", 
                 i, fitted_params[i], params_true[i]);
         }
@@ -300,7 +300,7 @@ mod tests {
 
         let x_data = linspace(-0.45, 0.45, 100);
 
-        let y_data: Vec<f64> = x_data.iter()
+        let y_data: Vec<Float> = x_data.iter()
             .map(|&x| test_function_elliptical(x, &params_true))
             .collect();
 

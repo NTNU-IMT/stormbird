@@ -7,7 +7,7 @@
         &mut self, 
         line_force_model: &LineForceModel, 
         wake_building_velocity: SpatialVector, 
-        time_step: f64
+        time_step: Float
     ) {
         let nr_panels = self.indices.nr_panels();
         
@@ -44,21 +44,21 @@
     pub fn initialize_based_on_chord_length(
         &mut self, 
         line_force_model: &LineForceModel,
-        relative_length_factor: f64,
+        relative_length_factor: Float,
     ) {
         let nr_panels_per_line_element = self.indices.nr_panels_per_line_element;
 
         let chord_vectors = line_force_model.global_chord_vectors();
 
         let average_chord_vector = chord_vectors.iter()
-            .sum::<SpatialVector>() / chord_vectors.len() as f64;
+            .sum::<SpatialVector>() / chord_vectors.len() as Float;
 
         let average_chord_length = average_chord_vector.length();
 
         let wake_length = relative_length_factor * average_chord_length;
 
         let time_step = 1.0;
-        let wake_building_velocity = (wake_length / nr_panels_per_line_element as f64) * average_chord_vector;
+        let wake_building_velocity = (wake_length / nr_panels_per_line_element as Float) * average_chord_vector;
 
         self.initialize_with_velocity_and_time_step(line_force_model, wake_building_velocity, time_step);
 

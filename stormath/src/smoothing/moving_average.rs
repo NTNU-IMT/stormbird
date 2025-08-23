@@ -1,9 +1,11 @@
 use std::collections::VecDeque;
 
+use crate::type_aliases::Float;
+
 #[derive(Debug, Default, Clone)]
 /// A simple moving average filter
 pub struct MovingAverage {
-    window: VecDeque<f64>,
+    window: VecDeque<Float>,
     window_size: usize,
 }
 
@@ -15,7 +17,7 @@ impl MovingAverage {
         }
     }
 
-    pub fn add(&mut self, value: f64) {
+    pub fn add(&mut self, value: Float) {
         self.window.push_back(value);
 
         if self.window.len() > self.window_size {
@@ -23,7 +25,7 @@ impl MovingAverage {
         }
     }
 
-    pub fn get_average(&self) -> f64 {
-        self.window.iter().sum::<f64>() / self.window.len() as f64
+    pub fn get_average(&self) -> Float {
+        self.window.iter().sum::<Float>() / self.window.len() as Float
     }
 }

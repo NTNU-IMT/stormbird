@@ -4,7 +4,8 @@
 
 //! Tests for the dynamic simulation capabilities of the lifting line module
 
-use std::f64::consts::PI;
+use stormath::type_aliases::Float;
+use stormath::consts::TAU;
 
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{ 
@@ -23,7 +24,7 @@ fn right_force_magnitude_with_steady_forward_motion() {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 0.5;
     let angle_of_attack = 0.0;
-    let cl_2d = cl_zero_angle + 2.0 * PI * angle_of_attack;
+    let cl_2d = cl_zero_angle + TAU * angle_of_attack;
 
     let theory = EllipticWingTheory {
         cl_2d,
@@ -42,7 +43,7 @@ fn right_force_magnitude_with_steady_forward_motion() {
 
     let vel_magnitude = 5.2;
 
-    let freestream_velocity = SpatialVector([vel_magnitude, 0.0, 0.0]);
+    let freestream_velocity = SpatialVector::from([vel_magnitude, 0.0, 0.0]);
 
     let steady_settings = SteadySettings::default();
     let dynamic_settings = UnsteadySettings::default();
@@ -62,16 +63,16 @@ fn right_force_magnitude_with_steady_forward_motion() {
 
     let freestream_velocity_points = sim_inflow.get_freestream_velocity_points();
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
-    let input_freestream_velocity_translation = vec![SpatialVector::<3>::default(); freestream_velocity_points.len()];
+    let input_freestream_velocity_translation = vec![SpatialVector::default(); freestream_velocity_points.len()];
 
     let force_factor = 0.5 * aspect_ratio * vel_magnitude.powi(2) * sim_translation.line_force_model.density;
 
     let time_step = 0.1;
     for i in 1..20 {
         
-        let time = (i as f64) * time_step;
+        let time = (i as Float) * time_step;
         
-        let translation = SpatialVector([
+        let translation = SpatialVector::from([
             -vel_magnitude * time, 
             0.0, 
             0.0
@@ -132,13 +133,13 @@ fn right_sign_of_the_force_when_translating() {
         ..Default::default()
     }.build();
 
-    let freestream_velocity = SpatialVector([1.2, 0.0, 0.0]);
+    let freestream_velocity = SpatialVector::from([1.2, 0.0, 0.0]);
 
     let vel_magnitude = (freestream_velocity).length();
 
     let time_step = 0.1;
     let period = 2.0;
-    let frequency = 2.0 * PI / period;
+    let frequency = TAU / period;
 
     let amplitude = 0.23;
 
@@ -154,12 +155,12 @@ fn right_sign_of_the_force_when_translating() {
 
     for i in 1..20 {
         
-        let time: f64 = (i as f64) * time_step;
+        let time: Float = (i as Float) * time_step;
 
         let translation_y = amplitude * (time * frequency).sin();
         let velocity_y = amplitude * frequency * (time * frequency).cos();
 
-        let translation = SpatialVector([0.0, translation_y, 0.0]);
+        let translation = SpatialVector::from([0.0, translation_y, 0.0]);
 
         sim.line_force_model.rigid_body_motion.update_translation_with_velocity_using_finite_difference(
             translation,
@@ -186,7 +187,7 @@ fn right_sign_of_the_force_when_translating() {
 /// and moments from a motion should always oppose the motion. In other words, a symmetric wing that
 /// move upwards should experience a downwards force and vice versa.
 fn right_sign_of_the_moment_when_rotating() {
-    let aspect_ratio: f64 = 5.0;
+    let aspect_ratio: Float = 5.0;
     let cl_zero_angle = 0.0;
     let angle_of_attack = 0.0;
 
@@ -198,11 +199,11 @@ fn right_sign_of_the_moment_when_rotating() {
         ..Default::default()
     }.build();
 
-    let freestream_velocity = SpatialVector([10.2, 0.0, 0.0]);
+    let freestream_velocity = SpatialVector::from([10.2, 0.0, 0.0]);
 
     let period = 2.0;
     let nr_time_steps_per_period = 20;
-    let time_step = period / nr_time_steps_per_period as f64;
+    let time_step = period / nr_time_steps_per_period as Float;
 
     let mut sim = SimulationBuilder::new (
         wing_builder,
@@ -211,17 +212,17 @@ fn right_sign_of_the_moment_when_rotating() {
         ),
     ).build();
 
-    let frequency = 2.0 * PI / period;
+    let frequency = TAU / period;
 
-    let amplitude = 5.0_f64.to_radians();
+    let amplitude = Float::from(5.0).to_radians();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
 
     for i in 1..nr_time_steps_per_period {
-        let time = (i as f64) * time_step;
+        let time = (i as Float) * time_step;
 
-        let rotation = SpatialVector([
+        let rotation = SpatialVector::from([
             amplitude * (frequency * time).sin(),
             0.0,
             0.0,

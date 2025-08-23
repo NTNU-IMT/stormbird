@@ -13,23 +13,25 @@ use super::measurements::{
     measure_apparent_wind_direction
 };
 
+use stormath::type_aliases::Float;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 /// Structure containing input values that is used by the controllers to set the local wing angles
 /// and the section models' internal state. Each member variable contains vectors with data. The
 /// length of each vector should equal the number of wings in the simulation
 pub struct ControllerInput {
-    pub loading: f64,
-    pub current_local_wing_angles: Vec<f64>,
-    pub current_section_models_internal_state: Vec<f64>,
-    pub angles_of_attack: Vec<f64>,
-    pub velocity: Vec<f64>,
-    pub apparent_wind_directions: Vec<f64>,
+    pub loading: Float,
+    pub current_local_wing_angles: Vec<Float>,
+    pub current_section_models_internal_state: Vec<Float>,
+    pub angles_of_attack: Vec<Float>,
+    pub velocity: Vec<Float>,
+    pub apparent_wind_directions: Vec<Float>,
 }
 
 impl ControllerInput {
     pub fn new(
-        loading: f64,
+        loading: Float,
         line_force_model: &LineForceModel,
         simulation_result: &SimulationResult,
         measurement_settings: &FlowMeasurementSettings,

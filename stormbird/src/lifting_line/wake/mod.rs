@@ -19,6 +19,7 @@ pub mod line_force_model_data;
 use line_force_model_data::LineForceModelData;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use crate::line_force_model::LineForceModel;
 
@@ -59,9 +60,9 @@ pub struct Wake {
     /// The velocity at each point in the wake
     pub velocity_at_points: Vec<SpatialVector>,
     /// The strengths of the panels
-    pub strengths: Vec<f64>,
+    pub strengths: Vec<Float>,
     /// The viscous core length of each panel
-    pub panels_viscous_core_length: Vec<f64>,
+    pub panels_viscous_core_length: Vec<Float>,
     /// Settings for the wake behavior
     pub settings: WakeSettings,
     /// The model used to calculate induced velocities from vortex lines

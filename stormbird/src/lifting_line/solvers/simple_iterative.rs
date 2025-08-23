@@ -7,6 +7,7 @@
 use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use crate::line_force_model::prelude::*;
 use crate::common_utils::prelude::*;
@@ -19,18 +20,18 @@ pub struct SteadySimpleIterativeBuilder {
     #[serde(default="SteadySimpleIterativeBuilder::default_max_iterations_per_time_step")]
     pub max_iterations_per_time_step: usize,
     #[serde(default="SteadySimpleIterativeBuilder::default_damping_factor")]
-    pub damping_factor: f64,
+    pub damping_factor: Float,
     #[serde(default="SimpleIterative::default_residual_tolerance_absolute")]
-    pub residual_tolerance_absolute: f64,
+    pub residual_tolerance_absolute: Float,
     #[serde(default="SimpleIterative::default_strength_difference_tolerance")]
-    pub strength_difference_tolerance: f64,
+    pub strength_difference_tolerance: Float,
     #[serde(default)]
     pub velocity_corrections: VelocityCorrections,
 }
 
 impl SteadySimpleIterativeBuilder {
     pub fn default_max_iterations_per_time_step() -> usize {1000}
-    pub fn default_damping_factor() -> f64 {0.04}
+    pub fn default_damping_factor() -> Float {0.04}
 
     pub fn build(&self) -> SimpleIterative {
         SimpleIterative {
@@ -50,11 +51,11 @@ pub struct SimpleIterative {
     #[serde(default="SimpleIterative::default_max_iterations_per_time_step")]
     pub max_iterations_per_time_step: usize,
     #[serde(default="SimpleIterative::default_damping_factor")]
-    pub damping_factor: f64,
+    pub damping_factor: Float,
     #[serde(default="SimpleIterative::default_residual_tolerance_absolute")]
-    pub residual_tolerance_absolute: f64,
+    pub residual_tolerance_absolute: Float,
     #[serde(default="SimpleIterative::default_strength_difference_tolerance")]
-    pub strength_difference_tolerance: f64,
+    pub strength_difference_tolerance: Float,
     #[serde(default)]
     pub velocity_corrections: VelocityCorrections,
     #[serde(default="SimpleIterative::default_use_raw_circulation_during_iterations")]
@@ -64,20 +65,20 @@ pub struct SimpleIterative {
 impl SimpleIterative {
     pub fn default_use_raw_circulation_during_iterations() -> bool {false}
     pub fn default_max_iterations_per_time_step() -> usize {10}
-    pub fn default_damping_factor() -> f64 {0.04}
-    pub fn default_residual_tolerance_absolute() -> f64 {1e-4}
-    pub fn default_strength_difference_tolerance() -> f64 {1e-6}
+    pub fn default_damping_factor() -> Float {0.04}
+    pub fn default_residual_tolerance_absolute() -> Float {1e-4}
+    pub fn default_strength_difference_tolerance() -> Float {1e-6}
 
     pub fn do_step(
         &self,
         line_force_model: &LineForceModel,
         felt_ctrl_points_freestream: &[SpatialVector],
         frozen_wake: &FrozenWake,
-        initial_solution: &[f64],
+        initial_solution: &[Float],
     ) -> SolverResult {
         let ctrl_points = line_force_model.ctrl_points();
     
-        let mut circulation_strength: Vec<f64> = initial_solution.to_vec();
+        let mut circulation_strength: Vec<Float> = initial_solution.to_vec();
         let mut ctrl_point_velocity = vec![SpatialVector::default(); ctrl_points.len()];
         let mut residual = line_force_model.average_residual_absolute(
             &circulation_strength, 

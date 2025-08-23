@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
+
 use crate::line_force_model::LineForceModel;
 use crate::common_utils::forces_and_moments::CoordinateSystem;
 
@@ -9,9 +11,9 @@ use crate::elliptic_wing_theory::EllipticalWing;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EmpiricalAngleOfAttackCorrection {
-    pub factor: f64,
+    pub factor: Float,
     pub nr_solver_iterations: usize,
-    pub solver_damping_factor: f64,
+    pub solver_damping_factor: Float,
 }
 
 impl EmpiricalAngleOfAttackCorrection {
@@ -19,7 +21,7 @@ impl EmpiricalAngleOfAttackCorrection {
         &self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let section_cl = line_force_model.lift_coefficients(
             ctrl_points_velocity, 
             CoordinateSystem::Global

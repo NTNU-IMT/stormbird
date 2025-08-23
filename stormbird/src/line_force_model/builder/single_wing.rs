@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 use stormath::{
     spatial_vector::SpatialVector,
     interpolation::linear_interpolation,
+    type_aliases::Float
 };
 
 use crate::section_models::SectionModel;
@@ -32,8 +33,8 @@ pub struct WingBuilder {
 }
 
 impl WingBuilder {
-    pub fn span_distance(&self) -> Vec<f64> {
-        let mut span_distance: Vec<f64> = Vec::new();
+    pub fn span_distance(&self) -> Vec<Float> {
+        let mut span_distance: Vec<Float> = Vec::new();
 
         for i in 0..self.section_points.len() {
             if span_distance.is_empty() {
@@ -60,14 +61,14 @@ impl WingBuilder {
 
         let total_span_distance = span_distance.last().unwrap();
 
-        let delta_span_distance = total_span_distance / (nr_sections as f64);        
+        let delta_span_distance = total_span_distance / (nr_sections as Float);        
 
         let mut span_lines_local: Vec<SpanLine> = Vec::new();
         let mut chord_vectors_local: Vec<SpatialVector> = Vec::new();
 
         for i in 0..nr_sections {
-            let start_distance = i as f64 * delta_span_distance;
-            let end_distance   = (i+1) as f64 * delta_span_distance;
+            let start_distance = i as Float * delta_span_distance;
+            let end_distance   = (i+1) as Float * delta_span_distance;
             let ctrl_point_distance = 0.5 * (start_distance + end_distance);
 
             let start_point = linear_interpolation(start_distance, &span_distance, &self.section_points);

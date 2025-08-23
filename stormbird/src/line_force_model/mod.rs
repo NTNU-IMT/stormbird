@@ -6,9 +6,11 @@
 //! lift-induced velocities are estimated. In other words, this part is common for all methods
 //! available in the library, and therefore the foundation of all simulations.
 
-use std::{f64::consts::PI, ops::Range};
+use std::ops::Range;
 
 use stormath::{
+    type_aliases::Float,
+    consts::PI,
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 
@@ -58,7 +60,7 @@ pub struct LineForceModel {
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along
     /// the span axis during a dynamic simulation. The typical example is changing the angle of
     /// attack on a wing sail due to changing apparent wind conditions.
-    pub local_wing_angles: Vec<f64>,
+    pub local_wing_angles: Vec<Float>,
     /// A vector that contains booleans that indicate whether the circulation should be zero at the
     /// ends or not. The variables are used both when initializing the circulation before a
     /// simulation and in cases where smoothing is applied to the circulation.
@@ -70,7 +72,7 @@ pub struct LineForceModel {
     ///  the circulation is assumed to be non-zero.
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     /// Density used in force calculations
-    pub density: f64,
+    pub density: Float,
     /// Optional correction that can be applied to the estimated circulation strength.
     pub circulation_correction: CirculationCorrection,
     /// Optional correction for the angle of attack
@@ -87,13 +89,13 @@ impl Default for LineForceModel {
 
 impl LineForceModel {
     /// Default density for air at sea level in kg/m^3
-    pub fn default_density() -> f64 {
+    pub fn default_density() -> Float {
         1.225
     }
 
     /// Creates a new empty line force model. Wings can be added using the 
     /// [LineForceModel::add_wing] function.
-    pub fn new(density: f64) -> LineForceModel {
+    pub fn new(density: Float) -> LineForceModel {
         Self {
             span_lines_local: Vec::new(),
             chord_vectors_local: Vec::new(),
@@ -200,7 +202,7 @@ impl LineForceModel {
     }
 
     /// Calculates the wake angle behind each line element.
-    pub fn wake_angles(&self, velocity: &[SpatialVector]) -> Vec<f64> {
+    pub fn wake_angles(&self, velocity: &[SpatialVector]) -> Vec<Float> {
         (0..self.nr_span_lines())
             .map(|index| {
                 let wing_index = self.wing_index_from_global(index);
@@ -219,11 +221,11 @@ impl LineForceModel {
     
     /// Shorthand for quickly calculating the typical force factor used when presenting
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)
-    pub fn total_force_factor(&self, freestream_velocity: f64) -> f64 {
+    pub fn total_force_factor(&self, freestream_velocity: Float) -> Float {
         0.5 * self.density * freestream_velocity.powi(2) * self.total_projected_area()
     }
 
-    pub fn set_section_models_internal_state(&mut self, internal_state: &[f64]) {
+    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
         for wing_index in 0..self.nr_wings() {
             match self.section_models[wing_index] {
                 SectionModel::Foil(_) => {}

@@ -12,10 +12,10 @@ use super::*;
 /// The two typical use cases are to model foil sections that include a flap angle, or suction 
 /// sails, where the foil section properties are dependent on the suction rate.
 pub struct VaryingFoil {
-    pub internal_state_data: Vec<f64>,
+    pub internal_state_data: Vec<Float>,
     pub foils_data: Vec<Foil>,
     #[serde(default)]
-    pub current_internal_state: f64,
+    pub current_internal_state: Float,
     #[serde(default)]
     pub current_foil: Option<Foil>,
 }
@@ -32,24 +32,24 @@ impl VaryingFoil {
     }
 
     pub fn get_foil(&self) -> Foil {
-        let cl_zero_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
-        let cl_initial_slope_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
-        let cl_high_order_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_high_order_factor).collect();
-        let cl_high_order_power_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_high_order_power).collect();
-        let cl_max_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
+        let cl_zero_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
+        let cl_initial_slope_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
+        let cl_high_order_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor).collect();
+        let cl_high_order_power_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_power).collect();
+        let cl_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
 
-        let cd_min_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_min).collect();
-        let angle_cd_min_data: Vec<f64> = self.foils_data.iter().map(|x| x.angle_cd_min).collect();
-        let cd_second_order_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
-        let cd_max_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_max_after_stall).collect();
-        let cd_power_after_stall_data: Vec<f64> = self.foils_data.iter().map(|x| x.cd_power_after_stall).collect();
-        let cdi_correction_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.cdi_correction_factor).collect();
+        let cd_min_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_min).collect();
+        let angle_cd_min_data: Vec<Float> = self.foils_data.iter().map(|x| x.angle_cd_min).collect();
+        let cd_second_order_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
+        let cd_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_max_after_stall).collect();
+        let cd_power_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_power_after_stall).collect();
+        let cdi_correction_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cdi_correction_factor).collect();
 
-        let mean_positive_stall_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.mean_positive_stall_angle).collect();
-        let mean_negative_stall_angle_data: Vec<f64> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
-        let stall_range_data: Vec<f64> = self.foils_data.iter().map(|x| x.stall_range).collect();
+        let mean_positive_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_positive_stall_angle).collect();
+        let mean_negative_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
+        let stall_range_data: Vec<Float> = self.foils_data.iter().map(|x| x.stall_range).collect();
 
-        let added_mass_factor_data: Vec<f64> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
+        let added_mass_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
 
         let x = self.current_internal_state;
         let x_data = &self.internal_state_data;
@@ -76,24 +76,24 @@ impl VaryingFoil {
         }
     }
 
-    pub fn set_internal_state(&mut self, internal_state: f64) {
+    pub fn set_internal_state(&mut self, internal_state: Float) {
         self.current_internal_state = internal_state;
         self.current_foil = Some(self.get_foil());
     }
 
-    pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
+    pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
         self.get_foil().lift_coefficient(angle_of_attack)
     }
 
-    pub fn drag_coefficient(&self, angle_of_attack: f64) -> f64 {
+    pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
         self.get_foil().drag_coefficient(angle_of_attack)
     }
 
-    pub fn added_mass_coefficient(&self, heave_acceleration: f64) -> f64 {
+    pub fn added_mass_coefficient(&self, heave_acceleration: Float) -> Float {
         self.get_foil().added_mass_coefficient(heave_acceleration)
     }
 
-    pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
+    pub fn amount_of_stall(&self, angle_of_attack: Float) -> Float {
         self.get_foil().amount_of_stall(angle_of_attack)
     }
 }

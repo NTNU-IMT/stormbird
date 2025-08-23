@@ -5,6 +5,7 @@
 use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 use crate::line_force_model::span_line::SpanLine;
 
 pub mod gaussian;
@@ -19,7 +20,7 @@ pub struct ProjectionSettings {
     #[serde(default)]
     pub project_normal_to_velocity: bool,
     #[serde(default="ProjectionSettings::default_weight_limit")]
-    pub weight_limit: f64,
+    pub weight_limit: Float,
     #[serde(default)]
     pub project_sectional_drag: bool,
 }
@@ -37,14 +38,14 @@ impl Default for ProjectionSettings {
 
 
 impl ProjectionSettings {
-    fn default_weight_limit() -> f64 {0.001}
+    fn default_weight_limit() -> Float {0.001}
 
     pub fn projection_value_at_point(
         &self, 
         point: SpatialVector, 
         chord_vector: SpatialVector, 
         span_line: &SpanLine
-    ) -> f64 {
+    ) -> Float {
         self.projection_function.projection_value_at_point(
             point, chord_vector, span_line
         )

@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::io_utils::csv_data;
+use stormath::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ControllerOutput {
-    pub local_wing_angles: Option<Vec<f64>>,
-    pub section_models_internal_state: Option<Vec<f64>>,
+    pub local_wing_angles: Option<Vec<Float>>,
+    pub section_models_internal_state: Option<Vec<Float>>,
 }
 
 impl ControllerOutput {

@@ -3,6 +3,7 @@
 //! that produce a value based on some input. The name *special functions* is inspired by the
 //! the scipy library.
 
+use crate::type_aliases::Float;
 
 /// A sigmoid function where the value goes from zero to one.
 ///
@@ -14,14 +15,14 @@
 ///
 /// ## Returns
 /// The value of the sigmoid function at the input
-pub fn sigmoid_zero_to_one(x: f64, x0: f64, transition_range: f64) -> f64 {
+pub fn sigmoid_zero_to_one(x: Float, x0: Float, transition_range: Float) -> Float {
     // The slope constant is set such that this function returns 0.01 at x = x0 - transition_range
     // and 0.99 at x = x0 + transition_range
     let slope = 4.5951212 / transition_range;
 
     let x_prime = slope * (x - x0);
 
-    1.0 / ( 1.0 + f64::exp(-x_prime))
+    1.0 / ( 1.0 + Float::exp(-x_prime))
 }
 
 #[cfg(test)]

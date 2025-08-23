@@ -16,6 +16,9 @@
 pub mod circulation;
 pub mod angle_of_attack;
 
+use stormath::type_aliases::Float;
+use stormath::consts::MIN_POSITIVE;
+
 use stormath::smoothing::{
     gaussian::GaussianSmoothing, 
     polynomial::CubicPolynomialSmoothing
@@ -45,7 +48,7 @@ impl LineForceModel {
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem,
         circulation_smoothing: &CirculationSmoothing,
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let raw_strength = self.circulation_strength_raw(
             velocity, 
             input_coordinate_system
@@ -61,7 +64,7 @@ impl LineForceModel {
             vec![0.0; raw_strength.len()]
         };
 
-        let values_to_smooth: Vec<f64> = raw_strength.iter()
+        let values_to_smooth: Vec<Float> = raw_strength.iter()
             .zip(values_to_subtract.iter())
             .map(|(raw, subtract)| raw - subtract)
             .collect();
@@ -84,7 +87,7 @@ impl LineForceModel {
     /// Function that applies a Gaussian smoothing to the supplied strength vector. 
     /// 
     /// # Arguments
-    /// - `noisy_values` - A slice of f64 values representing the noisy values to be smoothed.
+    /// - `noisy_values` - A slice of Float values representing the noisy values to be smoothed.
     /// - `smoothing_settings` - A slice of Gaussian smoothing settings for each wing.
     /// 
     /// # Returns
@@ -92,10 +95,10 @@ impl LineForceModel {
     /// noisy value.
     pub fn gaussian_smoothed_values(
         &self, 
-        noisy_values: &[f64],
-        smoothing_settings: &[GaussianSmoothing<f64>],
-    ) -> Vec<f64> {        
-        let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
+        noisy_values: &[Float],
+        smoothing_settings: &[GaussianSmoothing<Float>],
+    ) -> Vec<Float> {        
+        let mut smoothed_values: Vec<Float> = Vec::with_capacity(noisy_values.len());
         
         let span_distance = self.span_distance_in_local_coordinates();
 
@@ -120,10 +123,10 @@ impl LineForceModel {
 
     pub fn polynomial_smoothed_values(
         &self, 
-        noisy_values: &[f64],
-        smoothing_settings: &[CubicPolynomialSmoothing<f64>],
-    ) -> Vec<f64> {
-        let mut smoothed_values: Vec<f64> = Vec::with_capacity(noisy_values.len());
+        noisy_values: &[Float],
+        smoothing_settings: &[CubicPolynomialSmoothing<Float>],
+    ) -> Vec<Float> {
+        let mut smoothed_values: Vec<Float> = Vec::with_capacity(noisy_values.len());
 
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
 
@@ -158,7 +161,7 @@ impl LineForceModel {
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem,
         prescribed_circulation: &PrescribedCirculation, 
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
 
         let nr_wings = self.nr_wings();
 
@@ -167,14 +170,14 @@ impl LineForceModel {
             input_coordinate_system
         );
 
-        let velocity_squared: Vec<f64> = velocity.iter().map(
+        let velocity_squared: Vec<Float> = velocity.iter().map(
             |v| v.length_squared()
         ).collect();
 
         let mut gamma_divided_by_u2 = Vec::with_capacity(raw_circulation_strength.len());
 
         for i in 0..raw_circulation_strength.len() {
-            if velocity_squared[i] < f64::MIN_POSITIVE {
+            if velocity_squared[i] < MIN_POSITIVE {
                 gamma_divided_by_u2.push(0.0);
             } else {
                 gamma_divided_by_u2.push(raw_circulation_strength[i] / velocity_squared[i]);
@@ -207,7 +210,7 @@ impl LineForceModel {
             vec![prescribed_circulation.shape.clone(); nr_wings]
         };
 
-        let mut out: Vec<f64> = Vec::with_capacity(raw_circulation_strength.len());
+        let mut out: Vec<Float> = Vec::with_capacity(raw_circulation_strength.len());
 
         for wing_index in 0..nr_wings {
             let wing_indices = self.wing_indices[wing_index].clone();
@@ -219,8 +222,8 @@ impl LineForceModel {
                 &local_effective_relative_span_distance
             );
 
-            let averaged_averaged_prescribed_circulation_value: f64 = local_prescribed_circulation_shape_values.iter()
-                .sum::<f64>() / (local_prescribed_circulation_shape_values.len() as f64);
+            let averaged_averaged_prescribed_circulation_value: Float = local_prescribed_circulation_shape_values.iter()
+                .sum::<Float>() / (local_prescribed_circulation_shape_values.len() as Float);
 
             for i in 0..local_effective_relative_span_distance.len() {
                 let factor = if averaged_averaged_prescribed_circulation_value == 0.0 {

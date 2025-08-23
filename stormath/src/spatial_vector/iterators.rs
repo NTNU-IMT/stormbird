@@ -6,15 +6,15 @@ use std::iter;
 use super::*;
 
 impl iter::Sum for SpatialVector {
-    fn sum<I>(iter: I) -> Self 
-    where 
-        I: Iterator<Item = Self> 
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
     {
         iter.fold(
-            Self([0.0; 4]), |a, b| {
-                let mut result = [0.0; 4];
+            Self([0.0; DATA_SIZE]), |a, b| {
+                let mut result = [0.0; DATA_SIZE];
 
-                for i in 0..3 {
+                for i in 0..VECTOR_LENGTH {
                     result[i] = a[i] + b[i];
                 }
 
@@ -24,16 +24,16 @@ impl iter::Sum for SpatialVector {
     }
 }
 
-impl<'a> iter::Sum<&'a Self> for SpatialVector {
+impl<'a,> iter::Sum<&'a Self> for SpatialVector {
     fn sum<I>(iter: I) -> Self
     where
         I: Iterator<Item = &'a Self>,
     {
         iter.fold(
-            Self([0.0; 4]), |a, b| {
-                let mut result = [0.0; 4];
+            Self([0.0; DATA_SIZE]), |a, b| {
+                let mut result = [0.0; DATA_SIZE];
 
-                for i in 0..3 {
+                for i in 0..VECTOR_LENGTH {
                     result[i] = a[i] + b[i];
                 }
 

@@ -13,11 +13,13 @@ use end_condition::EndCondition;
 
 use serde::{Serialize, Deserialize};
 
+use crate::type_aliases::Float;
+
 pub trait SmoothingOps:
-    std::ops::Mul<f64, Output = Self> + 
+    std::ops::Mul<Float, Output = Self> + 
     std::ops::Add<Self, Output = Self> + 
     std::ops::Sub<Self, Output = Self> + 
-    std::ops::Div<f64, Output = Self> +
+    std::ops::Div<Float, Output = Self> +
     std::ops::Neg<Output = Self> +
     Default +
     Copy
@@ -25,10 +27,10 @@ pub trait SmoothingOps:
 
 impl<T> SmoothingOps for T where 
     T:
-        std::ops::Mul<f64, Output = T> + 
+        std::ops::Mul<Float, Output = T> + 
         std::ops::Add<T, Output = T> + 
         std::ops::Sub<T, Output = T> + 
-        std::ops::Div<f64, Output = T> +
+        std::ops::Div<Float, Output = T> +
         std::ops::Neg<Output = T> +
         Default +
         Copy

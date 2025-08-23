@@ -3,9 +3,11 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use super::*;
-use stormath::special_functions;
-
-use std::f64::consts::PI;
+use stormath::{
+    type_aliases::Float,
+    consts::{PI, TAU},
+    special_functions
+};
 
 use crate::error::Error;
 
@@ -49,66 +51,66 @@ pub struct Foil {
     #[serde(default)]
     /// Lift coefficient at zero angle of attack. This is zero by default, but can be set to a 
     /// non-zero value to account for camber, flap angle or boundary layer suction/blowing.
-    pub cl_zero_angle: f64,
+    pub cl_zero_angle: Float,
     #[serde(default="Foil::default_cl_initial_slope")]
     /// How fast the lift coefficient increases with angle of attack, when the angle of attack is
     /// small. The default value is 2 * pi, which is a typical value for a normal foil profile, 
     /// but it can also be set to different value for instance to account for boundary layer 
     /// suction/blowing.
-    pub cl_initial_slope: f64,
+    pub cl_initial_slope: Float,
     #[serde(default)]
     /// Optional proportionality factor for adding higher order terms to the lift. Is zero by 
     /// default, and therefore not used. Can be used to adjust the behavior of the lift curve close
     /// to stall.
-    pub cl_high_order_factor: f64,
+    pub cl_high_order_factor: Float,
     #[serde(default)]
     /// Option power for adding higher order terms to the lift. Is zero by default, and therefore 
     /// not used. Can be used to adjust the behavior of the lift curve close to stall.
-    pub cl_high_order_power: f64,
+    pub cl_high_order_power: Float,
     #[serde(default="Foil::default_one")]
     /// The maximum lift coefficient after stall. 
-    pub cl_max_after_stall: f64,
+    pub cl_max_after_stall: Float,
     #[serde(default)]
     /// Minimum drag coefficient angle of attack
-    pub cd_min: f64,
+    pub cd_min: Float,
     #[serde(default)]
     /// The angle where the the minimum drag coefficient is reached
-    pub angle_cd_min: f64,
+    pub angle_cd_min: Float,
     #[serde(default)]
     /// Factor to give the drag coefficient a second order term. This is zero by default.
-    pub cd_second_order_factor: f64,
+    pub cd_second_order_factor: Float,
     #[serde(default="Foil::default_one")]
     /// The maximum drag coefficient after stall.
-    pub cd_max_after_stall: f64,
+    pub cd_max_after_stall: Float,
     #[serde(default="Foil::default_cd_power_after_stall")]
     /// Power factor for the harmonic dependency of the drag coefficient after stall. Set to 1.6 by 
     /// default.
-    pub cd_power_after_stall: f64,
+    pub cd_power_after_stall: Float,
     #[serde(default)]
     /// factor that can be used to correct for numerical errors in the lift-induced drag. Set to a
     /// a positive value to increase the drag, and a negative value to decrease the drag. The 
     /// default is zero, which means no correction.
-    pub cdi_correction_factor: f64,
+    pub cdi_correction_factor: Float,
     #[serde(default="Foil::default_mean_stall_angle")]
     /// The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to
     /// post-stall behavior. The default value is 20 degrees.
-    pub mean_positive_stall_angle: f64,
+    pub mean_positive_stall_angle: Float,
     #[serde(default="Foil::default_mean_stall_angle")]
     /// The mean stall angle for negative angles of attack, which is the mean angle where the model transitions from pre-stall to
     /// post-stall behavior. The default value is 20 degrees.
-    pub mean_negative_stall_angle: f64,
+    pub mean_negative_stall_angle: Float,
     #[serde(default="Foil::default_stall_range")]
     /// The range of the stall transition. The default value is 6 degrees.
-    pub stall_range: f64,
+    pub stall_range: Float,
     #[serde(default)]
     /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
-    pub added_mass_factor: f64,
+    pub added_mass_factor: Float,
     #[serde(default)]
     /// Type of stall model to use. The default is harmonic.
     pub stall_model: StallModel,
 }
 
-fn get_stall_angle(angle_of_attack: f64) -> f64 {
+fn get_stall_angle(angle_of_attack: Float) -> Float {
     let mut effective = angle_of_attack.abs();
 
         while effective > PI {
@@ -121,11 +123,11 @@ fn get_stall_angle(angle_of_attack: f64) -> f64 {
 }
 
 impl Foil {
-    fn default_one() -> f64 {1.0}
-    pub fn default_cl_initial_slope()     -> f64 {2.0 * PI}
-    pub fn default_mean_stall_angle()     -> f64 {20.0_f64.to_radians()}
-    pub fn default_stall_range()          -> f64 {6.0_f64.to_radians()}
-    pub fn default_cd_power_after_stall() -> f64 {1.6}
+    fn default_one() -> Float {1.0}
+    pub fn default_cl_initial_slope()     -> Float {TAU}
+    pub fn default_mean_stall_angle()     -> Float {Float::from(20.0).to_radians()}
+    pub fn default_stall_range()          -> Float {Float::from(6.0).to_radians()}
+    pub fn default_cd_power_after_stall() -> Float {1.6}
 
     pub fn new_from_string(string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(string)?;
@@ -141,7 +143,7 @@ impl Foil {
     /// 
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
-    pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
+    pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
         let cl_pre_stall  = self.lift_coefficient_pre_stall(angle_of_attack);
 
         match self.stall_model {
@@ -166,7 +168,7 @@ impl Foil {
         }
     }
 
-    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: f64) -> f64 {
+    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: Float) -> Float {
         let angle_high_power = if self.cl_high_order_power > 0.0 {
             angle_of_attack.abs().powf(self.cl_high_order_power) * angle_of_attack.signum()
         } else {
@@ -178,7 +180,7 @@ impl Foil {
         self.cl_high_order_factor * angle_high_power
     }
 
-    pub fn lift_coefficient_post_stall(&self, angle_of_attack: f64) -> f64 {
+    pub fn lift_coefficient_post_stall(&self, angle_of_attack: Float) -> Float {
         self.cl_max_after_stall * (2.0 * angle_of_attack).sin()
     }
 
@@ -186,7 +188,7 @@ impl Foil {
     /// 
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
-    pub fn drag_coefficient(&self, angle_of_attack: f64) -> f64 {
+    pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
         let stall_angle = get_stall_angle(angle_of_attack);
 
         let pre_stall_effective_angle = (angle_of_attack + self.angle_cd_min).abs();
@@ -212,12 +214,12 @@ impl Foil {
     /// # Arguments
     /// * `heave_acceleration` - Acceleration of the flow around the foil normal to the chord 
     /// length. That is, the opposite of theacceleration of the foil itself.
-    pub fn added_mass_coefficient(&self, heave_acceleration: f64) -> f64 {
+    pub fn added_mass_coefficient(&self, heave_acceleration: Float) -> Float {
         self.added_mass_factor * heave_acceleration
     }
 
     /// Calculates the amount of stall for a given angle of attack.
-    pub fn amount_of_stall(&self, angle_of_attack: f64) -> f64 {
+    pub fn amount_of_stall(&self, angle_of_attack: Float) -> Float {
         let effective_angle = angle_of_attack + self.angle_cd_min;
 
         let mean_stall_angle = if effective_angle >= 0.0 {
@@ -233,7 +235,7 @@ impl Foil {
         )
     }
 
-    fn combine_pre_and_post_stall(&self, angle_of_attack: f64, pre_stall: f64, post_stall: f64) -> f64 {
+    fn combine_pre_and_post_stall(&self, angle_of_attack: Float, pre_stall: Float, post_stall: Float) -> Float {
         let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
         pre_stall * (1.0 - amount_of_stall) + amount_of_stall * post_stall

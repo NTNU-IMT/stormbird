@@ -1,19 +1,20 @@
 use serde::{Serialize, Deserialize};
 
+use stormath::type_aliases::Float;
 use stormath::spatial_vector::SpatialVector;
 use stormath::interpolation::linear_interpolation;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InflowCorrectionSingleSail {
-    pub non_dimensional_span_distances: Vec<f64>,
-    pub wake_factors_magnitude: Vec<f64>,
-    pub angle_corrections: Vec<f64>,
+    pub non_dimensional_span_distances: Vec<Float>,
+    pub wake_factors_magnitude: Vec<Float>,
+    pub angle_corrections: Vec<Float>,
 }
 
 impl InflowCorrectionSingleSail {
     pub fn correct_velocity(
         &self,
-        non_dimensional_span_distance: f64,
+        non_dimensional_span_distance: Float,
         velocity: SpatialVector, 
         up_vector: SpatialVector
     ) -> SpatialVector {

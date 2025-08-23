@@ -14,23 +14,24 @@ use crate::lifting_line::simulation_builder::{
 use super::test_setup::RectangularWing;
 
 use stormath::spatial_vector::transformations::RotationType;
+use stormath::type_aliases::Float;
 
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
 fn coordinate_systems() {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 1.2;
-    let angle_of_attack = 2.0_f64.to_radians();
+    let angle_of_attack = Float::from(2.0).to_radians();
 
     // Note: adding rotation in any other axis than the x-axis affects the angle of attack, and will 
     // therefore make the comparison between the "fixed" and "body" forces fail.
-    let rotation = SpatialVector([
-        72.0_f64.to_radians(),
+    let rotation = SpatialVector::from([
+        Float::from(72.0).to_radians(),
         0.0,
         0.0
     ]);
 
-    let translation = SpatialVector([100.0, 42.0, 10.0]);
+    let translation = SpatialVector::from([100.0, 42.0, 10.0]);
 
     let model_builder_global = RectangularWing {
         aspect_ratio,
@@ -43,7 +44,7 @@ fn coordinate_systems() {
     let mut model_builder_body = model_builder_global.clone();
     model_builder_body.output_coordinate_system = CoordinateSystem::Body;
 
-    let velocity = SpatialVector([1.2, 0.0, 0.0]);
+    let velocity = SpatialVector::from([1.2, 0.0, 0.0]);
 
     let time_step = 0.1;
 

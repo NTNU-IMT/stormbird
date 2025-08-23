@@ -5,11 +5,13 @@
 
 //! Numerical solvers, such as root-finding algorithms.
 
+use crate::type_aliases::Float;
+
 #[derive(Debug, Clone)]
 /// General structure for passing in settings to a numerical solver
 pub struct SolverSettings {
     /// Tolerance for the solver to stop iterating
-    pub tolerance: f64,
+    pub tolerance: Float,
     /// Maximum number of iterations to perform for the solver
     pub max_iterations: usize,
 }
@@ -24,11 +26,11 @@ pub struct SolverSettings {
 /// * `x2` - The second initial guess for the root.
 /// * `settings` - The settings for the solver. See `SolverSettings` for more information.
 pub fn secant_solver(
-    f: impl Fn(f64) -> f64, 
-    x1: f64, 
-    x2: f64, 
+    f: impl Fn(Float) -> Float, 
+    x1: Float, 
+    x2: Float, 
     settings: &SolverSettings
-) -> f64 {
+) -> Float {
     let f1 = f(x1);
     let f2 = f(x2);
 
@@ -62,7 +64,7 @@ pub fn secant_solver(
 mod tests {
     use super::*;
 
-    fn test_function(x: f64) -> f64 {
+    fn test_function(x: Float) -> Float {
         x.powf(2.0) - 4.0
     }
 

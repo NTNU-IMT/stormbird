@@ -2,12 +2,15 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use std::f64::consts::PI;
+
 
 use crate::spatial_vector::{
     SpatialVector,
     transformations::RotationType
 };
+
+use crate::type_aliases::{Float};
+use crate::consts::{PI, TAU};
 
 use serde::{Serialize, Deserialize};
 
@@ -64,7 +67,7 @@ impl RigidBodyMotion {
     pub fn update_translation_with_velocity_using_finite_difference(
         &mut self, 
         translation: SpatialVector, 
-        time_step: f64
+        time_step: Float
     ) {
         let old_translation = self.translation.clone();
 
@@ -76,7 +79,7 @@ impl RigidBodyMotion {
     pub fn update_rotation_with_velocity_using_finite_difference(
         &mut self, 
         rotation: SpatialVector, 
-        time_step: f64
+        time_step: Float
     ) {
         let old_rotation = self.rotation.clone();
 
@@ -89,9 +92,9 @@ impl RigidBodyMotion {
         // one time step. This seems like a reasonable assumption, but it is not guaranteed.
         for i in 0..3 {
             if rotation_difference[i] > PI {
-                rotation_difference[i] -= 2.0 * PI;
+                rotation_difference[i] = rotation_difference[i] + TAU;
             } else if rotation_difference[i] < -PI {
-                rotation_difference[i] += 2.0 * PI;
+                rotation_difference[i] = rotation_difference[i] + TAU;
             }
         }
 
@@ -103,7 +106,8 @@ impl RigidBodyMotion {
 mod tests {
     use super::*;
 
-    use std::f64::consts::PI;
+    use crate::consts::PI;
+    use crate::type_aliases::Float;
     
     #[test]
     /// Test to compare the motion calculated by the rigid body motion struct against the a simpler, 
@@ -111,7 +115,7 @@ mod tests {
     /// the rigid body motion struct. It is assumed that any logic mistakes can be detected if the 
     /// difference against the finite difference method is large.
     fn compare_motion_against_finite_difference() {
-        let rotation_amplitude = 45.0_f64.to_radians();
+        let rotation_amplitude = Float::from(45.0).to_radians();
         let translation_amplitude = 2.1;
 
         let period = 0.5;
@@ -122,11 +126,11 @@ mod tests {
 
         let end_time = 0.5 * period;
 
-        let rotation_motion = |t: f64| rotation_amplitude * (angular_frequency * t).sin();
-        let rotation_motion_derivative = |t: f64| rotation_amplitude * angular_frequency * (angular_frequency * t).cos();
+        let rotation_motion = |t: Float| rotation_amplitude * (angular_frequency * t).sin();
+        let rotation_motion_derivative = |t: Float| rotation_amplitude * angular_frequency * (angular_frequency * t).cos();
         
-        let translation_motion = |t: f64| translation_amplitude * (angular_frequency * t).sin();
-        let translation_motion_derivative = |t: f64| translation_amplitude * angular_frequency * (angular_frequency * t).cos();
+        let translation_motion = |t: Float| translation_amplitude * (angular_frequency * t).sin();
+        let translation_motion_derivative = |t: Float| translation_amplitude * angular_frequency * (angular_frequency * t).cos();
     
         let initial_point_to_check = SpatialVector::new(0.0, 1.3, 0.8);
 
@@ -138,10 +142,10 @@ mod tests {
         let mut t = 0.0;
         while t < end_time {
             let current_motion = RigidBodyMotion {
-                translation: SpatialVector([0.0, translation_motion(t), 0.0]),
-                rotation: SpatialVector([rotation_motion(t), 0.0, 0.0]),
-                velocity_linear: SpatialVector([0.0, translation_motion_derivative(t), 0.0]),
-                velocity_angular: SpatialVector([rotation_motion_derivative(t), 0.0, 0.0]),
+                translation: SpatialVector::from([0.0, translation_motion(t), 0.0]),
+                rotation: SpatialVector::from([rotation_motion(t), 0.0, 0.0]),
+                velocity_linear: SpatialVector::from([0.0, translation_motion_derivative(t), 0.0]),
+                velocity_angular: SpatialVector::from([rotation_motion_derivative(t), 0.0, 0.0]),
                 rotation_type: RotationType::XYZ,
             };
 
@@ -164,7 +168,7 @@ mod tests {
                 dbg!(fd_velocity, expected_velocity);
             }
 
-            assert!(velocity_difference / max_rotational_velocity < 0.0001,
+            assert!(velocity_difference / max_rotational_velocity < 0.0008,
                 "fd velocity: {}, rb velocity {}", fd_velocity, expected_velocity
             );
 

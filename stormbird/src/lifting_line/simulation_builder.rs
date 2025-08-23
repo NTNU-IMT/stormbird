@@ -126,10 +126,10 @@ impl SimulationBuilder {
         let previous_circulation_strength = vec![0.0; nr_of_lines];
 
         let flow_derivatives = FlowDerivatives::new(
-            &vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines]
+            &vec![SpatialVector::from([0.0, 0.0, 0.0]); nr_of_lines]
         );
 
-        let felt_ctrl_point_freestream = vec![SpatialVector([0.0, 0.0, 0.0]); nr_of_lines];
+        let felt_ctrl_point_freestream = vec![SpatialVector::from([0.0, 0.0, 0.0]); nr_of_lines];
 
         let previous_line_force_model_data = LineForceModelData::new(
             &line_force_model,

@@ -7,6 +7,7 @@
 use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 /// Model to empirically correct the estimated velocity in lifting line simulations, based on the 
@@ -18,14 +19,14 @@ pub enum VelocityCorrections {
     #[default]
     None,
     /// The induced velocity is capped using a ratio between the induced velocity and the freestream
-    MaxInducedVelocityMagnitudeRatio(f64),
+    MaxInducedVelocityMagnitudeRatio(Float),
     /// The total velocity is kept at a fixed magnitude, equal to the freestream velocity 
     FixedMagnitudeEqualToFreestream,
 }
 
 impl VelocityCorrections {
     pub fn max_induced_velocity_magnitude_ratio(
-        ratio: f64,
+        ratio: Float,
         freestream_velocities: &[SpatialVector],
         induced_velocities: &[SpatialVector],
     ) -> Vec<SpatialVector> {

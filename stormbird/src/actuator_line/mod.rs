@@ -16,6 +16,7 @@ pub mod corrections;
 use stormath::smoothing::gaussian::gaussian_kernel;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 use crate::line_force_model::LineForceModel;
 
 use crate::common_utils::prelude::*;
@@ -110,8 +111,8 @@ impl ActuatorLine {
         line_index: usize, 
         velocity: SpatialVector, 
         cell_center: SpatialVector, 
-        cell_volume: f64
-    ) -> (SpatialVector, f64) {
+        cell_volume: Float
+    ) -> (SpatialVector, Float) {
         let span_line = self.line_force_model.span_line_at_index(line_index);
         let chord_vector = self.line_force_model.global_chord_vector_at_index(line_index);
 
@@ -150,7 +151,7 @@ impl ActuatorLine {
     /// 
     /// It solves for the circulation strength and computes the simulation result based on the 
     /// current estimate of the control point velocities.
-    pub fn do_step(&mut self, time: f64, time_step: f64){
+    pub fn do_step(&mut self, time: Float, time_step: Float){
         if self.current_iteration >= self.start_iteration {
             if self.sampling_settings.extrapolate_end_velocities {
                 self.correct_end_velocities_through_extrapolation();
@@ -173,7 +174,7 @@ impl ActuatorLine {
     }
 
     /// Function to update the controller in the model, if the controller is present.
-    pub fn update_controller(&mut self, time: f64, time_step: f64) -> bool {
+    pub fn update_controller(&mut self, time: Float, time_step: Float) -> bool {
         if self.current_iteration >= self.start_iteration {
             let controller_output = if let Some(controller) = &mut self.controller {
                 let simulation_result = self.simulation_result.as_ref().unwrap();
@@ -235,7 +236,7 @@ impl ActuatorLine {
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn solve(&mut self, _time_step: f64) -> SolverResult {
+    pub fn solve(&mut self, _time_step: Float) -> SolverResult {
         let mut corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity();
         
         let mut new_estimated_circulation_strength = self.line_force_model.circulation_strength(
@@ -366,7 +367,7 @@ impl ActuatorLine {
     }
 
     /// Computes the body force weights for each line element at a given point in space.
-    pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector) -> Vec<f64> {
+    pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector) -> Vec<Float> {
         let span_lines = self.line_force_model.span_lines();
         let chord_vectors = self.line_force_model.global_chord_vectors();
         
@@ -386,7 +387,7 @@ impl ActuatorLine {
     }
 
     /// Computes the sum of the projection weights for all line elements at a given point in space.
-    pub fn summed_projection_weights_at_point(&self, point: SpatialVector) -> f64 {
+    pub fn summed_projection_weights_at_point(&self, point: SpatialVector) -> Float {
         self.line_segments_projection_weights_at_point(point).iter().sum()
     }
 

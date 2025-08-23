@@ -5,6 +5,8 @@ use super::Wake;
 
 use std::collections::HashMap;
 
+use stormath::type_aliases::Float;
+
 impl Wake {
     pub fn write_wake_data_to_file_if_activated(&self, time_step_index: usize) {
         if self.settings.write_wake_data_to_file {
@@ -157,7 +159,7 @@ impl Wake {
 
     /// Exports the wake structure to a hashmap with the necessary fields for plotting the mesh 
     /// using the Plotly library. 
-    pub fn export_to_plotly_mesh(&self) -> HashMap<String, Vec<f64>> {
+    pub fn export_to_plotly_mesh(&self) -> HashMap<String, Vec<Float>> {
         let mut x = Vec::new();
         let mut y = Vec::new();
         let mut z = Vec::new();
@@ -178,19 +180,19 @@ impl Wake {
             let indices = self.panel_point_indices(stream_index, span_index);
 
             // Push two triangles for each panel
-            i.push(indices[0] as f64);
-            j.push(indices[1] as f64);
-            k.push(indices[2] as f64);
+            i.push(indices[0] as Float);
+            j.push(indices[1] as Float);
+            k.push(indices[2] as Float);
 
-            i.push(indices[0] as f64);
-            j.push(indices[2] as f64);
-            k.push(indices[3] as f64);
+            i.push(indices[0] as Float);
+            j.push(indices[2] as Float);
+            k.push(indices[3] as Float);
 
             strength.push(self.strengths[panel_index]);
             strength.push(self.strengths[panel_index]); 
         }
 
-        let mut out_data: HashMap<String, Vec<f64>> = HashMap::new();
+        let mut out_data: HashMap<String, Vec<Float>> = HashMap::new();
         out_data.insert("x".to_string(), x);
         out_data.insert("y".to_string(), y);
         out_data.insert("z".to_string(), z);

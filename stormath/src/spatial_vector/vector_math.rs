@@ -3,11 +3,11 @@ use super::*;
 impl SpatialVector {
     #[inline(always)]
     /// Returns the dot product of two vectors
-    pub fn dot(self, rhs: Self) -> f64 {
+    pub fn dot(self, rhs: Self) -> Float {
         let mut result = 0.0;
 
-        for i in 0..3 {
-            result += self[i] * rhs[i];
+        for i in 0..VECTOR_LENGTH {
+            result = result + self[i] * rhs[i];
         }
 
         result
@@ -16,25 +16,25 @@ impl SpatialVector {
     #[inline(always)]
     /// Returns the length of the vector squared, which is equal to the dot product of the vector 
     /// with itself
-    pub fn length_squared(self) -> f64 {
+    pub fn length_squared(self) -> Float {
         self.dot(self)
     }
 
     #[inline(always)]
     /// Returns the length of the vector
-    pub fn length(self) -> f64 {
+    pub fn length(self) -> Float {
         self.length_squared().sqrt()
     }
 
     #[inline(always)]
     /// Returns a normalized version of the vector
     pub fn normalize(&self) -> Self {
-        let length: f64 = self.length();
+        let length: Float = self.length();
 
         if length > 0.0 {
-            let mut result = [0.0; 4];
+            let mut result = [0.0; DATA_SIZE];
 
-            for i in 0..3 {
+            for i in 0..VECTOR_LENGTH {
                 result[i] = self[i] / length;
             }
 
@@ -47,7 +47,7 @@ impl SpatialVector {
 
     #[inline(always)]
     /// Returns the distance between two vectors
-    pub fn distance(self, rhs: Self) -> f64 {
+    pub fn distance(self, rhs: Self) -> Float {
         (self - rhs).length()
     }
 
@@ -63,7 +63,7 @@ impl SpatialVector {
 
     #[inline(always)]
     /// Returns the absolute value of the angle between two vectors
-    pub fn absolute_angle_between(self, rhs: Self) -> f64 {
+    pub fn absolute_angle_between(self, rhs: Self) -> Float {
         if self.length() == 0.0 || rhs.length() == 0.0 {
             return 0.0;
         }
@@ -72,7 +72,7 @@ impl SpatialVector {
 
         // Correct for potential floating point errors
         let clipped_cosine_value = cosine_value.max(-1.0).min(1.0);
-        
+
         clipped_cosine_value.acos()
     }
 
@@ -80,7 +80,7 @@ impl SpatialVector {
     /// Returns the signed angle between two vectors, with the sign determined by the axis.
     /// 
     /// The sign is determined by the right-hand rule where the rotation is from self to rhs.
-    pub fn signed_angle_between(self, rhs: Self, axis: Self) -> f64 {
+    pub fn signed_angle_between(self, rhs: Self, axis: Self) -> Float {
         let triple_product = self.dot(rhs.cross(axis));
 
         let absolute_angle = self.absolute_angle_between(rhs);
@@ -97,7 +97,7 @@ impl SpatialVector {
     pub fn project(self, rhs: Self) -> Self {
         let rhs_normalized = rhs.normalize();
 
-        self.dot(rhs_normalized) * rhs_normalized
+        rhs_normalized * self.dot(rhs_normalized)
     }
 
     #[inline(always)]

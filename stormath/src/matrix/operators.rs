@@ -59,12 +59,12 @@ where T: Default + Clone + Copy + Debug + Sub<Output = T>,
     }
 }
 
-impl<T> Mul<f64> for Matrix<T> 
-where T: Default + Clone + Copy + Debug + Mul<f64, Output = T>,
+impl<T> Mul<Float> for Matrix<T> 
+where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
 {
     type Output = Self;
 
-    fn mul(self, scalar: f64) -> Self {
+    fn mul(self, scalar: Float) -> Self {
         let mut result = self.clone();
         
         for i in 0..self.data.len() {
@@ -75,8 +75,8 @@ where T: Default + Clone + Copy + Debug + Mul<f64, Output = T>,
     }
 }
 
-impl<T> Mul<Matrix<T>> for f64 
-where T: Default + Clone + Copy + Debug + Mul<f64, Output = T>,
+impl<T> Mul<Matrix<T>> for Float 
+where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
 {
     type Output = Matrix<T>;
 

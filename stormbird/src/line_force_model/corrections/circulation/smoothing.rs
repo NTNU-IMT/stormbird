@@ -1,6 +1,7 @@
 
 use serde::{Serialize, Deserialize};
 
+use stormath::type_aliases::Float;
 use stormath::smoothing::{
     end_condition::EndCondition, 
     gaussian::GaussianSmoothing, 
@@ -17,10 +18,10 @@ use super::prescribed::PrescribedCirculation;
 /// Enum for choosing the type of smoothing to apply to the circulation strength.
 pub enum SmoothingType {
     /// Gaussian smoothing. The settings are stored in a vector, one for each wing in the model.
-    Gaussian(Vec<GaussianSmoothing<f64>>),
+    Gaussian(Vec<GaussianSmoothing<Float>>),
     /// Cubic polynomial smoothing. The settings are stored in a vector, one for each wing in the 
     /// model.
-    CubicPolynomial(Vec<CubicPolynomialSmoothing<f64>>),
+    CubicPolynomial(Vec<CubicPolynomialSmoothing<Float>>),
 }
 
 #[derive(Debug, Clone)]
@@ -37,7 +38,7 @@ pub struct CirculationSmoothing {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GaussianSmoothingBuilder {
-    pub smoothing_length_factor: f64,
+    pub smoothing_length_factor: Float,
     #[serde(default)]
     pub number_of_end_points_to_interpolate: usize
 }
@@ -64,15 +65,15 @@ pub struct CirculationSmoothingBuilder {
 }
 
 impl CirculationSmoothingBuilder {
-    pub fn end_conditions(&self, line_force_model: &LineForceModel) -> Vec<[EndCondition<f64>; 2]> {
+    pub fn end_conditions(&self, line_force_model: &LineForceModel) -> Vec<[EndCondition<Float>; 2]> {
         let nr_wings = line_force_model.nr_wings();
 
-        let mut end_conditions: Vec<[EndCondition<f64>; 2]> = Vec::new();
+        let mut end_conditions: Vec<[EndCondition<Float>; 2]> = Vec::new();
 
         for wing_index in 0..nr_wings {
             let non_zero_circulation_at_ends = line_force_model.non_zero_circulation_at_ends[wing_index];
 
-            let mut end_conditions_current: [EndCondition<f64>; 2] = [
+            let mut end_conditions_current: [EndCondition<Float>; 2] = [
                 EndCondition::Extended, 
                 EndCondition::Extended
             ];
@@ -98,7 +99,7 @@ impl CirculationSmoothingBuilder {
         
         match &self.smoothing_type {
             SmoothingTypeBuilder::Gaussian(settings_builder) => {
-                let mut settings_vector: Vec<GaussianSmoothing<f64>> = Vec::with_capacity(nr_wings);
+                let mut settings_vector: Vec<GaussianSmoothing<Float>> = Vec::with_capacity(nr_wings);
 
                 for wing_index in 0..nr_wings {
                     let smoothing_length = wing_span_lengths[wing_index] * settings_builder.smoothing_length_factor;
@@ -121,7 +122,7 @@ impl CirculationSmoothingBuilder {
                 }
             },
             SmoothingTypeBuilder::CubicPolynomial(settings_builder) => {
-                let mut settings_vector: Vec<CubicPolynomialSmoothing<f64>> = Vec::with_capacity(nr_wings);
+                let mut settings_vector: Vec<CubicPolynomialSmoothing<Float>> = Vec::with_capacity(nr_wings);
 
                 for wing_index in 0..nr_wings {
                     settings_vector.push(

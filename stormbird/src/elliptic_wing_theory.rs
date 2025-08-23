@@ -6,17 +6,20 @@
 //! Implementation of some of the theoretical functions from elliptic wing theory, based on the 
 //! classical lifting line theory.
 
-use std::f64::consts::PI;
+use stormath::{
+    type_aliases::Float,
+    consts::PI
+};
 
 pub struct EllipticalWing {
-    pub aspect_ratio: f64,
+    pub aspect_ratio: Float,
 }
 
 impl EllipticalWing {
     #[inline(always)]
     /// Function that computes the lift-induced angle of attack according to elliptic wing theory, based
     /// only on the lift coefficient and aspect ratio of the wing.
-    pub fn lift_induced_angle_of_attach(&self, lift_coefficient: f64) -> f64 {
+    pub fn lift_induced_angle_of_attach(&self, lift_coefficient: Float) -> Float {
         if self.aspect_ratio <= 0.0 {
             return 0.0;
         }

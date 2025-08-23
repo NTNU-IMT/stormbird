@@ -4,6 +4,8 @@
 
 //! Interpolation functions
 
+use crate::type_aliases::Float;
+
 use super::smoothing::gaussian::gaussian_kernel;
 
 /// Linear interpolation of a target value based on input data.
@@ -12,9 +14,9 @@ use super::smoothing::gaussian::gaussian_kernel;
 /// * `x_target` - The x target value to interpolate to.
 /// * `x_data` - The input x data.
 /// * `y_data` - The input y data.
-pub fn linear_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T]) -> T
+pub fn linear_interpolation<T>(x_target: Float, x_data: &[Float], y_data: &[T]) -> T
 where T:
-    std::ops::Mul<f64, Output = T> +
+    std::ops::Mul<Float, Output = T> +
     std::ops::Add<T, Output = T> +
     std::ops::Sub<T, Output = T> +
     Copy
@@ -78,9 +80,9 @@ where T:
 /// * `x_target` - The x target value to interpolate to.
 /// * `x_data` - The input x data.
 /// * `y_data` - The input y data.
-pub fn linear_interpolation_two_data_points<T>(x_target: f64, x_data: &[f64; 2], y_data: &[T; 2]) -> T
+pub fn linear_interpolation_two_data_points<T>(x_target: Float, x_data: &[Float; 2], y_data: &[T; 2]) -> T
 where T:
-    std::ops::Mul<f64, Output = T> +
+    std::ops::Mul<Float, Output = T> +
     std::ops::Add<T, Output = T> +
     std::ops::Sub<T, Output = T> +
     Copy
@@ -104,12 +106,12 @@ where T:
 /// * `x_target` - The x target value to interpolate to.
 /// * `x_data` - The input x data.
 /// * `y_data` - The input y data.
-pub fn gaussian_interpolation<T>(x_target: f64, x_data: &[f64], y_data: &[T], smoothing_length: f64) -> T
+pub fn gaussian_interpolation<T>(x_target: Float, x_data: &[Float], y_data: &[T], smoothing_length: Float) -> T
 where T:
-    std::ops::Mul<f64, Output = T> +
+    std::ops::Mul<Float, Output = T> +
     std::ops::Add<T, Output = T> +
     std::ops::Sub<T, Output = T> +
-    std::ops::Div<f64, Output = T> +
+    std::ops::Div<Float, Output = T> +
     Default +
     Copy
 {
@@ -140,7 +142,7 @@ mod tests {
 
         let linear_factor = 2.0;
 
-        let y_data: Vec<f64> = x_data.iter().map(|x| linear_factor * x).collect();
+        let y_data: Vec<Float> = x_data.iter().map(|x| linear_factor * x).collect();
 
         let x_target = 3.0;
 

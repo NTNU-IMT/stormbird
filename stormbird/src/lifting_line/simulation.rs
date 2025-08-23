@@ -7,6 +7,8 @@
 //! To support different use cases, both quasi-steady and true dynamic simulations are supported.
 //! However, the interface is designed to be as unified as possible.
 
+use stormath::type_aliases::Float;
+
 use crate::lifting_line::prelude::*;
 use crate::line_force_model::corrections::circulation::{
     CirculationCorrection,
@@ -27,7 +29,7 @@ pub struct Simulation {
     pub wake: Wake,
     pub frozen_wake: FrozenWake,
     pub solver: SimpleIterative,
-    pub previous_circulation_strength: Vec<f64>,
+    pub previous_circulation_strength: Vec<Float>,
     pub previous_line_force_model_data: LineForceModelData,
     pub first_time_step_completed: bool,
 }
@@ -77,8 +79,8 @@ impl Simulation {
     /// `get_freestream_velocity_points`
     pub fn do_step(
         &mut self,
-        time: f64,
-        time_step: f64,
+        time: Float,
+        time_step: Float,
         freestream_velocity: &[SpatialVector],
     ) -> SimulationResult {
         let ctrl_points_freestream = freestream_velocity[0..self.line_force_model.nr_span_lines()].to_vec();
@@ -90,7 +92,7 @@ impl Simulation {
 
         if !self.first_time_step_completed {
             let averaged_ctrl_points_freesteream = ctrl_points_freestream.iter()
-                .sum::<SpatialVector>() / ctrl_points_freestream.len() as f64;
+                .sum::<SpatialVector>() / ctrl_points_freestream.len() as Float;
 
             self.wake.initialize_with_velocity_and_time_step(
                 &self.line_force_model,
@@ -165,8 +167,8 @@ impl Simulation {
     /// Initialize the circulation strength of the simulation with a given elliptic distribution.
     pub fn initialize_with_elliptic_distribution(
         &mut self,
-        time: f64,
-        time_step: f64,
+        time: Float,
+        time_step: Float,
         freestream_velocity: &[SpatialVector],
     ) {
         let old_circulation_correction = self.line_force_model.circulation_correction.clone();
@@ -185,7 +187,7 @@ impl Simulation {
         self.line_force_model.circulation_correction = CirculationCorrection::Prescribed(
             PrescribedCirculation::default()
         );
-        self.solver.damping_factor = 0.25_f64.max(old_damping_factor);
+        self.solver.damping_factor = Float::from(0.25).max(old_damping_factor);
 
         let _ = self.do_step(time, time_step, freestream_velocity);
 

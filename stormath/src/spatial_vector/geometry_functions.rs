@@ -7,7 +7,7 @@ use super::*;
 
 /// Function that calculates the induced velocity from a vortex panel, based on the corner points
 /// given as input. Source: <https://en.wikipedia.org/wiki/Brahmagupta%27s_formula>
-pub fn area_of_quadrilateral(vertices: &[SpatialVector; 4]) -> f64 {
+pub fn area_of_quadrilateral(vertices: &[SpatialVector; 4]) -> Float {
     let a = (vertices[1] - vertices[0]).length();
     let b = (vertices[2] - vertices[1]).length();
     let c = (vertices[3] - vertices[2]).length();

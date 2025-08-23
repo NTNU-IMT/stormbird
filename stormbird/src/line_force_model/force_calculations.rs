@@ -31,6 +31,8 @@
 
 use super::*;
 
+use stormath::consts::MIN_POSITIVE;
+
 impl LineForceModel {
     /// Function used to calculate the *felt* velocity at each control point. That is, 
     /// the input velocity minus the motion velocity at each control point.
@@ -66,14 +68,14 @@ impl LineForceModel {
         &self, 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let (span_lines, chord_vectors) = match input_coordinate_system {
             CoordinateSystem::Global => (self.span_lines(), self.global_chord_vectors()),
             CoordinateSystem::Body => (self.span_lines_local.clone(), self.local_chord_vectors()),
         };
 
-        let angles_of_attack: Vec<f64> = (0..velocity.len()).map(|index| {
-            if velocity[index].length() > std::f64::MIN_POSITIVE {
+        let angles_of_attack: Vec<Float> = (0..velocity.len()).map(|index| {
+            if velocity[index].length() > MIN_POSITIVE {
                 chord_vectors[index].signed_angle_between(
                     velocity[index],
                     span_lines[index].direction()
@@ -100,7 +102,7 @@ impl LineForceModel {
         &self, 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let angles_of_attack = self.angles_of_attack(velocity, input_coordinate_system);
 
         (0..self.nr_span_lines()).map(
@@ -130,7 +132,7 @@ impl LineForceModel {
         &self, 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         match &self.circulation_correction {
             CirculationCorrection::None => self.circulation_strength_raw(
                 velocity, 
@@ -160,7 +162,7 @@ impl LineForceModel {
         &self, 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let cl = self.lift_coefficients(&velocity, input_coordinate_system);
 
         (0..velocity.len()).map(|index| {
@@ -177,7 +179,7 @@ impl LineForceModel {
         &self, 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let angles_of_attack = self.angles_of_attack(velocity, input_coordinate_system);
 
         (0..self.nr_span_lines()).map(
@@ -199,7 +201,7 @@ impl LineForceModel {
     pub fn sectional_force_input(
         &self, 
         solver_result: &SolverResult, 
-        _time_step: f64
+        _time_step: Float
     ) -> SectionalForcesInput {
         let angles_of_attack = self.angles_of_attack(&solver_result.ctrl_point_velocity, CoordinateSystem::Global);
 
@@ -250,7 +252,7 @@ impl LineForceModel {
     }
 
     /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
-    pub fn sectional_circulatory_forces(&self, strength: &[f64], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
+    pub fn sectional_circulatory_forces(&self, strength: &[Float], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
         let span_lines = match self.output_coordinate_system {
             CoordinateSystem::Global => self.span_lines(),
             CoordinateSystem::Body => self.span_lines_local.clone(),
@@ -385,9 +387,9 @@ impl LineForceModel {
     /// circulation and velocity.
     pub fn lift_from_circulation(
         &self, 
-        strength: &[f64], 
+        strength: &[Float], 
         velocity: &[SpatialVector]
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let force = self.sectional_circulatory_forces(strength, velocity);
 
         force.iter().map(|f| f.length()).collect()
@@ -395,7 +397,7 @@ impl LineForceModel {
 
     /// Calculates the magnitude of the lift force on each line element based on the given
     /// coefficients and velocity
-    pub fn lift_from_coefficients(&self, velocity: &[SpatialVector], input_coordinate_system: CoordinateSystem) -> Vec<f64> {
+    pub fn lift_from_coefficients(&self, velocity: &[SpatialVector], input_coordinate_system: CoordinateSystem) -> Vec<Float> {
         let cl = self.lift_coefficients(velocity, input_coordinate_system);
 
         (0..self.nr_span_lines()).map(
@@ -412,10 +414,10 @@ impl LineForceModel {
 
     pub fn residual(
         &self, 
-        strength: &[f64], 
+        strength: &[Float], 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let circulation_lift = self.lift_from_circulation(strength, velocity);
         let lift_coefficients = self.lift_coefficients(velocity, input_coordinate_system);
 
@@ -435,27 +437,27 @@ impl LineForceModel {
 
     pub fn residual_absolute(
         &self, 
-        strength: &[f64], 
+        strength: &[Float], 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         self.residual(strength, velocity, input_coordinate_system).iter().map(|r| r.abs()).collect()
     }
 
     pub fn average_residual_absolute(
         &self, 
-        strength: &[f64], 
+        strength: &[Float], 
         velocity: &[SpatialVector], 
         input_coordinate_system: CoordinateSystem
-    ) -> f64 {
+    ) -> Float {
         let residuals = self.residual_absolute(strength, velocity, input_coordinate_system);
 
-        residuals.iter().sum::<f64>() / residuals.len() as f64
+        residuals.iter().sum::<Float>() / residuals.len() as Float
     }
 
     /// Function that calculates the amount of flow separation, as predicted by the sectional models
     /// based on the angles of attack on each control point
-    pub fn amount_of_flow_separation(&self, angles_of_attack: &[f64]) -> Vec<f64> {
+    pub fn amount_of_flow_separation(&self, angles_of_attack: &[Float]) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |i| {
                 let wing_index = self.wing_index_from_global(i);
@@ -468,8 +470,8 @@ impl LineForceModel {
     pub fn calculate_simulation_result(
         &self, 
         solver_result: &SolverResult,
-        time: f64,
-        time_step: f64
+        time: Float,
+        time_step: Float
     ) -> SimulationResult {
         let force_input = self.sectional_force_input(&solver_result, time_step);
 

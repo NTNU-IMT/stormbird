@@ -8,15 +8,9 @@ use super::*;
 
 #[derive(Serialize, Deserialize)]
 struct Vec3 {
-    x: f64,
-    y: f64,
-    z: f64,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Vec2 {
-    x: f64,
-    y: f64,
+    x: Float,
+    y: Float,
+    z: Float,
 }
 
 impl From<&SpatialVector> for Vec3 {
@@ -47,6 +41,10 @@ impl<'de> Deserialize<'de> for SpatialVector {
     {
         let vec3 = Vec3::deserialize(deserializer)?;
 
-        Ok(SpatialVector::new(vec3.x, vec3.y, vec3.z))
+        Ok(SpatialVector::new(
+            vec3.x,
+            vec3.y,
+            vec3.z
+        ))
     }
 }

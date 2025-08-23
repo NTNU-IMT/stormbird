@@ -11,6 +11,8 @@ use serde::{Serialize, Deserialize};
 pub mod linalg;
 pub mod tranforms;
 pub mod operators;
+
+use crate::type_aliases::Float;
     
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,7 +60,7 @@ where T: Default + Clone + Copy + Debug,
     }
 }
 
-impl Matrix<f64> {
+impl Matrix<Float> {
     pub fn identity(size: usize) -> Self {
         let mut out = Self::new_default([size, size]);
 

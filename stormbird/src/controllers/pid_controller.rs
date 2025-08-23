@@ -1,26 +1,28 @@
 
 use serde::{Deserialize, Serialize};
 
+use stormath::type_aliases::Float;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// A basic PID controller with anti-windup.
 ///
 /// Source: <https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller>
 pub struct PIDController {
-    pub proportional_gain: f64,
-    pub derivative_gain: f64,
-    pub integral_gain: f64,
-    pub max_value: f64,
-    pub min_value: f64,
+    pub proportional_gain: Float,
+    pub derivative_gain: Float,
+    pub integral_gain: Float,
+    pub max_value: Float,
+    pub min_value: Float,
     pub reverse_error_sign: bool,
-    pub set_point: f64,
+    pub set_point: Float,
 
-    previous_error: f64,
-    integral_term: f64,
+    previous_error: Float,
+    integral_term: Float,
 }
 
 impl PIDController {
-    pub fn do_step(&mut self, time_step: f64, input: f64) -> f64 {
+    pub fn do_step(&mut self, time_step: Float, input: Float) -> Float {
         let error = if self.reverse_error_sign {
             input - self.set_point
         } else {

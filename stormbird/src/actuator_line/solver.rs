@@ -1,10 +1,12 @@
 use serde::{Serialize, Deserialize};
 
+use stormath::type_aliases::Float;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SolverSettings {
     #[serde(default="SolverSettings::default_damping_factor")]
-    pub damping_factor: f64,
+    pub damping_factor: Float,
 }
 
 impl Default for SolverSettings {
@@ -16,5 +18,5 @@ impl Default for SolverSettings {
 }
 
 impl SolverSettings {
-    fn default_damping_factor() -> f64 {0.5}
+    fn default_damping_factor() -> Float {0.5}
 }

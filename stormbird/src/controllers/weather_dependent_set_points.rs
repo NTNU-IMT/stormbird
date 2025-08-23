@@ -5,16 +5,18 @@ use stormath::interpolation::linear_interpolation;
 
 use super::prelude::*;
 
-use std::f64::consts::PI;
+use stormath::type_aliases::Float;
+use stormath::consts::PI;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpinRatioConversion {
-    diameter: f64,
-    max_rps: f64,
+    diameter: Float,
+    max_rps: Float,
 }
 
 impl SpinRatioConversion {
-    pub fn get_rps_from_spin_ratio(&self, spin_ratio: f64, velocity: f64) -> f64 {
+    pub fn get_rps_from_spin_ratio(&self, spin_ratio: Float, velocity: Float) -> Float {
         let circumference = PI * self.diameter;
 
         let rps_raw = spin_ratio * velocity / circumference;
@@ -38,16 +40,16 @@ pub enum InternalStateType {
 #[serde(deny_unknown_fields)]
 /// Controller that interpolate on arrays of weather-dependent set points
 pub struct WeatherDependentSetPoints {
-    pub apparent_wind_directions: Vec<f64>,
+    pub apparent_wind_directions: Vec<Float>,
     #[serde(default)]
-    pub local_angle_of_attack_set_points: Option<Vec<f64>>,
+    pub local_angle_of_attack_set_points: Option<Vec<Float>>,
     #[serde(default)]
-    pub section_model_internal_state_set_points: Option<Vec<f64>>,
+    pub section_model_internal_state_set_points: Option<Vec<Float>>,
     pub internal_state_type: InternalStateType
 }
 
 impl WeatherDependentSetPoints {
-    pub fn get_local_angle_of_attack_angle(&self, apparent_wind_direction: f64) -> Option<f64> {
+    pub fn get_local_angle_of_attack_angle(&self, apparent_wind_direction: Float) -> Option<Float> {
         if let Some(local_angles) = &self.local_angle_of_attack_set_points {
             return Some(
                 linear_interpolation(
@@ -61,7 +63,7 @@ impl WeatherDependentSetPoints {
         }
     }
 
-    pub fn get_internal_state(&self, apparent_wind_direction: f64) -> Option<f64> {
+    pub fn get_internal_state(&self, apparent_wind_direction: Float) -> Option<Float> {
         if let Some(internal_states) = &self.section_model_internal_state_set_points {
             return Some(
                 linear_interpolation(

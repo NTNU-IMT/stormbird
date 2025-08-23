@@ -2,10 +2,11 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use std::f64::consts::PI;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::spatial_vector::geometry_functions;
+use stormath::type_aliases::Float;
+use stormath::consts::PI;
 
 use super::vortex_line;
 
@@ -13,17 +14,17 @@ use super::vortex_line;
 pub struct Panel {
     points: [SpatialVector; 4],
     center: SpatialVector,
-    area: f64,
+    area: Float,
     normal: SpatialVector,
-    far_field_length: f64,
-    viscous_core_length: f64,
+    far_field_length: Float,
+    viscous_core_length: Float,
 }
 
 impl Panel {
     pub fn new(
         points: [SpatialVector; 4],
-        far_field_ratio: f64,
-        viscous_core_length: f64,
+        far_field_ratio: Float,
+        viscous_core_length: Float,
     ) -> Self {
         let center = 0.25 * (points[0] + points[1] + points[2] + points[3]);
         let area = geometry_functions::area_of_quadrilateral(&points);

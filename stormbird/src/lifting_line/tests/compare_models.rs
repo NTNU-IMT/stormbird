@@ -4,8 +4,10 @@
 
 //! Compare the result from different solvers
 
-use std::f64::consts::PI;
 use std::time::Instant;
+
+use stormath::type_aliases::Float;
+use stormath::consts::TAU;
 
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
@@ -26,10 +28,10 @@ use super::elliptic_wing_theory::EllipticWingTheory;
 fn steady_lift() {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 1.2;
-    let angle_of_attack = 2.0_f64.to_radians();
+    let angle_of_attack = Float::from(2.0).to_radians();
 
     let theory = EllipticWingTheory {
-        cl_2d: cl_zero_angle + 2.0 * PI * angle_of_attack,
+        cl_2d: cl_zero_angle + TAU * angle_of_attack,
         aspect_ratio
     };
 
@@ -60,7 +62,7 @@ fn steady_lift() {
 
     let time_step = 0.25;
 
-    let velocity = SpatialVector([1.2, 0.0, 0.0]);
+    let velocity = SpatialVector::from([1.2, 0.0, 0.0]);
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
@@ -82,8 +84,8 @@ fn steady_lift() {
     let dynamic_velocity_points = dynamic_sim.get_freestream_velocity_points();
     let static_velocity_points = steady_sim.get_freestream_velocity_points();
 
-    let dynamic_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; dynamic_velocity_points.len()];
-    let static_velocity_freestream: Vec<SpatialVector<3>> = vec![velocity; static_velocity_points.len()];
+    let dynamic_velocity_freestream: Vec<SpatialVector> = vec![velocity; dynamic_velocity_points.len()];
+    let static_velocity_freestream: Vec<SpatialVector> = vec![velocity; static_velocity_points.len()];
 
     let start = Instant::now();
     let result_steady  = steady_sim.do_step(
@@ -119,7 +121,7 @@ fn steady_lift() {
     let mut result_dynamic = SimulationResult::default();
     let start = Instant::now();
     for i in 0..nr_time_steps {
-        let time = (i as f64) * time_step;
+        let time = (i as Float) * time_step;
         
         result_dynamic = dynamic_sim.do_step(
             time, 

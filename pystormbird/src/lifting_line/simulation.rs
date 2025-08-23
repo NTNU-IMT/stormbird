@@ -86,7 +86,7 @@ impl Simulation {
         freestream_velocity: Vec<SpatialVector>,
     ) -> SimulationResult {
 
-        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
+        let rust_freestream_velocity: Vec<SpatialVectorRust> = freestream_velocity.iter().map(
             |v| v.data
         ).collect();
 
@@ -103,7 +103,7 @@ impl Simulation {
         points
     ))]
     pub fn induced_velocities(&self, points: Vec<SpatialVector>) -> Vec<SpatialVector> {
-        let rust_points: Vec<SpatialVectorRust<3>> = points.iter().map(
+        let rust_points: Vec<SpatialVectorRust> = points.iter().map(
             |v| v.data
         ).collect();
 
@@ -127,7 +127,7 @@ impl Simulation {
         freestream_velocity: Vec<SpatialVector>,
     ) {
 
-        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
+        let rust_freestream_velocity: Vec<SpatialVectorRust> = freestream_velocity.iter().map(
             |v| v.data
         ).collect();
 

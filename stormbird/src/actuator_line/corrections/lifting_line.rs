@@ -8,6 +8,7 @@ use crate::line_force_model::LineForceModel;
 use crate::common_utils::prelude::*;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use serde::{Serialize, Deserialize};
 
@@ -17,28 +18,28 @@ use serde::{Serialize, Deserialize};
 #[serde(deny_unknown_fields)]
 pub struct LiftingLineCorrectionBuilder {
     #[serde(default = "LiftingLineCorrectionBuilder::default_wake_length_factor")]
-    pub wake_length_factor: f64,
+    pub wake_length_factor: Float,
     #[serde(default = "LiftingLineCorrectionBuilder::default_solver_damping_factor")]
-    pub solver_damping_factor: f64,
+    pub solver_damping_factor: Float,
     #[serde(default = "LiftingLineCorrectionBuilder::default_nr_solver_iterations")]
     pub nr_solver_iterations: usize
 }
 
 impl LiftingLineCorrectionBuilder {
-    fn default_wake_length_factor() -> f64 {100.0}
-    fn default_solver_damping_factor() -> f64 {0.1}
+    fn default_wake_length_factor() -> Float {100.0}
+    fn default_solver_damping_factor() -> Float {0.1}
     fn default_nr_solver_iterations() -> usize {20}
 
     pub fn build(
         &self, 
-        viscous_core_length_factor: f64, 
+        viscous_core_length_factor: Float, 
         line_force_model: &LineForceModel
     ) -> LiftingLineCorrection {
-        let chord_lengths: Vec<f64> = line_force_model.chord_vectors_local.iter().map(
+        let chord_lengths: Vec<Float> = line_force_model.chord_vectors_local.iter().map(
             |chord_vector| chord_vector.length()
         ).collect();
 
-        let average_chord_length = chord_lengths.iter().sum::<f64>() / chord_lengths.len() as f64;
+        let average_chord_length = chord_lengths.iter().sum::<Float>() / chord_lengths.len() as Float;
 
         let viscous_core_length = viscous_core_length_factor * average_chord_length;
 
@@ -60,9 +61,9 @@ impl LiftingLineCorrectionBuilder {
 /// A structure used to compute corrections for the velocity, based on a lifting line model.
 pub struct LiftingLineCorrection {
     pub initialized: bool,
-    pub viscous_core_length: f64,
+    pub viscous_core_length: Float,
     pub nr_solver_iterations: usize,
-    pub solver_damping_factor: f64,
+    pub solver_damping_factor: Float,
     velocity_correction_estimate: Vec<SpatialVector>
 }
 
@@ -71,7 +72,7 @@ impl LiftingLineCorrection {
         &mut self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
-        circulation_strength: &[f64],
+        circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
         let span_lines = line_force_model.span_lines();
 
@@ -95,7 +96,7 @@ impl LiftingLineCorrection {
             ];
 
             let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector>() 
-                / wing_ctrl_points_velocity.len() as f64;
+                / wing_ctrl_points_velocity.len() as Float;
 
             let wake_vector = averaged_ctrl_points_velocity.normalize() * 100.0;
 
@@ -135,10 +136,10 @@ impl LiftingLineCorrection {
         &mut self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
-        circulation_strength: &[f64],
+        circulation_strength: &[Float],
     ) -> (
         Vec<SpatialVector>,
-        Vec<f64>
+        Vec<Float>
     ) {
         let mut corrected_ctrl_points_velocity = ctrl_points_velocity.to_vec();
         let mut corrected_circulation_strength = circulation_strength.to_vec();

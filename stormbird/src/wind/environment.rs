@@ -6,7 +6,10 @@
 
 use std::ops::Range;
 
-use stormath::spatial_vector::SpatialVector;
+use stormath::{
+    type_aliases::Float,
+    spatial_vector::SpatialVector
+};
 use serde::{Serialize, Deserialize};
 use serde_json;
 
@@ -16,8 +19,8 @@ use super::height_variation::HeightVariationModel;
 
 #[derive(Debug, Clone, Copy)]
 pub struct WindCondition {
-    pub reference_velocity: f64,
-    pub direction_coming_from: f64,
+    pub reference_velocity: Float,
+    pub direction_coming_from: Float,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,7 +35,7 @@ pub struct WindEnvironment {
     #[serde(default="WindEnvironment::default_zero_direction_vector")]
     pub zero_direction_vector: SpatialVector,
     #[serde(default)]
-    pub water_plane_height: f64,
+    pub water_plane_height: Float,
 }
 
 impl Default for WindEnvironment {
@@ -47,8 +50,8 @@ impl Default for WindEnvironment {
 }
 
 impl WindEnvironment {
-    pub fn default_zero_direction_vector() -> SpatialVector {SpatialVector([-1.0, 0.0, 0.0])}
-    pub fn default_up_direction() -> SpatialVector {SpatialVector([0.0, 0.0, 1.0])}
+    pub fn default_zero_direction_vector() -> SpatialVector {SpatialVector::from([-1.0, 0.0, 0.0])}
+    pub fn default_up_direction() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
@@ -63,7 +66,7 @@ impl WindEnvironment {
     }
 
     /// Computes the true wind velocity magnitude based on the input height
-    pub fn true_wind_velocity_at_height(&self, condition: WindCondition, height: f64) -> f64 {
+    pub fn true_wind_velocity_at_height(&self, condition: WindCondition, height: Float) -> Float {
         let increase_factor = if let Some(model) = self.height_variation_model {
             if height > 0.0 {
                 model.velocity_increase_factor(height)
@@ -82,7 +85,7 @@ impl WindEnvironment {
         &self,
         condition: WindCondition,
         location: SpatialVector,
-    ) -> f64 {
+    ) -> Float {
         let height = (
             location.dot(self.up_direction) - self.water_plane_height
         ).max(0.0);
@@ -140,7 +143,7 @@ impl WindEnvironment {
         &self,
         condition: WindCondition,
         ctrl_points: &[SpatialVector],
-        non_dimensional_span_distances: &[f64],
+        non_dimensional_span_distances: &[Float],
         linear_velocity: SpatialVector,
         wing_indices: Vec<Range<usize>>,
     ) -> Vec<SpatialVector> {

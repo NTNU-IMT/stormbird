@@ -2,8 +2,8 @@ use super::*;
 
 use crate::error::Error;
 
-impl Matrix<f64> {
-    pub fn check_dimensions_for_solvability(&self, rhs: &[f64]) {
+impl Matrix<Float> {
+    pub fn check_dimensions_for_solvability(&self, rhs: &[Float]) {
         let n = self.nr_rows();
         let m = self.nr_cols();
         
@@ -16,7 +16,7 @@ impl Matrix<f64> {
     /// Solves the equation system Ax = b using Gaussian elimination.
     /// 
     /// Source: <https://en.wikipedia.org/wiki/Gaussian_elimination>
-    pub fn solve_gaussian_elimination(&self, rhs: &[f64]) -> Result<Vec<f64>, Error> {
+    pub fn solve_gaussian_elimination(&self, rhs: &[Float]) -> Result<Vec<Float>, Error> {
         self.check_dimensions_for_solvability(rhs);
 
         let n = self.nr_rows();
@@ -83,7 +83,7 @@ impl Matrix<f64> {
     /// Solves the equation system Ax = b using Gauss-Seidel method.
     /// 
     /// Source: <https://en.wikipedia.org/wiki/Gauss%E2%80%93Seidel_method>
-    pub fn solve_gauss_seidel(&self, rhs: &[f64], nr_iterations: usize) -> Result<Vec<f64>, Error> {
+    pub fn solve_gauss_seidel(&self, rhs: &[Float], nr_iterations: usize) -> Result<Vec<Float>, Error> {
         self.check_dimensions_for_solvability(rhs);
 
         let n = self.nr_rows();
@@ -120,6 +120,7 @@ mod tests {
 
     #[test]
     fn test_matrix_solver() {
+        let allowable_error = 1e-6;
 
         let a = Matrix{
             data: vec![3.0, 2.0, 0.0, 
@@ -140,13 +141,13 @@ mod tests {
 
         for i in 0..x_solved_elimination.len() {
             assert!(
-                (x_solved_elimination[i] - x_numpy[i]).abs() < 1e-12, 
+                (x_solved_elimination[i] - x_numpy[i]).abs() < allowable_error, 
                 "Mismatch at index {}: {} != {}", 
                 i, x_solved_elimination[i], x_numpy[i]
             );
 
             assert!(
-                (x_solved_iterative[i] - x_numpy[i]).abs() < 1e-12, 
+                (x_solved_iterative[i] - x_numpy[i]).abs() < allowable_error, 
                 "Mismatch at index {}: {} != {}", 
                 i, x_solved_iterative[i], x_numpy[i]
             );

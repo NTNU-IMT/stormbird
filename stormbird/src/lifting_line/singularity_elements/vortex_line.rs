@@ -3,11 +3,12 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 //! Funtctionality for vortex lines and their induced velocities.
-use std::f64::consts::PI;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
+use stormath::consts::PI;
 
-const CLOSENESS_ERROR: f64 = 1.0e-10;
+const CLOSENESS_ERROR: Float = 1.0e-10;
 
 #[inline(always)]
 /// Implementation of induced velocity function based on the user manual for VSAERO
@@ -15,7 +16,7 @@ const CLOSENESS_ERROR: f64 = 1.0e-10;
 pub fn induced_velocity_from_line_with_unit_strength(
     line_points: &[SpatialVector; 2], 
     ctrl_point: SpatialVector, 
-    viscous_core_length: f64,
+    viscous_core_length: Float,
 ) -> SpatialVector {
     let r_1 = ctrl_point - line_points[0];
     let r_2 = ctrl_point - line_points[1];
@@ -45,7 +46,7 @@ pub fn induced_velocity_from_line_with_unit_strength(
 
 #[inline(always)]
 /// Calculates the distance between the point and the line
-pub fn normal_distance(line_points: &[SpatialVector; 2], ctrl_point: SpatialVector) -> f64 {
+pub fn normal_distance(line_points: &[SpatialVector; 2], ctrl_point: SpatialVector) -> Float {
     let relative_line  = line_points[1] - line_points[0];
     let relative_point = ctrl_point - line_points[0];
 
@@ -70,7 +71,7 @@ pub fn normal_distance(line_points: &[SpatialVector; 2], ctrl_point: SpatialVect
 /// Viscous core term. Based on expressions from:
 /// J. T. Reid (2020) - A general approach to lifting-line theory, applied to wings with sweep
 /// Link: <https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=8982&context=etd>
-pub fn viscous_core_term(line_points: &[SpatialVector; 2], ctrl_point: SpatialVector, viscous_core_length: f64) -> f64 {
+pub fn viscous_core_term(line_points: &[SpatialVector; 2], ctrl_point: SpatialVector, viscous_core_length: Float) -> Float {
     let distance = normal_distance(line_points, ctrl_point);
 
     let denominator = (viscous_core_length.powi(4) + distance.powi(4)).sqrt();

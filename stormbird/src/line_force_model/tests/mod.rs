@@ -21,15 +21,15 @@ pub fn get_example_model() -> LineForceModel {
 
     let mut builder = LineForceModelBuilder::new(5);
 
-    let chord_vector = SpatialVector([chord_length, 0.0, 0.0]);
+    let chord_vector = SpatialVector::from([chord_length, 0.0, 0.0]);
 
     let x_positions = vec![-1.5 * span, 1.32 * span];
 
     for x in x_positions {
         let wing = WingBuilder{
             section_points: vec![
-                SpatialVector([x, 0.0, start_height]),
-                SpatialVector([x, 0.0, start_height + span]),
+                SpatialVector::from([x, 0.0, start_height]),
+                SpatialVector::from([x, 0.0, start_height + span]),
             ],
             chord_vectors: vec![
                 chord_vector,

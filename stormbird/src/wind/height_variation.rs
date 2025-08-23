@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use stormath::type_aliases::Float;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum HeightVariationModel {
     PowerModel(PowerModel),
@@ -17,7 +19,7 @@ impl Default for HeightVariationModel {
 }
 
 impl HeightVariationModel {
-    pub fn velocity_increase_factor(&self, height: f64) -> f64 {
+    pub fn velocity_increase_factor(&self, height: Float) -> Float {
         match self {
             HeightVariationModel::PowerModel(model) => 
                 model.velocity_increase_factor(height),
@@ -39,16 +41,16 @@ impl HeightVariationModel {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PowerModel {
     #[serde(default="PowerModel::default_reference_height")]
-    pub reference_height: f64,
+    pub reference_height: Float,
     #[serde(default="PowerModel::default_power_factor")]
-    pub power_factor: f64,
+    pub power_factor: Float,
 }
 
 impl PowerModel {
-    pub fn default_reference_height() -> f64 {10.0}
-    pub fn default_power_factor() -> f64 {1.0/9.0}
+    pub fn default_reference_height() -> Float {10.0}
+    pub fn default_power_factor() -> Float {1.0/9.0}
 
-    pub fn velocity_increase_factor(&self, height: f64) -> f64 {
+    pub fn velocity_increase_factor(&self, height: Float) -> Float {
         if self.power_factor > 0.0 {
             (height / self.reference_height).powf(self.power_factor)
         } else {
@@ -69,16 +71,16 @@ impl Default for PowerModel {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LogarithmicModel {
     #[serde(default="LogarithmicModel::default_reference_height")]
-    pub reference_height: f64,
+    pub reference_height: Float,
     #[serde(default="LogarithmicModel::surface_roughness")]
-    pub surface_roughness: f64,
+    pub surface_roughness: Float,
 }
 
 impl LogarithmicModel {
-    pub fn default_reference_height() -> f64 {10.0}
-    pub fn surface_roughness() -> f64 {0.0002}
+    pub fn default_reference_height() -> Float {10.0}
+    pub fn surface_roughness() -> Float {0.0002}
 
-    pub fn velocity_increase_factor(&self, height: f64) -> f64 {
+    pub fn velocity_increase_factor(&self, height: Float) -> Float {
         if self.surface_roughness > 0.0 {
             (height / self.surface_roughness).ln() / 
             (self.reference_height / self.surface_roughness).ln()

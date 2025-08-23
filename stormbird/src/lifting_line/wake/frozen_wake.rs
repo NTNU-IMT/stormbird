@@ -4,6 +4,7 @@ use crate::line_force_model::span_line::SpanLine;
 use crate::lifting_line::singularity_elements::panel::Panel;
 
 use stormath::matrix::Matrix;
+use stormath::type_aliases::Float;
 
 //use rayon::prelude::*;
 
@@ -53,8 +54,8 @@ impl FrozenWake {
     pub fn steady_wake_from_span_lines_and_direction(
         span_lines: &[SpanLine],
         wake_vector: SpatialVector,
-        viscous_core_length: f64,
-        far_field_ratio: f64,
+        viscous_core_length: Float,
+        far_field_ratio: Float,
     ) -> Self {
         let nr_span_lines = span_lines.len();
 
@@ -166,7 +167,7 @@ impl FrozenWake {
     /// wake. The strength is assumed to be constant along the length of the span line.
     pub fn induced_velocities_at_control_points(
         &self,
-        circulation_strength: &[f64],
+        circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
         let n = self.fixed_velocities.len();
 

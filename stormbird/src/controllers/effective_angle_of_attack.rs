@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use super::prelude::*;
 
+use stormath::type_aliases::Float;
+use stormath::consts::{PI, TAU};
+
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -9,14 +12,14 @@ use super::prelude::*;
 /// attack. 
 pub struct EffectiveAngleOfAttackController {
     /// The set point for the effective angle of attack
-    pub target_angles_of_attack: Vec<f64>,
+    pub target_angles_of_attack: Vec<Float>,
 }
 
 impl EffectiveAngleOfAttackController {
     pub fn get_new_output(
         &self,
-        loading: f64,
-        angle_measurements: &[f64]
+        loading: Float,
+        angle_measurements: &[Float]
     ) -> ControllerOutput {
         let nr_of_wings = angle_measurements.len();
 
@@ -39,14 +42,14 @@ impl EffectiveAngleOfAttackController {
     }
 
     #[inline(always)]
-    fn correct_angle_to_be_between_pi_and_negative_pi(angle: f64) -> f64 {
+    fn correct_angle_to_be_between_pi_and_negative_pi(angle: Float) -> Float {
         let mut corrected_angle = angle;
 
-        while corrected_angle > std::f64::consts::PI {
-            corrected_angle -= 2.0 * std::f64::consts::PI;
+        while corrected_angle > PI {
+            corrected_angle -= TAU;
         }
-        while corrected_angle < -std::f64::consts::PI {
-            corrected_angle += 2.0 * std::f64::consts::PI;
+        while corrected_angle < -PI {
+            corrected_angle += TAU;
         }
 
         corrected_angle
