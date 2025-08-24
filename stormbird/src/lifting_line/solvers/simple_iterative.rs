@@ -91,7 +91,9 @@ impl SimpleIterative {
         while iterations < self.max_iterations_per_time_step && !converged {
             iterations += 1;
     
-            let induced_velocities = frozen_wake.induced_velocities_at_control_points(&circulation_strength);
+            let induced_velocities = frozen_wake.induced_velocities_at_control_points(
+                &circulation_strength
+            );
 
             match &self.velocity_corrections {
                 VelocityCorrections::None => {
@@ -114,12 +116,21 @@ impl SimpleIterative {
                 },
             }
 
-            ctrl_point_velocity = line_force_model.remove_span_velocity(&ctrl_point_velocity, CoordinateSystem::Global);
-    
+            ctrl_point_velocity = line_force_model.remove_span_velocity(
+                &ctrl_point_velocity, 
+                CoordinateSystem::Global
+            );
+
             let new_estimated_strength = if self.use_raw_circulation_during_iterations {
-                line_force_model.circulation_strength_raw(&ctrl_point_velocity, CoordinateSystem::Global)
+                line_force_model.circulation_strength_raw(
+                    &ctrl_point_velocity, 
+                    CoordinateSystem::Global
+                )
             } else {
-                line_force_model.circulation_strength(&ctrl_point_velocity, CoordinateSystem::Global)
+                line_force_model.circulation_strength(
+                    &ctrl_point_velocity, 
+                    CoordinateSystem::Global
+                )
             };
     
             residual = line_force_model.average_residual_absolute(
@@ -153,11 +164,15 @@ impl SimpleIterative {
             }
         }
 
-        circulation_strength = line_force_model.circulation_strength(&ctrl_point_velocity, CoordinateSystem::Global);
-    
+        circulation_strength = line_force_model.circulation_strength(
+            &ctrl_point_velocity, 
+            CoordinateSystem::Global
+        );
+
         SolverResult {
+            input_ctrl_point_velocity: felt_ctrl_points_freestream.to_vec(),
             circulation_strength,
-            ctrl_point_velocity,
+            output_ctrl_point_velocity: ctrl_point_velocity,
             iterations,
             residual
         }

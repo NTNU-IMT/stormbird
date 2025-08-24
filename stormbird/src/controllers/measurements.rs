@@ -104,9 +104,14 @@ pub fn measure_wind_velocity_magnitude(
 pub fn measure_apparent_wind_direction(
     simulation_result: &SimulationResult,
     measurement_settings: &MeasurementSettings,
-    wind_environment: &WindEnvironment
+    wind_environment: &WindEnvironment,
+    use_input_velocity: bool,
 ) -> Vec<Float> {
-    let relevant_velocities = simulation_result.felt_velocity_minus_rotational_motion();
+    let relevant_velocities = if use_input_velocity {
+        simulation_result.felt_input_velocity_minus_rotational_motion()
+    } else {
+        simulation_result.felt_velocity_minus_rotational_motion()
+    };
 
     let wind_directions: Vec<Float> = relevant_velocities.iter()
         .map(

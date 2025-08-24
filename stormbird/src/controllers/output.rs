@@ -10,6 +10,30 @@ pub struct ControllerOutput {
     pub section_models_internal_state: Option<Vec<Float>>,
 }
 
+pub fn limit_values(
+    old_values: &[Float],
+    raw_new_values: &[Float],
+    max_change: Float,
+) -> Vec<Float> {
+    let nr_values = raw_new_values.len();
+
+    let mut new_values: Vec<Float> = Vec::with_capacity(nr_values);
+
+    for i in 0..nr_values {
+        let raw_difference = raw_new_values[i] - old_values[i];
+
+        if raw_difference.abs() > max_change {
+            new_values.push(
+                old_values[i] * max_change * raw_difference.signum()
+            )
+        } else {
+            new_values.push(raw_new_values[i])
+        }
+    }
+
+    new_values
+}
+
 impl ControllerOutput {
     pub fn as_csv_string(&self) -> (String, String) {
         let mut header = String::new();

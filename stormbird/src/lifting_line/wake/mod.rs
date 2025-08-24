@@ -14,14 +14,12 @@ pub mod frozen_wake;
 pub mod induced_velocity_calc;
 pub mod update_data;
 pub mod initialization;
-pub mod line_force_model_data;
 
-use line_force_model_data::LineForceModelData;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 
-use crate::line_force_model::LineForceModel;
+use crate::line_force_model::global_geometry_data::GlobalLineForceModelGeometry;
 
 //use rayon::prelude::*;
 //use rayon::iter::ParallelIterator;
@@ -73,21 +71,11 @@ pub struct Wake {
     pub number_of_time_steps_completed: usize,
     /// Panel geometry data
     pub panels: Vec<Panel>,
+    /// Representative chord length
+    pub representative_chord_length: Float,
 }
 
 impl Wake {
-    pub fn ctrl_points(&self) -> Vec<SpatialVector> {
-        let mut ctrl_points: Vec<SpatialVector> = Vec::with_capacity(self.indices.nr_panels_along_span);
-
-        for i in 0..self.indices.nr_panels_along_span {
-            ctrl_points.push(
-                (self.points[i] + self.points[i+1]) * 0.5
-            );
-        }
-
-        ctrl_points
-    }
-
     /// Returns the index of the wing that the span index belongs to
     fn wing_index(&self, span_index: usize) -> usize {
         for i in 0..self.wing_indices.len() {

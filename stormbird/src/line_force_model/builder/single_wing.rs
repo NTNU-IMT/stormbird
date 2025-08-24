@@ -14,6 +14,7 @@ use crate::line_force_model::span_line::SpanLine;
 pub struct SingleWing {
     pub span_lines_local: Vec<SpanLine>,
     pub chord_vectors_local: Vec<SpatialVector>,
+    pub chord_lengths: Vec<Float>,
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
 }
@@ -65,6 +66,7 @@ impl WingBuilder {
 
         let mut span_lines_local: Vec<SpanLine> = Vec::new();
         let mut chord_vectors_local: Vec<SpatialVector> = Vec::new();
+        let mut chord_lengths: Vec<Float> = Vec::new();
 
         for i in 0..nr_sections {
             let start_distance = i as Float * delta_span_distance;
@@ -79,6 +81,8 @@ impl WingBuilder {
             chord_vectors_local.push(
                 linear_interpolation(ctrl_point_distance, &span_distance, &self.chord_vectors)
             );
+
+            chord_lengths.push(chord_vectors_local.last().unwrap().length());
         }
 
         let section_model = match &self.section_model {
@@ -90,6 +94,7 @@ impl WingBuilder {
         SingleWing {
             span_lines_local,
             chord_vectors_local,
+            chord_lengths,
             section_model,
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
         }

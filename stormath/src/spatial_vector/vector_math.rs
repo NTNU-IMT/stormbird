@@ -4,20 +4,14 @@ impl SpatialVector {
     #[inline(always)]
     /// Returns the dot product of two vectors
     pub fn dot(self, rhs: Self) -> Float {
-        let mut result = 0.0;
-
-        for i in 0..VECTOR_LENGTH {
-            result = result + self[i] * rhs[i];
-        }
-
-        result
+        self[0] * rhs[0] + self[1] * rhs[1] + self[2] * rhs[2]
     }
 
     #[inline(always)]
     /// Returns the length of the vector squared, which is equal to the dot product of the vector 
     /// with itself
     pub fn length_squared(self) -> Float {
-        self.dot(self)
+        self[0] * self[0] + self[1] * self[1] + self[2] * self[2]
     }
 
     #[inline(always)]
@@ -64,11 +58,14 @@ impl SpatialVector {
     #[inline(always)]
     /// Returns the absolute value of the angle between two vectors
     pub fn absolute_angle_between(self, rhs: Self) -> Float {
-        if self.length() == 0.0 || rhs.length() == 0.0 {
+        let self_len_sq = self.length_squared();
+        let rhs_len_sq = rhs.length_squared();
+
+        if self_len_sq == 0.0 || rhs_len_sq == 0.0 {
             return 0.0;
         }
 
-        let cosine_value = self.dot(rhs) / (self.length() * rhs.length());
+        let cosine_value = self.dot(rhs) / (self_len_sq * rhs_len_sq).sqrt();
 
         // Correct for potential floating point errors
         let clipped_cosine_value = cosine_value.max(-1.0).min(1.0);

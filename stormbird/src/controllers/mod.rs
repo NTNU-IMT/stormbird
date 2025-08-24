@@ -53,13 +53,12 @@ pub struct ControllerBuilder {
     pub max_internal_section_state_change_rate: Option<Float>,
     #[serde(default)]
     pub moving_average_window_size: Option<usize>,
-    #[serde(default = "ControllerBuilder::default_update_factor")]
-    pub update_factor: Float,
+    #[serde(default)]
+    pub use_input_velocity_for_apparent_wind_direction: bool,
 }
 
 impl ControllerBuilder {
     pub fn default_time_steps_between_updates() -> usize {1}
-    pub fn default_update_factor() -> Float {1.0}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
@@ -81,8 +80,8 @@ impl ControllerBuilder {
             start_time: self.start_time,
             max_local_wing_angle_change_rate: self.max_local_wing_angle_change_rate,
             max_internal_section_state_change_rate: self.max_internal_section_state_change_rate,
-            update_factor: self.update_factor,
             time_step_index: 0,
+            use_input_velocity_for_apparent_wind_direction: self.use_input_velocity_for_apparent_wind_direction,
         }
     }
 }
@@ -95,8 +94,8 @@ pub struct Controller {
     pub start_time: Float,
     pub max_local_wing_angle_change_rate: Option<Float>,
     pub max_internal_section_state_change_rate: Option<Float>,
-    pub update_factor: Float,
-    pub time_step_index: usize
+    pub time_step_index: usize,
+    pub use_input_velocity_for_apparent_wind_direction: bool,
 }
 
 impl Controller {
@@ -111,7 +110,7 @@ impl Controller {
         let first_time_step = self.time_step_index == 1;
 
         if first_time_step || (time_to_update && initialization_done) {
-            let new_output_raw = match &self.logic {
+            let mut output = match &self.logic {
                 ControllerLogic::EffectiveAngleOfAttack(controller) => {
                     controller.get_new_output(input.loading, &input.angles_of_attack)
                 },
@@ -120,7 +119,33 @@ impl Controller {
                 }
             };
 
-            return Some(new_output_raw)
+            if self.max_local_wing_angle_change_rate.is_some() && output.local_wing_angles.is_some() {
+                let raw_new_values = output.local_wing_angles.as_ref().unwrap();
+                let max_change = self.max_local_wing_angle_change_rate.unwrap() * time_step;
+
+                output.local_wing_angles = Some(
+                    output::limit_values(
+                        &input.current_local_wing_angles, 
+                        raw_new_values, 
+                        max_change
+                    )
+                )
+            }
+
+            if self.max_local_wing_angle_change_rate.is_some() && output.section_models_internal_state.is_some() {
+                let raw_new_values = output.section_models_internal_state.as_ref().unwrap();
+                let max_change = self.max_internal_section_state_change_rate.unwrap() * time_step;
+
+                output.section_models_internal_state = Some(
+                    output::limit_values(
+                        &input.current_section_models_internal_state, 
+                        raw_new_values, 
+                        max_change
+                    )
+                )
+            }
+
+            return Some(output)
         }
 
         None

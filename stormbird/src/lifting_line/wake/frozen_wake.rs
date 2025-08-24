@@ -104,59 +104,63 @@ impl FrozenWake {
 
     }
 
-    pub fn update(&mut self, wake: &Wake) {
-        self.update_fixed_velocities(wake);
-        self.update_variable_velocity_factors(wake);
+    pub fn update(&mut self, ctrl_points: &[SpatialVector], wake: &Wake) {
+        self.update_fixed_velocities(ctrl_points, wake);
+        self.update_variable_velocity_factors(ctrl_points, wake);
     }
 
-    pub fn update_fixed_velocities(&mut self, wake: &Wake) {
-        let ctrl_points = wake.ctrl_points();
-
+    pub fn update_fixed_velocities(&mut self, ctrl_points: &[SpatialVector], wake: &Wake) {
         self.fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
     }
 
-    pub fn update_variable_velocity_factors(&mut self, wake: &Wake) {
-        let ctrl_points = wake.ctrl_points();
+    fn update_variable_velocity_factors_full(&mut self, ctrl_points: &[SpatialVector], wake: &Wake) {
+        let [nr_ctrl_points, nr_panels] = self.variable_velocity_factors.shape;
 
-        let mut indices_vector: Vec<[usize; 2]> = Vec::with_capacity(self.variable_velocity_factors.data.len());
+        for panel_index in 0..nr_panels {
+            for ctrl_point_index in 0..nr_ctrl_points {
+                let ctrl_point = ctrl_points[ctrl_point_index];
 
-        for i in 0..self.variable_velocity_factors.data.len() {
-            indices_vector.push(self.variable_velocity_factors.indices_from_index(i));
-        }
-
-        if wake.settings.neglect_self_induced_velocities {
-            self.variable_velocity_factors.data.iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let indices = indices_vector[flat_index];
-
-                let ctrl_point_index = indices[0];
-                let panel_index = indices[1];
-    
-                let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
-                let panel_wing_index      = wake.wing_index(panel_index);
-    
-                if ctrl_point_wing_index == panel_wing_index {
-                    *factor = SpatialVector::default();
-                } else {
-                    *factor = wake.unit_strength_induced_velocity_from_panel(
-                        0, 
-                        panel_index, 
-                        ctrl_points[ctrl_point_index]
-                    );
-                }
-            });
-        } else {
-            self.variable_velocity_factors.data.iter_mut().enumerate().for_each(|(flat_index, factor)| {
-                let indices = indices_vector[flat_index];
-
-                let ctrl_point_index = indices[0];
-                let panel_index = indices[1];
-    
-                *factor = wake.unit_strength_induced_velocity_from_panel(
+                let induced_velocity = wake.unit_strength_induced_velocity_from_panel(
                     0, 
                     panel_index, 
-                    ctrl_points[ctrl_point_index]
+                    ctrl_point
                 );
-            });
+
+                self.variable_velocity_factors[[ctrl_point_index, panel_index]] = induced_velocity;
+            }
+        }
+    }
+
+    fn update_variable_velocity_factors_neglect_self_induced(&mut self, ctrl_points: &[SpatialVector], wake: &Wake) {
+        let [nr_ctrl_points, nr_panels] = self.variable_velocity_factors.shape;
+
+        for panel_index in 0..nr_panels {
+            for ctrl_point_index in 0..nr_ctrl_points {
+                let ctrl_point = ctrl_points[ctrl_point_index];
+
+                let ctrl_point_wing_index = wake.wing_index(ctrl_point_index);
+                let panel_wing_index      = wake.wing_index(panel_index);
+
+                if ctrl_point_wing_index == panel_wing_index {
+                    self.variable_velocity_factors[[ctrl_point_index, panel_index]] = SpatialVector::default();
+                } else {
+                    let induced_velocity = wake.unit_strength_induced_velocity_from_panel(
+                        0, 
+                        panel_index, 
+                        ctrl_point
+                    );
+
+                    self.variable_velocity_factors[[ctrl_point_index, panel_index]] = induced_velocity;
+                }
+            }
+        }
+    }
+
+    pub fn update_variable_velocity_factors(&mut self, ctrl_points: &[SpatialVector], wake: &Wake) {
+        if wake.settings.neglect_self_induced_velocities {
+            self.update_variable_velocity_factors_neglect_self_induced(ctrl_points, wake);
+        } else {
+            self.update_variable_velocity_factors_full(ctrl_points, wake);
         }
     }
 
@@ -169,23 +173,23 @@ impl FrozenWake {
         &self,
         circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
-        let n = self.fixed_velocities.len();
+        let nr_rows = self.fixed_velocities.len();
+        let nr_cols = self.variable_velocity_factors.shape[1];
 
-        let mut results = Vec::with_capacity(n);
+        let mut results = Vec::with_capacity(nr_rows);
 
-        for i_row in 0..n {
-            let mut induced_velocity = self.fixed_velocities[i_row];
+        for i_row in 0..nr_rows {
+            let relevant_variable_factors = &self.variable_velocity_factors.data[i_row * nr_cols..(i_row + 1) * nr_cols];
+            
+            let mut variable_sum = (0..nr_cols)
+                .map(|i_col| {
+                    relevant_variable_factors[i_col] * circulation_strength[i_col]
+                }).sum::<SpatialVector>();
 
-            for i_col in 0..self.variable_velocity_factors.shape[1] {
-                induced_velocity += 
-                        self.variable_velocity_factors[[i_row, i_col]] * circulation_strength[i_col];
-            }
+            // Should not be necessary, but here just in case
+            variable_sum.replace_nans_with_zeros();
 
-            if induced_velocity[0].is_nan() || induced_velocity[1].is_nan() || induced_velocity[2].is_nan() {
-                induced_velocity = SpatialVector::default();
-            }
-
-            results.push(induced_velocity)
+            results.push(variable_sum + self.fixed_velocities[i_row]);
         }
 
         results

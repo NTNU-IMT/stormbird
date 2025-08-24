@@ -88,6 +88,14 @@ impl SpatialVector {
 
         Self(data)
     }
+
+    pub fn replace_nans_with_zeros(&mut self) {
+        for i in 0..DATA_SIZE {
+            if self.0[i].is_nan() {
+                self.0[i] = 0.0;
+            }
+        }
+    }
 }
 
 impl Default for SpatialVector {

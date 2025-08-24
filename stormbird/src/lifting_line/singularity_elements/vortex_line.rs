@@ -8,6 +8,8 @@ use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 use stormath::consts::PI;
 
+const FOUR_PI_INVERSE: Float = 1.0 / (4.0 * PI);
+
 const CLOSENESS_ERROR: Float = 1.0e-10;
 
 #[inline(always)]
@@ -21,8 +23,10 @@ pub fn induced_velocity_from_line_with_unit_strength(
     let r_1 = ctrl_point - line_points[0];
     let r_2 = ctrl_point - line_points[1];
 
-    let r_1_length = r_1.length();
-    let r_2_length = r_2.length(); 
+    let r_1_length_sq = r_1.length_squared();
+    let r_2_length_sq = r_2.length_squared();
+    let r_1_length = r_1_length_sq.sqrt();
+    let r_2_length = r_2_length_sq.sqrt();
 
     let r_1_r_2 = r_1_length * r_2_length;
 
@@ -32,12 +36,18 @@ pub fn induced_velocity_from_line_with_unit_strength(
         let viscous_core_term = if viscous_core_length == 0.0 {
             1.0
         } else {
-            viscous_core_term(line_points, ctrl_point, viscous_core_length)
+            viscous_core_term(
+                line_points, 
+                ctrl_point, 
+                viscous_core_length,
+                r_1_length_sq,
+                r_2_length_sq
+            )
         };
 
         let k = (r_1_length + r_2_length) / denominator;
 
-        viscous_core_term * r_1.cross(r_2) * (k / (4.0 * PI))
+        viscous_core_term * r_1.cross(r_2) * (k * FOUR_PI_INVERSE)
     }
     else {
         SpatialVector::default()
@@ -46,24 +56,30 @@ pub fn induced_velocity_from_line_with_unit_strength(
 
 #[inline(always)]
 /// Calculates the distance between the point and the line
-pub fn normal_distance(line_points: &[SpatialVector; 2], ctrl_point: SpatialVector) -> Float {
+fn normal_distance_squared(
+    line_points: &[SpatialVector; 2], 
+    ctrl_point: SpatialVector,
+    r_1_length_sq: Float,
+    r_2_length_sq: Float,
+) -> Float {
     let relative_line  = line_points[1] - line_points[0];
     let relative_point = ctrl_point - line_points[0];
 
-    let line_direction = relative_line.normalize();
+    let line_length_sq = relative_line.length_squared();
+    let line_length = line_length_sq.sqrt();
+    let line_direction = relative_line / line_length;
 
-    let point_vector_line_parallel = relative_point.project(line_direction);
+    //let line_direction = relative_line.normalize();
 
-    let parallel_distance_from_start_point = point_vector_line_parallel.dot(line_direction);
+    let parallel_distance_from_start = relative_point.dot(line_direction);
 
-    if parallel_distance_from_start_point < 0.0 {
-        relative_point.length()
-    } else if parallel_distance_from_start_point > relative_line.length() {
-        (ctrl_point - line_points[1]).length()
+    if parallel_distance_from_start < 0.0 {
+        r_1_length_sq
+    } else if parallel_distance_from_start > line_length {
+        r_2_length_sq
     } else {
-        let point_vector_line_normal  = relative_point - point_vector_line_parallel;
-
-        point_vector_line_normal.length()
+        let parallel_component_sq = parallel_distance_from_start * parallel_distance_from_start;
+        relative_point.length_squared() - parallel_component_sq
     }
 }
 
@@ -71,15 +87,20 @@ pub fn normal_distance(line_points: &[SpatialVector; 2], ctrl_point: SpatialVect
 /// Viscous core term. Based on expressions from:
 /// J. T. Reid (2020) - A general approach to lifting-line theory, applied to wings with sweep
 /// Link: <https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=8982&context=etd>
-pub fn viscous_core_term(line_points: &[SpatialVector; 2], ctrl_point: SpatialVector, viscous_core_length: Float) -> Float {
-    let distance = normal_distance(line_points, ctrl_point);
+fn viscous_core_term(
+    line_points: &[SpatialVector; 2], 
+    ctrl_point: SpatialVector, 
+    viscous_core_length: Float,
+    r_1_length_sq: Float,
+    r_2_length_sq: Float,
+) -> Float {
+    let distance_squared = normal_distance_squared(line_points, ctrl_point, r_1_length_sq, r_2_length_sq);
 
-    let denominator = (viscous_core_length.powi(4) + distance.powi(4)).sqrt();
+    let denominator = (viscous_core_length.powi(4) + distance_squared * distance_squared).sqrt();
     
     if denominator > 0.0 {
-        distance.powi(2) / denominator
+        distance_squared / denominator
     } else {
         0.0
     }
-    
 }

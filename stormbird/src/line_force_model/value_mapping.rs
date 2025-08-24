@@ -82,7 +82,7 @@ impl LineForceModel {
     /// Maps the values at the control points to the values at the span points using linear
     /// interpolation.
     pub fn span_point_values_from_ctrl_point_values<T>(
-        wing_indices: &[Range<usize>],
+        &self,
         ctrl_point_values: &[T],
         extrapolate_ends: bool,
     ) -> Vec<T>
@@ -93,13 +93,13 @@ impl LineForceModel {
             + Copy,
     {   
         let nr_span_lines = ctrl_point_values.len();
-        let nr_wings = wing_indices.len();
+        let nr_wings = self.wing_indices.len();
 
         let mut span_point_values: Vec<T> =
             Vec::with_capacity(nr_span_lines + nr_wings);
 
         for wing_index in 0..nr_wings {
-            let first_index = wing_indices[wing_index].start;
+            let first_index =self.wing_indices[wing_index].start;
 
             // First point is extrapolated
             if extrapolate_ends {
@@ -112,8 +112,8 @@ impl LineForceModel {
             }
 
             // Loop over all span lines in the wing
-            for i in wing_indices[wing_index].clone() {
-                let last_index = wing_indices[wing_index].clone().last().unwrap();
+            for i in self.wing_indices[wing_index].clone() {
+                let last_index = self.wing_indices[wing_index].clone().last().unwrap();
 
                 // Last point is extrapolated, all others are interpolated
                 if i == last_index {

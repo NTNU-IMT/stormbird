@@ -23,6 +23,7 @@ pub mod data_access;
 pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
+pub mod global_geometry_data;
 
 pub mod corrections;
 pub mod prelude;
@@ -51,6 +52,8 @@ pub struct LineForceModel {
     pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
     pub chord_vectors_local: Vec<SpatialVector>,
+    /// The length of the chord vectors, stored as it is needed for several calculations
+    pub chord_lengths: Vec<Float>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
@@ -99,6 +102,7 @@ impl LineForceModel {
         Self {
             span_lines_local: Vec::new(),
             chord_vectors_local: Vec::new(),
+            chord_lengths: Vec::new(),
             section_models: Vec::new(),
             wing_indices: Vec::new(),
             rigid_body_motion: RigidBodyMotion::default(),
@@ -134,6 +138,10 @@ impl LineForceModel {
 
         for chord_vector in &wing.chord_vectors_local {
             self.chord_vectors_local.push(*chord_vector);
+        }
+
+        for chord_length in &wing.chord_lengths {
+            self.chord_lengths.push(*chord_length);
         }
 
         self.section_models.push(wing.section_model.clone());

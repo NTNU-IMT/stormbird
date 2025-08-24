@@ -139,6 +139,7 @@ impl WindEnvironment {
         true_wind
     }
 
+    /// Calculates the apparent wind + any optional corrections to the inflow model
     pub fn effective_wind_velocity_at_ctrl_points(
         &self,
         condition: WindCondition,

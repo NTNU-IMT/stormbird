@@ -159,10 +159,12 @@ impl ActuatorLine {
             
             let solver_result = self.solve(time_step);
 
+            let ctrl_point_acceleration = vec![SpatialVector::default(); self.line_force_model.nr_span_lines()];
+
             let simulation_result = self.line_force_model.calculate_simulation_result(
                 &solver_result, 
+                &ctrl_point_acceleration,
                 time, 
-                time_step
             );
 
             //self.line_force_model.update_flow_derivatives(&result);
@@ -186,7 +188,8 @@ impl ActuatorLine {
                     &self.line_force_model,
                     &simulation_result,
                     &controller.flow_measurement_settings,
-                    &wind_environment
+                    &wind_environment,
+                    false
                 );
                
                 controller.update(time, time_step, &input)
@@ -289,8 +292,9 @@ impl ActuatorLine {
         );
 
         SolverResult {
+            input_ctrl_point_velocity: self.ctrl_points_velocity.clone(),
             circulation_strength,
-            ctrl_point_velocity: corrected_ctrl_points_velocity,
+            output_ctrl_point_velocity: corrected_ctrl_points_velocity,
             iterations: 1,
             residual,
         }

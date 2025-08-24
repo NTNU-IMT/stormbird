@@ -482,7 +482,7 @@ impl StormbirdLiftingLine {
 
     /// Returns the rotation as a vector. If `angles_in_degrees` is set to true, the angles are 
     /// converted to radians.
-    fn rotation_vector(&self) -> SpatialVector<3> {
+    fn rotation_vector(&self) -> SpatialVector {
         if self.parameters.angles_in_degrees {
             SpatialVector([
                 self.rotation_x.to_radians(),
@@ -499,12 +499,12 @@ impl StormbirdLiftingLine {
     }
 
     /// Returns the translation as a vector
-    fn translation_vector(&self) -> SpatialVector<3> {
+    fn translation_vector(&self) -> SpatialVector {
         SpatialVector([self.translation_x, self.translation_y, self.translation_z])
     }
 
     /// Returns the linear motion velocity as a vector
-    fn motion_velocity_linear_vector(&self) -> SpatialVector<3> {
+    fn motion_velocity_linear_vector(&self) -> SpatialVector {
         let mut out = SpatialVector([
             self.motion_velocity_linear_x,
             self.motion_velocity_linear_y,
@@ -526,7 +526,7 @@ impl StormbirdLiftingLine {
     }
 
     /// Returns the angular motion velocity as a vector
-    fn motion_velocity_angular_vector(&self) -> SpatialVector<3> {
+    fn motion_velocity_angular_vector(&self) -> SpatialVector {
         if self.parameters.angles_in_degrees {
             SpatialVector([
                 self.motion_velocity_angular_x.to_radians(),
@@ -565,9 +565,9 @@ impl StormbirdLiftingLine {
 
     /// Function that returns the velocity inflow to the lifting line model. The function combines
     /// the wind velocity and the translational velocity of the model.
-    fn freestream_velocity(&self) -> Vec<SpatialVector<3>> {
+    fn freestream_velocity(&self) -> Vec<SpatialVector> {
         // Collect the relevant points to calculate the wind condition for
-        let freestream_velocity_points: Vec<SpatialVector<3>> =
+        let freestream_velocity_points: Vec<SpatialVector> =
             if let Some(model) = &self.stormbird_model {
                 model.get_freestream_velocity_points()
             } else {
@@ -685,7 +685,8 @@ impl StormbirdLiftingLine {
                     &model.line_force_model,
                     result,
                     &controller.flow_measurement_settings,
-                    environment
+                    environment,
+                    controller.use_input_velocity_for_apparent_wind_direction
                 )
             },
             (Some(model), Some(environment), None) => {
@@ -694,7 +695,8 @@ impl StormbirdLiftingLine {
                     &model.line_force_model,
                     result,
                     &FlowMeasurementSettings::default(),
-                    environment
+                    environment,
+                    false
                 )
             },
             _ => {
@@ -726,7 +728,6 @@ impl StormbirdLiftingLine {
                 angles_of_attack_extended[i] = controller_input.angles_of_attack[i];
                 apparent_wind_directions_extended[i] = controller_input.apparent_wind_directions[i];
             }
-            
         }
 
         self.angle_of_attack_measurement_1  = angles_of_attack_extended[0];

@@ -36,15 +36,25 @@ impl ControllerInput {
         simulation_result: &SimulationResult,
         measurement_settings: &FlowMeasurementSettings,
         wind_environment: &WindEnvironment,
+        use_input_velocity_for_apparent_wind_direction: bool,
     ) -> Self {
         Self {
             loading: loading,
             current_local_wing_angles: line_force_model.local_wing_angles.clone(),
             current_section_models_internal_state: line_force_model.section_models_internal_state(),
-            angles_of_attack: measure_angles_of_attack(simulation_result, &measurement_settings.angle_of_attack),
-            velocity: measure_wind_velocity_magnitude(simulation_result, &measurement_settings.wind_velocity),
+            angles_of_attack: measure_angles_of_attack(
+                simulation_result, 
+                &measurement_settings.angle_of_attack
+            ),
+            velocity: measure_wind_velocity_magnitude(
+                simulation_result, 
+                &measurement_settings.wind_velocity
+            ),
             apparent_wind_directions: measure_apparent_wind_direction(
-                simulation_result, &measurement_settings.wind_direction, wind_environment
+                simulation_result, 
+                &measurement_settings.wind_direction, 
+                wind_environment, 
+                use_input_velocity_for_apparent_wind_direction
             ),
         }
     }

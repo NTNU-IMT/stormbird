@@ -53,6 +53,8 @@ impl Wake {
         )
     }
 
+    /// Calculate the induced velocities from panels on all points, including self-induced 
+    /// velocities
     fn induced_velocities_local_include_self_induced(
         &self, 
         points: &[SpatialVector], 
@@ -61,24 +63,13 @@ impl Wake {
     ) -> Vec<SpatialVector> {
         // Could be par_iter
 
-        let mut results = Vec::with_capacity(points.len());
+        let mut results = vec![SpatialVector::default(); points.len()];
 
-        for point in points {
-            let mut velocity = SpatialVector::default();
-
-            for panel_index in start_index..end_index {
-                velocity += self.induced_velocity_from_panel(panel_index, *point)
+        for panel_index in start_index..end_index {
+            for (point_index, &point) in points.iter().enumerate() {
+                results[point_index] += self.induced_velocity_from_panel(panel_index, point);
             }
-
-            results.push(velocity)
         }
-        
-        /*points.iter()
-        .map(|point| {
-            (start_index..end_index).into_iter().map(|i_panel| {
-                self.induced_velocity_from_panel(i_panel, *point)
-            }).sum()
-        }).collect()*/
 
         results
     }
@@ -89,23 +80,22 @@ impl Wake {
         start_index: usize, 
         end_index: usize, 
     ) -> Vec<SpatialVector> {
-        // Could be par_iter
-        points.iter()
-        .enumerate()
-        .map(|(point_index, point)| {
-            (start_index..end_index).into_iter().map(|i_panel| {
-                let (_stream_index, span_index) = self.indices.reverse_panel_index(i_panel);
+        let mut results = vec![SpatialVector::default(); points.len()];
 
-                let wing_index_panel = self.wing_index(span_index);
+        for i_panel in start_index..end_index {
+            let (_stream_index, span_index) = self.indices.reverse_panel_index(i_panel);
+            let wing_index_panel = self.wing_index(span_index);
+
+            for (point_index, &point) in points.iter().enumerate() {
                 let wing_index_point = self.wing_index(point_index);
 
-                if wing_index_panel == wing_index_point {
-                    SpatialVector::default()
-                } else {
-                    self.induced_velocity_from_panel(i_panel, *point)
+                if wing_index_panel != wing_index_point {
+                    results[point_index] += self.induced_velocity_from_panel(i_panel, point);
                 }
-            }).sum()
-        }).collect()
+            }
+        }
+
+        results
     }
 
     /// Calculates induced velocities from the panels starting at start_index and ending at end_index
@@ -167,29 +157,4 @@ impl Wake {
             self.strengths[panel_index] * unit_velocity
         }
     }
-
-    /// Returns the velocity at all the wake points.
-    ///
-    /// The velocity is calculated as the sum of the freestream velocity and the induced velocity.
-    /// However, if the settings contains and end-index for the induced velocities, the induced
-    /// velocities can be neglected for the last panels. This is useful for speeding up simulations.
-    ///
-    /// # Argument
-    /// * `wake_points_freestream` - A vector containing the freestream velocity at the wake points
-    pub fn velocity_at_wake_points(&self, wake_points_freestream: &[SpatialVector]) -> Vec<SpatialVector> {
-        let mut velocity: Vec<SpatialVector> = wake_points_freestream.to_vec();
-
-        let end_index = self.settings.end_index_induced_velocities_on_wake.min(self.points.len());
-
-        if end_index > 0 && self.number_of_time_steps_completed > 2 {
-            let u_i_calc: Vec<SpatialVector> = self.induced_velocities(&self.points[0..end_index]);
-
-            for i in 0..end_index {
-                velocity[i] += u_i_calc[i];
-            }
-        }
-
-        velocity
-    }
-
 }

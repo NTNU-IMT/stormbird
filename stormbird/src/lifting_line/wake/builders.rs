@@ -12,7 +12,10 @@ use stormath::{
     consts::{PI, MIN_POSITIVE, INFINITY},
 };
 
-use crate::line_force_model::LineForceModel;
+use crate::line_force_model::{
+    LineForceModel,
+    global_geometry_data::GlobalLineForceModelGeometry,
+};
 
 use crate::lifting_line::singularity_elements::prelude::*;
 
@@ -202,6 +205,10 @@ impl WakeBuilder {
 
         let velocity_at_points = vec![SpatialVector::default(); indices.nr_points()];
 
+        let representative_chord_length = line_force_model.chord_lengths.iter()
+            .map(|c| *c)
+            .sum::<Float>() / line_force_model.chord_lengths.len() as Float;
+
         let mut wake = Wake {
             indices,
             points,
@@ -212,11 +219,16 @@ impl WakeBuilder {
             potential_theory_settings,
             wing_indices: line_force_model.wing_indices.clone(),
             number_of_time_steps_completed: 0,
-            panels
+            panels,
+            representative_chord_length,
         };
 
+        let line_force_model_geometry = GlobalLineForceModelGeometry::new(
+            line_force_model
+        );
+
         wake.initialize_based_on_chord_length(
-            line_force_model, 
+            &line_force_model_geometry, 
             self.initial_relative_wake_length
         );
 

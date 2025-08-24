@@ -166,7 +166,7 @@ impl LineForceModel {
         let cl = self.lift_coefficients(&velocity, input_coordinate_system);
 
         (0..velocity.len()).map(|index| {
-            -0.5 * self.chord_vectors_local[index].length() * velocity[index].length() * cl[index]
+            -0.5 * self.chord_lengths[index] * velocity[index].length() * cl[index]
         }).collect()
     }
 
@@ -192,7 +192,7 @@ impl LineForceModel {
                     SectionModel::VaryingFoil(foil) =>
                         foil.drag_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) =>
-                        cylinder.drag_coefficient(self.chord_vectors_local[index].length(), velocity[index].length())
+                        cylinder.drag_coefficient(self.chord_lengths[index], velocity[index].length())
                 }
             }
         ).collect()
@@ -200,18 +200,22 @@ impl LineForceModel {
 
     pub fn sectional_force_input(
         &self, 
-        solver_result: &SolverResult, 
-        _time_step: Float
+        solver_result: &SolverResult,
+        ctrl_point_acceleration: &[SpatialVector]
     ) -> SectionalForcesInput {
-        let angles_of_attack = self.angles_of_attack(&solver_result.ctrl_point_velocity, CoordinateSystem::Global);
+        let angles_of_attack = self.angles_of_attack(
+            &solver_result.output_ctrl_point_velocity, 
+            CoordinateSystem::Global
+        );
 
         let nr_span_lines = self.nr_span_lines();
 
         // TODO: these must be calculated somehow... Must be moved probably
-        let mut acceleration = vec![SpatialVector::default(); nr_span_lines];
-        let mut rotation_velocity = SpatialVector::default(); 
+        let mut acceleration = ctrl_point_acceleration.to_vec();
+        
+        let mut rotation_velocity = self.rigid_body_motion.velocity_angular; 
 
-        let mut velocity = solver_result.ctrl_point_velocity.clone();
+        let mut velocity = solver_result.output_ctrl_point_velocity.clone();
 
         match self.output_coordinate_system {
             CoordinateSystem::Body => {
@@ -279,9 +283,9 @@ impl LineForceModel {
             |index| {
                 let drag_direction = velocity[index].normalize();
 
-                let drag_area = self.chord_vectors_local[index].length() * self.span_lines_local[index].length();
+                let drag_area = self.chord_lengths[index] * self.span_lines_local[index].length();
 
-                let force_factor = 0.5 * drag_area * self.density * velocity[index].length().powi(2);
+                let force_factor = 0.5 * drag_area * self.density * velocity[index].length_squared();
 
                 drag_direction * cd[index] * force_factor
             }
@@ -314,7 +318,7 @@ impl LineForceModel {
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
 
-                let strip_area = chord_vectors[index].length() * span_lines[index].length();
+                let strip_area = self.chord_lengths[index] * span_lines[index].length();
 
                 let mut relevant_acceleration = acceleration[index];
 
@@ -402,10 +406,9 @@ impl LineForceModel {
 
         (0..self.nr_span_lines()).map(
             |i| {
-                let chord = self.chord_vectors_local[i].length();
-                let lift_area = chord * self.span_lines_local[i].length();
+                let lift_area = self.chord_lengths[i] * self.span_lines_local[i].length();
 
-                let force_factor = 0.5 * lift_area * self.density * velocity[i].length().powi(2);
+                let force_factor = 0.5 * lift_area * self.density * velocity[i].length_squared();
 
                 cl[i] * force_factor
             }
@@ -422,16 +425,15 @@ impl LineForceModel {
         let lift_coefficients = self.lift_coefficients(velocity, input_coordinate_system);
 
         (0..self.nr_span_lines()).map(|i_span| {
-            let chord = self.chord_vectors_local[i_span].length();
-                let lift_area = chord * self.span_lines_local[i_span].length();
+            let lift_area = self.chord_lengths[i_span] * self.span_lines_local[i_span].length();
 
-                let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length().powi(2);
+            let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length_squared();
 
-                if force_factor == 0.0 {
-                    return 0.0;
-                }
+            if force_factor == 0.0 {
+                return 0.0;
+            }
 
-                circulation_lift[i_span] / force_factor - lift_coefficients[i_span]
+            circulation_lift[i_span] / force_factor - lift_coefficients[i_span]
         }).collect()
     }
 
@@ -470,10 +472,10 @@ impl LineForceModel {
     pub fn calculate_simulation_result(
         &self, 
         solver_result: &SolverResult,
+        ctrl_point_acceleration: &[SpatialVector],
         time: Float,
-        time_step: Float
     ) -> SimulationResult {
-        let force_input = self.sectional_force_input(&solver_result, time_step);
+        let force_input = self.sectional_force_input(&solver_result, ctrl_point_acceleration);
 
         let ctrl_points = self.ctrl_points();
         let sectional_forces   = self.sectional_forces(&force_input);
@@ -483,6 +485,7 @@ impl LineForceModel {
         SimulationResult {
             time,
             ctrl_points,
+            solver_input_ctrl_point_velocity: solver_result.input_ctrl_point_velocity.clone(),
             force_input,
             sectional_forces,
             integrated_forces,
