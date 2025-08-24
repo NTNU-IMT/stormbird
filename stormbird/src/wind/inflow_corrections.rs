@@ -16,7 +16,7 @@ impl InflowCorrectionSingleSail {
         &self,
         non_dimensional_span_distance: Float,
         velocity: SpatialVector, 
-        up_vector: SpatialVector
+        up_direction: SpatialVector
     ) -> SpatialVector {
         let wake_factor_magnitude = linear_interpolation(
             non_dimensional_span_distance, 
@@ -32,7 +32,7 @@ impl InflowCorrectionSingleSail {
 
         (velocity * (1.0 - wake_factor_magnitude)).rotate_around_axis(
             angle_correction, 
-            up_vector
+            up_direction
         )
 
     }
@@ -40,5 +40,18 @@ impl InflowCorrectionSingleSail {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InflowCorrections {
-    pub corrections_for_each_sail: Vec<InflowCorrectionSingleSail>,
+    pub individual_corrections: Vec<InflowCorrectionSingleSail>,
+}
+
+impl InflowCorrections {
+    pub fn correct_velocity(
+        &self,
+        wing_index: usize,
+        non_dimensional_span_distance: Float,
+        velocity: SpatialVector,
+        up_direction: SpatialVector
+    ) -> SpatialVector {
+        self.individual_corrections[wing_index]
+            .correct_velocity(non_dimensional_span_distance, velocity, up_direction)
+    }
 }

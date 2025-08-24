@@ -102,6 +102,78 @@ pub struct StormbirdLiftingLine {
     pub moment_x: f64,
     pub moment_y: f64,
     pub moment_z: f64,
+
+    /// Individual sail forces
+    pub force_sail_1_x: f64,
+    pub force_sail_1_y: f64,
+    pub force_sail_1_z: f64,
+    pub moment_sail_1_x: f64,
+    pub moment_sail_1_y: f64,
+    pub moment_sail_1_z: f64,
+
+    pub force_sail_2_x: f64,
+    pub force_sail_2_y: f64,
+    pub force_sail_2_z: f64,
+    pub moment_sail_2_x: f64,
+    pub moment_sail_2_y: f64,
+    pub moment_sail_2_z: f64,
+
+    pub force_sail_3_x: f64,
+    pub force_sail_3_y: f64,
+    pub force_sail_3_z: f64,
+    pub moment_sail_3_x: f64,
+    pub moment_sail_3_y: f64,
+    pub moment_sail_3_z: f64,
+
+    pub force_sail_4_x: f64,
+    pub force_sail_4_y: f64,
+    pub force_sail_4_z: f64,
+    pub moment_sail_4_x: f64,
+    pub moment_sail_4_y: f64,
+    pub moment_sail_4_z: f64,
+
+    pub force_sail_5_x: f64,
+    pub force_sail_5_y: f64,
+    pub force_sail_5_z: f64,
+    pub moment_sail_5_x: f64,
+    pub moment_sail_5_y: f64,
+    pub moment_sail_5_z: f64,
+
+    pub force_sail_6_x: f64,
+    pub force_sail_6_y: f64,
+    pub force_sail_6_z: f64,
+    pub moment_sail_6_x: f64,
+    pub moment_sail_6_y: f64,
+    pub moment_sail_6_z: f64,
+
+    pub force_sail_7_x: f64,
+    pub force_sail_7_y: f64,
+    pub force_sail_7_z: f64,
+    pub moment_sail_7_x: f64,
+    pub moment_sail_7_y: f64,
+    pub moment_sail_7_z: f64,
+
+    pub force_sail_8_x: f64,
+    pub force_sail_8_y: f64,
+    pub force_sail_8_z: f64,
+    pub moment_sail_8_x: f64,
+    pub moment_sail_8_y: f64,
+    pub moment_sail_8_z: f64,
+
+    pub force_sail_9_x: f64,
+    pub force_sail_9_y: f64,
+    pub force_sail_9_z: f64,
+    pub moment_sail_9_x: f64,
+    pub moment_sail_9_y: f64,
+    pub moment_sail_9_z: f64,
+
+    pub force_sail_10_x: f64,
+    pub force_sail_10_y: f64,
+    pub force_sail_10_z: f64,
+    pub moment_sail_10_x: f64,
+    pub moment_sail_10_y: f64,
+    pub moment_sail_10_z: f64,
+
     /// Measurements of the effective angle of attack at different wings. Max 10 as output in the 
     /// FMU
     pub angle_of_attack_measurement_1: f64,
@@ -588,11 +660,24 @@ impl StormbirdLiftingLine {
         };
 
         let out = if let Some(env) = &self.wind_environment {
-            env.apparent_wind_velocity_vectors_at_locations(
+            let mut freestream_velocity = env.apparent_wind_velocity_vectors_at_locations(
                 wind_condition, 
                 &freestream_velocity_points,
                 linear_velocity
-            )
+            );
+
+            if let Some(model) = &self.stormbird_model {
+                let non_dimensional_span_distances = model.line_force_model.span_distance_in_local_coordinates();
+                let wing_indices = model.line_force_model.wing_indices.clone();
+                env.apply_inflow_corrections(
+                    &mut freestream_velocity,
+                    &non_dimensional_span_distances,
+                    wing_indices
+                );
+            }
+
+            freestream_velocity
+            
         } else {
             panic!("Wind environment is not defined!")
         };
@@ -675,6 +760,94 @@ impl StormbirdLiftingLine {
         self.moment_x = integrated_moments[0];
         self.moment_y = integrated_moments[1];
         self.moment_z = integrated_moments[2];
+
+        let mut individual_force_x_raw = vec![0.0; 10];
+        let mut individual_force_y_raw = vec![0.0; 10];
+        let mut individual_force_z_raw = vec![0.0; 10];
+
+        let mut individual_moment_x_raw = vec![0.0; 10];
+        let mut individual_moment_y_raw = vec![0.0; 10];
+        let mut individual_moment_z_raw = vec![0.0; 10];
+
+        for i in 0..10 {
+            individual_force_x_raw[i] = result.integrated_forces[i].total[0];
+            individual_force_y_raw[i] = result.integrated_forces[i].total[1];
+            individual_force_z_raw[i] = result.integrated_forces[i].total[2];
+
+            individual_moment_x_raw[i] = result.integrated_moments[i].total[0];
+            individual_moment_y_raw[i] = result.integrated_moments[i].total[1];
+            individual_moment_z_raw[i] = result.integrated_moments[i].total[2];
+        }
+
+        self.force_sail_1_x = individual_force_x_raw[0];
+        self.force_sail_1_y = individual_force_y_raw[0];
+        self.force_sail_1_z = individual_force_z_raw[0];
+        self.moment_sail_1_x = individual_moment_x_raw[0];
+        self.moment_sail_1_y = individual_moment_y_raw[0];
+        self.moment_sail_1_z = individual_moment_z_raw[0];
+
+        self.force_sail_2_x = individual_force_x_raw[1];
+        self.force_sail_2_y = individual_force_y_raw[1];
+        self.force_sail_2_z = individual_force_z_raw[1];
+        self.moment_sail_2_x = individual_moment_x_raw[1];
+        self.moment_sail_2_y = individual_moment_y_raw[1];
+        self.moment_sail_2_z = individual_moment_z_raw[1];
+
+        self.force_sail_3_x = individual_force_x_raw[2];
+        self.force_sail_3_y = individual_force_y_raw[2];
+        self.force_sail_3_z = individual_force_z_raw[2];
+        self.moment_sail_3_x = individual_moment_x_raw[2];
+        self.moment_sail_3_y = individual_moment_y_raw[2];
+        self.moment_sail_3_z = individual_moment_z_raw[2];
+
+        self.force_sail_4_x = individual_force_x_raw[3];
+        self.force_sail_4_y = individual_force_y_raw[3];
+        self.force_sail_4_z = individual_force_z_raw[3];
+        self.moment_sail_4_x = individual_moment_x_raw[3];
+        self.moment_sail_4_y = individual_moment_y_raw[3];
+        self.moment_sail_4_z = individual_moment_z_raw[3];
+
+        self.force_sail_5_x = individual_force_x_raw[4];
+        self.force_sail_5_y = individual_force_y_raw[4];
+        self.force_sail_5_z = individual_force_z_raw[4];
+        self.moment_sail_5_x = individual_moment_x_raw[4];
+        self.moment_sail_5_y = individual_moment_y_raw[4];
+        self.moment_sail_5_z = individual_moment_z_raw[4];
+
+        self.force_sail_6_x = individual_force_x_raw[5];
+        self.force_sail_6_y = individual_force_y_raw[5];
+        self.force_sail_6_z = individual_force_z_raw[5];
+        self.moment_sail_6_x = individual_moment_x_raw[5];
+        self.moment_sail_6_y = individual_moment_y_raw[5];
+        self.moment_sail_6_z = individual_moment_z_raw[5];
+
+        self.force_sail_7_x = individual_force_x_raw[6];
+        self.force_sail_7_y = individual_force_y_raw[6];
+        self.force_sail_7_z = individual_force_z_raw[6];
+        self.moment_sail_7_x = individual_moment_x_raw[6];
+        self.moment_sail_7_y = individual_moment_y_raw[6];
+        self.moment_sail_7_z = individual_moment_z_raw[6];
+
+        self.force_sail_8_x = individual_force_x_raw[7];
+        self.force_sail_8_y = individual_force_y_raw[7];
+        self.force_sail_8_z = individual_force_z_raw[7];
+        self.moment_sail_8_x = individual_moment_x_raw[7];
+        self.moment_sail_8_y = individual_moment_y_raw[7];
+        self.moment_sail_8_z = individual_moment_z_raw[7];
+
+        self.force_sail_9_x = individual_force_x_raw[8];
+        self.force_sail_9_y = individual_force_y_raw[8];
+        self.force_sail_9_z = individual_force_z_raw[8];
+        self.moment_sail_9_x = individual_moment_x_raw[8];
+        self.moment_sail_9_y = individual_moment_y_raw[8];
+        self.moment_sail_9_z = individual_moment_z_raw[8];
+
+        self.force_sail_10_x = individual_force_x_raw[9];
+        self.force_sail_10_y = individual_force_y_raw[9];
+        self.force_sail_10_z = individual_force_z_raw[9];
+        self.moment_sail_10_x = individual_moment_x_raw[9];
+        self.moment_sail_10_y = individual_moment_y_raw[9];
+        self.moment_sail_10_z = individual_moment_z_raw[9];
     }
 
     fn controller_input(&self, result: &SimulationResult) -> ControllerInput {

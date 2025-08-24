@@ -16,6 +16,7 @@ use serde_json;
 use crate::error::Error;
 
 use super::height_variation::HeightVariationModel;
+use super::inflow_corrections::InflowCorrections;
 
 #[derive(Debug, Clone, Copy)]
 pub struct WindCondition {
@@ -36,6 +37,8 @@ pub struct WindEnvironment {
     pub zero_direction_vector: SpatialVector,
     #[serde(default)]
     pub water_plane_height: Float,
+    #[serde(default)]
+    pub inflow_corrections: Option<InflowCorrections>,
 }
 
 impl Default for WindEnvironment {
@@ -44,7 +47,8 @@ impl Default for WindEnvironment {
             height_variation_model: None,
             up_direction: Self::default_up_direction(),
             zero_direction_vector: Self::default_zero_direction_vector(),
-            water_plane_height: 0.0
+            water_plane_height: 0.0,
+            inflow_corrections: None
         }
     }
 }
@@ -139,16 +143,27 @@ impl WindEnvironment {
         true_wind
     }
 
-    /// Calculates the apparent wind + any optional corrections to the inflow model
-    pub fn effective_wind_velocity_at_ctrl_points(
+    /// Applies inflow corrections to the first points in the input freestream velocity
+    pub fn apply_inflow_corrections(
         &self,
-        condition: WindCondition,
-        ctrl_points: &[SpatialVector],
+        freestream_velocity: &mut [SpatialVector],
         non_dimensional_span_distances: &[Float],
-        linear_velocity: SpatialVector,
-        wing_indices: Vec<Range<usize>>,
-    ) -> Vec<SpatialVector> {
-        todo!()
+        wing_indices_vector: Vec<Range<usize>>,
+    ) {
+        if let Some(corrections) = &self.inflow_corrections {
+            for wing_index in 0..wing_indices_vector.len() {
+                let wing_indices = wing_indices_vector[wing_index].clone();
+
+                for i in wing_indices.start..wing_indices.end {
+                    freestream_velocity[i] = corrections.correct_velocity(
+                        wing_index, 
+                        non_dimensional_span_distances[i], 
+                        freestream_velocity[i], 
+                        self.up_direction
+                    )
+                }
+            }
+        }
     }
 }
 
