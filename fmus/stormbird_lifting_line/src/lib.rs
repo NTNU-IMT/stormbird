@@ -17,9 +17,9 @@ use stormbird::common_utils::results::simulation::SimulationResult;
 use stormbird::lifting_line::simulation::Simulation;
 use stormbird::lifting_line::simulation_builder::SimulationBuilder;
 
-use stormbird::wind::environment::{
-    WindEnvironment,
-    WindCondition
+use stormbird::wind::{
+    environment::WindEnvironment,
+    wind_condition::WindCondition
 };
 
 use stormbird::controllers::{
@@ -29,6 +29,8 @@ use stormbird::controllers::{
     output::ControllerOutput,
     measurements::FlowMeasurementSettings
 };
+
+use stormbird::extra_force_models::blendermann_superstructre_forces::BlendermannSuperstructureForces;
 
 use fmu_from_struct::FmuInfo;
 
@@ -174,6 +176,13 @@ pub struct StormbirdLiftingLine {
     pub moment_sail_10_y: f64,
     pub moment_sail_10_z: f64,
 
+    pub superstructure_force_x: f64,
+    pub superstructure_force_y: f64,
+    pub superstructure_force_z: f64,
+    pub superstructure_moment_x: f64,
+    pub superstructure_moment_y: f64,
+    pub superstructure_moment_z: f64,
+
     /// Measurements of the effective angle of attack at different wings. Max 10 as output in the 
     /// FMU
     pub angle_of_attack_measurement_1: f64,
@@ -243,7 +252,8 @@ pub struct StormbirdLiftingLine {
     wind_environment: Option<WindEnvironment>,
     controller: Option<Controller>,
     input_filters: Option<InputFilters>,
-    time_model_scaling: Option<ModelScaling>
+    time_model_scaling: Option<ModelScaling>,
+    superstructure_force_model: Option<BlendermannSuperstructureForces>,
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
@@ -648,7 +658,7 @@ impl StormbirdLiftingLine {
         
         // Get the wind field from the wind environment, based on the wind condition
         let wind_condition = WindCondition {
-            reference_velocity: self.wind_velocity,
+            velocity: self.wind_velocity,
             direction_coming_from: self.wind_direction()
         };
 
@@ -749,17 +759,67 @@ impl StormbirdLiftingLine {
         section_models_internal_state
     }
 
+    fn superstructure_force_and_moment(&self) -> (SpatialVector, SpatialVector) {
+        if let Some(model) = &self.superstructure_force_model {
+            let representative_height = 10.0; // TODO: figure out where to put this variable
+
+            // Get the wind field from the wind environment, based on the wind condition
+            let true_wind_condition = WindCondition {
+                velocity: self.wind_velocity,
+                direction_coming_from: self.wind_direction()
+            };
+
+            // Apply the linear motion of the ship to the freestream
+            let linear_velocity =  -1.0 * self.motion_velocity_linear_vector();
+
+            // TODO: what to do with the angular motion?
+
+            let apparent_wind_vector = if let Some(env) = &self.wind_environment {
+                let locations = vec![representative_height * env.up_direction];
+
+                env.apparent_wind_velocity_vectors_at_locations(
+                    true_wind_condition,
+                    &locations,
+                    linear_velocity
+                )[0]
+            } else {
+                panic!("Wind environment is not defined!")
+            };
+
+            let apparent_wind_condition = WindCondition::from_velocity_vector_assuming_ned(
+                apparent_wind_vector
+            );
+
+            let force = model.body_fixed_force(apparent_wind_condition);
+            let moment = model.body_fixed_force(apparent_wind_condition);
+
+            (force, moment)
+        } else {
+            (SpatialVector::default(), SpatialVector::default())
+        }
+    }
+
     fn set_force_output(&mut self, result: &SimulationResult) {
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
-        self.force_x = integrated_forces[0];
-        self.force_y = integrated_forces[1];
-        self.force_z = integrated_forces[2];
+        let (superstructure_force, superstructure_moment) = self.superstructure_force_and_moment();
 
-        self.moment_x = integrated_moments[0];
-        self.moment_y = integrated_moments[1];
-        self.moment_z = integrated_moments[2];
+        self.force_x = integrated_forces[0] + superstructure_force[0];
+        self.force_y = integrated_forces[1] + superstructure_force[1];
+        self.force_z = integrated_forces[2] + superstructure_force[2];
+
+        self.moment_x = integrated_moments[0] + superstructure_moment[0];
+        self.moment_y = integrated_moments[1] + superstructure_moment[1];
+        self.moment_z = integrated_moments[2] + superstructure_moment[2];
+
+        self.superstructure_force_x = superstructure_force[0];
+        self.superstructure_force_y = superstructure_force[1];
+        self.superstructure_force_z = superstructure_force[2];
+
+        self.superstructure_moment_x = superstructure_moment[0];
+        self.superstructure_moment_y = superstructure_moment[1];
+        self.superstructure_moment_z = superstructure_moment[2];
 
         let mut individual_force_x_raw = vec![0.0; 10];
         let mut individual_force_y_raw = vec![0.0; 10];
@@ -946,6 +1006,5 @@ impl StormbirdLiftingLine {
         self.controller_section_models_internal_state_8  = section_models_internal_state[7];
         self.controller_section_models_internal_state_9  = section_models_internal_state[8];
         self.controller_section_models_internal_state_10 = section_models_internal_state[9];
-
     }
 }

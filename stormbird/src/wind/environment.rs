@@ -17,12 +17,7 @@ use crate::error::Error;
 
 use super::height_variation::HeightVariationModel;
 use super::inflow_corrections::InflowCorrections;
-
-#[derive(Debug, Clone, Copy)]
-pub struct WindCondition {
-    pub reference_velocity: Float,
-    pub direction_coming_from: Float,
-}
+use super::wind_condition::WindCondition;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -81,7 +76,7 @@ impl WindEnvironment {
             1.0
         };
 
-        increase_factor * condition.reference_velocity
+        increase_factor * condition.velocity
     }
 
     /// Computes the height of the input location and then the true wind velocity at this height
@@ -164,6 +159,65 @@ impl WindEnvironment {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_true_wind_velocity_vectors() {
+        let wind_environment = WindEnvironment::default();
+        let location = SpatialVector::new(0.0, 0.0, 10.0);
+
+        let wind_velocity = 8.2;
+
+        let north_wind_condition = WindCondition{
+            velocity: wind_velocity,
+            direction_coming_from: 0.0
+        };
+
+        let east_wind_condition = WindCondition{
+            velocity: wind_velocity,
+            direction_coming_from: Float::from(90.0).to_radians()
+        };
+
+        let west_wind_condition = WindCondition{
+            velocity: wind_velocity,
+            direction_coming_from: Float::from(-90.0).to_radians()
+        };
+
+        let south_wind_condition = WindCondition{
+            velocity: wind_velocity,
+            direction_coming_from: Float::from(180.0).to_radians()
+        };
+
+        let north_vector = wind_environment.true_wind_velocity_vector_at_location(
+            north_wind_condition, location
+        );
+
+        let east_vector = wind_environment.true_wind_velocity_vector_at_location(
+            east_wind_condition, location
+        );
+
+        let west_vector = wind_environment.true_wind_velocity_vector_at_location(
+            west_wind_condition, location
+        );
+
+        let south_vector = wind_environment.true_wind_velocity_vector_at_location(
+            south_wind_condition, location
+        );
+
+        assert!(north_vector[0] < 0.0);
+        assert!(east_vector[1] < 0.0);
+        assert!(west_vector[1] > 0.0);
+        assert!(south_vector[0] > 0.0);
+
+        dbg!(north_vector);
+        dbg!(east_vector);
+        dbg!(west_vector);
+        dbg!(south_vector);
     }
 }
 

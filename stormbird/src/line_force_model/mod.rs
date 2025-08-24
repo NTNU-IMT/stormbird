@@ -69,7 +69,7 @@ pub struct LineForceModel {
     /// simulation and in cases where smoothing is applied to the circulation.
     /// The vector is structured as follows:
     /// - The first index is the wing index
-    /// - The second index is the end index, where 0 means that start of the wind and 1 means the ¨
+    /// - The second index is the end index, where 0 means that start of the wing and 1 means the
     /// end
     /// - When the boolean is false, the circulation is set to zero at the end, and when it is true,
     ///  the circulation is assumed to be non-zero.
