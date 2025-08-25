@@ -21,6 +21,8 @@ pub struct FmuParameters {
     /// Path to the JSON file describing the controller, if used
     pub controller_setup_file_path: String,
     #[serde(default)]
+    pub superstructure_force_setup_path: String,
+    #[serde(default)]
     /// Switch to specify if angles is given in degrees or radians.
     pub angles_in_degrees: bool,
     #[serde(default)]

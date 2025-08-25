@@ -10,6 +10,8 @@ use stormath::{
 
 use crate::wind::wind_condition::WindCondition;
 
+use crate::error::Error;
+
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,6 +52,18 @@ impl BlendermannSuperstructureForces {
     fn default_coupling_factor() -> Float {0.55}
     fn default_non_dim_yaw_arm_correction() -> Float {0.0}
     fn default_air_density() -> Float {1.225}
+
+    pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(json_string)?;
+        
+        Ok(serde_res)
+    }
+
+    pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
+        let json_string = std::fs::read_to_string(file_path)?;
+        
+        Self::from_json_string(&json_string)
+    }
 
     pub fn body_fixed_force(&self, apparent_wind: WindCondition) -> SpatialVector {
         SpatialVector::new(

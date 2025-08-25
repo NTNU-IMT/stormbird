@@ -5,6 +5,7 @@
 mod input_filters;
 mod parameters;
 mod model_scaling;
+mod setup;
 
 use std::f64::consts::PI;
 use std::path::PathBuf;
@@ -263,6 +264,7 @@ impl FmuFunctions for StormbirdLiftingLine {
         self.build_controller();
         self.build_filters();
         self.build_lifting_line_model();
+        self.build_superstructure_force_model();
 
         if self.time_model_scale > 0.0 {
             self.time_model_scaling = Some(
@@ -314,121 +316,6 @@ impl FmuFunctions for StormbirdLiftingLine {
 }
 
 impl StormbirdLiftingLine {
-    /// Function that checks if the parameters file path is set, and if not, sets the default path
-    /// to the resource directory of the FMU. 
-    fn parameters_path(&self) -> PathBuf {
-        let parameters_path: PathBuf = if self.parameters_path.is_empty() {
-            let mut path = self.fmu_info.resource_path.clone();
-
-            path.push("parameters.json");
-
-            path
-        } else {
-            PathBuf::from(&self.parameters_path)
-        };
-
-        parameters_path
-    }
-
-    /// Function that reads the parameters from the parameters file.
-    fn read_parameters(&mut self) {
-        let parameters_path = self.parameters_path();
-
-        let parameters = FmuParameters::from_json_file(&parameters_path);
-
-        match parameters {
-            Ok(parameters) => {
-                self.parameters = parameters;
-            },
-            Err(e) => {
-                println!("Error reading parameters file: {}", e);
-            }
-        }
-    }
-
-    /// Builds the sail model using the lifting liner setup file
-    fn build_lifting_line_model(&mut self) {
-        let mut setup_path = self.parameters_path();
-        setup_path.pop();
-        setup_path.push(self.parameters.lifting_line_setup_file_path.clone());
-
-        let stormbird_model_builder =
-            SimulationBuilder::new_from_file(&setup_path.to_string_lossy());
-
-        match stormbird_model_builder {
-            Ok(builder) => {
-                self.stormbird_model = Some(builder.build());
-            },
-            Err(e) => {
-                println!(
-                    "Error reading lifting line setup file from path: {}. Error: {}", 
-                    &setup_path.to_string_lossy(), 
-                    e
-                );
-            }
-        }
-    }
-
-    /// Builds filters for the input
-    fn build_filters(&mut self) {
-        if self.parameters.input_moving_average_window_size > 0 {
-            self.input_filters = Some(
-                InputFilters::new(self.parameters.input_moving_average_window_size)
-            );
-        }
-    }
-
-    /// Builds a wind environment model
-    fn build_wind_model(&mut self) {
-        if !self.parameters.wind_environment_setup_file_path.is_empty() {
-            let mut setup_path = self.parameters_path();
-            setup_path.pop();
-            setup_path.push(self.parameters.wind_environment_setup_file_path.clone());
-
-            let environment = WindEnvironment::from_json_file(&setup_path.to_string_lossy());
-
-            match environment {
-                Ok(env) => {
-                    self.wind_environment = Some(env);
-                },
-                Err(e) => {
-                    println!(
-                        "Error reading wind environment setup file from path: {}. Error: {}", 
-                        &self.parameters.wind_environment_setup_file_path, 
-                        e
-                    );
-                }
-            }
-        } else {
-            self.wind_environment = Some(WindEnvironment::default());
-        }
-    }
-
-    fn build_controller(&mut self) {
-        if !self.parameters.controller_setup_file_path.is_empty() {
-            let mut setup_path = self.parameters_path();
-            setup_path.pop();
-            setup_path.push(self.parameters.controller_setup_file_path.clone());
-            
-            let controller_builder = ControllerBuilder::from_json_file(
-                &setup_path.to_string_lossy()
-            );
-
-            match controller_builder {
-                Ok(builder) => {
-                    self.controller = Some(builder.build());
-                },
-                Err(e) => {
-                    println!(
-                        "Error reading controller setup file from path: {}. Error: {}", 
-                        &self.parameters.controller_setup_file_path, 
-                        e
-                    );
-                }
-            }
-        }
-    }
-
     fn apply_controller(
         &mut self,
         current_time: f64, 
@@ -480,6 +367,7 @@ impl StormbirdLiftingLine {
         }
 
         if let Some(model) = &mut self.stormbird_model {
+            // Apply translation, and compute the velocity using finite difference
             model
                 .line_force_model
                 .rigid_body_motion
@@ -487,7 +375,8 @@ impl StormbirdLiftingLine {
                     translation,
                     time_step
                 );
-
+            
+            // Apply rotation, and compute the velocity using finite difference
             model
                 .line_force_model
                 .rigid_body_motion
@@ -495,7 +384,8 @@ impl StormbirdLiftingLine {
                     rotation,
                     time_step
                 );
-
+            
+            // Set the computed velocity to the outputs
             self.calculated_motion_velocity_linear_x = model.line_force_model.rigid_body_motion.velocity_linear[0];
             self.calculated_motion_velocity_linear_y = model.line_force_model.rigid_body_motion.velocity_linear[1];
             self.calculated_motion_velocity_linear_z = model.line_force_model.rigid_body_motion.velocity_linear[2];
@@ -503,6 +393,7 @@ impl StormbirdLiftingLine {
             self.calculated_motion_velocity_angular_y = model.line_force_model.rigid_body_motion.velocity_angular[1];
             self.calculated_motion_velocity_angular_z = model.line_force_model.rigid_body_motion.velocity_angular[2];
 
+            // Override the computed velocities if motion velocity is used
             if self.parameters.use_motion_velocity {
                 model.line_force_model.rigid_body_motion.velocity_angular = motion_velocity_angular;
                 
