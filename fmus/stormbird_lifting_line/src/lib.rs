@@ -720,7 +720,7 @@ impl StormbirdLiftingLine {
         let mut individual_moment_y_raw = vec![0.0; 10];
         let mut individual_moment_z_raw = vec![0.0; 10];
 
-        for i in 0..10 {
+        for i in 0..result.nr_of_wings() {
             individual_force_x_raw[i] = result.integrated_forces[i].total[0];
             individual_force_y_raw[i] = result.integrated_forces[i].total[1];
             individual_force_z_raw[i] = result.integrated_forces[i].total[2];

@@ -61,8 +61,6 @@ impl Wake {
         start_index: usize, 
         end_index: usize
     ) -> Vec<SpatialVector> {
-        // Could be par_iter
-
         let mut results = vec![SpatialVector::default(); points.len()];
 
         for panel_index in start_index..end_index {
