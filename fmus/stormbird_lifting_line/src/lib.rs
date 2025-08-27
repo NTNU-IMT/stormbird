@@ -712,13 +712,13 @@ impl StormbirdLiftingLine {
         self.superstructure_moment_y = superstructure_moment[1];
         self.superstructure_moment_z = superstructure_moment[2];
 
-        let mut individual_force_x_raw = vec![0.0; 10];
-        let mut individual_force_y_raw = vec![0.0; 10];
-        let mut individual_force_z_raw = vec![0.0; 10];
+        let mut individual_force_x_raw = [0.0; 10];
+        let mut individual_force_y_raw = [0.0; 10];
+        let mut individual_force_z_raw = [0.0; 10];
 
-        let mut individual_moment_x_raw = vec![0.0; 10];
-        let mut individual_moment_y_raw = vec![0.0; 10];
-        let mut individual_moment_z_raw = vec![0.0; 10];
+        let mut individual_moment_x_raw = [0.0; 10];
+        let mut individual_moment_y_raw = [0.0; 10];
+        let mut individual_moment_z_raw = [0.0; 10];
 
         for i in 0..result.nr_of_wings() {
             individual_force_x_raw[i] = result.integrated_forces[i].total[0];
