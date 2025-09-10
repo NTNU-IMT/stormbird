@@ -292,10 +292,26 @@ impl FmuFunctions for StormbirdLiftingLine {
 
             let freestream_velocity = self.freestream_velocity();
 
+            let mut non_zero_input = false;
+
+            for i in 0..freestream_velocity.len() {
+                if freestream_velocity[i].length_squared() > 0.0 {
+                    non_zero_input = true;
+                    break;
+                }
+            }
+
             let result = if let Some(model) = &mut self.stormbird_model {
-                Some(
-                    model.do_step(current_time, time_step, &freestream_velocity)
-                )
+                if non_zero_input {
+                    Some(
+                        model.do_step(current_time, time_step, &freestream_velocity)
+                    )
+                } else {
+                    self.set_zero_force_output();
+                    
+                    None
+                }
+                
             } else {
                 None
             };
@@ -688,6 +704,94 @@ impl StormbirdLiftingLine {
         } else {
             (SpatialVector::default(), SpatialVector::default())
         }
+    }
+
+    fn set_zero_force_output(&mut self) {
+        self.force_x = 0.0;
+        self.force_y = 0.0;
+        self.force_z = 0.0;
+
+        self.moment_x = 0.0;
+        self.moment_y = 0.0;
+        self.moment_z = 0.0;
+
+        self.superstructure_force_x = 0.0;
+        self.superstructure_force_y = 0.0;
+        self.superstructure_force_z = 0.0;
+
+        self.superstructure_moment_x = 0.0;
+        self.superstructure_moment_y = 0.0;
+        self.superstructure_moment_z = 0.0;
+
+        self.force_sail_1_x = 0.0;
+        self.force_sail_1_y = 0.0;
+        self.force_sail_1_z = 0.0;
+        self.moment_sail_1_x = 0.0;
+        self.moment_sail_1_y = 0.0;
+        self.moment_sail_1_z = 0.0;
+
+        self.force_sail_2_x = 0.0;
+        self.force_sail_2_y = 0.0;
+        self.force_sail_2_z = 0.0;
+        self.moment_sail_2_x = 0.0;
+        self.moment_sail_2_y = 0.0;
+        self.moment_sail_2_z = 0.0;
+
+        self.force_sail_3_x = 0.0;
+        self.force_sail_3_y = 0.0;
+        self.force_sail_3_z = 0.0;
+        self.moment_sail_3_x = 0.0;
+        self.moment_sail_3_y = 0.0;
+        self.moment_sail_3_z = 0.0;
+
+        self.force_sail_4_x = 0.0;
+        self.force_sail_4_y = 0.0;
+        self.force_sail_4_z = 0.0;
+        self.moment_sail_4_x = 0.0;
+        self.moment_sail_4_y = 0.0;
+        self.moment_sail_4_z = 0.0;
+
+        self.force_sail_5_x = 0.0;
+        self.force_sail_5_y = 0.0;
+        self.force_sail_5_z = 0.0;
+        self.moment_sail_5_x = 0.0;
+        self.moment_sail_5_y = 0.0;
+        self.moment_sail_5_z = 0.0;
+
+        self.force_sail_6_x = 0.0;
+        self.force_sail_6_y = 0.0;
+        self.force_sail_6_z = 0.0;
+        self.moment_sail_6_x = 0.0;
+        self.moment_sail_6_y = 0.0;
+        self.moment_sail_6_z = 0.0;
+
+        self.force_sail_7_x = 0.0;
+        self.force_sail_7_y = 0.0;
+        self.force_sail_7_z = 0.0;
+        self.moment_sail_7_x = 0.0;
+        self.moment_sail_7_y = 0.0;
+        self.moment_sail_7_z = 0.0;
+
+        self.force_sail_8_x = 0.0;
+        self.force_sail_8_y = 0.0;
+        self.force_sail_8_z = 0.0;
+        self.moment_sail_8_x = 0.0;
+        self.moment_sail_8_y = 0.0;
+        self.moment_sail_8_z = 0.0;
+
+        self.force_sail_9_x = 0.0;
+        self.force_sail_9_y = 0.0;
+        self.force_sail_9_z = 0.0;
+        self.moment_sail_9_x = 0.0;
+        self.moment_sail_9_y = 0.0;
+        self.moment_sail_9_z = 0.0;
+
+        self.force_sail_10_x = 0.0;
+        self.force_sail_10_y = 0.0;
+        self.force_sail_10_z = 0.0;
+        self.moment_sail_10_x = 0.0;
+        self.moment_sail_10_y = 0.0;
+        self.moment_sail_10_z = 0.0;
     }
 
     fn set_force_output(&mut self, result: &SimulationResult) {
