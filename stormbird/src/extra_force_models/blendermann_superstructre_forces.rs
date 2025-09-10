@@ -3,7 +3,6 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use stormath::{
-    consts::PI, 
     spatial_vector::SpatialVector, 
     type_aliases::Float
 };
@@ -18,39 +17,29 @@ use serde::{Serialize, Deserialize};
 #[serde(deny_unknown_fields)]
 /// Parametric model for wind loads on a ship superstructure.
 ///
-/// Based on the "Blendermann model".
+/// Forces are based on the "Blendermann model". The moment formulation is slightly simplified, and 
+/// computed from the forces and the specified center of effort.
 /// Source: W. Blendermann, 1994, Parameter identification of wind loads on ships,
 /// Journal of Wind Engineering and Industrial Aerodynamics, 51, 339-351.
 /// Link: https://www.sciencedirect.com/science/article/pii/0167610594900671
 pub struct BlendermannSuperstructureForces {
     pub frontal_area: Float,
     pub side_area: Float,
-    pub ship_length: Float,
+    pub center_of_effort: SpatialVector,
     #[serde(default="BlendermannSuperstructureForces::default_resistance_coefficient")]
     pub resistance_coefficient: Float,
     #[serde(default="BlendermannSuperstructureForces::default_side_force_coefficient")]
     pub side_force_coefficient: Float,
-    #[serde(default)]
-    pub non_dim_side_area_centroid: Float,
-    #[serde(default)]
-    pub non_dim_heel_arm: Float,
     #[serde(default="BlendermannSuperstructureForces::default_coupling_factor")]
     pub coupling_factor: Float,
-    #[serde(default="BlendermannSuperstructureForces::default_non_dim_yaw_arm_correction")]
-    pub non_dim_yaw_arm_correction: Float,
     #[serde(default="BlendermannSuperstructureForces::default_air_density")]
     pub density: Float,
-    #[serde(default="default_one")]
-    pub velocity_correction_factor: Float,
 }
-
-fn default_one() -> Float {1.0}
 
 impl BlendermannSuperstructureForces {
     fn default_resistance_coefficient() -> Float {0.55}
     fn default_side_force_coefficient() -> Float {0.85}
     fn default_coupling_factor() -> Float {0.55}
-    fn default_non_dim_yaw_arm_correction() -> Float {0.0}
     fn default_air_density() -> Float {1.225}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
@@ -65,19 +54,26 @@ impl BlendermannSuperstructureForces {
         Self::from_json_string(&json_string)
     }
 
-    pub fn body_fixed_force(&self, apparent_wind: WindCondition) -> SpatialVector {
+    pub fn body_fixed_force(&self, body_fixed_velocity: SpatialVector) -> SpatialVector {
+
+        let apparent_wind = WindCondition::from_velocity_vector_assuming_ned(
+            body_fixed_velocity
+        );
+        
         SpatialVector::new(
             -self.resistance(&apparent_wind),
-            self.side_force(&apparent_wind),
+            -self.side_force(&apparent_wind),
             0.0
         )
     }
 
-    pub fn body_fixed_moment(&self, apparent_wind: &WindCondition) -> SpatialVector {
+    pub fn body_fixed_moment(&self, body_fixed_force: SpatialVector) -> SpatialVector {
+        let sway_force = body_fixed_force[1];
+
         SpatialVector::new(
-            self.heel_moment(apparent_wind),
+            -sway_force * self.center_of_effort[2],
             0.0,
-            self.yaw_moment(apparent_wind)
+            sway_force * self.center_of_effort[0]
         )
     }
 
@@ -95,24 +91,6 @@ impl BlendermannSuperstructureForces {
         let force_coefficient = self.side_force_coefficient * apparent_wind.direction_coming_from.sin() / denominator;
 
         force_coefficient * self.side_area * self.dynamic_pressure(apparent_wind.velocity)
-    }
-
-    fn non_dim_yaw_moment_arm(&self, wind_direction: Float) -> Float {
-        self.non_dim_side_area_centroid + self.non_dim_yaw_arm_correction * (wind_direction - PI * 0.5)
-    }
-
-    pub fn yaw_moment(&self, apparent_wind: &WindCondition) -> Float {
-        let side_force = self.side_force(apparent_wind);
-
-        let arm = self.non_dim_yaw_moment_arm(apparent_wind.direction_coming_from) * self.ship_length;
-
-        arm * side_force
-    }
-
-    pub fn heel_moment(&self, apparent_wind: &WindCondition) -> Float {
-        let side_force = self.side_force(apparent_wind);
-
-        side_force * self.non_dim_heel_arm * self.ship_length
     }
 
     fn dynamic_pressure(&self, wind_velocity: Float) -> Float {

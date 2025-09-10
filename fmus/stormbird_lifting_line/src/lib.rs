@@ -177,12 +177,12 @@ pub struct StormbirdLiftingLine {
     pub moment_sail_10_y: f64,
     pub moment_sail_10_z: f64,
 
-    pub superstructure_force_x: f64,
-    pub superstructure_force_y: f64,
-    pub superstructure_force_z: f64,
-    pub superstructure_moment_x: f64,
-    pub superstructure_moment_y: f64,
-    pub superstructure_moment_z: f64,
+    pub force_superstructure_x: f64,
+    pub force_superstructure_y: f64,
+    pub force_superstructure_z: f64,
+    pub moment_superstructure_x: f64,
+    pub moment_superstructure_y: f64,
+    pub moment_superstructure_z: f64,
 
     /// Measurements of the effective angle of attack at different wings. Max 10 as output in the 
     /// FMU
@@ -668,7 +668,7 @@ impl StormbirdLiftingLine {
 
     fn superstructure_force_and_moment(&self) -> (SpatialVector, SpatialVector) {
         if let Some(model) = &self.superstructure_force_model {
-            let representative_height = 10.0; // TODO: figure out where to put this variable
+            let representative_height = model.center_of_effort[2].abs();
 
             // Get the wind field from the wind environment, based on the wind condition
             let true_wind_condition = WindCondition {
@@ -679,8 +679,7 @@ impl StormbirdLiftingLine {
             // Apply the linear motion of the ship to the freestream
             let linear_velocity =  -1.0 * self.motion_velocity_linear_vector();
 
-            // TODO: what to do with the angular motion?
-
+            // TODO: consider including angular motion on the apparent wind calculation
             let apparent_wind_vector = if let Some(env) = &self.wind_environment {
                 let locations = vec![representative_height * env.up_direction];
 
@@ -693,12 +692,8 @@ impl StormbirdLiftingLine {
                 panic!("Wind environment is not defined!")
             };
 
-            let apparent_wind_condition = WindCondition::from_velocity_vector_assuming_ned(
-                apparent_wind_vector
-            );
-
-            let force = model.body_fixed_force(apparent_wind_condition);
-            let moment = model.body_fixed_force(apparent_wind_condition);
+            let force = model.body_fixed_force(apparent_wind_vector);
+            let moment = model.body_fixed_moment(force);
 
             (force, moment)
         } else {
@@ -715,13 +710,13 @@ impl StormbirdLiftingLine {
         self.moment_y = 0.0;
         self.moment_z = 0.0;
 
-        self.superstructure_force_x = 0.0;
-        self.superstructure_force_y = 0.0;
-        self.superstructure_force_z = 0.0;
+        self.force_superstructure_x = 0.0;
+        self.force_superstructure_y = 0.0;
+        self.force_superstructure_z = 0.0;
 
-        self.superstructure_moment_x = 0.0;
-        self.superstructure_moment_y = 0.0;
-        self.superstructure_moment_z = 0.0;
+        self.moment_superstructure_x = 0.0;
+        self.moment_superstructure_y = 0.0;
+        self.moment_superstructure_z = 0.0;
 
         self.force_sail_1_x = 0.0;
         self.force_sail_1_y = 0.0;
@@ -808,13 +803,13 @@ impl StormbirdLiftingLine {
         self.moment_y = integrated_moments[1] + superstructure_moment[1];
         self.moment_z = integrated_moments[2] + superstructure_moment[2];
 
-        self.superstructure_force_x = superstructure_force[0];
-        self.superstructure_force_y = superstructure_force[1];
-        self.superstructure_force_z = superstructure_force[2];
+        self.force_superstructure_x = superstructure_force[0];
+        self.force_superstructure_y = superstructure_force[1];
+        self.force_superstructure_z = superstructure_force[2];
 
-        self.superstructure_moment_x = superstructure_moment[0];
-        self.superstructure_moment_y = superstructure_moment[1];
-        self.superstructure_moment_z = superstructure_moment[2];
+        self.moment_superstructure_x = superstructure_moment[0];
+        self.moment_superstructure_y = superstructure_moment[1];
+        self.moment_superstructure_z = superstructure_moment[2];
 
         let mut individual_force_x_raw = [0.0; 10];
         let mut individual_force_y_raw = [0.0; 10];
