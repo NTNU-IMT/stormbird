@@ -222,6 +222,7 @@ impl LineForceModel {
                         self.chord_vectors_local[index].length(),
                         velocity[index].length(),
                     ),
+                    SectionModel::EffectiveWindSensor => 0.0,
                 }
             })
             .collect()
@@ -242,7 +243,8 @@ impl LineForceModel {
                 }
                 SectionModel::RotatingCylinder(ref mut cylinder) => {
                     cylinder.revolutions_per_second = internal_state[wing_index];
-                }
+                },
+                SectionModel::EffectiveWindSensor => {}
             }
         }
     }

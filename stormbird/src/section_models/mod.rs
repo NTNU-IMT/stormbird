@@ -25,6 +25,7 @@ pub enum SectionModel {
     Foil(Foil),
     VaryingFoil(VaryingFoil),
     RotatingCylinder(RotatingCylinder),
+    EffectiveWindSensor,
 }
 
 impl SectionModel {
@@ -33,6 +34,7 @@ impl SectionModel {
             SectionModel::Foil(foil) => foil.amount_of_stall(angle_of_attack),
             SectionModel::VaryingFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
             SectionModel::RotatingCylinder(_) => 1.0,
+            SectionModel::EffectiveWindSensor => 0.0
         }
     }
 

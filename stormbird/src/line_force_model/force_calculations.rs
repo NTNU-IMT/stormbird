@@ -118,6 +118,7 @@ impl LineForceModel {
                         cylinder.lift_coefficient(
                             self.chord_vectors_local[index].length(), velocity[index].length()
                         ),
+                    SectionModel::EffectiveWindSensor => 0.0
                 }
             }
         ).collect()
@@ -192,7 +193,8 @@ impl LineForceModel {
                     SectionModel::VaryingFoil(foil) =>
                         foil.drag_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) =>
-                        cylinder.drag_coefficient(self.chord_lengths[index], velocity[index].length())
+                        cylinder.drag_coefficient(self.chord_lengths[index], velocity[index].length()),
+                    SectionModel::EffectiveWindSensor => 0.0
                 }
             }
         ).collect()
@@ -343,7 +345,8 @@ impl LineForceModel {
                         },
                         SectionModel::RotatingCylinder(cylinder) => {
                             cylinder.added_mass_coefficient(relevant_acceleration.length())
-                        }
+                        },
+                        SectionModel::EffectiveWindSensor => 0.0
                     };
                     
                     added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
@@ -371,7 +374,7 @@ impl LineForceModel {
                 let wing_index = self.wing_index_from_global(index);
 
                 match &self.section_models[wing_index] {
-                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => SpatialVector::default(),
+                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) | SectionModel::EffectiveWindSensor => SpatialVector::default(),
                     SectionModel::RotatingCylinder(cylinder) => {
                         let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
 

@@ -89,6 +89,7 @@ impl WingBuilder {
             SectionModel::Foil(foil) => SectionModel::Foil(foil.clone()),
             SectionModel::VaryingFoil(foils) => SectionModel::VaryingFoil(foils.clone()),
             SectionModel::RotatingCylinder(cylinder) => SectionModel::RotatingCylinder(cylinder.clone()),
+            SectionModel::EffectiveWindSensor => SectionModel::EffectiveWindSensor
         };
 
         SingleWing {
