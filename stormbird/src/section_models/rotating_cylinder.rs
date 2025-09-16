@@ -123,7 +123,11 @@ impl RotatingCylinder {
 
     /// Helper function to calculate revolutions per second from a target spin ratio, diameter and
     /// velocity.
-    pub fn revolutions_per_second_from_spin_ratio(spin_ratio: Float, diameter: Float, velocity: Float) -> Float {
+    pub fn revolutions_per_second_from_spin_ratio(
+        spin_ratio: Float, 
+        diameter: Float, 
+        velocity: Float
+    ) -> Float {
         if velocity == 0.0 {
             0.0
         } else {

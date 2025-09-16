@@ -118,7 +118,7 @@ pub fn measure_apparent_wind_direction(
             |velocity| {
                 wind_environment.zero_direction_vector.signed_angle_between(
                     *velocity, 
-                    wind_environment.up_direction
+                    wind_environment.wind_rotation_axis
                 )
             }
         ).collect();

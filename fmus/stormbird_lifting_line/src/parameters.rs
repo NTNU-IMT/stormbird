@@ -26,10 +26,6 @@ pub struct FmuParameters {
     /// Switch to specify if angles is given in degrees or radians.
     pub angles_in_degrees: bool,
     #[serde(default)]
-    /// Switch that reversers the wind direction. This is useful as the definition of a positive 
-    /// wind direction varies between different applications.
-    pub reverse_wind_direction: bool,
-    #[serde(default)]
     /// Switch to specify whether or not to use the motion velocity input
     pub use_motion_velocity: bool,
     #[serde(default)]

@@ -28,6 +28,8 @@ pub struct WindEnvironment {
     pub height_variation_model: Option<HeightVariationModel>,
     #[serde(default="WindEnvironment::default_up_direction")]
     pub up_direction: SpatialVector,
+    #[serde(default="WindEnvironment::default_wind_rotation_axis")]
+    pub wind_rotation_axis: SpatialVector,
     #[serde(default="WindEnvironment::default_zero_direction_vector")]
     pub zero_direction_vector: SpatialVector,
     #[serde(default)]
@@ -41,6 +43,7 @@ impl Default for WindEnvironment {
         Self {
             height_variation_model: None,
             up_direction: Self::default_up_direction(),
+            wind_rotation_axis: Self::default_wind_rotation_axis(),
             zero_direction_vector: Self::default_zero_direction_vector(),
             water_plane_height: 0.0,
             inflow_corrections: None
@@ -49,8 +52,9 @@ impl Default for WindEnvironment {
 }
 
 impl WindEnvironment {
-    pub fn default_zero_direction_vector() -> SpatialVector {SpatialVector::from([-1.0, 0.0, 0.0])}
+    pub fn default_zero_direction_vector() -> SpatialVector {SpatialVector::from([1.0, 0.0, 0.0])}
     pub fn default_up_direction() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
+    pub fn default_wind_rotation_axis() -> SpatialVector {SpatialVector::from([0.0, 0.0, -1.0])}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
@@ -102,7 +106,7 @@ impl WindEnvironment {
 
         let direction_vector = self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
-            self.up_direction
+            self.wind_rotation_axis
         );
 
         velocity * direction_vector
@@ -209,10 +213,10 @@ mod tests {
             south_wind_condition, location
         );
 
-        assert!(north_vector[0] < 0.0);
+        assert!(north_vector[0] > 0.0);
         assert!(east_vector[1] < 0.0);
         assert!(west_vector[1] > 0.0);
-        assert!(south_vector[0] > 0.0);
+        assert!(south_vector[0] < 0.0);
 
         dbg!(north_vector);
         dbg!(east_vector);

@@ -538,10 +538,6 @@ impl StormbirdLiftingLine {
             self.wind_direction_coming_from
         };
 
-        if self.parameters.reverse_wind_direction {
-            wind_direction *= -1.0;
-        }
-
         // Ensure wind direction is within +/- 180 degrees
         if wind_direction < -PI {
             wind_direction += 2.0 * PI;
