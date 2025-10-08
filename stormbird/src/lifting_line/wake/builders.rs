@@ -4,12 +4,18 @@
 
 //! Functionality for calculating lift-induced velocities from full dynamic wake.
 
-use std::f64::consts::PI;
 use serde::{Deserialize, Serialize};
 
-use stormath::spatial_vector::SpatialVector;
+use stormath::{
+    spatial_vector::SpatialVector,
+    type_aliases::Float,
+    consts::{PI, MIN_POSITIVE, INFINITY},
+};
 
-use crate::line_force_model::LineForceModel;
+use crate::line_force_model::{
+    LineForceModel,
+    global_geometry_data::GlobalLineForceModelGeometry,
+};
 
 use crate::lifting_line::singularity_elements::prelude::*;
 
@@ -27,10 +33,10 @@ use super::{
 pub enum ViscousCoreLength {
     /// Signifies that the viscous core length is a fraction of the length of the vortex line. To
     /// be used, the vortex line geometry must be known.
-    Relative(f64),
+    Relative(Float),
     /// Signifies that the viscous core length is an absolute value, and that it can be used without
     /// any more information about the geometry.
-    Absolute(f64),
+    Absolute(Float),
     /// Signifies that the viscous core length is not used.
     NoViscousCore,
 }
@@ -46,11 +52,11 @@ impl Default for ViscousCoreLength {
 pub struct SinIncreasedViscousCoreLength {
     pub last_panel_value: ViscousCoreLength,
     #[serde(default="SinIncreasedViscousCoreLength::default_evolution_length_factor")]
-    pub evolution_length_factor: f64,
+    pub evolution_length_factor: Float,
 }
 
 impl SinIncreasedViscousCoreLength {
-    fn default_evolution_length_factor() -> f64 { 1.0 }
+    fn default_evolution_length_factor() -> Float { 1.0 }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -82,10 +88,10 @@ pub struct WakeBuilder {
     pub viscous_core_length_evolution: ViscousCoreLengthEvolution,
     #[serde(default="WakeBuilder::default_first_panel_relative_length")]
     /// How the first panel in the wake is treated
-    pub first_panel_relative_length: f64,
+    pub first_panel_relative_length: Float,
     #[serde(default="WakeBuilder::default_last_panel_relative_length")]
     /// Factor used to calculate the length of the final panel, relative to the chord length.
-    pub last_panel_relative_length: f64,
+    pub last_panel_relative_length: Float,
     #[serde(default)]
     /// Determines if the chord direction should be used when calculating the direction of the first
     /// wake panels
@@ -98,15 +104,15 @@ pub struct WakeBuilder {
     /// velocities. The default is zero, which means no wake points are affected by the induced
     /// velocities. A value of 1.0 means that all wake points are affected by the induced
     /// velocities.
-    pub ratio_of_wake_affected_by_induced_velocities: f64,
+    pub ratio_of_wake_affected_by_induced_velocities: Float,
     #[serde(default="PotentialTheorySettings::default_far_field_ratio")]
     /// Determines how far away from a panel it is necessary to be before the far field method is
     /// used to calculate the induced velocity, rather than the full method.
-    pub far_field_ratio: f64,
+    pub far_field_ratio: Float,
     #[serde(default)]
     /// Damping factor for the shape of the wake. A value of 0.0 means no damping (the wake moves
     /// freely), while a value of 1.0 means that the wake points are fixed in space.
-    pub shape_damping_factor: f64,
+    pub shape_damping_factor: Float,
     #[serde(default)]
     /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is
     /// useful if the effect of self-induced velocities on lift and drag is calculated in another
@@ -118,7 +124,7 @@ pub struct WakeBuilder {
     pub neglect_self_induced_velocities: bool,
     #[serde(default="WakeBuilder::default_initial_relative_wake_length")]
     /// Length of wake during initialization, relative to the chord length
-    pub initial_relative_wake_length: f64,
+    pub initial_relative_wake_length: Float,
     #[serde(default)]
     /// A variable to determine whether the wake geometry and data should be written to a file
     pub write_wake_data_to_file: bool,
@@ -132,7 +138,7 @@ pub struct WakeBuilder {
 /// Variables used to build a steady wake model.
 pub struct SteadyWakeBuilder {
     #[serde(default="SteadyWakeBuilder::default_wake_length_factor")]
-    pub wake_length_factor: f64,
+    pub wake_length_factor: Float,
     #[serde(default)]
     pub symmetry_condition: SymmetryCondition,
     #[serde(default)]
@@ -142,9 +148,9 @@ pub struct SteadyWakeBuilder {
 
 impl WakeBuilder {
     fn default_number_of_panels_per_line_element() -> usize {100}
-    fn default_initial_relative_wake_length() -> f64 {100.0}
-    fn default_first_panel_relative_length() -> f64 {0.75}
-    fn default_last_panel_relative_length() -> f64 {25.0}
+    fn default_initial_relative_wake_length() -> Float {100.0}
+    fn default_first_panel_relative_length() -> Float {0.75}
+    fn default_last_panel_relative_length() -> Float {25.0}
 
     pub fn build(
         &self,
@@ -154,7 +160,7 @@ impl WakeBuilder {
 
         let indices = self.get_wake_indices(line_force_model);
 
-        let mut points = vec![SpatialVector::<3>::default(); indices.nr_points()];
+        let mut points = vec![SpatialVector::default(); indices.nr_points()];
 
         for i_stream in 0..indices.nr_points_per_line_element {
             for i_span in 0..span_points.len() {
@@ -166,7 +172,7 @@ impl WakeBuilder {
 
         let end_index_induced_velocities_on_wake = (
             self.ratio_of_wake_affected_by_induced_velocities *
-            indices.nr_panels_per_line_element as f64
+            indices.nr_panels_per_line_element as Float
         ).ceil() as usize;
 
         let settings = WakeSettings {
@@ -188,7 +194,7 @@ impl WakeBuilder {
 
         let nr_panels = indices.nr_panels();
 
-        let strengths: Vec<f64> = vec![0.0; nr_panels];
+        let strengths: Vec<Float> = vec![0.0; nr_panels];
 
         let panels_viscous_core_length = self.get_panels_viscous_core_length(
             line_force_model,
@@ -197,7 +203,11 @@ impl WakeBuilder {
 
         let panels = vec![Panel::default(); nr_panels];
 
-        let velocity_at_points = vec![SpatialVector::<3>::default(); indices.nr_points()];
+        let velocity_at_points = vec![SpatialVector::default(); indices.nr_points()];
+
+        let representative_chord_length = line_force_model.chord_lengths.iter()
+            .map(|c| *c)
+            .sum::<Float>() / line_force_model.chord_lengths.len() as Float;
 
         let mut wake = Wake {
             indices,
@@ -209,11 +219,16 @@ impl WakeBuilder {
             potential_theory_settings,
             wing_indices: line_force_model.wing_indices.clone(),
             number_of_time_steps_completed: 0,
-            panels
+            panels,
+            representative_chord_length,
         };
 
+        let line_force_model_geometry = GlobalLineForceModelGeometry::new(
+            line_force_model
+        );
+
         wake.initialize_based_on_chord_length(
-            line_force_model, 
+            &line_force_model_geometry, 
             self.initial_relative_wake_length
         );
 
@@ -225,12 +240,12 @@ impl WakeBuilder {
         &self, 
         line_force_model: &LineForceModel,
         wake_indices: &WakeIndices,
-    ) -> Vec<f64> {
+    ) -> Vec<Float> {
         let mut out = vec![0.0; wake_indices.nr_panels()];
 
         let span_lines = line_force_model.span_lines();
 
-        let span_line_lengths: Vec<f64> = span_lines.iter()
+        let span_line_lengths: Vec<Float> = span_lines.iter()
             .map(|line| line.length())
             .collect();
 
@@ -246,7 +261,7 @@ impl WakeBuilder {
                         relative_length * span_line_lengths[i_span]
                     },
                     ViscousCoreLength::Absolute(length) => length,
-                    ViscousCoreLength::NoViscousCore => f64::MIN
+                    ViscousCoreLength::NoViscousCore => MIN_POSITIVE
                 };
 
                 out[flat_index] = match self.viscous_core_length_evolution {
@@ -257,12 +272,12 @@ impl WakeBuilder {
                                 relative_length * span_line_lengths[i_span]
                             },
                             ViscousCoreLength::Absolute(length) => length,
-                            ViscousCoreLength::NoViscousCore => f64::MIN
+                            ViscousCoreLength::NoViscousCore => MIN_POSITIVE
                         };
 
-                        let length_before_last_value_is_used = (wake_indices.nr_panels_per_line_element - 1) as f64 * evolution_settings.evolution_length_factor;
+                        let length_before_last_value_is_used = (wake_indices.nr_panels_per_line_element - 1) as Float * evolution_settings.evolution_length_factor;
 
-                        let relative_stream_value = (i_stream as f64 / length_before_last_value_is_used).min(1.0).max(0.0); // Converts to [0, 1]
+                        let relative_stream_value = (i_stream as Float / length_before_last_value_is_used).min(1.0).max(0.0); // Converts to [0, 1]
 
                         let sin_input = 0.5 * relative_stream_value * PI; // Converts to [0, PI/2]
                         let sin_factor = sin_input.sin(); // Converts to [0, 1]
@@ -321,7 +336,7 @@ impl Default for WakeBuilder {
 }
 
 impl SteadyWakeBuilder {
-    pub fn default_wake_length_factor() -> f64 {100.0}
+    pub fn default_wake_length_factor() -> Float {100.0}
 
     pub fn build(&self,
         line_force_model: &LineForceModel,
@@ -335,7 +350,7 @@ impl SteadyWakeBuilder {
             use_chord_direction: false,
             symmetry_condition: self.symmetry_condition.clone(),
             ratio_of_wake_affected_by_induced_velocities: 0.0,
-            far_field_ratio: f64::INFINITY,
+            far_field_ratio: INFINITY,
             shape_damping_factor: 0.0,
             neglect_self_induced_velocities: false,
             initial_relative_wake_length: WakeBuilder::default_initial_relative_wake_length(),

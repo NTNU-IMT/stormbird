@@ -14,16 +14,15 @@ pub mod frozen_wake;
 pub mod induced_velocity_calc;
 pub mod update_data;
 pub mod initialization;
-pub mod line_force_model_data;
 
-use line_force_model_data::LineForceModelData;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
-use crate::line_force_model::LineForceModel;
+use crate::line_force_model::global_geometry_data::GlobalLineForceModelGeometry;
 
-use rayon::prelude::*;
-use rayon::iter::ParallelIterator;
+//use rayon::prelude::*;
+//use rayon::iter::ParallelIterator;
 
 use std::ops::Range;
 
@@ -55,13 +54,13 @@ pub struct Wake {
     /// The indices for the wake
     pub indices: WakeIndices,
     /// The points making up the vortex wake
-    pub points: Vec<SpatialVector<3>>,
+    pub points: Vec<SpatialVector>,
     /// The velocity at each point in the wake
-    pub velocity_at_points: Vec<SpatialVector<3>>,
+    pub velocity_at_points: Vec<SpatialVector>,
     /// The strengths of the panels
-    pub strengths: Vec<f64>,
+    pub strengths: Vec<Float>,
     /// The viscous core length of each panel
-    pub panels_viscous_core_length: Vec<f64>,
+    pub panels_viscous_core_length: Vec<Float>,
     /// Settings for the wake behavior
     pub settings: WakeSettings,
     /// The model used to calculate induced velocities from vortex lines
@@ -72,21 +71,11 @@ pub struct Wake {
     pub number_of_time_steps_completed: usize,
     /// Panel geometry data
     pub panels: Vec<Panel>,
+    /// Representative chord length
+    pub representative_chord_length: Float,
 }
 
 impl Wake {
-    pub fn ctrl_points(&self) -> Vec<SpatialVector<3>> {
-        let mut ctrl_points: Vec<SpatialVector::<3>> = Vec::with_capacity(self.indices.nr_panels_along_span);
-
-        for i in 0..self.indices.nr_panels_along_span {
-            ctrl_points.push(
-                (self.points[i] + self.points[i+1]) * 0.5
-            );
-        }
-
-        ctrl_points
-    }
-
     /// Returns the index of the wing that the span index belongs to
     fn wing_index(&self, span_index: usize) -> usize {
         for i in 0..self.wing_indices.len() {
@@ -114,7 +103,7 @@ impl Wake {
     }
 
     /// Returns the four points that make up a panel at the given indices
-    fn panel_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector<3>; 4] {
+    fn panel_points(&self, panel_stream_index: usize, panel_span_index: usize) -> [SpatialVector; 4] {
         let point_indices = self.panel_point_indices(panel_stream_index, panel_span_index);
 
         [

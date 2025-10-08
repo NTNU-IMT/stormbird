@@ -1,10 +1,11 @@
 
-use stormath::optimization::particle_swarm::{
+use stormath::optimize::particle_swarm::{
     SwarmState,
     SwarmResult,
     ParticleSwarm
 };
 
+use stormath::type_aliases::Float;
 use stormath::spatial_vector::SpatialVector;
 
 use stormath::statistics::time_averaged_mean;
@@ -18,10 +19,10 @@ use super::ControllerOutput;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// This structure is used to control an optimization process that can run in dynamic simulations. 
 pub struct ParticleSwarmOptimizer {
-    pub initialization_time: f64,
-    pub time_between_evaluations: f64,
-    pub averaging_time: f64,
-    pub thrust_direction: SpatialVector<3>,
+    pub initialization_time: Float,
+    pub time_between_evaluations: Float,
+    pub averaging_time: Float,
+    pub thrust_direction: SpatialVector,
     pub optimizer: ParticleSwarm,
     #[serde(default)]
     pub current_particle: usize,
@@ -34,9 +35,9 @@ pub struct ParticleSwarmOptimizer {
 }
 
 impl ParticleSwarmOptimizer {
-    pub fn objective_function(&self, time: &[f64], result: &[SimulationResult]) -> f64 {
-        let mut relevant_thrust_values: Vec<f64> = Vec::new();
-        let mut relevant_times: Vec<f64> = Vec::new();
+    pub fn objective_function(&self, time: &[Float], result: &[SimulationResult]) -> Float {
+        let mut relevant_thrust_values: Vec<Float> = Vec::new();
+        let mut relevant_times: Vec<Float> = Vec::new();
 
         let time_length = time.len();
 
@@ -81,9 +82,9 @@ impl ParticleSwarmOptimizer {
     }
 
     /// Checks the time to see if a new test is required.
-    pub fn new_test_required(&self, time: f64) -> bool {
+    pub fn new_test_required(&self, time: Float) -> bool {
         let time_to_next_setup_change = self.initialization_time + 
-            self.time_between_evaluations * self.test_index() as f64;
+            self.time_between_evaluations * self.test_index() as Float;
         
         if time > time_to_next_setup_change {
             true
@@ -123,7 +124,7 @@ impl ParticleSwarmOptimizer {
     }
 
     /// The function responsible for updating the optimizer with new simulation results.
-    pub fn update(&mut self, time: &[f64], results: &[SimulationResult]) -> Option<ControllerOutput> {
+    pub fn update(&mut self, time: &[Float], results: &[SimulationResult]) -> Option<ControllerOutput> {
         let current_time = time.last().unwrap().clone();
 
         if self.new_test_required(current_time) {

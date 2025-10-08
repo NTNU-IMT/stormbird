@@ -86,7 +86,7 @@ impl Simulation {
         freestream_velocity: Vec<SpatialVector>,
     ) -> SimulationResult {
 
-        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
+        let rust_freestream_velocity: Vec<SpatialVectorRust> = freestream_velocity.iter().map(
             |v| v.data
         ).collect();
 
@@ -103,7 +103,7 @@ impl Simulation {
         points
     ))]
     pub fn induced_velocities(&self, points: Vec<SpatialVector>) -> Vec<SpatialVector> {
-        let rust_points: Vec<SpatialVectorRust<3>> = points.iter().map(
+        let rust_points: Vec<SpatialVectorRust> = points.iter().map(
             |v| v.data
         ).collect();
 
@@ -112,30 +112,5 @@ impl Simulation {
         rust_induced_velocities.iter().map(
             |v| SpatialVector::new(v[0], v[1], v[2])
         ).collect()
-    }
-
-    #[pyo3(signature=(
-        *,
-        time, 
-        time_step,
-        freestream_velocity,
-    ))]
-    pub fn initialize_with_elliptic_distribution(
-        &mut self, 
-        time: f64, 
-        time_step: f64,
-        freestream_velocity: Vec<SpatialVector>,
-    ) {
-
-        let rust_freestream_velocity: Vec<SpatialVectorRust<3>> = freestream_velocity.iter().map(
-            |v| v.data
-        ).collect();
-
-        
-        self.data.initialize_with_elliptic_distribution(
-            time, 
-            time_step,
-            &rust_freestream_velocity
-        );
     }
 }

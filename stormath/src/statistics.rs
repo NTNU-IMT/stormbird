@@ -5,11 +5,12 @@
 //! Functions that compute statistical properties of vectors
 
 use crate::integration::trapz;
+use crate::type_aliases::Float;
 
 /// Computes the mean value of the input vector.
 pub fn mean<T>(x: &[T]) -> T
 where T: 
-    std::ops::Div<f64, Output = T> + 
+    std::ops::Div<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     Copy
 {
@@ -19,12 +20,12 @@ where T:
         sum = sum + x[i];
     }
 
-    sum / (x.len() as f64)
+    sum / (x.len() as Float)
 }
 
-pub fn time_averaged_mean<T>(time: &[f64], x: &[T]) -> T
+pub fn time_averaged_mean<T>(time: &[Float], x: &[T]) -> T
 where T:
-    std::ops::Mul<f64, Output = T> + 
+    std::ops::Mul<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     std::ops::Sub<T, Output = T> + 
     std::default::Default +
@@ -38,7 +39,7 @@ where T:
 }
 
 /// Returns the maximum value in the input vector.
-pub fn max(x: &[f64]) -> f64 {
+pub fn max(x: &[Float]) -> Float {
     let mut max = x[0];
 
     for i in 1..x.len() {
@@ -51,7 +52,7 @@ pub fn max(x: &[f64]) -> f64 {
 }
 
 /// Returns the minimum value in the input vector.
-pub fn min(x: &[f64]) -> f64 {
+pub fn min(x: &[Float]) -> Float {
     let mut min = x[0];
 
     for i in 1..x.len() {

@@ -1,15 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+use stormath::type_aliases::Float;
+
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// A value that can, optionally, be dependent on the amount of separation in a simulation
 pub struct SeparationDependentValue{
-    pub value: f64,
-    pub value_separated: Option<f64>,
+    pub value: Float,
+    pub value_separated: Option<Float>,
 }
 
 impl SeparationDependentValue {
-    pub fn get_value(&self, separation: f64) -> f64 {
+    pub fn get_value(&self, separation: Float) -> Float {
         match self.value_separated {
             Some(value_separated) => {
                 self.value * (1.0 - separation) + value_separated * separation
@@ -82,16 +84,16 @@ impl WakeIndices {
 /// Settings for the wake
 pub struct WakeSettings {
     /// The length of the first panel, relative to the local chord length
-    pub first_panel_relative_length: f64,
+    pub first_panel_relative_length: Float,
     /// The length of the last panel, relative to the local chord length
-    pub last_panel_relative_length: f64,
+    pub last_panel_relative_length: Float,
     /// A variable to determine of the chord direction should be used for the wake direction
     pub use_chord_direction: bool,
     /// A variable which panels that should be updated with the induced velocities included in the 
     /// velocity calculation
     pub end_index_induced_velocities_on_wake: usize,
     /// The amount of damping in the shape of the wake
-    pub shape_damping_factor: f64,
+    pub shape_damping_factor: Float,
     /// A variable to determine whether the self-induced velocities should be neglected or not
     pub neglect_self_induced_velocities: bool,
     /// A variable to determine whether the wake geometry and data should be written to a file

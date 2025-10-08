@@ -2,9 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Collection of structs used for input and output in simulations. The structs are kept independent
-//! from the specific methods in the library (lifting- and actuator line), as they are used in 
-//! multiple places.
+//! Collection of structs used for multiple simulations methods, i.e., useful for both lifting line
+//! and actuator line methods.
 
 pub mod results;
 pub mod forces_and_moments;

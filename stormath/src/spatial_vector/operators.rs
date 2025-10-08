@@ -6,28 +6,34 @@ use std::ops;
 
 use super::*;
 
-impl<const N: usize> ops::Index<usize> for SpatialVector<N> {
-    type Output = f64;
+impl ops::Index<usize> for SpatialVector {
+    type Output = Float;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        match index {
+            0..VECTOR_LENGTH => &self.0[index],
+            _ => panic!("SpatialVector index {} out of bounds (0-2)", index),
+        }
     }
 }
 
-impl<const N: usize> ops::IndexMut<usize> for SpatialVector<N> {
+impl ops::IndexMut<usize> for SpatialVector {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
+        match index {
+            0..VECTOR_LENGTH => &mut self.0[index], 
+            _ => panic!("SpatialVector index {} out of bounds (0-2)", index),
+        }
     }
 }
 
 
-impl<const N: usize> ops::Add for SpatialVector<N> {
+impl ops::Add for SpatialVector {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        let mut result = [0.0; N];
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
+        for i in 0..VECTOR_LENGTH {
             result[i] = self[i] + other.0[i];
         }
 
@@ -35,21 +41,21 @@ impl<const N: usize> ops::Add for SpatialVector<N> {
     }
 }
 
-impl<const N: usize> ops::AddAssign for SpatialVector<N> {
+impl ops::AddAssign for SpatialVector {
     fn add_assign(&mut self, rhs: Self) {
-        for i in 0..N {
-            self.0[i] += rhs.0[i];
+        for i in 0..VECTOR_LENGTH {
+            self.0[i] = self.0[i] + rhs.0[i];
         }
     }
 }
 
-impl<const N: usize> ops::Sub for SpatialVector<N> {
+impl ops::Sub for SpatialVector {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        let mut result = [0.0; N];
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
+        for i in 0..VECTOR_LENGTH {
             result[i] = self[i] - other.0[i];
         }
 
@@ -57,21 +63,21 @@ impl<const N: usize> ops::Sub for SpatialVector<N> {
     }
 }
 
-impl<const N: usize> ops::SubAssign for SpatialVector<N> {
+impl ops::SubAssign for SpatialVector {
     fn sub_assign(&mut self, rhs: Self) {
-        for i in 0..N {
-            self.0[i] -= rhs.0[i];
+        for i in 0..VECTOR_LENGTH {
+            self.0[i] = self.0[i] - rhs.0[i];
         }
     }
 }
 
-impl<const N: usize> ops::Mul<f64> for SpatialVector<N> {
+impl ops::Mul<Float> for SpatialVector {
     type Output = Self;
 
-    fn mul(self, scalar: f64) -> Self {
-        let mut result = [0.0; N];
+    fn mul(self, scalar: Float) -> Self {
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
+        for i in 0..VECTOR_LENGTH {
             result[i] = self[i] * scalar;
         }
 
@@ -79,14 +85,14 @@ impl<const N: usize> ops::Mul<f64> for SpatialVector<N> {
     }
 }
 
-impl<const N: usize> ops::Mul<Self> for SpatialVector<N> {
+impl ops::Mul<Self> for SpatialVector {
     type Output = Self;
 
     /// Element-wise multiplication of two vectors.
     fn mul(self, other: Self) -> Self {
-        let mut result = [0.0; N];
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
+        for i in 0..VECTOR_LENGTH {
             result[i] = self[i] * other[i];
         }
 
@@ -94,35 +100,35 @@ impl<const N: usize> ops::Mul<Self> for SpatialVector<N> {
     }
 }
 
-impl<const N: usize> ops::MulAssign<f64> for SpatialVector<N> {
-    fn mul_assign(&mut self, rhs: f64) {
-        for i in 0..N {
-            self.0[i] *= rhs;
+impl ops::MulAssign<Float> for SpatialVector {
+    fn mul_assign(&mut self, rhs: Float) {
+        for i in 0..VECTOR_LENGTH {
+            self.0[i] = self.0[i] * rhs;
         }
     }
 }
 
-impl<const N: usize> ops::Mul<SpatialVector<N>> for f64 {
-    type Output = SpatialVector<N>;
+impl ops::Mul<SpatialVector> for Float {
+    type Output = SpatialVector;
 
-    fn mul(self, rhs: SpatialVector<N>) -> SpatialVector<N> {
-        let mut result = [0.0; N];
+    fn mul(self, rhs: SpatialVector) -> SpatialVector {
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
-            result[i] = self * rhs[i];
+        for i in 0..VECTOR_LENGTH {
+            result[i] = rhs[i] * self;
         }
 
         SpatialVector(result)
     }
 }
 
-impl<const N: usize> ops::Div<f64> for SpatialVector<N> {
+impl ops::Div<Float> for SpatialVector {
     type Output = Self;
 
-    fn div(self, rhs: f64) -> Self {
-        let mut result = [0.0; N];
+    fn div(self, rhs: Float) -> Self {
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
+        for i in 0..VECTOR_LENGTH {
             result[i] = self[i] / rhs;
         }
 
@@ -130,21 +136,21 @@ impl<const N: usize> ops::Div<f64> for SpatialVector<N> {
     }
 }
 
-impl<const N: usize> ops::DivAssign<f64> for SpatialVector<N> {
-    fn div_assign(&mut self, rhs: f64) {
-        for i in 0..N {
-            self.0[i] /= rhs;
+impl ops::DivAssign<Float> for SpatialVector {
+    fn div_assign(&mut self, rhs: Float) {
+        for i in 0..VECTOR_LENGTH {
+            self.0[i] = self.0[i] / rhs;
         }
     }
 }
 
-impl<const N: usize> ops::Neg for SpatialVector<N> {
+impl ops::Neg for SpatialVector {
     type Output = Self;
 
     fn neg(self) -> Self {
-        let mut result = [0.0; N];
+        let mut result = [0.0; DATA_SIZE];
 
-        for i in 0..N {
+        for i in 0..VECTOR_LENGTH {
             result[i] = -self[i];
         }
 

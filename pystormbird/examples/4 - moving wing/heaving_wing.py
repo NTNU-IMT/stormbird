@@ -126,22 +126,20 @@ if __name__ == "__main__":
     line_force_model_dyn_prescribed = {
         "wing_builders": wings,
         "nr_sections": nr_sections,
-        "circulation_corrections": {
-            "PrescribedCirculation": {}
+        "circulation_correction": {
+            "Prescribed": {}
         }
     }
 
     solver_settings = {
-        "max_iterations_per_time_step": 5,
+        "max_iterations_per_time_step": 10,
         "damping_factor": 0.5,
     }
 
     dt = 0.25 * chord_length / velocity
     final_time = 5.0 * period
 
-    relative_panel_length = dt * velocity / chord_length
-
-    first_panel_relative_length = relative_panel_length / chord_length
+    first_panel_relative_length = dt * velocity / chord_length
 
     dynamic_settings = {
         "Dynamic": {
@@ -153,6 +151,10 @@ if __name__ == "__main__":
             }
         }
     }
+
+    if args.write_wake_files:
+        dynamic_settings["Dynamic"]["wake"]["write_wake_data_to_file"] = True
+        dynamic_settings["Dynamic"]["wake"]["wake_files_folder_path"] = str(wake_files_folder_path)
 
     steady_settings = {
         "QuasiSteady": {

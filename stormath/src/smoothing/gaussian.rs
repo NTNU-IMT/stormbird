@@ -6,7 +6,7 @@ use super::*;
 
 /// Gaussian kernel to be used in smoothing function.
 /// Based on: <https://en.wikipedia.org/wiki/Kernel_smoother>
-pub fn gaussian_kernel(x: f64, x0: f64, smoothing_length: f64) -> f64 {
+pub fn gaussian_kernel(x: Float, x0: Float, smoothing_length: Float) -> Float {
     let x_prime = x - x0;
 
     (-x_prime.powi(2) / (2.0 * smoothing_length.powi(2))).exp()
@@ -14,22 +14,22 @@ pub fn gaussian_kernel(x: f64, x0: f64, smoothing_length: f64) -> f64 {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GaussianSmoothing<T: SmoothingOps> {
-    pub smoothing_length: f64,
+    pub smoothing_length: Float,
     pub end_conditions: [EndCondition<T>; 2],
     #[serde(default)]
     pub number_of_end_insertions: Option<usize>,
     #[serde(default = "default_delta_x_factor_end_insertions")]
-    pub delta_x_factor_end_insertions: f64,
+    pub delta_x_factor_end_insertions: Float,
     #[serde(default)]
     pub number_of_end_points_to_interpolate: usize
 }
 
-fn default_delta_x_factor_end_insertions() -> f64 {1.0}
+fn default_delta_x_factor_end_insertions() -> Float {1.0}
 
 impl<T: SmoothingOps> GaussianSmoothing<T> {
     /// Returns the number of end-insertions, which is either the user specified value, if present,
     /// or a default calculation based on the smoothing length
-    pub fn number_of_end_insertions(&self, x: &[f64]) -> usize {
+    pub fn number_of_end_insertions(&self, x: &[Float]) -> usize {
         let dx = (x[1] - x[0]) * self.delta_x_factor_end_insertions;
 
         match self.number_of_end_insertions {
@@ -44,10 +44,10 @@ impl<T: SmoothingOps> GaussianSmoothing<T> {
 
     /// Gaussian smoothing using the kernel function above.
     /// Based on: <https://en.wikipedia.org/wiki/Kernel_smoother>
-    pub fn apply_smoothing(&self, x: &[f64], y: &[T]) -> Vec<T> {   
+    pub fn apply_smoothing(&self, x: &[Float], y: &[T]) -> Vec<T> {   
         let number_of_end_insertions = self.number_of_end_insertions(x);
 
-        let x_modified_end_insertions = EndCondition::<f64>::add_end_values_to_x_data(
+        let x_modified_end_insertions = EndCondition::<Float>::add_end_values_to_x_data(
             x, 
             number_of_end_insertions,
             self.delta_x_factor_end_insertions

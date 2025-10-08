@@ -13,6 +13,7 @@ pub mod varying_foil;
 pub mod rotating_cylinder;
 
 use serde::{Serialize, Deserialize};
+use stormath::type_aliases::Float;
 
 use foil::Foil;
 use varying_foil::VaryingFoil;
@@ -24,14 +25,16 @@ pub enum SectionModel {
     Foil(Foil),
     VaryingFoil(VaryingFoil),
     RotatingCylinder(RotatingCylinder),
+    EffectiveWindSensor,
 }
 
 impl SectionModel {
-    pub fn amount_of_flow_separation(&self, angle_of_attack: f64) -> f64 {
+    pub fn amount_of_flow_separation(&self, angle_of_attack: Float) -> Float {
         match self {
             SectionModel::Foil(foil) => foil.amount_of_stall(angle_of_attack),
             SectionModel::VaryingFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
             SectionModel::RotatingCylinder(_) => 1.0,
+            SectionModel::EffectiveWindSensor => 0.0
         }
     }
 

@@ -19,5 +19,42 @@ pub mod finite_difference;
 pub mod spatial_vector;
 pub mod special_functions;
 pub mod solvers;
-pub mod array2;
-pub mod optimization;
+pub mod matrix;
+pub mod optimize;
+pub mod rigid_body_motion;
+pub mod error;
+
+pub mod type_aliases {
+    #[cfg(feature = "single_precision")]
+    pub type Float = f32;
+
+    #[cfg(not(feature = "single_precision"))]
+    pub type Float = f64;    
+}
+
+pub mod consts {
+    use super::type_aliases::Float;
+
+    #[cfg(feature = "single_precision")]
+    pub const PI: Float = std::f32::consts::PI;
+    #[cfg(feature = "single_precision")]
+    pub const TAU: Float = std::f32::consts::TAU;
+    #[cfg(feature = "single_precision")]
+    pub const INFINITY: Float = std::f32::INFINITY;
+    #[cfg(feature = "single_precision")]
+    pub const MIN_POSITIVE: Float = std::f32::MIN_POSITIVE;
+    #[cfg(feature = "single_precision")]
+    pub const MIN: Float = std::f32::MIN;
+
+    #[cfg(not(feature = "single_precision"))]
+    pub const PI: Float = std::f64::consts::PI;
+    #[cfg(not(feature = "single_precision"))]
+    pub const TAU: Float = std::f64::consts::TAU;
+    #[cfg(not(feature = "single_precision"))]
+    pub const INFINITY: Float = std::f64::INFINITY;
+    #[cfg(not(feature = "single_precision"))]
+    pub const MIN_POSITIVE: Float = std::f64::MIN_POSITIVE;
+    #[cfg(not(feature = "single_precision"))]
+    pub const MIN: Float = std::f64::MIN;
+
+}

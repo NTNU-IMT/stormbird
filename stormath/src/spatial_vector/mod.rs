@@ -14,65 +14,97 @@ pub mod transformations;
 pub mod geometry_functions;
 pub mod iterators;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-/// A 3D vector with typical geometric functions implemented
-pub struct SpatialVector<const N: usize>(pub [f64; N]);
+// Length of the vector
+pub const VECTOR_LENGTH: usize = 3;
 
+#[cfg(feature = "padded_spatial_vectors")]
+pub const DATA_SIZE: usize = 4;
+
+#[cfg(not(feature = "padded_spatial_vectors"))]
+pub const DATA_SIZE: usize = 3;
+
+use crate::type_aliases::Float;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+/// A 2D or 3D vector with typical geometric functions implemented
+pub struct SpatialVector(pub [Float; DATA_SIZE]);
 
 /// Convert from a 3-element array to a Vec3
-impl<const N: usize> From<[f64; N]> for SpatialVector<N> {
-    fn from(array: [f64; N]) -> Self {
-        Self(array)
+impl From<[Float; VECTOR_LENGTH]> for SpatialVector {
+    fn from(array: [Float; VECTOR_LENGTH]) -> Self {
+        let mut data = [0.0; DATA_SIZE];
+
+        for i in 0..VECTOR_LENGTH {
+            data[i] = array[i];
+        }
+
+        Self(data)
     }
 }
 
 /// Convert from a Vec3 to a 3-element array
-impl<const N: usize> From<SpatialVector<N>> for [f64; N] {
-    fn from(vector: SpatialVector<N>) -> [f64; N] {
-        vector.0
+impl From<SpatialVector> for [Float; VECTOR_LENGTH] {
+    fn from(vector: SpatialVector) -> [Float; VECTOR_LENGTH] {
+        let mut out = [0.0; VECTOR_LENGTH];
+
+        for i in 0..VECTOR_LENGTH {
+            out[i] = vector.0[i]
+        }
+
+        out
     }
 }
 
+impl SpatialVector {
+    pub fn new(x: Float, y: Float, z: Float) -> Self {
+        let mut data = [0.0; DATA_SIZE];
+        data[0] = x;
+        data[1] = y;
+        data[2] = z;
 
-impl SpatialVector<2> {
-    pub fn new(x: f64, y: f64) -> Self {
-        Self([x, y])
+        Self(data)
     }
 
     pub fn unit_x() -> Self {
-        Self([1.0, 0.0])
+        let mut data = [0.0; DATA_SIZE];
+
+        data[0] = 1.0;
+
+        Self(data)
     }
 
     pub fn unit_y() -> Self {
-        Self([0.0, 1.0])
-    }
-}
+        let mut data = [0.0; DATA_SIZE];
 
-impl SpatialVector<3> {
-    pub fn new(x: f64, y: f64, z: f64) -> Self {
-        Self([x, y, z])
-    }
+        data[1] = 1.0;
 
-    pub fn unit_x() -> Self {
-        Self([1.0, 0.0, 0.0])
-    }
-
-    pub fn unit_y() -> Self {
-        Self([0.0, 1.0, 0.0])
+        Self(data)
     }
 
     pub fn unit_z() -> Self {
-        Self([0.0, 0.0, 1.0])
+        let mut data = [0.0; DATA_SIZE];
+
+        data[2] = 1.0;
+
+        Self(data)
+    }
+
+    pub fn replace_nans_with_zeros(&mut self) {
+        for i in 0..DATA_SIZE {
+            if self.0[i].is_nan() {
+                self.0[i] = 0.0;
+            }
+        }
     }
 }
 
-impl<const N: usize> Default for SpatialVector<N> {
+impl Default for SpatialVector {
     fn default() -> Self {
-        Self([0.0; N])
+        Self([0.0; DATA_SIZE])
     }
 }
 
-impl<const N: usize> std::fmt::Display for SpatialVector<N> {
+impl std::fmt::Display for SpatialVector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.0)
     }

@@ -1,40 +1,34 @@
 use super::*;
 
-impl<const N: usize> SpatialVector<N> {
-    #[inline]
+impl SpatialVector {
+    #[inline(always)]
     /// Returns the dot product of two vectors
-    pub fn dot(self, rhs: Self) -> f64 {
-        let mut result = 0.0;
-
-        for i in 0..N {
-            result += self[i] * rhs[i];
-        }
-
-        result
+    pub fn dot(self, rhs: Self) -> Float {
+        self[0] * rhs[0] + self[1] * rhs[1] + self[2] * rhs[2]
     }
 
-    #[inline]
+    #[inline(always)]
     /// Returns the length of the vector squared, which is equal to the dot product of the vector 
     /// with itself
-    pub fn length_squared(self) -> f64 {
-        self.dot(self)
+    pub fn length_squared(self) -> Float {
+        self[0] * self[0] + self[1] * self[1] + self[2] * self[2]
     }
 
-    #[inline]
+    #[inline(always)]
     /// Returns the length of the vector
-    pub fn length(self) -> f64 {
+    pub fn length(self) -> Float {
         self.length_squared().sqrt()
     }
 
-    #[inline]
+    #[inline(always)]
     /// Returns a normalized version of the vector
     pub fn normalize(&self) -> Self {
-        let length: f64 = self.length();
+        let length: Float = self.length();
 
         if length > 0.0 {
-            let mut result = [0.0; N];
+            let mut result = [0.0; DATA_SIZE];
 
-            for i in 0..N {
+            for i in 0..VECTOR_LENGTH {
                 result[i] = self[i] / length;
             }
 
@@ -45,16 +39,13 @@ impl<const N: usize> SpatialVector<N> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     /// Returns the distance between two vectors
-    pub fn distance(self, rhs: Self) -> f64 {
+    pub fn distance(self, rhs: Self) -> Float {
         (self - rhs).length()
     }
 
-}
-
-impl SpatialVector<3> {
-    #[inline]
+    #[inline(always)]
     /// Returns the cross product of two vectors
     pub fn cross(self, rhs: Self) -> Self {
         let x = self[1] * rhs[2] - self[2] * rhs[1];
@@ -64,26 +55,29 @@ impl SpatialVector<3> {
         Self::new(x, y, z)
     }
 
-    #[inline]
+    #[inline(always)]
     /// Returns the absolute value of the angle between two vectors
-    pub fn absolute_angle_between(self, rhs: Self) -> f64 {
-        if self.length() == 0.0 || rhs.length() == 0.0 {
+    pub fn absolute_angle_between(self, rhs: Self) -> Float {
+        let self_len_sq = self.length_squared();
+        let rhs_len_sq = rhs.length_squared();
+
+        if self_len_sq == 0.0 || rhs_len_sq == 0.0 {
             return 0.0;
         }
 
-        let cosine_value = self.dot(rhs) / (self.length() * rhs.length());
+        let cosine_value = self.dot(rhs) / (self_len_sq * rhs_len_sq).sqrt();
 
         // Correct for potential floating point errors
         let clipped_cosine_value = cosine_value.max(-1.0).min(1.0);
-        
+
         clipped_cosine_value.acos()
     }
 
-    #[inline]
+    #[inline(always)]
     /// Returns the signed angle between two vectors, with the sign determined by the axis.
     /// 
     /// The sign is determined by the right-hand rule where the rotation is from self to rhs.
-    pub fn signed_angle_between(self, rhs: Self, axis: Self) -> f64 {
+    pub fn signed_angle_between(self, rhs: Self, axis: Self) -> Float {
         let triple_product = self.dot(rhs.cross(axis));
 
         let absolute_angle = self.absolute_angle_between(rhs);
@@ -95,17 +89,18 @@ impl SpatialVector<3> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     /// Vector projection, as described in <https://en.wikipedia.org/wiki/Vector_projection>
     pub fn project(self, rhs: Self) -> Self {
         let rhs_normalized = rhs.normalize();
 
-        self.dot(rhs_normalized) * rhs_normalized
+        rhs_normalized * self.dot(rhs_normalized)
     }
 
-    #[inline]
+    #[inline(always)]
     /// Projects the vector onto a plane defined by the normal vector
     pub fn project_on_plane(self, plane_normal: Self) -> Self {
         self - self.project(plane_normal)
     }
+
 }

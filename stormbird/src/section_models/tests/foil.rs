@@ -4,13 +4,14 @@
 
 use crate::section_models::foil::Foil;
 
-use std::f64::consts::PI;
+use stormath::type_aliases::Float;
+use stormath::consts::TAU;
 
 #[test]
 fn large_angle_of_attack() {
     let foil = Foil::default();
 
-    let angle_of_attack = 80.0_f64.to_radians();
+    let angle_of_attack = Float::from(80.0).to_radians();
 
     let cd = foil.drag_coefficient(angle_of_attack);
 
@@ -22,9 +23,9 @@ fn large_angle_of_attack() {
 fn default_lift_coefficent() {
     let foil = Foil::default();
 
-    let angle_of_attack = 5.0_f64.to_radians();
+    let angle_of_attack = Float::from(5.0).to_radians();
 
-    let cl_theory = 2.0 * PI * angle_of_attack;
+    let cl_theory = TAU * angle_of_attack;
     let cl_model = foil.lift_coefficient(angle_of_attack);
 
     let cl_error = (cl_model - cl_theory).abs();

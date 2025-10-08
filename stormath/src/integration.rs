@@ -4,15 +4,17 @@
 
 //! Numerical integration functions
 
+use crate::type_aliases::Float;
+
 /// Trapezoidal integration of the input arrays.
 /// For more: <https://en.wikipedia.org/wiki/Trapezoidal_rule>
 ///
 /// # Arguments
 /// * `x` - the input values of the function to be integrated
 /// * `y` - the return values of the function to be integrated. in other words, y = f(x)
-pub fn trapz<T>(x: &[f64], y: &[T]) -> T 
+pub fn trapz<T>(x: &[Float], y: &[T]) -> T 
 where T:
-    std::ops::Mul<f64, Output = T> + 
+    std::ops::Mul<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     std::ops::Sub<T, Output = T> + 
     std::default::Default +
@@ -21,7 +23,7 @@ where T:
     let mut integration_sum: T = T::default();
 
     for i in 1..x.len() {
-        let delta_x: f64 = x[i] - x[i-1];
+        let delta_x: Float = x[i] - x[i-1];
 
         let y_average: T = (y[i-1] + y[i]) * 0.5;
         
@@ -50,7 +52,7 @@ mod tests {
         let a1 = 1.2425;
         let a2 = 4.1231;
 
-        let mut y_vector: Vec<f64> = Vec::new();
+        let mut y_vector: Vec<Float> = Vec::new();
         for x in &x_vector {
             y_vector.push(a0 + a1 * x + a2 * x.powf(2.0));
         }

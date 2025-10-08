@@ -4,12 +4,15 @@
 
 use crate::lifting_line::prelude::*;
 
+use stormath::type_aliases::Float;
+
+
 #[derive(Debug, Clone)]
 /// Struct for setting up line force models for a rectangular wing with constant foil properties
 pub struct RectangularWing {
-    pub aspect_ratio: f64,
-    pub cl_zero_angle: f64,
-    pub angle_of_attack: f64,
+    pub aspect_ratio: Float,
+    pub cl_zero_angle: Float,
+    pub angle_of_attack: Float,
     pub nr_strips: usize,
     pub negative_span_orientation: bool
 }
@@ -29,12 +32,12 @@ impl Default for RectangularWing {
 impl RectangularWing {
     pub fn build(&self) -> LineForceModelBuilder {
         let rotation_axis = if self.negative_span_orientation {
-            -SpatialVector::<3>::unit_z()
+            -SpatialVector::unit_z()
         } else {
-            SpatialVector::<3>::unit_z()
+            SpatialVector::unit_z()
         };
 
-        let chord_vector = SpatialVector([1.0, 0.0, 0.0]).rotate_around_axis(
+        let chord_vector = SpatialVector::from([1.0, 0.0, 0.0]).rotate_around_axis(
             -self.angle_of_attack, rotation_axis
         );
 
@@ -50,8 +53,8 @@ impl RectangularWing {
 
         let wing_builder = WingBuilder {
             section_points: vec![
-                SpatialVector([0.0, 0.0, 0.0]),
-                SpatialVector([0.0, 0.0, last_z]),
+                SpatialVector::from([0.0, 0.0, 0.0]),
+                SpatialVector::from([0.0, 0.0, last_z]),
             ],
             chord_vectors: vec![
                 chord_vector,
@@ -59,8 +62,8 @@ impl RectangularWing {
             ],
             section_model: SectionModel::Foil(Foil {
                 cl_zero_angle: self.cl_zero_angle,
-                mean_positive_stall_angle: 45.0_f64.to_radians(),
-                mean_negative_stall_angle: 45.0_f64.to_radians(),
+                mean_positive_stall_angle: Float::from(45.0).to_radians(),
+                mean_negative_stall_angle: Float::from(45.0).to_radians(),
                 ..Default::default()
             }),
             non_zero_circulation_at_ends: [false, false],

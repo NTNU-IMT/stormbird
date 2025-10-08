@@ -2,26 +2,27 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use std::f64::consts::PI;
 
 use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
+use stormath::consts::PI;
 
 use crate::line_force_model::span_line::SpanLine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Gaussian {
-    pub chord_factor: f64,
-    pub thickness_factor: f64,
+    pub chord_factor: Float,
+    pub thickness_factor: Float,
 }
 
 impl Default for Gaussian {
     fn default() -> Self {
         Self {
             chord_factor: 0.4,
-            thickness_factor: 0.4
+            thickness_factor: 0.2
         }
     }
 }
@@ -29,10 +30,10 @@ impl Default for Gaussian {
 impl Gaussian {
     pub fn projection_value_at_point(
         &self, 
-        point: SpatialVector<3>, 
-        chord_vector: SpatialVector<3>, 
+        point: SpatialVector, 
+        chord_vector: SpatialVector, 
         span_line: &SpanLine
-    ) -> f64 {
+    ) -> Float {
         let chord_length = chord_vector.length();
         let line_length = span_line.length();
 

@@ -71,42 +71,42 @@ impl<T: SmoothingOps> EndCondition<T> {
         y_end
     }
 
-    pub fn x_start_values(x: &[f64], number_of_end_insertions: usize, delta_x_factor: f64) -> Vec<f64> {
-        let mut x_start: Vec<f64> = Vec::with_capacity(number_of_end_insertions);
+    pub fn x_start_values(x: &[Float], number_of_end_insertions: usize, delta_x_factor: Float) -> Vec<Float> {
+        let mut x_start: Vec<Float> = Vec::with_capacity(number_of_end_insertions);
 
         let delta_x = (x[0] - x[1]) * delta_x_factor;
 
         for i in (0..number_of_end_insertions).rev() {
-            x_start.push(x[0] + ((i+1) as f64) * delta_x);
+            x_start.push(x[0] + ((i+1) as Float) * delta_x);
         }
 
         x_start
     }
 
-    pub fn x_end_values(x: &[f64], number_of_end_insertions: usize, delta_x_factor: f64) -> Vec<f64> {
-        let mut x_end: Vec<f64> = Vec::with_capacity(number_of_end_insertions);
+    pub fn x_end_values(x: &[Float], number_of_end_insertions: usize, delta_x_factor: Float) -> Vec<Float> {
+        let mut x_end: Vec<Float> = Vec::with_capacity(number_of_end_insertions);
 
         let nr_points = x.len();
 
         let delta_x = (x[nr_points-1] - x[nr_points-2]) * delta_x_factor;
 
         for i in 0..number_of_end_insertions {
-            x_end.push(x[nr_points-1] + ((i+1) as f64) * delta_x);
+            x_end.push(x[nr_points-1] + ((i+1) as Float) * delta_x);
         }
 
         x_end
     }
 
     pub fn add_end_values_to_x_data(
-        x: &[f64], 
+        x: &[Float], 
         number_of_end_insertions: usize, 
-        delta_x_factor: f64
-    ) -> Vec<f64> {
+        delta_x_factor: Float
+    ) -> Vec<Float> {
 
         let x_start = Self::x_start_values(x, number_of_end_insertions, delta_x_factor);
         let x_end = Self::x_end_values(x, number_of_end_insertions, delta_x_factor);
 
-        let mut x_modified: Vec<f64> = Vec::with_capacity(x.len() + number_of_end_insertions * 2);
+        let mut x_modified: Vec<Float> = Vec::with_capacity(x.len() + number_of_end_insertions * 2);
 
         x_modified.extend_from_slice(&x_start);
         x_modified.extend_from_slice(x);
@@ -148,7 +148,7 @@ mod tests {
 
         let delta_x_factor = 0.5;
 
-        let x_modified = EndCondition::<f64>::add_end_values_to_x_data(
+        let x_modified = EndCondition::<Float>::add_end_values_to_x_data(
             &x, 
             number_of_end_insertions, 
             delta_x_factor

@@ -1,6 +1,6 @@
 // Copyright (C) 2024, NTNU 
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
-// License: GPL v3.0 (see seperate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 #include "fvMesh.H"
 #include "fvMatrix.H"
@@ -26,6 +26,8 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
     this->relevant_cells_for_velocity_sampling = labelList();
     this->dominating_line_element_index_sampling = labelList();
 
+    double weight_limit = this->model->sampling_weight_limit();
+
     forAll(cell_ids, i) {
         label cell_id = cell_ids[i];
 
@@ -37,7 +39,7 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
 
         double body_force_weight = this->model->summed_projection_weights_at_point(cell_center);
 
-        if (body_force_weight > this->sampling_integral_limit) {
+        if (body_force_weight > weight_limit) {
             this->relevant_cells_for_velocity_sampling.append(cell_id);
 
             this->dominating_line_element_index_sampling.append(
@@ -70,12 +72,7 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
 
 
 // --------------------- Perform the interpolation -------------------------------------------------
-
 void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) {
-    if (this->need_update) {
-        this->set_velocity_sampling_data_integral();
-    }
-
     const vectorField& cell_centers = mesh_.C();
     const scalarField& cell_volumes = mesh_.V();
 
@@ -108,36 +105,19 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
             cell_centers[cell_id][2]
         };
 
-        if (this->only_use_dominating_line_element_when_sampling) {
-            auto line_index = this->dominating_line_element_index_sampling[i];
-            
-            std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
-                line_index,
-                velocity,
-                cell_center,
-                cell_volume
-            );
+        auto line_index = this->dominating_line_element_index_sampling[i];
+        
+        std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
+            line_index,
+            velocity,
+            cell_center,
+            cell_volume
+        );
 
-            numerator[line_index][0] += temp_out[0];
-            numerator[line_index][1] += temp_out[1];
-            numerator[line_index][2] += temp_out[2];
-            denominator[line_index] += temp_out[3];
-
-        } else {
-            for (int line_index = 0; line_index < nr_span_lines; line_index++) {
-                std::array<double, 4> temp_out = this->model->get_weighted_velocity_sampling_integral_terms_for_cell(
-                    line_index,
-                    velocity,
-                    cell_center,
-                    cell_volume
-                );
-                
-                numerator[line_index][0] += temp_out[0];
-                numerator[line_index][1] += temp_out[1];
-                numerator[line_index][2] += temp_out[2];
-                denominator[line_index] += temp_out[3];
-            }
-        }
+        numerator[line_index][0] += temp_out[0];
+        numerator[line_index][1] += temp_out[1];
+        numerator[line_index][2] += temp_out[2];
+        denominator[line_index] += temp_out[3];
     }
 
     // Sync the values between processors
@@ -161,11 +141,7 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
     }
 }
 
-void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {
-    if (this->need_update) {
-        this->set_velocity_sampling_data_interpolation();
-    }
-    
+void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {    
     interpolationCellPoint<vector> u_interpolator(velocity_field); // create interpolation object
 
     for (unsigned int i = 0; i < this->ctrl_points.size(); i++) {

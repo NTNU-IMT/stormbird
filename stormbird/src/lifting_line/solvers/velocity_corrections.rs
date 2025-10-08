@@ -7,6 +7,7 @@
 use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 /// Model to empirically correct the estimated velocity in lifting line simulations, based on the 
@@ -18,18 +19,18 @@ pub enum VelocityCorrections {
     #[default]
     None,
     /// The induced velocity is capped using a ratio between the induced velocity and the freestream
-    MaxInducedVelocityMagnitudeRatio(f64),
+    MaxInducedVelocityMagnitudeRatio(Float),
     /// The total velocity is kept at a fixed magnitude, equal to the freestream velocity 
     FixedMagnitudeEqualToFreestream,
 }
 
 impl VelocityCorrections {
     pub fn max_induced_velocity_magnitude_ratio(
-        ratio: f64,
-        freestream_velocities: &[SpatialVector<3>],
-        induced_velocities: &[SpatialVector<3>],
-    ) -> Vec<SpatialVector<3>> {
-        let u_i_corrected: Vec<SpatialVector<3>> = induced_velocities.iter().zip(freestream_velocities.iter()).map(
+        ratio: Float,
+        freestream_velocities: &[SpatialVector],
+        induced_velocities: &[SpatialVector],
+    ) -> Vec<SpatialVector> {
+        let u_i_corrected: Vec<SpatialVector> = induced_velocities.iter().zip(freestream_velocities.iter()).map(
             |(induced_velocity, freestream_velocity)| {
                 let induced_velocity_magnitude = induced_velocity.length();
                 let freestream_velocity_magnitude = freestream_velocity.length();
@@ -52,10 +53,10 @@ impl VelocityCorrections {
     }
 
     pub fn fixed_magnitude_equal_to_freestream(
-        freestream_velocities: &[SpatialVector<3>],
-        induced_velocities: &[SpatialVector<3>],
-    ) -> Vec<SpatialVector<3>> {
-        let mut u_total: Vec<SpatialVector<3>> = induced_velocities.iter().zip(freestream_velocities.iter()).map(
+        freestream_velocities: &[SpatialVector],
+        induced_velocities: &[SpatialVector],
+    ) -> Vec<SpatialVector> {
+        let mut u_total: Vec<SpatialVector> = induced_velocities.iter().zip(freestream_velocities.iter()).map(
             |(induced_velocity, freestream_velocity)| {
                 *freestream_velocity + *induced_velocity
             }

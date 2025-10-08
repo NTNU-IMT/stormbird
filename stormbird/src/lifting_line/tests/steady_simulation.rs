@@ -27,7 +27,7 @@ fn moment_test() {
         ..Default::default()
     }.build();
 
-    let freestream_velocity = SpatialVector([1.2, 0.0, 0.0]);
+    let freestream_velocity = SpatialVector::from([1.2, 0.0, 0.0]);
 
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder,

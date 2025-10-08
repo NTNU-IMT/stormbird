@@ -5,9 +5,16 @@ use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
 
-use super::projection::Projection;
-use super::settings::*;
+use super::projection::ProjectionSettings;
+use super::sampling::SamplingSettings;
+use super::solver::SolverSettings;
 use super::ActuatorLine;
+
+use super::corrections::{
+    lifting_line::LiftingLineCorrectionBuilder,
+    empirical_circulation::EmpiricalCirculationCorrection,
+    empirical_angle_of_attack::EmpiricalAngleOfAttackCorrection,
+};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,7 +23,7 @@ use super::ActuatorLine;
 pub struct ActuatorLineBuilder {
     pub line_force_model: LineForceModelBuilder,
     #[serde(default)]
-    pub projection: Projection,
+    pub projection_settings: ProjectionSettings,
     #[serde(default)]
     pub solver_settings: SolverSettings,
     #[serde(default)]
@@ -28,9 +35,11 @@ pub struct ActuatorLineBuilder {
     #[serde(default)]
     pub start_iteration: usize,
     #[serde(default)]
-    pub extrapolate_end_velocities: bool,
+    pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
-    pub remove_span_velocity: bool
+    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    #[serde(default)]
+    pub empirical_angle_of_attack_correction: Option<EmpiricalAngleOfAttackCorrection>,
 }
 
 impl ActuatorLineBuilder {
@@ -39,14 +48,15 @@ impl ActuatorLineBuilder {
     pub fn new(line_force_model: LineForceModelBuilder) -> Self {
         Self {
             line_force_model,
-            projection: Projection::default(),
+            projection_settings: ProjectionSettings::default(),
             solver_settings: SolverSettings::default(),
             sampling_settings: SamplingSettings::default(),
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
             start_iteration: 0,
-            extrapolate_end_velocities: false,
-            remove_span_velocity: false
+            lifting_line_correction: None,
+            empirical_circulation_correction: None,
+            empirical_angle_of_attack_correction: None,
         }
     }
 
@@ -62,19 +72,33 @@ impl ActuatorLineBuilder {
             None
         };
 
+        let lifting_line_correction = if let Some(lifting_line_correction_builder) = &self.lifting_line_correction {
+            let viscous_core_length_factor = 0.5 * (
+                self.projection_settings.projection_function.chord_factor +
+                self.projection_settings.projection_function.thickness_factor
+            );
+            
+            Some(
+                lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)
+            )
+        } else {
+            None
+        };
+
         ActuatorLine{
             line_force_model,
-            projection: self.projection.clone(),
-            ctrl_points_velocity: vec![SpatialVector::<3>::default(); nr_span_lines],
-            simulation_result: None,
+            projection_settings: self.projection_settings.clone(),
             solver_settings: self.solver_settings.clone(),
             sampling_settings: self.sampling_settings.clone(),
             controller,
             start_iteration: self.start_iteration,
             current_iteration: 0,
             write_iterations_full_result: self.write_iterations_full_result,
-            extrapolate_end_velocities: self.extrapolate_end_velocities,
-            remove_span_velocity: self.remove_span_velocity
+            ctrl_points_velocity: vec![SpatialVector::default(); nr_span_lines],
+            simulation_result: None,
+            lifting_line_correction,
+            empirical_circulation_correction: self.empirical_circulation_correction.clone(),
+            empirical_angle_of_attack_correction: self.empirical_angle_of_attack_correction.clone(),
         }
     }
 }

@@ -2,50 +2,56 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! The SpanLine struct, used to represent a line segment of a wing span.
+
 use serde::{Serialize, Deserialize};
 
-use stormath::spatial_vector::SpatialVector;
+use stormath::{
+    spatial_vector::SpatialVector,
+    type_aliases::Float
+};
+
 
 #[derive(Debug, Clone)]
 /// Struct that represents spatial coordinates in a coordinate system that is oriented along the 
 /// chord line, span line and thickness direction of a line segment.
 pub struct LineCoordinates {
-    pub chord: f64,
-    pub thickness: f64,
-    pub span: f64,
+    pub chord: Float,
+    pub thickness: Float,
+    pub span: Float,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// A line segment of a wing span
 pub struct SpanLine {
-    pub start_point: SpatialVector<3>,
-    pub end_point: SpatialVector<3>
+    pub start_point: SpatialVector,
+    pub end_point: SpatialVector
 }
 
 impl SpanLine {
-    pub fn relative_vector(&self) -> SpatialVector<3> {
+    pub fn relative_vector(&self) -> SpatialVector {
         self.end_point - self.start_point
     }
 
-    pub fn length(&self) -> f64 {
+    pub fn length(&self) -> Float {
         self.relative_vector().length()
     }
 
-    pub fn direction(&self) -> SpatialVector<3> {
+    pub fn direction(&self) -> SpatialVector {
         self.relative_vector().normalize()
     }
 
-    pub fn as_array(&self) -> [SpatialVector<3>; 2] {
+    pub fn as_array(&self) -> [SpatialVector; 2] {
         [self.start_point, self.end_point]
     }
 
     /// Return the control point of the line segment, which corresponds to the average point along 
     /// the line segment. 
-    pub fn ctrl_point(&self) -> SpatialVector<3> {
+    pub fn ctrl_point(&self) -> SpatialVector {
         0.5 * (self.start_point + self.end_point)
     }
 
-    pub fn distance(&self, point: SpatialVector<3>) -> f64 {
+    pub fn distance(&self, point: SpatialVector) -> Float {
         let relative_vector = self.relative_vector();
         let start_to_point  = point - self.start_point;
         let end_to_point    = point - self.end_point;
@@ -64,7 +70,7 @@ impl SpanLine {
     /// 
     /// The chord and span direction is given directly by Self and the input. The thickness 
     /// direction is assumed to be normal to the two other directions.
-    pub fn line_coordinates(&self, point: SpatialVector<3>, chord_vector: SpatialVector<3>) -> LineCoordinates {
+    pub fn line_coordinates(&self, point: SpatialVector, chord_vector: SpatialVector) -> LineCoordinates {
         let translated_point = point - self.ctrl_point();
 
         let span_direction      = self.relative_vector().normalize();

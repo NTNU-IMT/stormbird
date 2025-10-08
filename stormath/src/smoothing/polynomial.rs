@@ -17,7 +17,7 @@ impl WindowSize {
         }
     }
 
-    pub fn weights(&self) -> Vec<f64> {
+    pub fn weights(&self) -> Vec<Float> {
         match self {
             Self::Five => vec![-3.0, 12.0, 17.0, 12.0, -3.0],
             Self::Seven => vec![-2.0, 3.0, 6.0, 7.0, 6.0, 3.0, -2.0],
@@ -25,7 +25,7 @@ impl WindowSize {
         }
     }
 
-    pub fn normalization(&self) -> f64 {
+    pub fn normalization(&self) -> Float {
         match self {
             Self::Five => 35.0,
             Self::Seven => 21.0,

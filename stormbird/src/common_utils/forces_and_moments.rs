@@ -7,6 +7,7 @@
 use crate::line_force_model::LineForceModel;
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use serde::{Deserialize, Serialize};
 
@@ -20,28 +21,28 @@ pub enum CoordinateSystem {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Integrated values representing either forces or moments.
 pub struct IntegratedValues {
-    pub circulatory: SpatialVector<3>,
-    pub sectional_drag: SpatialVector<3>,
-    pub added_mass: SpatialVector<3>,
-    pub gyroscopic: SpatialVector<3>,
-    pub total: SpatialVector<3>,
+    pub circulatory: SpatialVector,
+    pub sectional_drag: SpatialVector,
+    pub added_mass: SpatialVector,
+    pub gyroscopic: SpatialVector,
+    pub total: SpatialVector,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Input data to calculate sectional forces.
 pub struct SectionalForcesInput {
     /// Circulation strength of each line element
-    pub circulation_strength: Vec<f64>,
+    pub circulation_strength: Vec<Float>,
     /// The *felt* velocity at each control point, meaning the velocity of the fluid from the 
     /// perspective of the wings, **not** the velocity of the wings themselves.  
-    pub velocity: Vec<SpatialVector<3>>,
+    pub velocity: Vec<SpatialVector>,
     /// The estimated angle of attack at each control point.
-    pub angles_of_attack: Vec<f64>,
+    pub angles_of_attack: Vec<Float>,
     /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
     /// the perspective of the wings, **not** the acceleration of the wings themselves.
-    pub acceleration: Vec<SpatialVector<3>>,
+    pub acceleration: Vec<SpatialVector>,
     /// The rotational velocity of the entire system. Primarily relevant for gyroscopic effects.
-    pub rotation_velocity: SpatialVector<3>,
+    pub rotation_velocity: SpatialVector,
     /// The coordinate system of the input data.
     pub coordinate_system: CoordinateSystem,
 }
@@ -51,19 +52,19 @@ pub struct SectionalForcesInput {
 pub struct SectionalForces {
     /// Forces due to the circulation on a line element. Computed from the lift part of the 
     /// sectional model.
-    pub circulatory: Vec<SpatialVector<3>>,
+    pub circulatory: Vec<SpatialVector>,
     /// Forces due to the two dimensional drag on a line element. 
     /// 
     /// **Note**: this is often the viscous drag, but not always. In can also include three- 
     /// dimensional effects on the drag, if the model is executed with a simplified approach, for 
     /// instance when neglecting the *self-induced* velocities.
-    pub sectional_drag: Vec<SpatialVector<3>>,
+    pub sectional_drag: Vec<SpatialVector>,
     /// Added mass forces on the line element.
-    pub added_mass: Vec<SpatialVector<3>>,
+    pub added_mass: Vec<SpatialVector>,
     /// Forces due to gyroscopic effects on the line element.
-    pub gyroscopic: Vec<SpatialVector<3>>,
+    pub gyroscopic: Vec<SpatialVector>,
     /// Total forces
-    pub total: Vec<SpatialVector<3>>,
+    pub total: Vec<SpatialVector>,
     /// The coordinate system of the forces data.
     pub coordinate_system: CoordinateSystem,
 }
@@ -82,7 +83,7 @@ impl SectionalForces {
     /// Calculates the moment contribution from each line element.
     /// 
     /// The moments are calculated as the cross product of the control point and the sectional force.
-    pub fn sectional_moments(line_force_model: &LineForceModel, sectional_forces: &[SpatialVector<3>], coordinate_system: CoordinateSystem) -> Vec<SpatialVector<3>> {
+    pub fn sectional_moments(line_force_model: &LineForceModel, sectional_forces: &[SpatialVector], coordinate_system: CoordinateSystem) -> Vec<SpatialVector> {
         let span_lines = match coordinate_system {
             CoordinateSystem::Global => line_force_model.span_lines(),
             CoordinateSystem::Body => line_force_model.span_lines_local.clone(),

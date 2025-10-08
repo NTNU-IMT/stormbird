@@ -1,6 +1,10 @@
 use std::ops::Range;
 
-use stormath::spatial_vector::SpatialVector;
+use stormath::{
+    type_aliases::Float,
+    spatial_vector::SpatialVector,
+    rigid_body_motion::RigidBodyMotion,
+};
 use serde::{Serialize, Deserialize};
 
 use crate::error::Error;
@@ -14,15 +18,17 @@ use crate::common_utils::forces_and_moments::{
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
-    pub time: f64,
-    pub ctrl_points: Vec<SpatialVector<3>>,
+    pub time: Float,
+    pub ctrl_points: Vec<SpatialVector>,
+    pub solver_input_ctrl_point_velocity: Vec<SpatialVector>,
     pub force_input: SectionalForcesInput,
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
     pub integrated_moments: Vec<IntegratedValues>,
     pub iterations: usize,
-    pub residual: f64,
+    pub residual: Float,
     pub wing_indices: Vec<Range<usize>>,
+    pub rigid_body_motion: RigidBodyMotion
 }
 
 impl SimulationResult {
@@ -36,8 +42,8 @@ impl SimulationResult {
         Ok(serde_res)
     }
 
-    pub fn integrated_forces_sum(&self) -> SpatialVector<3> {
-        let mut sum = SpatialVector::<3>::default();
+    pub fn integrated_forces_sum(&self) -> SpatialVector {
+        let mut sum = SpatialVector::default();
 
         for i in 0..self.integrated_forces.len() {
             sum += self.integrated_forces[i].total;
@@ -46,8 +52,8 @@ impl SimulationResult {
         sum
     }
 
-    pub fn integrated_moments_sum(&self) -> SpatialVector<3> {
-        let mut sum = SpatialVector::<3>::default();
+    pub fn integrated_moments_sum(&self) -> SpatialVector {
+        let mut sum = SpatialVector::default();
 
         for i in 0..self.integrated_moments.len() {
             sum += self.integrated_moments[i].total;
@@ -73,7 +79,7 @@ impl SimulationResult {
         self.integrated_forces.len()
     }
 
-    pub fn angles_of_attack_for_wing(&self, wing_index: usize) -> Vec<f64> {
+    pub fn angles_of_attack_for_wing(&self, wing_index: usize) -> Vec<Float> {
         let mut angles_of_attack = Vec::new();
 
         for i in self.wing_indices[wing_index].start..self.wing_indices[wing_index].end {
@@ -81,6 +87,38 @@ impl SimulationResult {
         }
 
         angles_of_attack
+    }
+
+    /// Returns the felt velocity at each control point, but with the motion due to rotational 
+    /// motion subtracted. 
+    pub fn felt_velocity_minus_rotational_motion(&self) -> Vec<SpatialVector> {
+        let nr_span_lines = self.nr_span_lines();
+        let mut out: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines);
+
+        for i in 0..nr_span_lines {
+            out.push(
+                self.force_input.velocity[i] + 
+                self.rigid_body_motion.rotation_velocity_at_point(self.ctrl_points[i])
+            )
+        }
+
+        out
+    }
+
+    /// Returns the felt input velocity at each control point, but with the motion due to rotational 
+    /// motion subtracted. 
+    pub fn felt_input_velocity_minus_rotational_motion(&self) -> Vec<SpatialVector> {
+        let nr_span_lines = self.nr_span_lines();
+        let mut out: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines);
+
+        for i in 0..nr_span_lines {
+            out.push(
+                self.solver_input_ctrl_point_velocity[i] + 
+                self.rigid_body_motion.rotation_velocity_at_point(self.ctrl_points[i])
+            )
+        }
+
+        out
     }
 
     pub fn as_reduced_flatten_csv_string(&self) -> (String, String) {

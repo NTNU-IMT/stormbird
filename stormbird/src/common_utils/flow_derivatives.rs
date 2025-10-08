@@ -7,19 +7,20 @@
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::finite_difference;
+use stormath::type_aliases::Float;
 
 
 
 #[derive(Debug, Clone)]
 /// Structure used to calculate the derivatives of flow quantities in a line force model
 pub struct FlowDerivatives {
-    pub velocity_history: [Vec<SpatialVector<3>>; 2],
+    pub velocity_history: [Vec<SpatialVector>; 2],
     update_count: usize,
 }
 
 impl FlowDerivatives {
     /// Create a new FlowDerivativesCalculator
-    pub fn new(initial_velocity: &[SpatialVector<3>]) -> Self {
+    pub fn new(initial_velocity: &[SpatialVector]) -> Self {
         Self {
             velocity_history: [initial_velocity.to_vec(), initial_velocity.to_vec()],
             update_count: 0,
@@ -27,9 +28,9 @@ impl FlowDerivatives {
     }
 
     /// Calculates the *flow acceleration* based on the stored history
-    pub fn acceleration(&self, current_velocity: &[SpatialVector<3>], time_step: f64) -> Vec<SpatialVector<3>> {
+    pub fn acceleration(&self, current_velocity: &[SpatialVector], time_step: Float) -> Vec<SpatialVector> {
         if self.update_count < 2 {
-            return vec![SpatialVector::<3>::default(); current_velocity.len()];
+            return vec![SpatialVector::default(); current_velocity.len()];
         }
 
         let mut acceleration = Vec::with_capacity(current_velocity.len());
@@ -53,7 +54,7 @@ impl FlowDerivatives {
     }
 
 
-    pub fn update(&mut self, current_velocity: &[SpatialVector<3>]) {
+    pub fn update(&mut self, current_velocity: &[SpatialVector]) {
         self.velocity_history[0] = self.velocity_history[1].clone();
         self.velocity_history[1] = current_velocity.to_vec();
 
@@ -62,7 +63,7 @@ impl FlowDerivatives {
 }
 
 /*impl LineForceModel {
-    pub fn initialize_flow_derivatives(&mut self, ctrl_points_freestream: &[SpatialVector<3>]) {
+    pub fn initialize_flow_derivatives(&mut self, ctrl_points_freestream: &[SpatialVector]) {
         let initial_angles = self.angles_of_attack(
             ctrl_points_freestream, 
             CoordinateSystem::Global

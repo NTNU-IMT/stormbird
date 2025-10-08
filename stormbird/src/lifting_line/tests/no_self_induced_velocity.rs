@@ -9,6 +9,8 @@ use crate::lifting_line::simulation_builder::{
     UnsteadySettings,
 };
 
+use stormath::type_aliases::Float;
+
 #[test]
 /// This tests whether the lift and drag coefficients are correct for a steady simulation of two 
 /// sails when the "neglect_self_induced_velocity" flag is set to true. The sails are placed far
@@ -38,7 +40,7 @@ fn no_self_induced_velocity() {
         }
     );*/
 
-    let chord_vector = SpatialVector([diameter, 0.0, 0.0]);
+    let chord_vector = SpatialVector::from([diameter, 0.0, 0.0]);
 
     let wing_x_positions = vec![
         -1.0 * span,
@@ -53,8 +55,8 @@ fn no_self_induced_velocity() {
     for (x_pos, y_pos) in wing_x_positions.iter().zip(wing_y_positions.iter()) {
         let wing_builder = WingBuilder {
             section_points: vec![
-                SpatialVector([*x_pos, *y_pos, 0.0]),
-                SpatialVector([*x_pos, *y_pos, span]),
+                SpatialVector::from([*x_pos, *y_pos, 0.0]),
+                SpatialVector::from([*x_pos, *y_pos, span]),
             ],
             chord_vectors: vec![
                 chord_vector,
@@ -67,8 +69,8 @@ fn no_self_induced_velocity() {
                     cd_data: vec![0.554, 0.674, 1.497, 2.877, 3.556, 3.816],
                     cl_data: vec![0.0, 1.889, 4.638, 6.794, 7.680, 7.950],
                     wake_angle_data: Some(vec![
-                        0.0, 20.0_f64.to_radians(), 25.0_f64.to_radians(), 
-                        35.0_f64.to_radians(), 45.0_f64.to_radians(), 60.0_f64.to_radians()
+                        0.0, Float::from(20.0).to_radians(), Float::from(25.0).to_radians(), 
+                        Float::from(35.0).to_radians(), Float::from(45.0).to_radians(), Float::from(60.0).to_radians()
                     ]),
                     ..Default::default()
                 }
@@ -93,7 +95,7 @@ fn no_self_induced_velocity() {
     let nr_time_steps = 100;
     let time_step = 0.5;
 
-    let velocity = SpatialVector([velocity_mag, 0.0, 0.0]);
+    let velocity = SpatialVector::from([velocity_mag, 0.0, 0.0]);
 
     let mut sim = SimulationBuilder::new(
         line_force_model_builder,
@@ -108,7 +110,7 @@ fn no_self_induced_velocity() {
     let mut result = SimulationResult::default();
 
     for i in 0..nr_time_steps {
-        let time = (i as f64) * time_step;
+        let time = (i as Float) * time_step;
         
         result = sim.do_step(time, time_step, &input_freestream_velocity);
     }

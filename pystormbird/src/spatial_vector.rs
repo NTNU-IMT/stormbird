@@ -5,16 +5,19 @@
 use pyo3::prelude::*;
 
 use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
+use stormath::spatial_vector::{
+    DATA_SIZE,
+};
 use stormath::spatial_vector::transformations::RotationType;
 
 #[pyclass]
 #[derive(Clone)]
 pub struct SpatialVector {
-    pub data: SpatialVectorRust<3>
+    pub data: SpatialVectorRust
 }
 
-impl From<SpatialVectorRust<3>> for SpatialVector {
-    fn from(v: SpatialVectorRust<3>) -> Self {
+impl From<SpatialVectorRust> for SpatialVector {
+    fn from(v: SpatialVectorRust) -> Self {
         Self {
             data: v
         }
@@ -25,8 +28,14 @@ impl From<SpatialVectorRust<3>> for SpatialVector {
 impl SpatialVector {
     #[new]
     pub fn new(x: f64, y: f64, z: f64) -> Self {
+        let mut out = [0.0; DATA_SIZE];
+
+        out[0] = x;
+        out[1] = y;
+        out[2] = z;
+
         Self {
-            data: SpatialVectorRust([x, y, z])
+            data: SpatialVectorRust(out)
         }
     }
 

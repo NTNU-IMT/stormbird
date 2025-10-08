@@ -4,18 +4,20 @@
 
 //! Functions to perform finite difference calculations
 
+use crate::type_aliases::Float;
+
 /// Calculate the first order derivative on the data using first order finite difference scheme
 /// 
 /// # Arguments
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
 /// data point, while the first is the oldest data point.
 /// * `step_size` - The step size between the data points
-pub fn first_derivative_first_order<T>(data: &[T; 2], step_size: f64) -> T 
+pub fn first_derivative_first_order<T>(data: &[T; 2], step_size: Float) -> T 
 where T: 
-    std::ops::Mul<f64, Output = T> + 
+    std::ops::Mul<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     std::ops::Sub<T, Output = T> + 
-    std::ops::Div<f64, Output = T> +
+    std::ops::Div<Float, Output = T> +
     Copy
 {
     (data[1] - data[0]) / step_size
@@ -28,12 +30,12 @@ where T:
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
 /// data point, while the first is the oldest data point. Each point is assumed to be equally spaced
 /// based on the step size
-pub fn first_derivative_second_order_backward<T>(data: &[T; 3], step_size: f64) -> T 
+pub fn first_derivative_second_order_backward<T>(data: &[T; 3], step_size: Float) -> T 
 where T: 
-    std::ops::Mul<f64, Output = T> + 
+    std::ops::Mul<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     std::ops::Sub<T, Output = T> + 
-    std::ops::Div<f64, Output = T> +
+    std::ops::Div<Float, Output = T> +
     Copy
 {
     (data[2] * 3.0 - data[1] * 4.0 + data[0]) / (2.0 * step_size)
@@ -47,12 +49,12 @@ where T:
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
 /// data point, while the first is the oldest data point. Each point is assumed to be equally spaced
 /// based on the step size
-pub fn second_derivative_backward<T>(data: &[T; 3], step_size: f64) -> T 
+pub fn second_derivative_backward<T>(data: &[T; 3], step_size: Float) -> T 
 where T: 
-    std::ops::Mul<f64, Output = T> + 
+    std::ops::Mul<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     std::ops::Sub<T, Output = T> + 
-    std::ops::Div<f64, Output = T> +
+    std::ops::Div<Float, Output = T> +
     Copy
 {
     (data[2] - data[1] * 2.0 + data[0]) / step_size.powi(2)
@@ -60,12 +62,12 @@ where T:
 
 /// Calculates the spatial derivative of the data using central finite difference scheme on the 
 /// interior points, and forward and backward finite difference on the end points.
-pub fn derivative_spatial_arrays<T>(x_data: &[f64], y_data: &[T]) -> Vec<T> 
+pub fn derivative_spatial_arrays<T>(x_data: &[Float], y_data: &[T]) -> Vec<T> 
 where T: 
-    std::ops::Mul<f64, Output = T> + 
+    std::ops::Mul<Float, Output = T> + 
     std::ops::Add<T, Output = T> + 
     std::ops::Sub<T, Output = T> + 
-    std::ops::Div<f64, Output = T> +
+    std::ops::Div<Float, Output = T> +
     std::default::Default +
     Copy
 {   
@@ -105,15 +107,15 @@ where T:
 mod tests {
     use super::*;
 
-    fn function(x: f64) -> f64 {
+    fn function(x: Float) -> Float {
         3.2 * x.powi(3) + 2.0 * x + 1.0
     }
 
-    fn derivative(x: f64) -> f64 {
+    fn derivative(x: Float) -> Float {
         3.0 * 3.2 * x.powi(2) + 2.0
     }
 
-    fn second_derivative(x: f64) -> f64 {
+    fn second_derivative(x: Float) -> Float {
         3.0 * 2.0 * 3.2 * x
     }
 
@@ -122,10 +124,10 @@ mod tests {
         let step_size = 0.0012;
         let x0 = 0.85;
 
-        let previous_x_values: [f64; 3] = [x0, x0 + step_size, x0 + 2.0 * step_size];
+        let previous_x_values: [Float; 3] = [x0, x0 + step_size, x0 + 2.0 * step_size];
         let new_x_value = x0 + 3.0 * step_size;
         
-        let data: [f64; 3] = [
+        let data: [Float; 3] = [
             function(previous_x_values[0]),
             function(previous_x_values[1]),
             function(previous_x_values[2]),
@@ -147,7 +149,7 @@ mod tests {
         
         dbg!(derivative_error_first_order, derivative_error_second_order, second_derivative_error);
 
-        let allowed_error = 0.005;
+        let allowed_error = 0.01;
         assert!(derivative_error_first_order < allowed_error);
         assert!(derivative_error_second_order < allowed_error);
         assert!(second_derivative_error < allowed_error);

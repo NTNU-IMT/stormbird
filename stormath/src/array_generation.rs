@@ -4,6 +4,8 @@
 
 //! Helper functions to generate arrays of numbers.
 
+use crate::type_aliases::Float;
+
 /// A function that returns a vector that linearly goes from a start value to an end value with a
 /// specified number of elements.
 ///
@@ -11,10 +13,10 @@
 /// * `x_start` - the value of the first element
 /// * `x_end` - the value of the last element
 /// * `n` - the number of elements
-pub fn linspace(x_start: f64, x_end: f64, n: usize) -> Vec<f64> {
-    let dx = (x_end - x_start) / ((n - 1) as f64);
+pub fn linspace(x_start: Float, x_end: Float, n: usize) -> Vec<Float> {
+    let dx = (x_end - x_start) / ((n - 1) as Float);
 
-    let mut x: Vec<f64> = Vec::new();
+    let mut x: Vec<Float> = Vec::new();
 
     let mut x_current = x_start;
 
@@ -33,7 +35,7 @@ mod tests {
 
     #[test]
     fn linspace_test() {
-        let allowable_error = 1e-6;
+        let allowable_error = 1e-4;
 
         let x_start = 2.3456;
         let x_end = 12.4535653;

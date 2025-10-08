@@ -5,9 +5,10 @@
 
 use super::*;
 
+#[inline(always)]
 /// Function that calculates the induced velocity from a vortex panel, based on the corner points
 /// given as input. Source: <https://en.wikipedia.org/wiki/Brahmagupta%27s_formula>
-pub fn area_of_quadrilateral(vertices: &[SpatialVector<3>; 4]) -> f64 {
+pub fn area_of_quadrilateral(vertices: &[SpatialVector; 4]) -> Float {
     let a = (vertices[1] - vertices[0]).length();
     let b = (vertices[2] - vertices[1]).length();
     let c = (vertices[3] - vertices[2]).length();
@@ -19,8 +20,9 @@ pub fn area_of_quadrilateral(vertices: &[SpatialVector<3>; 4]) -> f64 {
     ((s - a) * (s - b) * (s - c) * (s - d)).sqrt()
 }
 
+#[inline(always)]
 /// Function that calculates the normal of a quadrilateral, based on the corner points
-pub fn normal_of_quadrilateral(vertices: &[SpatialVector<3>; 4]) -> SpatialVector<3> {
+pub fn normal_of_quadrilateral(vertices: &[SpatialVector; 4]) -> SpatialVector {
     let a = vertices[2] - vertices[0];
     let b = vertices[3] - vertices[1];
 
