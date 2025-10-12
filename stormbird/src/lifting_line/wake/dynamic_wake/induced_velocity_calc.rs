@@ -4,7 +4,7 @@ use super::*;
 use rayon::prelude::*;
 
 /// This code block contains the logic for calculating the induced velocities from the wake panels.
-impl Wake {
+impl DynamicWake {
     /// Calculates the induced velocities from all the panels in the wake
     ///
     /// # Arguments
@@ -60,6 +60,30 @@ impl Wake {
     /// Calculate the induced velocities from panels on all points, including self-induced 
     /// velocities
     fn induced_velocities_local_include_self_induced(
+        &self, 
+        points: &[SpatialVector], 
+        start_index: usize, 
+        end_index: usize
+    ) -> Vec<SpatialVector> {
+        let mut results = vec![SpatialVector::default(); points.len()];
+
+        for panel_index in start_index..end_index {
+            let strength = self.strengths[panel_index];
+            
+            if strength != 0.0 {
+                for (point_index, &point) in points.iter().enumerate() {
+                    results[point_index] += strength * self.unit_strength_induced_velocity_from_panel_flat_index(panel_index, point);
+                }
+            }
+        }
+
+        results
+    }
+
+    #[cfg(not(feature = "parallel"))]
+    /// Calculate the induced velocities from panels on all points, including self-induced 
+    /// velocities
+    fn _induced_velocities_local_include_self_induced_old(
         &self, 
         points: &[SpatialVector], 
         start_index: usize, 

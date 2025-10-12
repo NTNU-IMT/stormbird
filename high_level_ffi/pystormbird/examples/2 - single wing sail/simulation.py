@@ -2,65 +2,15 @@ import json
 import numpy as np
 
 from pystormbird.lifting_line import Simulation
-from pystormbird import SpatialVector
+from pystormbird import SpatialVector as SpatialVectorRust
+
+from stormbird_setup.spatial_vector import SpatialVector
+from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings, DynamicSettings
+from stormbird_setup.lifting_line.solver import Linearized, SimpleIterative
+from stormbird_setup.lifting_line.wake import QuasiSteadyWake, DynamicWake, SymmetryCondition
 
 from dataclasses import dataclass
-from enum import Enum
-
-class SimulationMode(Enum):
-    '''
-    Enum used to choose between dynamic and static simulations.
-    '''
-    DYNAMIC = 0
-    STATIC = 1
-
-    def to_string(self):
-        return self.name.replace("_", " ").lower()
-
-class TestCase(Enum):
-    '''
-    Enum used to predefine settings for different test cases.
-    '''
-    RAW_SIMULATION = 0           # No corrections applied to the estimated circulation distribution
-    PRESCRIBED_CIRCULATION = 1   # Circulation is prescribed to a fixed mathematical shape
-    INITIALIZED_SIMULATION = 2   # Simulation is initialized with a prescribed circulation distribution, but then simulated without any corrections
-    SMOOTHED = 3                 # Simulation is smoothed using a Gaussian kernel
-
-    def to_string(self):
-        return self.name.replace("_", " ").lower()
-    
-    @property
-    def prescribed_circulation(self) -> bool:
-        '''
-        Returns True if the test case is prescribed circulation, False otherwise.
-        '''
-        match self:
-            case TestCase.PRESCRIBED_CIRCULATION:
-                return True
-            case _:
-                return False
-    
-    @property
-    def prescribed_initialization(self) -> bool:
-        '''
-        Returns True if the test case is prescribed initialization, False otherwise.
-        '''
-        match self:
-            case TestCase.INITIALIZED_SIMULATION:
-                return True
-            case _:
-                return False
-            
-    @property
-    def smoothing_length(self) -> float | None:
-        '''
-        Returns the smoothing length for the test case, or None if no smoothing is applied.
-        '''
-        match self:
-            case TestCase.SMOOTHED:
-                return 0.1
-            case _:
-                return None
 
 @dataclass(frozen=True, kw_only=True)
 class SimulationCase():
@@ -77,57 +27,36 @@ class SimulationCase():
     freestream_velocity: float = 8.0
     density: float = 1.225
     nr_sections: int = 32
-    simulation_mode: SimulationMode = SimulationMode.STATIC
-    smoothing_length: float | None = None
+    dynamic: bool = False
     z_symmetry: bool = False
-    write_wake_files: bool = False
-    prescribed_circulation: bool = False
-    prescribed_initialization: bool = False
 
     @property
     def force_factor(self) -> float:
         return 0.5 * self.chord_length * self.span * self.density * self.freestream_velocity**2
     
-    def get_line_force_model(self) -> dict:
-        chord_vector = SpatialVector(self.chord_length, 0.0, 0.0)
+    def get_line_force_model(self) -> LineForceModelBuilder:
+        chord_vector = SpatialVector(x=self.chord_length, y=0.0, z=0.0)
 
-        non_zero_circulation_at_ends = [True, False] if self.z_symmetry else [False, False]
+        non_zero_circulation_at_ends = (True, False) if self.z_symmetry else (False, False)
 
-        wing_builder = {
-            "section_points": [
-                {"x": 0.0, "y": 0.0, "z": 0.0},
-                {"x": 0.0, "y": 0.0, "z": self.span}
+        wing_builder = WingBuilder(
+            section_points = [
+                SpatialVector(x=0.0, y=0.0, z=0.0),
+                SpatialVector(x=0.0, y=0.0, z=self.span)
             ],
-            "chord_vectors": [
-                {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z},
-                {"x": chord_vector.x, "y": chord_vector.y, "z": chord_vector.z}
+            chord_vectors = [
+                chord_vector,
+                chord_vector
             ],
-            "section_model": self.section_model_dict,
-            "non_zero_circulation_at_ends": non_zero_circulation_at_ends
-        }
+            section_model = self.section_model_dict,
+            non_zero_circulation_at_ends = non_zero_circulation_at_ends
+        )
 
-        line_force_model = {
-            "wing_builders": [wing_builder],
-            "nr_sections": self.nr_sections,
-            "density": self.density,
-        }
-
-        if self.smoothing_length is not None and not(self.prescribed_circulation):
-            gaussian_smoothing = {
-                "length_factor": self.smoothing_length
-            }
-
-            line_force_model["circulation_correction"] = {
-                "GaussianSmoothing": gaussian_smoothing
-            }
-
-        if self.prescribed_circulation:
-            line_force_model["circulation_correction"] = {
-                "PrescribedCirculation": {
-                    "inner_power": 2.5,
-                    "outer_power": 0.2 # Note: The default also works ok. This Factor is tuned manually, based on manual comparison with a 'raw' simulation below stall.
-                }
-            }
+        line_force_model = LineForceModelBuilder(
+            wing_builders = [wing_builder],
+            nr_sections = self.nr_sections,
+            density = self.density
+        )
 
         return line_force_model
     
@@ -138,55 +67,52 @@ class SimulationCase():
     @property
     def time_step(self) -> float:
         return 0.25 * self.chord_length / self.freestream_velocity
+    
+    def simulation_builder_str(self) -> str:
+        line_force_model = self.get_line_force_model()
+        
+        symmetry_condition = SymmetryCondition.Z if self.z_symmetry else SymmetryCondition.NoSymmetry
+    
+        if self.dynamic:
+            '''solver = SimpleIterative(
+                max_iterations_per_time_step = 20,
+                damping_factor = 0.1,
+            )'''
 
+            solver = Linearized()
+
+            wake = DynamicWake(
+                symmetry_condition=symmetry_condition,
+            )
+            
+            simulation_builder = SimulationBuilder(
+                line_force_model = line_force_model,
+                simulation_settings = DynamicSettings(
+                    solver = solver,
+                    wake = wake
+                )
+            )
+        else:
+            solver = Linearized()
+
+            wake = QuasiSteadyWake(
+                symmetry_condition=symmetry_condition,
+            )
+
+            simulation_builder = SimulationBuilder(
+                line_force_model = line_force_model,
+                simulation_settings = QuasiSteadySettings(
+                    solver = solver,
+                    wake = wake
+                )
+            )
+
+        return simulation_builder.to_json_string()
     
     def run(self):
-        freestream_velocity = SpatialVector(self.freestream_velocity, 0.0, 0.0)
+        freestream_velocity = SpatialVectorRust(self.freestream_velocity, 0.0, 0.0)
 
-        line_force_model = self.get_line_force_model()
-            
-        solver = {
-            "max_iterations_per_time_step": 10,
-            "damping_factor": 0.1
-        } if self.simulation_mode == SimulationMode.DYNAMIC else {
-            "max_iterations_per_time_step": 1000,
-            "damping_factor": 0.05
-        }   
-
-        wake = {}
-
-        if self.z_symmetry:
-            wake["symmetry_condition"] = "Z"
-
-        match self.simulation_mode:
-            case SimulationMode.DYNAMIC:
-                wake["nr_panels_per_line_element"] = 200
-                wake["use_chord_direction"] = True
-                wake["first_panel_relative_length"] = 0.75
-                
-
-                sim_settings = {
-                    "Dynamic": {
-                        "solver": solver,
-                        "wake": wake,
-                    }
-                }
-            case SimulationMode.STATIC:
-                sim_settings = {
-                    "QuasiSteady": {
-                        "solver": solver,
-                        "wake": wake
-                    }
-                }
-            case _:
-                raise ValueError("Invalid simulation type")
-
-        setup = {
-            "line_force_model": line_force_model,
-            "simulation_settings": sim_settings
-        }
-
-        setup_string = json.dumps(setup)
+        setup_string = self.simulation_builder_str()
 
         simulation = Simulation(setup_string = setup_string)
 
@@ -204,7 +130,7 @@ class SimulationCase():
 
         simulation.set_local_wing_angles([-np.radians(self.angle_of_attack)])
 
-        if self.simulation_mode == SimulationMode.DYNAMIC:
+        if self.dynamic:
             while current_time < self.end_time:
                 result = simulation.do_step(
                     time = current_time, 
@@ -217,13 +143,6 @@ class SimulationCase():
                 result_history.append(result)
         else:
             simulation.set_local_wing_angles([-np.radians(self.angle_of_attack)])
-
-            if self.prescribed_initialization:
-                simulation.initialize_with_elliptic_distribution(
-                    time = current_time,
-                    time_step = self.time_step,
-                    freestream_velocity = freestream_velocity_list
-                )
 
             result = simulation.do_step(
                 time = current_time, 

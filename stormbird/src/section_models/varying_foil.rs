@@ -85,6 +85,10 @@ impl VaryingFoil {
         self.get_foil().lift_coefficient(angle_of_attack)
     }
 
+    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: Float) -> Float {
+        self.get_foil().lift_coefficient_pre_stall(angle_of_attack)
+    }
+
     pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
         self.get_foil().drag_coefficient(angle_of_attack)
     }

@@ -1,7 +1,9 @@
 use super::*;
 
+use crate::line_force_model::LineForceModel;
+
 /// This code block contains the logic to update the wake structure
-impl Wake {
+impl DynamicWake {
     /// Function that updates the wake data before the solver executes a new time step. The main job
     /// is to ensure that geometry of the wake and the strength behind the first panels is correct.
     /// 
@@ -21,12 +23,12 @@ impl Wake {
     pub fn update_before_solving(
         &mut self,
         time_step: Float,
-        line_force_model_geometry: &GlobalLineForceModelGeometry,
+        line_force_model: &LineForceModel,
         felt_span_points_freestream: &[SpatialVector]
     ) {
         self.update_wake_points_before_solving(
             time_step, 
-            line_force_model_geometry,
+            line_force_model,
             felt_span_points_freestream
         );
         
@@ -58,17 +60,17 @@ impl Wake {
     pub fn update_wake_points_before_solving(
         &mut self,
         time_step: Float,
-        line_force_model_geometry: &GlobalLineForceModelGeometry,
+        line_force_model: &LineForceModel,
         felt_span_points_freestream: &[SpatialVector]
     ) {
-        self.synchronize_first_points_to_wing_geometry(line_force_model_geometry);
+        self.synchronize_first_points_to_wing_geometry(line_force_model);
         
         self.stream_free_wake_points_based_on_stored_velocity(time_step);
         
         if self.settings.shape_damping_factor > 0.0 {
-            self.move_first_free_wake_points_with_damping(line_force_model_geometry, felt_span_points_freestream);
+            self.move_first_free_wake_points_with_damping(line_force_model, felt_span_points_freestream);
         } else {
-            self.move_first_free_wake_points_no_damping(line_force_model_geometry, felt_span_points_freestream);
+            self.move_first_free_wake_points_no_damping(line_force_model, felt_span_points_freestream);
         }
         
         self.move_last_wake_points(felt_span_points_freestream);
@@ -82,12 +84,12 @@ impl Wake {
     /// * `line_force_model` - The line force model that the wake is based on
     pub fn synchronize_first_points_to_wing_geometry(
         &mut self, 
-        line_force_model_geometry: &GlobalLineForceModelGeometry
+        line_force_model: &LineForceModel
     ) {
-        let nr_span_points = line_force_model_geometry.span_points.len();
+        let nr_span_points = line_force_model.span_lines_global.len();
 
         for i in 0..nr_span_points {
-            self.points[i] = line_force_model_geometry.span_points[i];
+            self.points[i] = line_force_model.span_points_global[i];
         }
     }
 
@@ -148,7 +150,7 @@ impl Wake {
     /// geometry and then *either* in the direction of the chord vector or the velocity vector.
     fn move_first_free_wake_points_no_damping(
         &mut self,
-        line_force_model_geometry: &GlobalLineForceModelGeometry,
+        line_force_model: &LineForceModel,
         felt_span_points_freestream: &[SpatialVector]
     ) {
         let nr_first_wake_points = self.indices.nr_points_along_span;
@@ -158,7 +160,7 @@ impl Wake {
         if self.settings.use_chord_direction {
             for i in 0..nr_first_wake_points{
                 direction_vectors.push(
-                    line_force_model_geometry.chord_vectors_at_span_points[i].normalize()
+                    line_force_model.chord_vectors_global_at_span_points[i].normalize()
                 )
             }
         } else {
@@ -184,7 +186,7 @@ impl Wake {
     /// geometry and then *either* in the direction of the chord vector or the velocity vector.
     fn move_first_free_wake_points_with_damping(
         &mut self,
-        line_force_model_geometry: &GlobalLineForceModelGeometry,
+        line_force_model: &LineForceModel,
         felt_span_points_freestream: &[SpatialVector]
     ) {
         let old_start_index = self.indices.nr_points_along_span;
@@ -199,7 +201,7 @@ impl Wake {
         if self.settings.use_chord_direction {
             for i in 0..nr_first_wake_points{
                 direction_vectors.push(
-                    line_force_model_geometry.chord_vectors_at_span_points[i].normalize()
+                    line_force_model.chord_vectors_global_at_span_points[i].normalize()
                 )
             }
         } else {

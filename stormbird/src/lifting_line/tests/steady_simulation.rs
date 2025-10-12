@@ -8,7 +8,7 @@ use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationSettings,
-    SteadySettings
+    QuasiSteadySettings
 };
 
 use super::test_setup::RectangularWing;
@@ -32,7 +32,7 @@ fn moment_test() {
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder,
         simulation_settings: SimulationSettings::QuasiSteady(
-            SteadySettings::default()
+            QuasiSteadySettings::default()
         ) 
     }.build();
 

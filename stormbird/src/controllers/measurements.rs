@@ -41,7 +41,7 @@ pub struct FlowMeasurementSettings {
     pub wind_velocity: MeasurementSettings,
 }
 
-fn measure_float_values(
+pub fn measure_float_values(
     values: &[Float],
     wing_indices: Vec<Range<usize>>,
     measurement_settings: &MeasurementSettings,
@@ -113,15 +113,8 @@ pub fn measure_apparent_wind_direction(
         simulation_result.felt_velocity_minus_rotational_motion()
     };
 
-    let wind_directions: Vec<Float> = relevant_velocities.iter()
-        .map(
-            |velocity| {
-                wind_environment.zero_direction_vector.signed_angle_between(
-                    *velocity, 
-                    wind_environment.wind_rotation_axis
-                )
-            }
-        ).collect();
+    let wind_directions = wind_environment
+        .apparent_wind_directions_from_velocity(&relevant_velocities);
 
     measure_float_values(
         &wind_directions, 

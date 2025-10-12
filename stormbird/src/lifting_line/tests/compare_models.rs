@@ -13,8 +13,8 @@ use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationSettings,
-    SteadySettings,
-    UnsteadySettings,
+    QuasiSteadySettings,
+    DynamicSettings,
 };
 use crate::line_force_model::corrections::circulation::{
     CirculationCorrectionBuilder,
@@ -55,8 +55,8 @@ fn steady_lift() {
         prescribed_circulation
     );
 
-    let steady_settings  = SteadySettings::default();
-    let dynamic_settings = UnsteadySettings::default();
+    let steady_settings  = QuasiSteadySettings::default();
+    let dynamic_settings = DynamicSettings::default();
 
     let nr_time_steps = 200;
 

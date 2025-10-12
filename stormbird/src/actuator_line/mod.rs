@@ -113,8 +113,8 @@ impl ActuatorLine {
         cell_center: SpatialVector, 
         cell_volume: Float
     ) -> (SpatialVector, Float) {
-        let span_line = self.line_force_model.span_line_at_index(line_index);
-        let chord_vector = self.line_force_model.global_chord_vector_at_index(line_index);
+        let span_line = self.line_force_model.span_lines_global[line_index];
+        let chord_vector = self.line_force_model.chord_vectors_global[line_index];
 
         let projection_value_org = self.projection_settings.projection_value_at_point(
             cell_center, chord_vector, &span_line
@@ -183,7 +183,7 @@ impl ActuatorLine {
 
                 let wind_environment = WindEnvironment::default();
 
-                let input = ControllerInput::new(
+                let input = ControllerInput::new_from_simulation_result(
                     1.0,
                     &self.line_force_model,
                     &simulation_result,
@@ -261,7 +261,7 @@ impl ActuatorLine {
         }
 
         if let Some(empirical_circulation_correction) = &self.empirical_circulation_correction {
-            let non_dim_span_positions = self.line_force_model.effective_relative_span_distance();
+            let non_dim_span_positions = &self.line_force_model.ctrl_point_spanwise_distance_circulation_model;
 
             for i in 0..new_estimated_circulation_strength.len() {
                 new_estimated_circulation_strength[i] *= empirical_circulation_correction.correction_factor(
@@ -352,7 +352,7 @@ impl ActuatorLine {
             };
 
             if self.projection_settings.project_normal_to_velocity {
-                let line = self.line_force_model.span_line_at_index(line_index);
+                let line = self.line_force_model.span_lines_global[line_index];
 
                 let lift_direction = line
                     .relative_vector()
@@ -372,8 +372,8 @@ impl ActuatorLine {
 
     /// Computes the body force weights for each line element at a given point in space.
     pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector) -> Vec<Float> {
-        let span_lines = self.line_force_model.span_lines();
-        let chord_vectors = self.line_force_model.global_chord_vectors();
+        let span_lines = &self.line_force_model.span_lines_global;
+        let chord_vectors = &self.line_force_model.chord_vectors_global;
         
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 

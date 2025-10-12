@@ -4,13 +4,59 @@
 
 //! Lifting line solvers
 
+use serde::{Deserialize, Serialize};
+
 //pub mod quasi_newton;
 pub mod simple_iterative;
+pub mod linearized;
 pub mod velocity_corrections;
 
-pub mod prelude {
-    pub use super::simple_iterative::{
-        SimpleIterative,
-        SteadySimpleIterativeBuilder,
-    };
+use simple_iterative::{
+    SimpleIterative,
+    QuasiSteadySimpleIterativeBuilder
+};
+use linearized::Linearized;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Solver {
+    SimpleIterative(SimpleIterative),
+    Linearized(Linearized)
 }
+
+impl Default for Solver {
+    fn default() -> Self {
+        Solver::SimpleIterative(SimpleIterative::default())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum QuasiSteadySolverBuilder {
+    SimpleIterative(QuasiSteadySimpleIterativeBuilder),
+    Linearized(Linearized)
+}
+
+impl Default for QuasiSteadySolverBuilder {
+    fn default() -> Self {
+        QuasiSteadySolverBuilder::SimpleIterative(QuasiSteadySimpleIterativeBuilder::default())
+    }
+}
+
+impl QuasiSteadySolverBuilder {
+    pub fn build(&self) -> Solver {
+        match self {
+            Self::Linearized(settings) => {
+                Solver::Linearized(settings.clone())
+            },
+            Self::SimpleIterative(builder) => {
+                Solver::SimpleIterative(builder.build())
+            }
+        }
+    }
+
+}
+
+pub mod prelude {
+    pub use super::Solver;
+    pub use super::QuasiSteadySolverBuilder;
+}
+

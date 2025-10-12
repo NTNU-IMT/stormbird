@@ -44,13 +44,11 @@ if __name__ == "__main__":
     cases = [
         TestCase.RAW_SIMULATION, 
         TestCase.PRESCRIBED_CIRCULATION, 
-        TestCase.INITIALIZED_SIMULATION,
         TestCase.SMOOTHED,
         TestCase.SMOOTHED
     ]
 
     modes = [
-        SimulationMode.STATIC,
         SimulationMode.STATIC,
         SimulationMode.STATIC,
         SimulationMode.STATIC,

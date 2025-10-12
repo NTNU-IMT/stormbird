@@ -1,8 +1,5 @@
 
 
-pub use super::Wake;
+pub use super::dynamic_wake::DynamicWake;
 pub use super::frozen_wake::FrozenWake;
-pub use super::builders::{
-    WakeBuilder,
-    SteadyWakeBuilder
-};
+pub use super::WakeData;

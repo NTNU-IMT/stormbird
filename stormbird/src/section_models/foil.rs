@@ -213,7 +213,7 @@ impl Foil {
     /// 
     /// # Arguments
     /// * `heave_acceleration` - Acceleration of the flow around the foil normal to the chord 
-    /// length. That is, the opposite of theacceleration of the foil itself.
+    /// length. That is, the opposite of the acceleration of the foil itself.
     pub fn added_mass_coefficient(&self, heave_acceleration: Float) -> Float {
         self.added_mass_factor * heave_acceleration
     }

@@ -40,7 +40,7 @@ impl LineForceModel {
         &self, 
         ctrl_points_velocity_no_motion: &[SpatialVector]
     ) -> Vec<SpatialVector> {
-        let ctrl_points = self.ctrl_points();
+        let ctrl_points = &self.ctrl_points_global;
 
         let mut ctrl_point_velocity = Vec::with_capacity(ctrl_points.len());
 
@@ -70,8 +70,8 @@ impl LineForceModel {
         input_coordinate_system: CoordinateSystem
     ) -> Vec<Float> {
         let (span_lines, chord_vectors) = match input_coordinate_system {
-            CoordinateSystem::Global => (self.span_lines(), self.global_chord_vectors()),
-            CoordinateSystem::Body => (self.span_lines_local.clone(), self.local_chord_vectors()),
+            CoordinateSystem::Global => (&self.span_lines_global, &self.chord_vectors_global),
+            CoordinateSystem::Body => (&self.span_lines_local, &self.chord_vectors_local),
         };
 
         let angles_of_attack: Vec<Float> = (0..velocity.len()).map(|index| {
@@ -116,9 +116,35 @@ impl LineForceModel {
                         foil.lift_coefficient(angles_of_attack[index]),
                     SectionModel::RotatingCylinder(cylinder) =>
                         cylinder.lift_coefficient(
-                            self.chord_vectors_local[index].length(), velocity[index].length()
+                            self.chord_lengths[index], velocity[index].length()
                         ),
                     SectionModel::EffectiveWindSensor => 0.0
+                }
+            }
+        ).collect()
+    }
+
+    /// Returns the local lift coefficient on each line element, but linearized. Primarily used when
+    /// setting up equation systems for the lifting line theory
+    ///
+    /// # Argument
+    /// * `velocity` - the velocity vector at each control point
+    pub fn linearized_lift_coefficients(
+        &self, 
+        angles_of_attack: &[Float],
+    ) -> Vec<Float> {
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index  = self.wing_index_from_global(index);
+
+                match &self.section_models[wing_index] {
+                    SectionModel::Foil(foil) =>
+                        foil.lift_coefficient_pre_stall(angles_of_attack[index]),
+                    SectionModel::VaryingFoil(foil) =>
+                        foil.lift_coefficient_pre_stall(angles_of_attack[index]),
+                    _ => {
+                        panic!("The section model is not supported for this function")
+                    }
                 }
             }
         ).collect()
@@ -260,8 +286,8 @@ impl LineForceModel {
     /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
     pub fn sectional_circulatory_forces(&self, strength: &[Float], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
         let span_lines = match self.output_coordinate_system {
-            CoordinateSystem::Global => self.span_lines(),
-            CoordinateSystem::Body => self.span_lines_local.clone(),
+            CoordinateSystem::Global => &self.span_lines_global,
+            CoordinateSystem::Body => &self.span_lines_local,
         };
 
         (0..self.nr_span_lines()).map(
@@ -312,8 +338,8 @@ impl LineForceModel {
         acceleration: &[SpatialVector]
     ) -> Vec<SpatialVector> {
         let (span_lines, chord_vectors) = match self.output_coordinate_system {
-            CoordinateSystem::Global => (self.span_lines(), self.global_chord_vectors()),
-            CoordinateSystem::Body => (self.span_lines_local.clone(), self.local_chord_vectors())
+            CoordinateSystem::Global => (&self.span_lines_global, &self.chord_vectors_global),
+            CoordinateSystem::Body => (&self.span_lines_local, &self.chord_vectors_local)
         };
 
         (0..self.nr_span_lines()).map(
@@ -365,8 +391,8 @@ impl LineForceModel {
         rotation_velocity: SpatialVector
     ) -> Vec<SpatialVector> {
         let span_lines = match self.output_coordinate_system {
-            CoordinateSystem::Global => self.span_lines(),
-            CoordinateSystem::Body => self.span_lines_local.clone(),
+            CoordinateSystem::Global => &self.span_lines_global,
+            CoordinateSystem::Body => &self.span_lines_local,
         };
 
         (0..self.nr_span_lines()).map(
@@ -480,7 +506,7 @@ impl LineForceModel {
     ) -> SimulationResult {
         let force_input = self.sectional_force_input(&solver_result, ctrl_point_acceleration);
 
-        let ctrl_points = self.ctrl_points();
+        let ctrl_points = self.ctrl_points_global.clone();
         let sectional_forces   = self.sectional_forces(&force_input);
         let integrated_forces = sectional_forces.integrate_forces(&self);
         let integrated_moments = sectional_forces.integrate_moments(&self);

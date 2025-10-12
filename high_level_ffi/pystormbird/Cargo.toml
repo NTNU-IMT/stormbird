@@ -4,10 +4,9 @@ version = "0.6.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "Python interface to the Stormbird library."
 homepage = "https://github.com/jarlekramer/stormbird"
-readme = "../README.md"
+readme = "../../README.md"
 repository = "https://github.com/jarlekramer/stormbird"
 license = "GPL-3.0"
-license_file = "../LICENSE"
 edition = "2021"
 
 [lib]
@@ -17,5 +16,5 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = "0.21.0"
 
-stormbird = { path = "../../stormbird"}
+stormbird = { path = "../../stormbird", features = ["parallel"] }
 stormath = { path = "../../stormath" }

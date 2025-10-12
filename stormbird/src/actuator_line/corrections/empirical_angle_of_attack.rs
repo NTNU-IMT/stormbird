@@ -56,7 +56,6 @@ impl EmpiricalAngleOfAttackCorrection {
     ) -> Vec<SpatialVector> {
 
         let nr_span_lines = line_force_model.nr_span_lines();
-        let span_lines = line_force_model.span_lines();
 
         let mut corrected_ctrl_points_velocity = ctrl_points_velocity.to_vec();
 
@@ -75,7 +74,7 @@ impl EmpiricalAngleOfAttackCorrection {
             }
 
             for j in 0..nr_span_lines {
-                let axis = span_lines[j].relative_vector().normalize();
+                let axis = line_force_model.span_lines_global[j].relative_vector().normalize();
                 
                 corrected_ctrl_points_velocity[j] = ctrl_points_velocity[j].rotate_around_axis(
                     -angle_correction[j], 

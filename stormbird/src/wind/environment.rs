@@ -164,6 +164,15 @@ impl WindEnvironment {
             }
         }
     }
+
+    pub fn apparent_wind_directions_from_velocity(&self, velocity: &[SpatialVector]) -> Vec<Float> {
+        velocity.iter().map(|velocity| {
+            self.zero_direction_vector.signed_angle_between(
+                *velocity, 
+                self.wind_rotation_axis
+            )
+        }).collect()
+    }
 }
 
 #[cfg(test)]

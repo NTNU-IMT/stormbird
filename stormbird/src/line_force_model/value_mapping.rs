@@ -46,7 +46,7 @@ impl LineForceModel {
     {
         let mut result: Vec<T> = Vec::with_capacity(self.nr_wings());
 
-        let relative_span_distance = self.relative_span_distance();
+        let relative_span_distance = &self.ctrl_point_spanwise_distance_non_dimensional;
 
         for wing_indices in &self.wing_indices {
             result.push(

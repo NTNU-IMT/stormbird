@@ -31,10 +31,6 @@ impl LineForceModel {
         }
     }
 
-    pub fn relative_span_distance(&self) -> Vec<f64> {
-        self.data.relative_span_distance()
-    }
-
     pub fn circulation_strength(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
         let rust_velocity: Vec<SpatialVectorRust> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
         self.data.circulation_strength(&rust_velocity, CoordinateSystem::Global)
@@ -48,7 +44,12 @@ impl LineForceModel {
 
     #[getter]
     pub fn ctrl_points(&self) -> Vec<SpatialVector> {
-        self.data.ctrl_points().iter().map(|v| SpatialVector::from(v.clone())).collect()
+        self.data.ctrl_points_global.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    }
+
+    #[getter]
+    pub fn ctrl_point_spanwise_distance_non_dimensional(&self) -> Vec<f64> {
+        self.data.ctrl_point_spanwise_distance_non_dimensional.clone()
     }
 }
 

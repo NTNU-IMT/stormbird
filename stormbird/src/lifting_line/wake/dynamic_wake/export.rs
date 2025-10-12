@@ -1,13 +1,13 @@
 use std::fs::File;
 use std::io::{Write, BufWriter, Error};
 
-use super::Wake;
+use super::DynamicWake;
 
 use std::collections::HashMap;
 
 use stormath::type_aliases::Float;
 
-impl Wake {
+impl DynamicWake {
     pub fn write_wake_data_to_file_if_activated(&self, time_step_index: usize) {
         if self.settings.write_wake_data_to_file {
             let file_path = format!("{}/wake_{}.vtp", self.settings.wake_files_folder_path, time_step_index);

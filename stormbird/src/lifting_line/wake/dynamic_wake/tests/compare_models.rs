@@ -2,7 +2,11 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use super::*;
+use crate::lifting_line::wake::{
+    builders::{
+        WakeBuilder, SteadyWakeBuilder
+    }
+};
 
 use crate::lifting_line::tests::test_setup::RectangularWing;
 
@@ -27,7 +31,7 @@ fn compare_wake_models() {
     dynamic_wake.strengths = vec![circulation_strength_value; dynamic_wake.strengths.len()];
     steady_wake.strengths = vec![circulation_strength_value; steady_wake.strengths.len()];
 
-    let points_to_check = line_force_model.ctrl_points();
+    let points_to_check = line_force_model.ctrl_points_global.clone();
 
     let u_i_steady  = steady_wake.induced_velocities(&points_to_check);
     let u_i_dynamic = dynamic_wake.induced_velocities(&points_to_check);

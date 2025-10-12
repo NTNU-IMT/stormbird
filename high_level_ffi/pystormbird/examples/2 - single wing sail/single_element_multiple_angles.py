@@ -12,7 +12,7 @@ import json
 
 import time as time_func
 
-from simulation import SimulationCase, SimulationMode, TestCase
+from simulation import SimulationCase
 
 section_model_path = '../1 - section models'
 
@@ -42,21 +42,7 @@ if __name__ == "__main__":
         cd_2d[i] = foil_model.drag_coefficient(np.radians(angles_of_attack[i]))
         cl_2d[i] = foil_model.lift_coefficient(np.radians(angles_of_attack[i]))
 
-    cases = [
-        TestCase.RAW_SIMULATION, 
-        TestCase.PRESCRIBED_CIRCULATION, 
-        TestCase.INITIALIZED_SIMULATION,
-        TestCase.SMOOTHED,
-        TestCase.RAW_SIMULATION
-    ]
-
-    modes = [
-        SimulationMode.STATIC,
-        SimulationMode.STATIC,
-        SimulationMode.STATIC,
-        SimulationMode.STATIC,
-        SimulationMode.DYNAMIC
-    ]
+    dynamic = [False, True]
 
     w_plot = 18
     h_plot = w_plot / 2.35
@@ -65,11 +51,10 @@ if __name__ == "__main__":
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
     
-
-    for case, mode in zip(cases, modes):
+    for dyn in dynamic:
         start_time = time_func.time()
         print()
-        print(case.to_string())
+        print("Dynamic simulation: ", dyn)
 
         cl = np.zeros(n_angles)
         cd = np.zeros(n_angles)
@@ -80,11 +65,8 @@ if __name__ == "__main__":
             sim_case = SimulationCase(
                 angle_of_attack = angles_of_attack[angle_index],
                 section_model_dict = section_model_dict,
-                simulation_mode = mode,
-                prescribed_circulation = case.prescribed_circulation,
-                prescribed_initialization = case.prescribed_initialization,
-                smoothing_length = case.smoothing_length,
-                z_symmetry=True
+                dynamic = dyn,
+                z_symmetry = True
             )
 
             result_history = sim_case.run()
@@ -101,9 +83,12 @@ if __name__ == "__main__":
         cl_theory = cl_2d / (1 + 2/theoretical_aspect_ratio)
         cd_theory = cd_2d + cl_theory**2 / (np.pi * theoretical_aspect_ratio)
 
-        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
-        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + case.to_string() + ', ' + mode.to_string())
-    
+        dyn_string = "Dynamic" if dyn else "Quasi-steady"
+
+        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + dyn_string)
+        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + dyn_string)
+
+
     # --------------- Comparison data ------------------------
     ax1.plot(
         comparison_data["experimental"]["angles_of_attack"], 
@@ -123,7 +108,7 @@ if __name__ == "__main__":
 
     ax2.plot(angles_of_attack, cd_2d, label='Section model', color='grey', linestyle='--')
 
-    ax1.set_ylim(0, 1.2)
+    #ax1.set_ylim(0, 1.2)
     ax2.set_ylim(0, 0.25)
     
     ax1.set_xlabel("Angle of attack [deg]")

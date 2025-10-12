@@ -12,3 +12,4 @@ mod steady_simulation;
 mod compare_models;
 mod no_self_induced_velocity;
 mod coordinate_systems;
+mod wing_sails_speed_test;

@@ -9,7 +9,10 @@ use serde::{Serialize, Deserialize};
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::wake::{
     frozen_wake::FrozenWake,
+    dynamic_wake::builder::DynamicWakeBuilder,
 };
+
+use crate::lifting_line::wake::settings::QuasiSteadyWakeSettings;
 
 use super::simulation::Simulation;
 
@@ -18,21 +21,21 @@ use crate::error::Error;
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
-pub struct SteadySettings {
+pub struct QuasiSteadySettings {
     #[serde(default)]
-    pub solver: SteadySimpleIterativeBuilder,
+    pub solver: QuasiSteadySolverBuilder,
     #[serde(default)]
-    pub wake: SteadyWakeBuilder,
+    pub wake: QuasiSteadyWakeSettings,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(deny_unknown_fields)]
 /// Settings for a dynamic simulation.
-pub struct UnsteadySettings {
+pub struct DynamicSettings {
     #[serde(default)]
-    pub solver: SimpleIterative,
+    pub solver: Solver,
     #[serde(default)]
-    pub wake: WakeBuilder,
+    pub wake: DynamicWakeBuilder,
 }
 
 
@@ -43,13 +46,13 @@ pub struct UnsteadySettings {
 /// Both quasi-steady and dynamic simulations are supported. The settings for each simulation type 
 /// is stored as a member variable of each variant.
 pub enum SimulationSettings {
-    QuasiSteady(SteadySettings),
-    Dynamic(UnsteadySettings),
+    QuasiSteady(QuasiSteadySettings),
+    Dynamic(DynamicSettings),
 }
 
 impl Default for SimulationSettings {
     fn default() -> Self {
-        SimulationSettings::QuasiSteady(SteadySettings::default())
+        SimulationSettings::QuasiSteady(QuasiSteadySettings::default())
     }
 }
 
@@ -75,8 +78,8 @@ impl SimulationBuilder {
 
     /// Creates a new simulation builder by parsing the the string as a JSON object. The parsing is
     /// done using the serde_json library.
-    pub fn new_from_string(string: &str) -> Result<Self, Error> {
-        let builder = serde_json::from_str(string)?;
+    pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
+        let builder = serde_json::from_str(setup_string)?;
         
         Ok(builder)
     }
@@ -87,9 +90,7 @@ impl SimulationBuilder {
     pub fn new_from_file(file_path: &str) -> Result<Self, Error> {
         let string = std::fs::read_to_string(file_path)?;
 
-        let builder = Self::new_from_string(&string)?;
-
-        Ok(builder)
+        Self::new_from_string(&string)
     }
 
     /// Builds the [Simulation] struct based on the current state of the builder.
@@ -98,15 +99,17 @@ impl SimulationBuilder {
 
         let nr_of_lines = line_force_model.nr_span_lines();
 
-        let wake = match &self.simulation_settings {
+        let wake_data = match &self.simulation_settings {
             SimulationSettings::Dynamic(settings) => {
-                settings.wake.build(
-                    &line_force_model
+                WakeData::Dynamic(
+                    settings.wake.build(
+                        &line_force_model
+                    )
                 )
             },
             SimulationSettings::QuasiSteady(settings) => {
-                settings.wake.build(
-                    &line_force_model,
+                WakeData::QuasiSteady(
+                    settings.wake.clone()
                 )
             }
         };
@@ -131,7 +134,7 @@ impl SimulationBuilder {
         Simulation {
             line_force_model,
             flow_derivatives,
-            wake,
+            wake_data,
             frozen_wake,
             solver,
             previous_circulation_strength,

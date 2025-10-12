@@ -102,6 +102,8 @@ impl LineForceModelBuilder {
         line_force_model.rigid_body_motion.translation = self.translation;
         line_force_model.rigid_body_motion.rotation = self.rotation;
 
+        line_force_model.update_calculated_values_after_create();
+
         line_force_model
     }    
 }

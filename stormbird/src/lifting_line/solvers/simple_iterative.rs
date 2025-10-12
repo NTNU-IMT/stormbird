@@ -16,10 +16,10 @@ use super::velocity_corrections::VelocityCorrections;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct SteadySimpleIterativeBuilder {
-    #[serde(default="SteadySimpleIterativeBuilder::default_max_iterations_per_time_step")]
+pub struct QuasiSteadySimpleIterativeBuilder {
+    #[serde(default="QuasiSteadySimpleIterativeBuilder::default_max_iterations_per_time_step")]
     pub max_iterations_per_time_step: usize,
-    #[serde(default="SteadySimpleIterativeBuilder::default_damping_factor")]
+    #[serde(default="QuasiSteadySimpleIterativeBuilder::default_damping_factor")]
     pub damping_factor: Float,
     #[serde(default="SimpleIterative::default_residual_tolerance_absolute")]
     pub residual_tolerance_absolute: Float,
@@ -29,7 +29,7 @@ pub struct SteadySimpleIterativeBuilder {
     pub velocity_corrections: VelocityCorrections,
 }
 
-impl SteadySimpleIterativeBuilder {
+impl QuasiSteadySimpleIterativeBuilder {
     pub fn default_max_iterations_per_time_step() -> usize {1000}
     pub fn default_damping_factor() -> Float {0.04}
 
@@ -69,14 +69,14 @@ impl SimpleIterative {
     pub fn default_residual_tolerance_absolute() -> Float {1e-4}
     pub fn default_strength_difference_tolerance() -> Float {1e-6}
 
-    pub fn do_step(
+    pub fn solve(
         &self,
         line_force_model: &LineForceModel,
         felt_ctrl_points_freestream: &[SpatialVector],
-        frozen_wake: &FrozenWake,
+        frozen_wake: &mut FrozenWake,
         initial_solution: &[Float],
     ) -> SolverResult {
-        let ctrl_points = line_force_model.ctrl_points();
+        let ctrl_points = &line_force_model.ctrl_points_global;
     
         let mut circulation_strength: Vec<Float> = initial_solution.to_vec();
         let mut ctrl_point_velocity = vec![SpatialVector::default(); ctrl_points.len()];
@@ -90,28 +90,28 @@ impl SimpleIterative {
         let mut converged = false;
         while iterations < self.max_iterations_per_time_step && !converged {
             iterations += 1;
-    
-            let induced_velocities = frozen_wake.induced_velocities_at_control_points(
+
+            frozen_wake.update_induced_velocities_at_control_points(
                 &circulation_strength
             );
 
             match &self.velocity_corrections {
                 VelocityCorrections::None => {
                     for i in 0..ctrl_points.len() {
-                        ctrl_point_velocity[i] = felt_ctrl_points_freestream[i] + induced_velocities[i];
+                        ctrl_point_velocity[i] = felt_ctrl_points_freestream[i] + frozen_wake.induced_velocities_at_control_points[i];
                     }
                 },
                 VelocityCorrections::MaxInducedVelocityMagnitudeRatio(ratio) => {
                     ctrl_point_velocity = VelocityCorrections::max_induced_velocity_magnitude_ratio(
                         *ratio, 
                         felt_ctrl_points_freestream, 
-                        &induced_velocities
+                        &frozen_wake.induced_velocities_at_control_points
                     );
                 },
                 VelocityCorrections::FixedMagnitudeEqualToFreestream => {
                     ctrl_point_velocity = VelocityCorrections::fixed_magnitude_equal_to_freestream(
                         felt_ctrl_points_freestream, 
-                        &induced_velocities
+                        &frozen_wake.induced_velocities_at_control_points
                     );
                 },
             }
@@ -192,11 +192,11 @@ impl Default for SimpleIterative {
     }
 }
 
-impl Default for SteadySimpleIterativeBuilder {
+impl Default for QuasiSteadySimpleIterativeBuilder {
     fn default() -> Self {
-        SteadySimpleIterativeBuilder {
-            max_iterations_per_time_step: SteadySimpleIterativeBuilder::default_max_iterations_per_time_step(),
-            damping_factor: SteadySimpleIterativeBuilder::default_damping_factor(),
+        QuasiSteadySimpleIterativeBuilder {
+            max_iterations_per_time_step: QuasiSteadySimpleIterativeBuilder::default_max_iterations_per_time_step(),
+            damping_factor: QuasiSteadySimpleIterativeBuilder::default_damping_factor(),
             residual_tolerance_absolute: SimpleIterative::default_residual_tolerance_absolute(),
             strength_difference_tolerance: SimpleIterative::default_strength_difference_tolerance(),
             velocity_corrections: VelocityCorrections::default(),

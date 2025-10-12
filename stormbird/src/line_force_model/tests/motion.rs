@@ -38,20 +38,14 @@ fn test_rigid_body_motion() {
 
     let acceptable_error = 0.01; // The difference in the calculated velocity magnitudes should be less than this value.
 
-    let mut previous_ctrl_points = line_force_model.ctrl_points();
+    let mut previous_ctrl_points = line_force_model.ctrl_points_global.clone();
 
     while time < end_time {
-        line_force_model.rigid_body_motion.update_translation_with_velocity_using_finite_difference(
-            translation_func(time), 
-            time_step
+        line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
+            time_step, translation_func(time), rotation_func(time)
         );
 
-        line_force_model.rigid_body_motion.update_rotation_with_velocity_using_finite_difference(
-            rotation_func(time), 
-            time_step
-        );
-
-        let ctrl_points = line_force_model.ctrl_points();
+        let ctrl_points = line_force_model.ctrl_points_global.clone();
 
         let ctrl_points_velocity_fd: Vec<SpatialVector> = ctrl_points.iter()
             .zip(previous_ctrl_points.iter())
@@ -85,7 +79,7 @@ fn test_rigid_body_motion() {
 fn test_wing_angles() {
     let mut line_force_model = get_example_model();
 
-    let chord_vector = line_force_model.chord_vectors_local[0].clone();
+    let chord_vector = line_force_model.chord_vectors_local_not_rotated[0].clone();
 
     let rotation_angle = Float::from(45.0).to_radians();
 
@@ -94,14 +88,14 @@ fn test_wing_angles() {
         SpatialVector::from([0.0, 0.0, 1.0])
     );
 
-    let original_span_points = line_force_model.span_points();
+    let original_span_points = line_force_model.span_points_global.clone();
 
     let wing_angles = vec![rotation_angle, rotation_angle];
 
-    line_force_model.local_wing_angles = wing_angles.clone();
+    line_force_model.set_local_wing_angles(&wing_angles);
 
-    let chord_vectors = line_force_model.global_chord_vectors();
-    let span_points = line_force_model.span_points();
+    let chord_vectors = &line_force_model.chord_vectors_global;
+    let span_points = &line_force_model.span_points_global.clone();
 
     for i in 0..chord_vectors.len() {
         assert_eq!(chord_vectors[i], rotated_chord_vector);

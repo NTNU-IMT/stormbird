@@ -83,10 +83,14 @@ impl SectionalForces {
     /// Calculates the moment contribution from each line element.
     /// 
     /// The moments are calculated as the cross product of the control point and the sectional force.
-    pub fn sectional_moments(line_force_model: &LineForceModel, sectional_forces: &[SpatialVector], coordinate_system: CoordinateSystem) -> Vec<SpatialVector> {
+    pub fn sectional_moments(
+        line_force_model: &LineForceModel, 
+        sectional_forces: &[SpatialVector], 
+        coordinate_system: CoordinateSystem
+    ) -> Vec<SpatialVector> {
         let span_lines = match coordinate_system {
-            CoordinateSystem::Global => line_force_model.span_lines(),
-            CoordinateSystem::Body => line_force_model.span_lines_local.clone(),
+            CoordinateSystem::Global => &line_force_model.span_lines_global,
+            CoordinateSystem::Body => &line_force_model.span_lines_local,
         };
 
         (0..span_lines.len()).map(

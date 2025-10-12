@@ -6,8 +6,9 @@ use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
     SimulationSettings,
-    UnsteadySettings,
+    DynamicSettings,
 };
+use crate::lifting_line::wake::dynamic_wake::builder::DynamicWakeBuilder;
 
 use stormath::type_aliases::Float;
 
@@ -82,12 +83,12 @@ fn no_self_induced_velocity() {
         line_force_model_builder.add_wing(wing_builder);
     }
 
-    let wake = WakeBuilder {
+    let wake = DynamicWakeBuilder {
         neglect_self_induced_velocities: true,
         ..Default::default()
     };
 
-    let settings = UnsteadySettings{
+    let settings = DynamicSettings{
         wake,
         ..Default::default()
     };
