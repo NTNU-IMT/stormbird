@@ -28,10 +28,10 @@ class StormbirdSetupBaseModel(BaseModel):
         return cls.model_validate_json(file_path.read_text())
     
     def to_json_string(self) -> str:
-        return self.model_dump_json()
+        return self.model_dump_json(exclude_none=True)
 
     def to_json_file(self, file_path: Path) -> None:
         file_path.write_text(self.to_json_string())
 
     def to_dict(self) -> dict:
-        return self.model_dump()
+        return self.model_dump(exclude_none=True)

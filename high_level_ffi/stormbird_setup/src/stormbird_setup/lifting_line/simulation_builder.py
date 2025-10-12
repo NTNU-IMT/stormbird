@@ -8,8 +8,8 @@ from .solver import Linearized, SimpleIterative
 from .wake import QuasiSteadyWake, DynamicWake
 
 class QuasiSteadySettings(StormbirdSetupBaseModel):
-    solver: Linearized | SimpleIterative
-    wake: QuasiSteadyWake
+    solver: Linearized | SimpleIterative = Linearized()
+    wake: QuasiSteadyWake = QuasiSteadyWake()
 
     @model_serializer
     def ser_model(self):
@@ -32,8 +32,8 @@ class QuasiSteadySettings(StormbirdSetupBaseModel):
             }
 
 class DynamicSettings(StormbirdSetupBaseModel):
-    solver: Linearized | SimpleIterative
-    wake: DynamicWake
+    solver: Linearized | SimpleIterative = Linearized()
+    wake: DynamicWake = DynamicWake()
 
     @model_serializer
     def ser_model(self):
@@ -56,8 +56,8 @@ class DynamicSettings(StormbirdSetupBaseModel):
             }
 
 class SimulationBuilder(StormbirdSetupBaseModel):
-    line_force_model: LineForceModelBuilder
-    simulation_settings: QuasiSteadySettings | DynamicSettings
+    line_force_model: LineForceModelBuilder = LineForceModelBuilder()
+    simulation_settings: QuasiSteadySettings | DynamicSettings = QuasiSteadySettings()
 
     @model_serializer
     def ser_model(self):
@@ -78,5 +78,6 @@ class SimulationBuilder(StormbirdSetupBaseModel):
                     "Dynamic": simulation_settings_dict
                 }
             }
+        
 
 

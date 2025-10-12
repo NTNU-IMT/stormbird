@@ -33,7 +33,7 @@ mod tests;
 
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
-use crate::controllers::output::ControllerOutput;
+use crate::controller::output::ControllerOutput;
 
 use corrections::{
     circulation::CirculationCorrection,

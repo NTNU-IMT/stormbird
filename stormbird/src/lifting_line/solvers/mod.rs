@@ -25,7 +25,7 @@ pub enum Solver {
 
 impl Default for Solver {
     fn default() -> Self {
-        Solver::SimpleIterative(SimpleIterative::default())
+        Solver::Linearized(Linearized::default())
     }
 }
 
@@ -37,7 +37,7 @@ pub enum QuasiSteadySolverBuilder {
 
 impl Default for QuasiSteadySolverBuilder {
     fn default() -> Self {
-        QuasiSteadySolverBuilder::SimpleIterative(QuasiSteadySimpleIterativeBuilder::default())
+        QuasiSteadySolverBuilder::Linearized(Linearized::default())
     }
 }
 

@@ -6,6 +6,6 @@ class SpatialVector(StormbirdSetupBaseModel):
     '''
     Class for defining a spatial vector
     '''
-    x: float
-    y: float
-    z: float
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0

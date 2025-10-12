@@ -20,7 +20,7 @@ use stormath::type_aliases::Float;
 use crate::line_force_model::LineForceModel;
 
 use crate::common_utils::prelude::*;
-use crate::controllers::prelude::*;
+use crate::controller::prelude::*;
 use crate::wind::environment::WindEnvironment;
 
 use crate::io_utils;

@@ -8,9 +8,7 @@
 pub mod input;
 pub mod output;
 pub mod measurements;
-pub mod weather_dependent_set_points;
-pub mod effective_angle_of_attack;
-//pub mod pid_controller;
+pub mod logic;
 pub mod prelude;
 
 use crate::error::Error;
@@ -19,23 +17,10 @@ use serde::{Deserialize, Serialize};
 
 use input::ControllerInput;
 use output::ControllerOutput;
+use logic::ControllerLogic;
 use measurements::FlowMeasurementSettings;
 
-use effective_angle_of_attack::{
-    EffectiveAngleOfAttackController,
-};
-
-use weather_dependent_set_points::{
-    WeatherDependentSetPoints
-};
-
 use stormath::type_aliases::Float;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ControllerLogic {
-    EffectiveAngleOfAttack(EffectiveAngleOfAttackController),
-    WeatherDependentSetPoints(WeatherDependentSetPoints),
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -110,14 +95,7 @@ impl Controller {
         let first_time_step = self.time_step_index == 1;
 
         if first_time_step || (time_to_update && initialization_done) {
-            let mut output = match &self.logic {
-                ControllerLogic::EffectiveAngleOfAttack(controller) => {
-                    controller.get_new_output(input.loading, &input.angles_of_attack)
-                },
-                ControllerLogic::WeatherDependentSetPoints(controller) => {
-                    controller.get_new_output(input)
-                }
-            };
+            let mut output = self.logic.get_new_output(input);
 
             if self.max_local_wing_angle_change_rate.is_some() && output.local_wing_angles.is_some() {
                 let raw_new_values = output.local_wing_angles.as_ref().unwrap();

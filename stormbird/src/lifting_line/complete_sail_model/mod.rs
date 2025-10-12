@@ -15,10 +15,12 @@ use crate::wind::{
     wind_condition::WindCondition
 };
 
-use crate::controllers::{
+use crate::controller::{
     Controller,
     input::ControllerInput,
 };
+
+use crate::input_power::InputPower;
 
 use crate::common_utils::results::simulation::SimulationResult;
 
@@ -39,7 +41,8 @@ use crate::error::Error;
 pub struct CompleteSailModel {
     lifting_line_simulation: LiftingLineSimulation,
     wind_environment: WindEnvironment,
-    controller: Controller
+    controller: Controller,
+    input_power: Option<InputPower>,
 }
 
 impl CompleteSailModel {
@@ -112,8 +115,8 @@ impl CompleteSailModel {
         let freestream_velocity_points = self.lifting_line_simulation
             .get_freestream_velocity_points();
 
-        let linear_velocity = SpatialVector::new(-ship_velocity, 0.0, 0.0);
-
+        let linear_velocity = ship_velocity * self.wind_environment.zero_direction_vector;
+        
         let freestream_velocity = self.wind_environment
             .apparent_wind_velocity_vectors_at_locations(
                 wind_condition, 
@@ -149,6 +152,16 @@ impl CompleteSailModel {
             self.lifting_line_simulation.line_force_model.set_controller_output(
                 output
             );
+        }
+    }
+
+    pub fn get_input_power(&self) -> Float {
+        if let Some(power_model) = &self.input_power {
+            power_model.get_input_power(
+                &self.lifting_line_simulation.line_force_model.section_models_internal_state()
+            )
+        } else {
+            0.0
         }
     }
 }
