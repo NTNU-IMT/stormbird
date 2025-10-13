@@ -9,6 +9,7 @@ use stormath::{
 
 use crate::section_models::SectionModel;
 use crate::line_force_model::span_line::SpanLine;
+use crate::line_force_model::input_power::InputPowerModel;
 
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
@@ -17,6 +18,7 @@ pub struct SingleWing {
     pub chord_lengths: Vec<Float>,
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
+    pub input_power_model: InputPowerModel,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -31,6 +33,8 @@ pub struct WingBuilder {
     pub non_zero_circulation_at_ends: [bool; 2],
     #[serde(default)]
     pub nr_sections: Option<usize>,
+    #[serde(default)]
+    pub input_power_model: InputPowerModel,
 }
 
 impl WingBuilder {
@@ -98,6 +102,7 @@ impl WingBuilder {
             chord_lengths,
             section_model,
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
+            input_power_model: self.input_power_model.clone(),
         }
     }
 }

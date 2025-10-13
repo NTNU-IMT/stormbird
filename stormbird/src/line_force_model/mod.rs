@@ -24,6 +24,7 @@ pub mod data_update;
 pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
+pub mod input_power;
 
 pub mod corrections;
 pub mod prelude;
@@ -41,6 +42,8 @@ use corrections::{
 };
 use builder::single_wing::SingleWing;
 use span_line::*;
+
+use input_power::InputPowerModel;
 
 #[derive(Clone, Debug)]
 /// The struct holds variables for a model that calculate the forces on wings, under the assumption
@@ -101,6 +104,8 @@ pub struct LineForceModel {
     pub ctrl_point_spanwise_distance_non_dimensional: Vec<Float>,
     /// Effective values for the ctrl point spanwise distance when applying prescribed circulation
     pub ctrl_point_spanwise_distance_circulation_model: Vec<Float>,
+    /// Models for estimating the input energy for the sails
+    pub input_power_models: Vec<InputPowerModel>,
 }
 
 impl Default for LineForceModel {
@@ -140,6 +145,7 @@ impl LineForceModel {
             ctrl_point_spanwise_distance: Vec::new(),
             ctrl_point_spanwise_distance_non_dimensional: Vec::new(),
             ctrl_point_spanwise_distance_circulation_model: Vec::new(),
+            input_power_models: Vec::new(),
         }
     }
 
@@ -179,6 +185,8 @@ impl LineForceModel {
 
         self.local_wing_angles.push(0.0);
         self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
+
+        self.input_power_models.push(wing.input_power_model.clone());
 
         self.update_global_data_representations();
     }

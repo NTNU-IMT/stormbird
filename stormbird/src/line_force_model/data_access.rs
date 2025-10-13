@@ -97,6 +97,7 @@ impl LineForceModel {
         total_area
     }
 
+    /// Returns the internal state for the section model belonging to each wing in the model.
     pub fn section_models_internal_state(&self) -> Vec<Float> {
         let mut internal_state: Vec<Float> = vec![0.0; self.nr_wings()];
 

@@ -498,6 +498,30 @@ impl LineForceModel {
         ).collect()
     }
 
+    pub fn input_power(&self, velocity: &[SpatialVector]) -> Vec<Float> {
+        let nr_wings = self.nr_wings();
+        let nr_span_lines = self.nr_span_lines();
+        
+        let mut out = vec![0.0; nr_wings];
+
+        let internal_states = self.section_models_internal_state();
+        
+        for i in 0..nr_span_lines {
+            let wing_index = self.wing_index_from_global(i);
+
+            let power_model = &self.input_power_models[wing_index];
+
+            out[wing_index] += power_model.input_power_for_strip(
+                internal_states[wing_index],
+                self.span_lines_local[i],
+                self.chord_lengths[i],
+                velocity[i]
+            );
+        }
+
+        out
+    }
+
     pub fn calculate_simulation_result(
         &self, 
         solver_result: &SolverResult,
@@ -511,6 +535,8 @@ impl LineForceModel {
         let integrated_forces = sectional_forces.integrate_forces(&self);
         let integrated_moments = sectional_forces.integrate_moments(&self);
 
+        let input_power = self.input_power(&solver_result.output_ctrl_point_velocity);
+
         SimulationResult {
             time,
             ctrl_points,
@@ -519,6 +545,7 @@ impl LineForceModel {
             sectional_forces,
             integrated_forces,
             integrated_moments,
+            input_power,
             iterations: solver_result.iterations,
             residual: solver_result.residual,
             wing_indices: self.wing_indices.clone(),

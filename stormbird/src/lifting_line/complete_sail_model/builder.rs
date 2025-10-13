@@ -12,6 +12,7 @@ use super::CompleteSailModel;
 use crate::error::Error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CompleteSailModelBuilder {
     lifting_line_simulation: SimulationBuilder,
     wind_environment: WindEnvironment,

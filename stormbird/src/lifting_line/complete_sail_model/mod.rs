@@ -153,14 +153,4 @@ impl CompleteSailModel {
             );
         }
     }
-
-    /*pub fn get_input_power(&self) -> Float {
-        if let Some(power_model) = &self.input_power {
-            power_model.get_input_power(
-                &self.lifting_line_simulation.line_force_model.section_models_internal_state()
-            )
-        } else {
-            0.0
-        }
-    }*/
 }
