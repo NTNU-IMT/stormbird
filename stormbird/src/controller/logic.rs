@@ -78,7 +78,7 @@ impl ControllerLogic {
                     input.apparent_wind_directions[i]
                 ).unwrap();
 
-                let wing_angle = input.apparent_wind_directions[i] + set_point;
+                let wing_angle = input.apparent_wind_directions[i] - set_point;
 
                 out.push(wing_angle);
             }

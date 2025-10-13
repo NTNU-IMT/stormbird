@@ -5,6 +5,7 @@ from stormbird_setup.lifting_line.solver import SimpleIterative
 
 from stormbird_setup.simple_sail_setup import SimpleSailSetup, SailType
 from stormbird_setup.spatial_vector import SpatialVector
+from stormbird_setup.wind import WindEnvironment
 
 from pystormbird.lifting_line import CompleteSailModel
 
@@ -42,16 +43,21 @@ if __name__ == "__main__":
 
         controller = sail.controller_builder()
 
-        model_builder = CompleteSailModelBuilder(
-            lifting_line_simulation=simulation_builder,
-            controller=controller
+        wind_environment = WindEnvironment(
+            height_variation_model=None
         )
 
-        if sail_type == SailType.RotorSail:
-            model_builder.lifting_line_simulation.simulation_settings.solver = SimpleIterative(
-                max_iterations_per_time_step = 200,
-                damping_factor = 0.1
-            )
+        model_builder = CompleteSailModelBuilder(
+            lifting_line_simulation=simulation_builder,
+            controller=controller,
+            wind_environment=wind_environment,
+        )
+
+        #if sail_type == SailType.RotorSail:
+        model_builder.lifting_line_simulation.simulation_settings.solver = SimpleIterative(
+            max_iterations_per_time_step = 200,
+            damping_factor = 0.1
+        )
 
         model = CompleteSailModel(model_builder.to_json_string())
 
@@ -62,11 +68,11 @@ if __name__ == "__main__":
             wind_dir_rad = np.radians(wind_dir_deg)
 
             u_wind_apparent = ship_velocity + wind_velocity * np.cos(wind_dir_rad)
-            v_wind_apparent = wind_velocity * np.sin(wind_dir_rad)
+            v_wind_apparent = -wind_velocity * np.sin(wind_dir_rad)
 
             u_inf = np.sqrt(u_wind_apparent**2 + v_wind_apparent**2)
 
-            apparent_wind_direction[index] = np.arctan2(v_wind_apparent, u_wind_apparent)
+            apparent_wind_direction[index] = np.arctan2(-v_wind_apparent, u_wind_apparent)
 
             result = model.simulate_condition(
                 wind_velocity = wind_velocity,

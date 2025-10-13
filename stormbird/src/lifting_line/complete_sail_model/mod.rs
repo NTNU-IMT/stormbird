@@ -20,7 +20,7 @@ use crate::controller::{
     input::ControllerInput,
 };
 
-use crate::input_power::InputPower;
+//use crate::empirical_models::input_power::InputPower;
 
 use crate::common_utils::results::simulation::SimulationResult;
 
@@ -42,7 +42,6 @@ pub struct CompleteSailModel {
     lifting_line_simulation: LiftingLineSimulation,
     wind_environment: WindEnvironment,
     controller: Controller,
-    input_power: Option<InputPower>,
 }
 
 impl CompleteSailModel {
@@ -155,7 +154,7 @@ impl CompleteSailModel {
         }
     }
 
-    pub fn get_input_power(&self) -> Float {
+    /*pub fn get_input_power(&self) -> Float {
         if let Some(power_model) = &self.input_power {
             power_model.get_input_power(
                 &self.lifting_line_simulation.line_force_model.section_models_internal_state()
@@ -163,5 +162,5 @@ impl CompleteSailModel {
         } else {
             0.0
         }
-    }
+    }*/
 }

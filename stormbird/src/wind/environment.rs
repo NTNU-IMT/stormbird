@@ -14,6 +14,7 @@ use serde::{Serialize, Deserialize};
 use serde_json;
 
 use crate::error::Error;
+use crate::line_force_model::LineForceModel;
 
 use super::height_variation::HeightVariationModel;
 use super::inflow_corrections::InflowCorrections;
@@ -165,13 +166,54 @@ impl WindEnvironment {
         }
     }
 
-    pub fn apparent_wind_directions_from_velocity(&self, velocity: &[SpatialVector]) -> Vec<Float> {
+    /// Measures the apparent wind direction based on the input velocity vectors, where the sign and 
+    /// magnitude is defined by the zero_direction_vector and the wind_rotation_axis.
+    pub fn apparent_wind_directions_from_velocity_based_on_rotation_axis(
+        &self, 
+        velocity: &[SpatialVector]
+    ) -> Vec<Float> {
         velocity.iter().map(|velocity| {
             self.zero_direction_vector.signed_angle_between(
                 *velocity, 
                 self.wind_rotation_axis
             )
         }).collect()
+    }
+
+    /// Measures the apparent wind direction based on the input velocity vectors, where the sign is
+    /// defined by the local, non-rotated, chord vector and rotation-axis of each wing in the line 
+    /// force model. This, then, gives the wind direction relative to the local coordinate system
+    /// for each wing. A direction of zero means that the flow is aligned with the non-rotated chord
+    pub fn apparent_wind_direction_from_velocity_and_line_force_model(
+        &self, 
+        velocity: &[SpatialVector],
+        line_force_model: &LineForceModel
+    ) -> Vec<Float> {
+
+        let nr_span_lines = line_force_model.nr_span_lines();
+        
+        let mut out = Vec::with_capacity(nr_span_lines);
+
+        for i in 0..nr_span_lines {
+            let wing_index = line_force_model.wing_index_from_global(i);
+
+            let first_strip_index = line_force_model.wing_indices[wing_index].start;
+
+            let rotation_axis = line_force_model.span_lines_global[first_strip_index].relative_vector().normalize();
+
+            let chord_local_non_transformed = line_force_model.chord_vectors_local_not_rotated[first_strip_index];
+
+            let chord_local_transformed = line_force_model.rigid_body_motion.transform_vector(chord_local_non_transformed);
+
+            out.push(
+                chord_local_transformed.signed_angle_between(
+                    velocity[i], 
+                    rotation_axis
+                )
+            );
+        }
+
+        out
     }
 }
 

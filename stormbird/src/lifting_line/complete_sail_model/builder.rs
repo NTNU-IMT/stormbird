@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use crate::lifting_line::simulation_builder::SimulationBuilder;
 use crate::wind::environment::WindEnvironment;
 use crate::controller::ControllerBuilder;
-use crate::input_power::InputPower;
+//use crate::empirical_models::input_power::InputPower;
 
 use super::CompleteSailModel;
 
@@ -16,7 +16,6 @@ pub struct CompleteSailModelBuilder {
     lifting_line_simulation: SimulationBuilder,
     wind_environment: WindEnvironment,
     controller: ControllerBuilder,
-    input_power: Option<InputPower>
 }
 
 impl CompleteSailModelBuilder {
@@ -40,8 +39,7 @@ impl CompleteSailModelBuilder {
         CompleteSailModel {
             lifting_line_simulation,
             wind_environment: self.wind_environment.clone(),
-            controller,
-            input_power: self.input_power.clone(),
+            controller
         }
     }
 }

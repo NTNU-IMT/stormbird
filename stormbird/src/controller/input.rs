@@ -65,6 +65,7 @@ impl ControllerInput {
                 simulation_result, 
                 &measurement_settings.wind_direction, 
                 wind_environment, 
+                line_force_model,
                 use_input_velocity_for_apparent_wind_direction
             ),
         }
@@ -84,7 +85,11 @@ impl ControllerInput {
         let angles_of_attack = line_force_model.angles_of_attack(
             velocity, CoordinateSystem::Global
         );
-        let wind_directions = wind_environment.apparent_wind_directions_from_velocity(velocity);
+        
+        let wind_directions = wind_environment.apparent_wind_direction_from_velocity_and_line_force_model(
+            velocity,
+            line_force_model
+        );
 
         let wing_indices = line_force_model.wing_indices.clone();
 

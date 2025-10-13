@@ -73,7 +73,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
     def controller_builder(self) -> ControllerBuilder:
         match self.sail_type:
             case SailType.WingSailSingleElement:
-                apparent_wind_directions_data = np.radians([-180, -30, -20, 20, 30, 180])
+                apparent_wind_directions_data = np.radians([-180, -30, -15, 15, 30, 180])
                 angle_of_attack_set_points_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
 
                 logic = ControllerLogic(
@@ -85,8 +85,8 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                     logic = logic
                 )
             case SailType.WingSailFlapped:
-                apparent_wind_directions_data = np.radians([-180, -30, -20, 20, 30, 180])
-                angle_of_attack_set_points_data = np.radians([12.0, 12.0, 0.0, 0.0, -12, -12])
+                apparent_wind_directions_data = np.radians([-180, -30, -15, 15, 30, 180])
+                angle_of_attack_set_points_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
                 section_model_internal_state_set_points_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15.0, 15.0])
 
                 logic = ControllerLogic(
@@ -99,8 +99,8 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                     logic = logic
                 )
             case SailType.RotorSail:
-                apparent_wind_directions_data = np.radians([-180, -30, -20, 20, 30, 180])
-                section_model_internal_state_set_points_data = [-4.0, -4.0, 0.0, 0.0, 4.0, 4.0]
+                apparent_wind_directions_data = np.radians([-180, -40, -30, 30, 40, 180])
+                section_model_internal_state_set_points_data = [4.0, 4.0, 0.0, 0.0, -4.0, -4.0]
 
                 internal_state_type = InternalStateType.SpinRatio
                 internal_state_conversion = SpinRatioConversion(

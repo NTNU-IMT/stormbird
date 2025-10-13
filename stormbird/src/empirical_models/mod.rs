@@ -5,3 +5,4 @@
 //! Extra force models that can be used together with the sail models
 
 pub mod blendermann_superstructre_forces;
+pub mod input_power;

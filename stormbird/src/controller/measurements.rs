@@ -6,7 +6,8 @@ use stormath::statistics;
 use stormath::type_aliases::Float;
 
 use crate::{
-    common_utils::results::simulation::SimulationResult,
+    common_utils::results::simulation::SimulationResult, 
+    line_force_model::LineForceModel, 
     wind::environment::WindEnvironment,
 };
 
@@ -105,6 +106,7 @@ pub fn measure_apparent_wind_direction(
     simulation_result: &SimulationResult,
     measurement_settings: &MeasurementSettings,
     wind_environment: &WindEnvironment,
+    line_force_model: &LineForceModel,
     use_input_velocity: bool,
 ) -> Vec<Float> {
     let relevant_velocities = if use_input_velocity {
@@ -114,7 +116,10 @@ pub fn measure_apparent_wind_direction(
     };
 
     let wind_directions = wind_environment
-        .apparent_wind_directions_from_velocity(&relevant_velocities);
+        .apparent_wind_direction_from_velocity_and_line_force_model(
+            &relevant_velocities, 
+            line_force_model
+        );
 
     measure_float_values(
         &wind_directions, 
