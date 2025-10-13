@@ -25,6 +25,7 @@ pub struct SimulationResult {
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
     pub integrated_moments: Vec<IntegratedValues>,
+    pub input_power: Vec<Float>,
     pub iterations: usize,
     pub residual: Float,
     pub wing_indices: Vec<Range<usize>>,

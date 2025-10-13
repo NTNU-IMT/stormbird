@@ -8,7 +8,7 @@ use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationSettings,
-    SteadySettings,
+    QuasiSteadySettings,
 };
 
 use super::test_setup::RectangularWing;
@@ -33,7 +33,7 @@ fn coordinate_systems() {
 
     let translation = SpatialVector::from([100.0, 42.0, 10.0]);
 
-    let model_builder_global = RectangularWing {
+    let model_builder_fixed = RectangularWing {
         aspect_ratio,
         cl_zero_angle,
         angle_of_attack,
@@ -41,32 +41,36 @@ fn coordinate_systems() {
         ..Default::default()
     }.build();
 
-    let mut model_builder_body = model_builder_global.clone();
+    let mut model_builder_body = model_builder_fixed.clone();
+    model_builder_body.translation = translation;
+    model_builder_body.rotation = rotation;
+
     model_builder_body.output_coordinate_system = CoordinateSystem::Body;
+
+    let mut model_builder_global = model_builder_fixed.clone();
+    model_builder_global.translation = translation;
+    model_builder_global.rotation = rotation;
 
     let velocity = SpatialVector::from([1.2, 0.0, 0.0]);
 
     let time_step = 0.1;
 
-    let steady_settings = SteadySettings::default();
+    let steady_settings = QuasiSteadySettings::default();
 
     let mut sim_fixed = SimulationBuilder::new(
+        model_builder_fixed.clone(),
+        SimulationSettings::QuasiSteady(steady_settings.clone())
+    ).build();
+
+    let mut sim_global = SimulationBuilder::new(
         model_builder_global.clone(),
         SimulationSettings::QuasiSteady(steady_settings.clone())
     ).build();
-
-    let mut sim_global = sim_fixed.clone();
-
+    
     let mut sim_body = SimulationBuilder::new(
         model_builder_body.clone(),
-        SimulationSettings::QuasiSteady(steady_settings.clone())
+        SimulationSettings::QuasiSteady(steady_settings.clone()),
     ).build();
-
-    sim_global.line_force_model.rigid_body_motion.rotation = rotation;
-    sim_body.line_force_model.rigid_body_motion.rotation = rotation;
-    
-    sim_global.line_force_model.rigid_body_motion.translation = translation;
-    sim_body.line_force_model.rigid_body_motion.translation = translation;
 
     let velocity_points = sim_global.get_freestream_velocity_points();
 
@@ -104,7 +108,6 @@ fn coordinate_systems() {
     let moments_body = result_body.integrated_moments_sum();
 
     let rotation_type = RotationType::XYZ;
-
 
     let forces_global_transformed = forces_global.in_rotated_coordinate_system(
         rotation,

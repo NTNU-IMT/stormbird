@@ -35,9 +35,7 @@ impl LiftingLineCorrectionBuilder {
         viscous_core_length_factor: Float, 
         line_force_model: &LineForceModel
     ) -> LiftingLineCorrection {
-        let chord_lengths: Vec<Float> = line_force_model.chord_vectors_local.iter().map(
-            |chord_vector| chord_vector.length()
-        ).collect();
+        let chord_lengths: Vec<Float> = line_force_model.chord_lengths.clone();
 
         let average_chord_length = chord_lengths.iter().sum::<Float>() / chord_lengths.len() as Float;
 
@@ -74,7 +72,7 @@ impl LiftingLineCorrection {
         ctrl_points_velocity: &[SpatialVector],
         circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
-        let span_lines = line_force_model.span_lines();
+        let span_lines = &line_force_model.span_lines_global;
 
         let mut u_i_correction: Vec<SpatialVector> = Vec::with_capacity(span_lines.len());
 
@@ -102,27 +100,30 @@ impl LiftingLineCorrection {
 
             let far_field_ratio = 5.0; // Ratio of far field length to viscous core length
 
-            let frozen_wake_viscous = FrozenWake::steady_wake_from_span_lines_and_direction(
+            let mut frozen_wake_viscous = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length,
                 far_field_ratio, // far_field_ratio
             );
 
-            let frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
+            let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length / 10.0,
                 far_field_ratio, // far_field_ratio
             );
 
-            let u_i_viscous = frozen_wake_viscous.induced_velocities_at_control_points(
+            frozen_wake_viscous.update_induced_velocities_at_control_points(
                 &wing_circulation_strength
             );
 
-            let u_i_default = frozen_wake_default.induced_velocities_at_control_points(
+            frozen_wake_default.update_induced_velocities_at_control_points(
                 &wing_circulation_strength
             );
+
+            let u_i_viscous = &frozen_wake_viscous.induced_velocities_at_control_points;
+            let u_i_default = &frozen_wake_default.induced_velocities_at_control_points;
 
             for i in 0..nr_span_lines {
                 u_i_correction.push(u_i_default[i] - u_i_viscous[i]);

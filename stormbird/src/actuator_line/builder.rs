@@ -1,5 +1,5 @@
 use crate::line_force_model::builder::LineForceModelBuilder;
-use crate::controllers::ControllerBuilder;
+use crate::controller::ControllerBuilder;
 
 use serde::{Serialize, Deserialize};
 

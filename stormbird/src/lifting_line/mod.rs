@@ -13,6 +13,7 @@ pub mod solvers;
 pub mod singularity_elements;
 pub mod simulation_builder;
 pub mod simulation;
+pub mod complete_sail_model;
 
 /// Typical imports when using the lifting line functionality
 pub mod prelude {

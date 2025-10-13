@@ -100,7 +100,7 @@ impl LineForceModel {
     ) -> Vec<Float> {        
         let mut smoothed_values: Vec<Float> = Vec::with_capacity(noisy_values.len());
         
-        let span_distance = self.span_distance_in_local_coordinates();
+        let span_distance = &self.ctrl_point_spanwise_distance;
 
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let settings = &smoothing_settings[wing_index];
@@ -188,7 +188,7 @@ impl LineForceModel {
             &gamma_divided_by_u2
         );
 
-        let effective_relative_span_distance = self.effective_relative_span_distance();
+        let effective_relative_span_distance = &self.ctrl_point_spanwise_distance_circulation_model;
 
         let prescribed_shape_vector = if prescribed_circulation.curve_fit_shape_parameters {
             let mut local_shape_vector = Vec::with_capacity(nr_wings);

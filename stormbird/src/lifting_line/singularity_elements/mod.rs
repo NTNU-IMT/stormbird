@@ -9,6 +9,7 @@ use symmetry_condition::SymmetryCondition;
 pub mod vortex_line;
 pub mod symmetry_condition;
 pub mod panel;
+pub mod horseshoe_vortex;
 
 use stormath::type_aliases::Float;
 

@@ -20,10 +20,11 @@ use stormath::{
 
 pub mod builder;
 pub mod data_access;
+pub mod data_update;
 pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
-pub mod global_geometry_data;
+pub mod input_power;
 
 pub mod corrections;
 pub mod prelude;
@@ -33,7 +34,7 @@ mod tests;
 
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
-use crate::controllers::output::ControllerOutput;
+use crate::controller::output::ControllerOutput;
 
 use corrections::{
     circulation::CirculationCorrection,
@@ -41,6 +42,8 @@ use corrections::{
 };
 use builder::single_wing::SingleWing;
 use span_line::*;
+
+use input_power::InputPowerModel;
 
 #[derive(Clone, Debug)]
 /// The struct holds variables for a model that calculate the forces on wings, under the assumption
@@ -51,19 +54,13 @@ pub struct LineForceModel {
     /// and end point, to allow for uncoupled analysis
     pub span_lines_local: Vec<SpanLine>,
     /// Vectors representing both the chord length and the direction of the chord for each span line
-    pub chord_vectors_local: Vec<SpatialVector>,
+    pub chord_vectors_local_not_rotated: Vec<SpatialVector>,
     /// The length of the chord vectors, stored as it is needed for several calculations
     pub chord_lengths: Vec<Float>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
     pub wing_indices: Vec<Range<usize>>,
-    /// Rigid body motion of the line force model
-    pub rigid_body_motion: RigidBodyMotion,
-    /// Vector used to store local angles for each wing. This can be used to rotate the wing along
-    /// the span axis during a dynamic simulation. The typical example is changing the angle of
-    /// attack on a wing sail due to changing apparent wind conditions.
-    pub local_wing_angles: Vec<Float>,
     /// A vector that contains booleans that indicate whether the circulation should be zero at the
     /// ends or not. The variables are used both when initializing the circulation before a
     /// simulation and in cases where smoothing is applied to the circulation.
@@ -82,6 +79,33 @@ pub struct LineForceModel {
     pub angle_of_attack_correction: AngleOfAttackCorrection,
     /// The coordinate system to generate the output in. Variants consists of Global and Body.
     pub output_coordinate_system: CoordinateSystem,
+    /// Rigid body motion of the line force model
+    pub rigid_body_motion: RigidBodyMotion,
+    /// Vector used to store local angles for each wing. This can be used to rotate the wing along
+    /// the span axis during a dynamic simulation. The typical example is changing the angle of
+    /// attack on a wing sail due to changing apparent wind conditions.
+    pub local_wing_angles: Vec<Float>,
+    /// The local chord vector after applying the local wing angles, but before applying the rigid
+    /// body rotation.
+    pub chord_vectors_local: Vec<SpatialVector>,
+    /// The global chord vectors, i.e., after applying the rigid body rotation and local wing angles
+    pub chord_vectors_global: Vec<SpatialVector>,
+    /// The chord vectors at the span points, interpolated and extrapolated from the global chord vectors
+    pub chord_vectors_global_at_span_points: Vec<SpatialVector>,
+    /// The global span lines, i.e., after applying the rigid body transformations
+    pub span_lines_global: Vec<SpanLine>,
+    /// The global span points, i.e., after applying the rigid body transformations
+    pub span_points_global: Vec<SpatialVector>,
+    /// The global ctrl points, i.e., after applying the rigid body transformations
+    pub ctrl_points_global: Vec<SpatialVector>,
+    /// The spanwise distance from the center of each wing for each control point
+    pub ctrl_point_spanwise_distance: Vec<Float>,
+    /// The non-dimensional spanwise distance from the center of each wing for each control point
+    pub ctrl_point_spanwise_distance_non_dimensional: Vec<Float>,
+    /// Effective values for the ctrl point spanwise distance when applying prescribed circulation
+    pub ctrl_point_spanwise_distance_circulation_model: Vec<Float>,
+    /// Models for estimating the input energy for the sails
+    pub input_power_models: Vec<InputPowerModel>,
 }
 
 impl Default for LineForceModel {
@@ -101,7 +125,7 @@ impl LineForceModel {
     pub fn new(density: Float) -> LineForceModel {
         Self {
             span_lines_local: Vec::new(),
-            chord_vectors_local: Vec::new(),
+            chord_vectors_local_not_rotated: Vec::new(),
             chord_lengths: Vec::new(),
             section_models: Vec::new(),
             wing_indices: Vec::new(),
@@ -111,7 +135,17 @@ impl LineForceModel {
             density,
             circulation_correction: Default::default(),
             angle_of_attack_correction: Default::default(),
-            output_coordinate_system: CoordinateSystem::Global
+            output_coordinate_system: CoordinateSystem::Global,
+            chord_vectors_local: Vec::new(),
+            chord_vectors_global: Vec::new(),
+            chord_vectors_global_at_span_points: Vec::new(),
+            span_lines_global: Vec::new(),
+            span_points_global: Vec::new(),
+            ctrl_points_global: Vec::new(),
+            ctrl_point_spanwise_distance: Vec::new(),
+            ctrl_point_spanwise_distance_non_dimensional: Vec::new(),
+            ctrl_point_spanwise_distance_circulation_model: Vec::new(),
+            input_power_models: Vec::new(),
         }
     }
 
@@ -134,10 +168,13 @@ impl LineForceModel {
 
         for line in &wing.span_lines_local {
             self.span_lines_local.push(line.clone());
+            self.span_lines_global.push(line.clone());
         }
 
         for chord_vector in &wing.chord_vectors_local {
+            self.chord_vectors_local_not_rotated.push(*chord_vector);
             self.chord_vectors_local.push(*chord_vector);
+            self.chord_vectors_global.push(*chord_vector);
         }
 
         for chord_length in &wing.chord_lengths {
@@ -147,8 +184,11 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
-        self.non_zero_circulation_at_ends
-            .push(wing.non_zero_circulation_at_ends);
+        self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
+
+        self.input_power_models.push(wing.input_power_model.clone());
+
+        self.update_global_data_representations();
     }
 
     
@@ -178,15 +218,6 @@ impl LineForceModel {
         panic!("Local index not found. The global index is not part of any wing")
     }
 
-    
-
-    /// Resets the local wing angles to zero.
-    pub fn reset_local_wing_angles(&mut self) {
-        for angle in self.local_wing_angles.iter_mut() {
-            *angle = 0.0;
-        }
-    }
-
     /// Removes the velocity in the span direction from the input velocity vector.
     pub fn remove_span_velocity(
         &self,
@@ -194,8 +225,8 @@ impl LineForceModel {
         input_coordinate_system: CoordinateSystem,
     ) -> Vec<SpatialVector> {
         let span_lines = match input_coordinate_system {
-            CoordinateSystem::Global => self.span_lines(),
-            CoordinateSystem::Body => self.span_lines_local.clone(),
+            CoordinateSystem::Global => &self.span_lines_global,
+            CoordinateSystem::Body => &self.span_lines_local,
         };
 
         velocity
@@ -219,7 +250,7 @@ impl LineForceModel {
                     SectionModel::Foil(_) => 0.0,
                     SectionModel::VaryingFoil(_) => 0.0,
                     SectionModel::RotatingCylinder(cylinder) => cylinder.wake_angle(
-                        self.chord_vectors_local[index].length(),
+                        self.chord_lengths[index],
                         velocity[index].length(),
                     ),
                     SectionModel::EffectiveWindSensor => 0.0,
@@ -232,32 +263,5 @@ impl LineForceModel {
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)
     pub fn total_force_factor(&self, freestream_velocity: Float) -> Float {
         0.5 * self.density * freestream_velocity.powi(2) * self.total_projected_area()
-    }
-
-    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
-        for wing_index in 0..self.nr_wings() {
-            match self.section_models[wing_index] {
-                SectionModel::Foil(_) => {}
-                SectionModel::VaryingFoil(ref mut foil) => {
-                    foil.current_internal_state = internal_state[wing_index];
-                }
-                SectionModel::RotatingCylinder(ref mut cylinder) => {
-                    cylinder.revolutions_per_second = internal_state[wing_index];
-                },
-                SectionModel::EffectiveWindSensor => {}
-            }
-        }
-    }
-
-    pub fn set_controller_output(&mut self, controller_output: &ControllerOutput) {
-        if let Some(local_wing_angles) = &controller_output.local_wing_angles {
-            for (index, angle) in local_wing_angles.iter().enumerate() {
-                self.local_wing_angles[index] = *angle;
-            }
-        }
-
-        if let Some(section_models_internal_state) = &controller_output.section_models_internal_state {
-            self.set_section_models_internal_state(section_models_internal_state);
-        }
     }
 }

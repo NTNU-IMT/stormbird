@@ -4,7 +4,6 @@
 
 //! Implementation block for all the methods that access data from the line force model
 
-
 use super::*;
 
 impl LineForceModel {
@@ -23,7 +22,7 @@ impl LineForceModel {
         self.span_lines_local[self.wing_indices[wing_index].start].relative_vector()
     }
 
-    pub fn wing_rotation_axis_from_global(&self, global_index: usize) -> SpatialVector {
+    pub fn wing_rotation_axis_from_global_index(&self, global_index: usize) -> SpatialVector {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_axis(wing_index)
@@ -37,98 +36,10 @@ impl LineForceModel {
         (angle, axis)
     }
 
-    pub fn wing_rotation_data_from_global(&self, global_index: usize) -> (Float, SpatialVector) {
+    pub fn wing_rotation_data_from_global_index(&self, global_index: usize) -> (Float, SpatialVector) {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_data(wing_index)
-    }
-
-    pub fn global_chord_vector_at_index(&self, index: usize) -> SpatialVector {
-        self.rigid_body_motion.transform_vector(self.local_chord_vector_at_index(index))
-    }
-
-    /// Returns the chord vectors in global coordinates.
-    pub fn local_chord_vectors(&self) -> Vec<SpatialVector> {
-        self.chord_vectors_local
-            .iter()
-            .enumerate()
-            .map(|(global_index, chord_vector)| {
-                let (angle, axis) = self.wing_rotation_data_from_global(global_index);
-
-                chord_vector.rotate_around_axis(angle, axis)
-            })
-            .collect()
-    }
-
-    pub fn global_chord_vectors(&self) -> Vec<SpatialVector> {
-        let local_chord_vectors = self.local_chord_vectors();
-
-        local_chord_vectors
-            .iter()
-            .map(|chord_vector| self.rigid_body_motion.transform_vector(*chord_vector))
-            .collect()
-    }
-
-    /// Returns the control points of each line element. This is calculated as the midpoint of each
-    /// span line
-    pub fn ctrl_points(&self) -> Vec<SpatialVector> {
-        let span_lines = self.span_lines();
-
-        span_lines
-            .iter()
-            .map(|line| line.ctrl_point())
-            .collect()
-    }
-
-    /// Returns the control points of each line element in local coordinates. This is calculated as
-    /// the midpoint of each span line
-    pub fn ctrl_points_local(&self) -> Vec<SpatialVector> {
-        self.span_lines_local
-            .iter()
-            .map(|line| line.ctrl_point())
-            .collect()
-    }
-
-    /// Returns the points making up the line geometry of the wings as a vector of spatial vectors,
-    /// as opposed to a vector of span lines.
-    pub fn span_points(&self) -> Vec<SpatialVector> {
-        let span_lines = self.span_lines();
-        let mut span_points: Vec<SpatialVector> = Vec::new();
-
-        for wing_index in 0..self.wing_indices.len() {
-            for i in self.wing_indices[wing_index].clone() {
-                span_points.push(span_lines[i].start_point);
-            }
-
-            let last_index = self.wing_indices[wing_index].clone().last().unwrap();
-
-            span_points.push(span_lines[last_index].end_point);
-        }
-
-        span_points
-    }
-
-    #[inline(always)]
-    pub fn span_line_at_index(&self, index: usize) -> SpanLine {
-        let mut span_line = self.span_lines_local[index].clone();
-
-        span_line.start_point = self.rigid_body_motion.transform_point(span_line.start_point);
-        span_line.end_point = self.rigid_body_motion.transform_point(span_line.end_point);
-
-        span_line
-    }
-
-    /// Returns the span lines in global coordinates.
-    pub fn span_lines(&self) -> Vec<SpanLine> {
-        (0..self.nr_span_lines())
-            .map(|i| self.span_line_at_index(i))
-            .collect()
-    }
-
-    pub fn local_chord_vector_at_index(&self, index: usize) -> SpatialVector {
-        let (angle, axis) = self.wing_rotation_data_from_global(index);
-
-        self.chord_vectors_local[index].rotate_around_axis(angle, axis)
     }
 
     pub fn projected_areas(&self) -> Vec<Float> {
@@ -138,7 +49,7 @@ impl LineForceModel {
             let wing_index = self.wing_index_from_global(i);
 
             areas[wing_index] +=
-                self.chord_vectors_local[i].length() * self.span_lines_local[i].length();
+                self.chord_lengths[i] * self.span_lines_local[i].length();
         }
 
         areas
@@ -180,12 +91,13 @@ impl LineForceModel {
         let mut total_area = 0.0;
 
         for i in 0..self.nr_span_lines() {
-            total_area += self.chord_vectors_local[i].length() * self.span_lines_local[i].length();
+            total_area += self.chord_lengths[i] * self.span_lines_local[i].length();
         }
 
         total_area
     }
 
+    /// Returns the internal state for the section model belonging to each wing in the model.
     pub fn section_models_internal_state(&self) -> Vec<Float> {
         let mut internal_state: Vec<Float> = vec![0.0; self.nr_wings()];
 
@@ -204,101 +116,21 @@ impl LineForceModel {
         internal_state
     }
 
-    pub fn span_distance_in_local_coordinates(&self) -> Vec<Float> {
-        let mut span_distance: Vec<Float> = Vec::new();
-
-        for wing_index in 0..self.wing_indices.len() {
-            let start_point =
-                self.span_lines_local[self.wing_indices[wing_index].start].start_point;
-
-            let mut previous_point = start_point;
-            let mut previous_distance = 0.0;
-
-            let mut current_wing_span_distance: Vec<Float> = Vec::new();
-
-            for i in self.wing_indices[wing_index].clone() {
-                let line = &self.span_lines_local[i];
-
-                let increase_in_distance = line.ctrl_point().distance(previous_point);
-                previous_point = line.ctrl_point();
-
-                current_wing_span_distance.push(previous_distance + increase_in_distance);
-
-                previous_distance += increase_in_distance;
-            }
-
-            let end_point = self.span_lines_local
-                [self.wing_indices[wing_index].clone().last().unwrap()]
-            .end_point;
-
-            let total_distance =
-                current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
-
-            for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
-                span_distance.push(current_wing_span_distance[i] - 0.5 * total_distance);
-            }
-        }
-
-        span_distance
-    }
-
-    /// Calculates the relative distance from the center off each wing for each control point.
-    /// The absolute values are divided with the span of each wing. In other words, the
-    /// return value will vary between -0.5 and 0.5, where 0 is the center of the wing.
-    pub fn relative_span_distance(&self) -> Vec<Float> {
-        let mut relative_span_distance: Vec<Float> = Vec::new();
-
-        for wing_index in 0..self.wing_indices.len() {
-            let start_point =
-                self.span_lines_local[self.wing_indices[wing_index].start].start_point;
-
-            let mut previous_point = start_point;
-            let mut previous_distance = 0.0;
-
-            let mut current_wing_span_distance: Vec<Float> = Vec::new();
-
-            for i in self.wing_indices[wing_index].clone() {
-                let line = &self.span_lines_local[i];
-
-                let increase_in_distance = line.ctrl_point().distance(previous_point);
-                previous_point = line.ctrl_point();
-
-                current_wing_span_distance.push(previous_distance + increase_in_distance);
-
-                previous_distance += increase_in_distance;
-            }
-
-            let end_point = self.span_lines_local
-                [self.wing_indices[wing_index].clone().last().unwrap()]
-            .end_point;
-
-            let total_distance =
-                current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
-
-            for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
-                relative_span_distance.push(current_wing_span_distance[i] / total_distance - 0.5);
-            }
-        }
-
-        relative_span_distance
-    }
-
-    /// Returns the effective non-dimensional span distance values for each control point.
-    pub fn effective_relative_span_distance(&self) -> Vec<Float> {
-        let relative_span_distance = self.relative_span_distance();
-
-        relative_span_distance.iter().enumerate().map(
-            |(index, value)| {
+    pub fn lift_coefficient_derivatives(&self) -> Vec<Float> {
+        (0..self.nr_span_lines()).map(
+            |index| {
                 let wing_index = self.wing_index_from_global(index);
-                    match self.non_zero_circulation_at_ends[wing_index] {
-                        [true, true] => *value, // TODO: consider if this case should behave differently. Not clear how it should be handled....
-                        [true, false] => (value + 0.5) / 2.0,
-                        [false, true] => (value - 0.5) / 2.0,
-                        [false, false] => *value
-                    }
+
+                match &self.section_models[wing_index] {
+                    SectionModel::Foil(foil) => foil.cl_initial_slope,
+                    SectionModel::VaryingFoil(varyin_foil) => {
+                        let foil = varyin_foil.get_foil();
+
+                        foil.cl_initial_slope
+                    },
+                    _ => panic!("Lift coefficient derivative requested for a section model that does not support this operation"),
+                }
             }
         ).collect()
     }
-
-
 }

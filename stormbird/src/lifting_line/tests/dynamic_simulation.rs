@@ -11,8 +11,8 @@ use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{ 
     SimulationBuilder,
     SimulationSettings,
-    SteadySettings,
-    UnsteadySettings,
+    QuasiSteadySettings,
+    DynamicSettings,
 };
 
 use super::test_setup::RectangularWing;
@@ -45,8 +45,8 @@ fn right_force_magnitude_with_steady_forward_motion() {
 
     let freestream_velocity = SpatialVector::from([vel_magnitude, 0.0, 0.0]);
 
-    let steady_settings = SteadySettings::default();
-    let dynamic_settings = UnsteadySettings::default();
+    let steady_settings = QuasiSteadySettings::default();
+    let dynamic_settings = DynamicSettings::default();
 
     let _sim_settings_steady = SimulationSettings::QuasiSteady(steady_settings.clone());
     let sim_settings_dynamic = SimulationSettings::Dynamic(dynamic_settings.clone());
@@ -78,12 +78,9 @@ fn right_force_magnitude_with_steady_forward_motion() {
             0.0
         ]);
 
-        sim_translation
-            .line_force_model
-            .rigid_body_motion
-            .update_translation_with_velocity_using_finite_difference(
-                translation,
-                time_step,
+        sim_translation.
+            line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
+                time_step, translation, SpatialVector::default()
             );
 
         //sim_translation.line_force_model.rigid_body_motion.velocity_linear = -freestream_velocity;
@@ -145,7 +142,7 @@ fn right_sign_of_the_force_when_translating() {
 
     let mut sim = SimulationBuilder::new (
         wing_builder,
-        SimulationSettings::QuasiSteady(SteadySettings::default()),
+        SimulationSettings::QuasiSteady(QuasiSteadySettings::default()),
     ).build();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
@@ -161,10 +158,10 @@ fn right_sign_of_the_force_when_translating() {
         let velocity_y = amplitude * frequency * (time * frequency).cos();
 
         let translation = SpatialVector::from([0.0, translation_y, 0.0]);
+        let rotation = SpatialVector::from([0.0, 0.0, 0.0]);
 
-        sim.line_force_model.rigid_body_motion.update_translation_with_velocity_using_finite_difference(
-            translation,
-            time_step,
+        sim.line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
+            time_step, translation, rotation
         );
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
@@ -208,7 +205,7 @@ fn right_sign_of_the_moment_when_rotating() {
     let mut sim = SimulationBuilder::new (
         wing_builder,
         SimulationSettings::QuasiSteady(
-            SteadySettings::default()
+            QuasiSteadySettings::default()
         ),
     ).build();
 
@@ -230,9 +227,8 @@ fn right_sign_of_the_moment_when_rotating() {
 
         let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
 
-        sim.line_force_model.rigid_body_motion.update_rotation_with_velocity_using_finite_difference(
-            rotation,
-            time_step,
+        sim.line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
+            time_step, SpatialVector::default(), rotation
         );
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);

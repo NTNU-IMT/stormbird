@@ -11,8 +11,6 @@ use stormath::type_aliases::Float;
 
 use crate::lifting_line::prelude::*;
 
-use crate::line_force_model::global_geometry_data::GlobalLineForceModelGeometry;
-
 use super::simulation_builder::SimulationBuilder;
 
 use crate::error::Error;
@@ -22,9 +20,9 @@ use crate::error::Error;
 pub struct Simulation {
     pub line_force_model: LineForceModel,
     pub flow_derivatives: FlowDerivatives,
-    pub wake: Wake,
+    pub wake_data: WakeData,
     pub frozen_wake: FrozenWake,
-    pub solver: SimpleIterative,
+    pub solver: Solver,
     pub previous_circulation_strength: Vec<Float>,
     pub first_time_step_completed: bool,
 }
@@ -45,44 +43,54 @@ impl Simulation {
     ///
     /// The points consist of the ctrl points from the line force model, and all points in the wake
     pub fn get_freestream_velocity_points(&self) -> Vec<SpatialVector> {
-        let total_nr_points = self.line_force_model.nr_span_lines() + self.wake.points.len();
+        let mut total_nr_points = self.line_force_model.nr_span_lines();
+
+        if let WakeData::Dynamic(wake) = &self.wake_data {
+            total_nr_points += wake.points.len();
+        };
 
         let mut points = Vec::with_capacity(total_nr_points);
 
-        points.extend(self.line_force_model.ctrl_points());
+        points.extend(self.line_force_model.ctrl_points_global.clone());
 
-        for i in 0..self.wake.points.len() {
-            points.push(self.wake.points[i]);
+        if let WakeData::Dynamic(wake) = &self.wake_data {
+            for i in 0..wake.points.len() {
+                points.push(wake.points[i]);
+            }
         }
 
         points
     }
 
     pub fn initialize(
-        &mut self, 
-        line_force_model_geometry: &GlobalLineForceModelGeometry, 
+        &mut self,
         ctrl_points_freestream: &[SpatialVector],
         time_step: Float
     ) {
-        let averaged_ctrl_points_freestream = ctrl_points_freestream.iter()
+
+        if let WakeData::Dynamic(wake) = &mut self.wake_data {
+            let averaged_ctrl_points_freestream = ctrl_points_freestream.iter()
                 .sum::<SpatialVector>() / ctrl_points_freestream.len() as Float;
 
-        for i in 0..self.wake.velocity_at_points.len() {
-            self.wake.velocity_at_points[i] = averaged_ctrl_points_freestream;
+            for i in 0..wake.velocity_at_points.len() {
+                wake.velocity_at_points[i] = averaged_ctrl_points_freestream;
+            }
+
+            wake.initialize_with_velocity_and_time_step(
+                &self.line_force_model,
+                averaged_ctrl_points_freestream,
+                time_step,
+            );
         }
-
-        self.wake.initialize_with_velocity_and_time_step(
-            line_force_model_geometry,
-            averaged_ctrl_points_freestream,
-            time_step,
-        );
-
+        
         self.flow_derivatives = FlowDerivatives::new(
             &ctrl_points_freestream
         );
 
         self.first_time_step_completed = true;
         
+
+        self.previous_circulation_strength = vec![0.0; self.line_force_model.nr_span_lines()];
     }
 
     /// Steps the simulation forward in time by one time step.
@@ -102,16 +110,13 @@ impl Simulation {
         time_step: Float,
         freestream_velocity: &[SpatialVector],
     ) -> SimulationResult {
-        let ctrl_points_freestream = freestream_velocity[
-            0..self.line_force_model.nr_span_lines()
-        ].to_vec();
+        self.line_force_model.update_global_data_representations();
 
-        let wake_points_freestream = freestream_velocity[
-            self.line_force_model.nr_span_lines()..
-        ].to_vec();
+        let ctrl_points_freestream_range = 0..self.line_force_model.nr_span_lines();
+        let wake_points_freestream_range = self.line_force_model.nr_span_lines()..freestream_velocity.len();
 
         let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_velocity(
-            &ctrl_points_freestream
+            &freestream_velocity[ctrl_points_freestream_range.clone()],
         );
 
         let felt_span_points_freestream = self.line_force_model.span_point_values_from_ctrl_point_values(
@@ -119,45 +124,68 @@ impl Simulation {
             false
         );
 
-        let line_force_model_geometry = GlobalLineForceModelGeometry::new(
-            &self.line_force_model
-        );
-
         if !self.first_time_step_completed {
-            self.initialize(&line_force_model_geometry, &ctrl_points_freestream, time_step);
+            self.initialize(
+                &freestream_velocity[ctrl_points_freestream_range.clone()], 
+                time_step
+            );
         }
 
-        // Update the full wake model based on the current state
-        self.wake.update_before_solving(
-            time_step, 
-            &line_force_model_geometry, 
-            &felt_span_points_freestream
-        );
+        match &mut self.wake_data {
+            WakeData::Dynamic(wake) => {
+                // Update the full wake model based on the current state
+                wake.update_before_solving(
+                    time_step, 
+                    &self.line_force_model,
+                    &felt_span_points_freestream
+                );
 
-        // Use the updated wake model to update the frozen wake
-        self.frozen_wake.update(
-            &line_force_model_geometry.ctrl_points,
-            &self.wake
-        );
+                // Use the updated wake model to update the frozen wake
+                self.frozen_wake.update_from_full_wake(
+                    &self.line_force_model.ctrl_points_global,
+                    &wake
+                );
+            },
+            WakeData::QuasiSteady(settings) => {
+                self.frozen_wake.update_as_steady_from_line_force_model_and_velocities(
+                    &self.line_force_model, 
+                    &felt_span_points_freestream,
+                    &settings
+                );
+            }
+        }
 
         // Run the solver with the frozen wake
-        let solver_result = self.solver.do_step(
-            &self.line_force_model,
-            &felt_ctrl_points_freestream,
-            &self.frozen_wake,
+
+        let solver_result = match &self.solver {
+            Solver::SimpleIterative(solver) => solver.solve(
+                &self.line_force_model,
+                &felt_ctrl_points_freestream,
+                &mut self.frozen_wake,
             &self.previous_circulation_strength
-        );
+            ),
+            Solver::Linearized(solver) => {
+                solver.solve(
+                    &self.line_force_model,
+                    &felt_ctrl_points_freestream,
+                    &mut self.frozen_wake,
+                )
+            }
+        };
 
-        // Update the wake model after solving
-        self.wake.update_after_solving(
-            &solver_result.circulation_strength,
-            &wake_points_freestream,
-        );
+        if let WakeData::Dynamic(wake) = &mut self.wake_data {
+            // Update the wake model after solving
+            wake.update_after_solving(
+                &solver_result.circulation_strength,
+                &freestream_velocity[wake_points_freestream_range.clone()],
+            );
 
-        let time_step_index = (time / time_step) as usize;
+            let time_step_index = (time / time_step) as usize;
 
-        self.wake.write_wake_data_to_file_if_activated(time_step_index);
+            wake.write_wake_data_to_file_if_activated(time_step_index);
+        }
 
+    
         self.previous_circulation_strength = solver_result.circulation_strength.clone();
 
         let ctrl_point_acceleration = self.flow_derivatives.acceleration(
@@ -167,7 +195,11 @@ impl Simulation {
         
         self.flow_derivatives.update(&solver_result.output_ctrl_point_velocity);
 
-        self.line_force_model.calculate_simulation_result(&solver_result, &ctrl_point_acceleration, time)
+        self.line_force_model.calculate_simulation_result(
+            &solver_result, 
+            &ctrl_point_acceleration, 
+            time
+        )
     }
 
 
@@ -176,6 +208,10 @@ impl Simulation {
         &self,
         points: &[SpatialVector],
     ) -> Vec<SpatialVector> {
-        self.wake.induced_velocities(points)
+        if let WakeData::Dynamic(wake) = &self.wake_data {
+            return wake.induced_velocities(points);
+        } else {
+            panic!("Induced velocities not implemented for pure quasi-steady simulations yet");
+        }
     }
 }
