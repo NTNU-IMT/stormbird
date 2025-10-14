@@ -6,14 +6,14 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from enum import Enum
 
-from .base_model import StormbirdSetupBaseModel
-from .spatial_vector import SpatialVector
+from ..base_model import StormbirdSetupBaseModel
+from ..direct_setup.spatial_vector import SpatialVector
 
-from .line_force_model import WingBuilder
+from ..direct_setup.line_force_model import WingBuilder
 
-from .section_model import SectionModel, Foil, VaryingFoil, RotatingCylinder
+from ..direct_setup.section_models import SectionModel, Foil, VaryingFoil, RotatingCylinder
 
-from .controller import ControllerBuilder, ControllerLogic, InternalStateType, SpinRatioConversion
+from ..direct_setup.controller import ControllerBuilder, ControllerLogic, InternalStateType, SpinRatioConversion
 
 import numpy as np
 
@@ -24,6 +24,10 @@ class SailType(Enum):
     SuctionSail = "SuctionSail"
 
 class SimpleSailSetup(StormbirdSetupBaseModel):
+    '''
+    Class that is used to quickly set up models for different sail types. It stores typical settings
+    for the different sail types, which are used to create the wing builder and controller builder.
+    '''
     position: SpatialVector = SpatialVector()
     chord_length: float
     height: float
@@ -51,9 +55,9 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                 internal_state_data = np.radians([-15.0, 0.0, 15.0])
 
                 foils_data = [
-                    Foil(cl_zero_angle = -1.0),
+                    Foil(cl_zero_angle = -1.75),
                     Foil(cl_zero_angle = 0.0),
-                    Foil(cl_zero_angle = 1.0)
+                    Foil(cl_zero_angle = 1.75)
                 ]
 
                 section_model = SectionModel(model=VaryingFoil(

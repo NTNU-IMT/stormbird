@@ -7,7 +7,7 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from pydantic import model_serializer, Field
 
-from .base_model import StormbirdSetupBaseModel
+from ..base_model import StormbirdSetupBaseModel
 
 from .spatial_vector import SpatialVector
 

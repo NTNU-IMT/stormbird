@@ -4,11 +4,18 @@ import numpy as np
 from pystormbird.lifting_line import Simulation
 from pystormbird import SpatialVector as SpatialVectorRust
 
-from stormbird_setup.spatial_vector import SpatialVector
-from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
-from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings, DynamicSettings
-from stormbird_setup.lifting_line.solver import Linearized, SimpleIterative
-from stormbird_setup.lifting_line.wake import QuasiSteadyWake, DynamicWake, SymmetryCondition
+from stormbird_setup.direct_setup.spatial_vector import SpatialVector
+from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings, DynamicSettings
+from stormbird_setup.direct_setup.lifting_line.solver import Linearized, SimpleIterative
+from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWake, DynamicWake, SymmetryCondition
+from stormbird_setup.direct_setup.section_models import SectionModel
+
+from enum import Enum
+
+class SolverType(Enum):
+    Linearized = "Linearized"
+    SimpleIterative = "SimpleIterative"
 
 from dataclasses import dataclass
 
@@ -21,13 +28,14 @@ class SimulationCase():
     parameters of the wing.
     '''
     angle_of_attack: float
-    section_model_dict: dict
+    section_model: SectionModel
     chord_length: float = 1.0
     span: float = 4.5
     freestream_velocity: float = 8.0
     density: float = 1.225
     nr_sections: int = 32
     dynamic: bool = False
+    solver_type: SolverType = SolverType.Linearized
     z_symmetry: bool = False
 
     @property
@@ -48,7 +56,7 @@ class SimulationCase():
                 chord_vector,
                 chord_vector
             ],
-            section_model = self.section_model_dict,
+            section_model = self.section_model,
             non_zero_circulation_at_ends = non_zero_circulation_at_ends
         )
 
@@ -74,12 +82,14 @@ class SimulationCase():
         symmetry_condition = SymmetryCondition.Z if self.z_symmetry else SymmetryCondition.NoSymmetry
     
         if self.dynamic:
-            '''solver = SimpleIterative(
-                max_iterations_per_time_step = 20,
-                damping_factor = 0.1,
-            )'''
-
-            solver = Linearized()
+            match self.solver_type:
+                case SolverType.SimpleIterative:
+                    solver = SimpleIterative(
+                        max_iterations_per_time_step = 20,
+                        damping_factor = 0.1,
+                    )
+                case SolverType.Linearized:
+                    solver = Linearized()
 
             wake = DynamicWake(
                 symmetry_condition=symmetry_condition,
@@ -93,7 +103,14 @@ class SimulationCase():
                 )
             )
         else:
-            solver = Linearized()
+            match self.solver_type:
+                case SolverType.SimpleIterative:
+                    solver = SimpleIterative(
+                        max_iterations_per_time_step = 1000,
+                        damping_factor = 0.05,
+                    )
+                case SolverType.Linearized:
+                    solver = Linearized()
 
             wake = QuasiSteadyWake(
                 symmetry_condition=symmetry_condition,

@@ -6,7 +6,6 @@ use pyo3::prelude::*;
 use stormbird::common_utils::prelude::CoordinateSystem;
 
 pub mod span_line;
-pub mod builder;
 
 use crate::spatial_vector::SpatialVector;
 use stormath::spatial_vector::SpatialVector as SpatialVectorRust;
@@ -31,9 +30,9 @@ impl LineForceModel {
         }
     }
 
-    pub fn circulation_strength(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
+    pub fn circulation_strength(&self, angles_of_attack: Vec<f64>, velocity: Vec<SpatialVector>) -> Vec<f64> {
         let rust_velocity: Vec<SpatialVectorRust> = velocity.iter().map(|v| SpatialVectorRust::from(v.data)).collect();
-        self.data.circulation_strength(&rust_velocity, CoordinateSystem::Global)
+        self.data.circulation_strength(&angles_of_attack, &rust_velocity)
     }
 
     pub fn angles_of_attack(&self, velocity: Vec<SpatialVector>) -> Vec<f64> {
@@ -56,8 +55,6 @@ impl LineForceModel {
 #[pymodule]
 pub fn line_force_model(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<span_line::SpanLine>()?;
-    m.add_class::<builder::WingBuilder>()?;
-    m.add_class::<builder::LineForceModelBuilder>()?;
     m.add_class::<LineForceModel>()?;
     Ok(())
 }

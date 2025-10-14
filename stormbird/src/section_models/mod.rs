@@ -38,6 +38,13 @@ impl SectionModel {
         }
     }
 
+    pub fn from_string(setup_string: &str) -> Result<Self, String> {
+        let section_model: SectionModel = serde_json::from_str(setup_string)
+            .map_err(|e| format!("Failed to parse section model from string: {}", e))?;
+        
+        Ok(section_model)
+    }
+
     pub fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap()
     }

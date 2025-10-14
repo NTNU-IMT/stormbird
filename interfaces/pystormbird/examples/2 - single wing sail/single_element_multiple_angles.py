@@ -12,7 +12,7 @@ import json
 
 import time as time_func
 
-from simulation import SimulationCase
+from simulation import SimulationCase, SolverType
 
 section_model_path = '../1 - section models'
 
@@ -26,14 +26,12 @@ if __name__ == "__main__":
 
     theoretical_aspect_ratio = 2 * 4.5
 
-    angles_of_attack = np.arange(0.0, 16.0, 0.5)
+    angles_of_attack = np.arange(0.0, 20.0, 0.5)
     n_angles = len(angles_of_attack)
 
-    foil_model = naca_0012_Graf2014.get_foil_model()
-
-    section_model_dict = {
-        "Foil": foil_model.__dict__
-    }
+    foil_tuner = naca_0012_Graf2014.get_tuned_foil_tuner()
+    foil_model = foil_tuner.get_foil_model()
+    section_model = foil_tuner.get_section_model_setup()
 
     cl_2d = np.zeros(n_angles)
     cd_2d = np.zeros(n_angles)
@@ -43,6 +41,7 @@ if __name__ == "__main__":
         cl_2d[i] = foil_model.lift_coefficient(np.radians(angles_of_attack[i]))
 
     dynamic = [False, True]
+    solver_types = [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative]
 
     w_plot = 18
     h_plot = w_plot / 2.35
@@ -50,11 +49,14 @@ if __name__ == "__main__":
 
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
-    
-    for dyn in dynamic:
+
+    for dyn, solver in zip(dynamic, solver_types):
+        label = "Dynamic" if dyn else "Quasi-steady"
+        label += " - " + solver.name
+
         start_time = time_func.time()
         print()
-        print("Dynamic simulation: ", dyn)
+        print(label)
 
         cl = np.zeros(n_angles)
         cd = np.zeros(n_angles)
@@ -64,8 +66,9 @@ if __name__ == "__main__":
 
             sim_case = SimulationCase(
                 angle_of_attack = angles_of_attack[angle_index],
-                section_model_dict = section_model_dict,
+                section_model = section_model,
                 dynamic = dyn,
+                solver_type = solver,
                 z_symmetry = True
             )
 
@@ -83,10 +86,10 @@ if __name__ == "__main__":
         cl_theory = cl_2d / (1 + 2/theoretical_aspect_ratio)
         cd_theory = cd_2d + cl_theory**2 / (np.pi * theoretical_aspect_ratio)
 
-        dyn_string = "Dynamic" if dyn else "Quasi-steady"
+        
 
-        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + dyn_string)
-        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + dyn_string)
+        ax1.plot(angles_of_attack, cl, label='Lifting line, ' + label)
+        ax2.plot(angles_of_attack, cd, label='Lifting line, ' + label)
 
 
     # --------------- Comparison data ------------------------

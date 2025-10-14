@@ -2,12 +2,7 @@
 
 The point of this example is to demonstrate how a single wing sail can be simulated using the lifting line functionality in Stormbird. 
 
-The simulations are executed in three different modes, to compare the output against each other. This is to demonstrate how the results are affected by different simplifications and corrections. The modes are as follows:
-
-1) Raw simulation - The simulation is executed without any corrections applied, meaning no smoothing or prescribed circulation is applied
-2) Prescribed circulation - the circulation is prescribed to follow an elliptic distribution
-3) Initialized simulation - the simulation is initialized with a prescribed circulation distribution, but then simulated without any corrections.
-4) Initialized and smoothed - the simulation is initialized with a prescribed circulation, and then simulated with some Gaussian smoothing applied. 
+The simulations are executed in three different modes, to compare the output against each other. This is to demonstrate how the results are affected by different simplifications and corrections.
 
 ## Overview of files
 - `simulation.py` sets up the general simulation, with the possibility of varying settings in the simulation. This file is therefore the main example of how to set up a simulation of a single wing sail.

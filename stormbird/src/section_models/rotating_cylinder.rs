@@ -51,6 +51,10 @@ impl Default for RotatingCylinder {
 }
 
 impl RotatingCylinder {
+    pub fn new_from_string(input_string: &str) -> Self {
+        serde_json::from_str(input_string).unwrap()
+    }
+
     /// Default values for spin ratio data based on two dimensional CFD simulations
     pub fn default_spin_ratio_data() -> Vec<Float> {
         vec![0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0]

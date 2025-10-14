@@ -27,9 +27,14 @@ impl EmpiricalAngleOfAttackCorrection {
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
     ) -> Vec<Float> {
-        let section_cl = line_force_model.lift_coefficients(
-            ctrl_points_velocity, 
+        let angles_of_attack = line_force_model.angles_of_attack(
+            &ctrl_points_velocity, 
             CoordinateSystem::Global
+        );
+
+        let section_cl = line_force_model.lift_coefficients_pre_stall_with_stall_drop_off(
+            &angles_of_attack,
+            ctrl_points_velocity
         );
 
         let wing_cl = line_force_model.wing_averaged_values(&section_cl);

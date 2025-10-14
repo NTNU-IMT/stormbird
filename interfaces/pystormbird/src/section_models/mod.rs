@@ -18,6 +18,13 @@ pub struct SectionModel{
 
 #[pymethods]
 impl SectionModel {
+    #[new]
+    pub fn new(setup_string: String) -> Self {
+        Self {
+            data: SectionModelRust::from_string(&setup_string).unwrap()
+        }
+    }
+
     pub fn __str__(&self) -> String {
         self.data.to_string()
     }

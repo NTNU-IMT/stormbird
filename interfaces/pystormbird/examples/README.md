@@ -1,0 +1,2 @@
+# Pystormbird examples
+The examples in this folder shows various ways of using both the [pystormbird](../../pystormbird/) library and the [stormbird_setup](../../stormbird_setup/) library. Therefore, both of these libraries must be installed to make them work.

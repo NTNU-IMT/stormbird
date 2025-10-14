@@ -7,7 +7,7 @@ import sys
 
 import argparse
 
-from simulation import SimulationCase, SimulationMode, TestCase
+from simulation import SimulationCase, SolverType
 
 section_model_path = '../1 - section models'
 
@@ -27,43 +27,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.multi_element:
-        foil_model = manual_multi_element_foil.get_foil_model()
-
-        foil_model.set_internal_state(np.radians(args.flap_angle))
-
-        section_model_dict = {
-            "VaryingFoil": foil_model.__dict__
-        }
+        section_model = manual_multi_element_foil.get_section_model_setup(flap_angle=np.radians(args.flap_angle))
     else:
-        foil_model = naca_0012_Graf2014.get_foil_model()
+        foil_tuner = naca_0012_Graf2014.get_tuned_foil_tuner()
 
-        section_model_dict = {
-            "Foil": foil_model.__dict__
-        }
-
-    cases = [
-        TestCase.RAW_SIMULATION, 
-        TestCase.PRESCRIBED_CIRCULATION, 
-        TestCase.SMOOTHED,
-        TestCase.SMOOTHED
-    ]
-
-    modes = [
-        SimulationMode.STATIC,
-        SimulationMode.STATIC,
-        SimulationMode.STATIC,
-        SimulationMode.DYNAMIC
-    ]
-
-    '''cases = [
-        TestCase.PRESCRIBED_CIRCULATION, 
-        TestCase.RAW_SIMULATION
-    ]
-
-    modes = [
-        SimulationMode.STATIC,
-        SimulationMode.DYNAMIC
-    ]'''
+        section_model = foil_tuner.get_section_model_setup()
 
     w_plot = 16
     fig = plt.figure(figsize=(w_plot, w_plot/3.0))
@@ -71,21 +39,23 @@ if __name__ == "__main__":
     ax2 = fig.add_subplot(132)
     ax3 = fig.add_subplot(133)
 
-    for case, mode in zip(cases, modes):
-        print()
-        print(case.to_string())
+    solver_types = [SolverType.Linearized, SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative]
+    dynamic = [False, True, False, True]
 
-        write_wake_files = args.write_wake_files if mode == SimulationMode.DYNAMIC else False
+    for dyn, solver in zip(dynamic, solver_types):
+        sim_label = "Dynamic" if dyn else "Steady"
+        sim_label += " - " + solver.name
+        
+        print("Running simulation case:", sim_label)
+
+        write_wake_files = args.write_wake_files if dyn else False
 
         sim_case = SimulationCase(
             angle_of_attack = args.angle_of_attack,
-            section_model_dict = section_model_dict,
-            simulation_mode = mode,
-            prescribed_circulation = case.prescribed_circulation,
-            prescribed_initialization = case.prescribed_initialization,
-            smoothing_length=case.smoothing_length,
-            z_symmetry=True,
-            write_wake_files=write_wake_files
+            section_model = section_model,
+            solver_type = solver,
+            dynamic = dyn,
+            z_symmetry=True
         )
 
         start_time = time.time()
@@ -97,7 +67,7 @@ if __name__ == "__main__":
         elapsed_time = end_time - start_time
 
         print('Elapsed time:', elapsed_time)
-        print('Time speed up', sim_case.end_time / elapsed_time)
+        #print('Time speed up', sim_case.end_time / elapsed_time)
 
         cd = np.zeros(len(result_history))
         cl = np.zeros(len(result_history))
@@ -111,6 +81,11 @@ if __name__ == "__main__":
         print('Last lift coefficient:', cl[-1])
         print('Last drag coefficient:', cd[-1])
 
+        if solver == SolverType.SimpleIterative:
+            linestyle='--'
+        else:
+            linestyle='-'
+
         circulation_strength = np.array(result_history[-1].force_input.circulation_strength)
         angles_of_attack     = np.array(result_history[-1].force_input.angles_of_attack)
 
@@ -119,9 +94,9 @@ if __name__ == "__main__":
         else:
             ax1.plot([0, 1], [cl[0], cl[0]])
 
-        ax2.plot(-circulation_strength, label=case.to_string() + ', ' + mode.to_string())
+        ax2.plot(-circulation_strength, label=sim_label, linestyle=linestyle)
 
-        ax3.plot(np.degrees(angles_of_attack), label=case.to_string() + ', ' + mode.to_string())
+        ax3.plot(np.degrees(angles_of_attack), label=sim_label, linestyle=linestyle)
 
     ax3.plot([0, len(angles_of_attack)], [args.angle_of_attack, args.angle_of_attack], 'k--', label='Geometric angle of attack')
 

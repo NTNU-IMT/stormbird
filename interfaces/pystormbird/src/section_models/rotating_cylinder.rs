@@ -18,31 +18,9 @@ pub struct RotatingCylinder {
 #[pymethods]
 impl RotatingCylinder {
     #[new]
-    #[pyo3(
-        signature = (
-            revolutions_per_second,
-            spin_ratio_data = RotatingCylinderRust::default_spin_ratio_data(),
-            cl_data         = RotatingCylinderRust::default_cl_data(),
-            cd_data         = RotatingCylinderRust::default_cd_data(),
-            wake_angle_data = None,
-        )
-    )]
-    pub fn new(
-        revolutions_per_second: f64,
-        spin_ratio_data: Vec<f64>,
-        cl_data: Vec<f64>,
-        cd_data: Vec<f64>,
-        wake_angle_data: Option<Vec<f64>>
-    ) -> Self {
+    pub fn new(input_string: String) -> Self {
         Self {
-            data: RotatingCylinderRust {
-                revolutions_per_second,
-                spin_ratio_data,
-                cl_data,
-                cd_data,
-                wake_angle_data,
-                ..Default::default()
-            }
+            data: RotatingCylinderRust::new_from_string(&input_string)
         }
     }
 

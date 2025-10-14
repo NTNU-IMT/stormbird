@@ -3,7 +3,6 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use pyo3::types::PyType;
 
 use stormbird::section_models::foil::Foil as FoilRust;
 
@@ -19,63 +18,9 @@ pub struct Foil {
 #[pymethods]
 impl Foil {
     #[new]
-    #[pyo3(
-        signature = (
-            *,
-            cl_zero_angle          = 0.0,
-            cl_initial_slope       = FoilRust::default_cl_initial_slope(),
-            cl_high_order_factor   = 0.0, 
-            cl_high_order_power    = 0.0,
-            cl_max_after_stall     = 1.0, 
-            cd_min                 = 0.0,
-            angle_cd_min            = 0.0,
-            cd_second_order_factor = 0.0, 
-            cd_max_after_stall     = 1.0, 
-            cd_power_after_stall   = FoilRust::default_cd_power_after_stall(), 
-            mean_positive_stall_angle = FoilRust::default_mean_stall_angle(),
-            mean_negative_stall_angle = FoilRust::default_mean_stall_angle(),
-            stall_range            = FoilRust::default_stall_range()
-        )
-    )]
-    pub fn new(
-        cl_zero_angle: f64,
-        cl_initial_slope: f64,
-        cl_high_order_factor: f64,
-        cl_high_order_power: f64,
-        cl_max_after_stall: f64,
-        cd_min: f64,
-        angle_cd_min: f64,
-        cd_second_order_factor: f64,
-        cd_max_after_stall: f64,
-        cd_power_after_stall: f64,
-        mean_positive_stall_angle: f64,
-        mean_negative_stall_angle: f64,
-        stall_range: f64,
-    ) -> Self {
+    pub fn new(input_string: String) -> Self {
         Self {
-            data: FoilRust {
-                cl_zero_angle,
-                cl_initial_slope,
-                cl_high_order_factor,
-                cl_high_order_power,
-                cl_max_after_stall,
-                cd_min,
-                angle_cd_min,
-                cd_second_order_factor,
-                cd_max_after_stall,
-                cd_power_after_stall,
-                mean_positive_stall_angle,
-                mean_negative_stall_angle,
-                stall_range,
-                ..Default::default()
-            }
-        }
-    }
-
-    #[classmethod]
-    pub fn new_from_string(_cls: &Bound<'_, PyType>, string: String) -> Self {
-        Self {
-            data: FoilRust::new_from_string(&string).unwrap()
+            data: FoilRust::new_from_string(&input_string).unwrap()
         }
     }
 

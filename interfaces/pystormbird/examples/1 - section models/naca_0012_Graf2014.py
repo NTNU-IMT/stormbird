@@ -12,7 +12,7 @@ def comparison_data():
 
     return angles_of_attack_data, cd_data, cl_data
 
-def get_foil_model():
+def get_tuned_foil_tuner():
     angles_of_attack_data, cd_data, cl_data = comparison_data()
 
     foil_tuner = FoilTuner(
@@ -21,12 +21,17 @@ def get_foil_model():
         cl_data = cl_data
     )
 
-    return foil_tuner.get_tuned_model()
+    foil_tuner.tune_model()
+
+    return foil_tuner
+    
 
 if __name__ == '__main__':
     angles_of_attack_data, cd_data, cl_data = comparison_data()
 
-    model = get_foil_model()
+    foil_tuner = get_tuned_foil_tuner()
+    
+    model = foil_tuner.get_foil_model()
 
     n_test = 100
     alpha_test_deg = np.linspace(0, 20, n_test)

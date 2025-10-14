@@ -1,7 +1,9 @@
 import numpy as np
 import scipy.optimize as opt
 
-from pystormbird.section_models import Foil
+from stormbird_setup.direct_setup.section_models import Foil as FoilSetup
+from stormbird_setup.direct_setup.section_models import SectionModel as SectionModelSetup
+from pystormbird.section_models import Foil as FoilModel
 
 class FoilTuner:
     '''
@@ -18,41 +20,50 @@ class FoilTuner:
 
         self.number_of_data_points = len(angles_of_attack_data)
         
-        self.model = Foil()
+        self.model_setup = FoilSetup()
 
     def set_cl_parameters(self, x):
-        self.model.cl_initial_slope = x[0]
-        self.model.cl_max_after_stall = x[1]
-        self.model.mean_positive_stall_angle = x[2]
-        self.model.stall_range = x[3]
+        self.model_setup.cl_initial_slope = x[0]
+        self.model_setup.cl_max_after_stall = x[1]
+        self.model_setup.mean_positive_stall_angle = x[2]
+        self.model_setup.stall_range = x[3]
 
     def set_cd_parameters(self, x):
-        self.model.cd_min = x[0]
-        self.model.cd_second_order_factor = x[1]
-        self.model.cd_power_after_stall = x[2]
-        self.model.cd_max_after_stall = x[3]
+        self.model_setup.cd_min = x[0]
+        self.model_setup.cd_second_order_factor = x[1]
+        self.model_setup.cd_power_after_stall = x[2]
+        self.model_setup.cd_max_after_stall = x[3]
+
+    def get_foil_model(self):
+        return FoilModel(self.model_setup.to_json_string())
+    
+    def get_section_model_setup(self):
+        return SectionModelSetup(model=self.model_setup)
 
     def cl_objective_function(self, x):
         self.set_cl_parameters(x)
 
+        foil_model = self.get_foil_model()
+
         cl_model = np.zeros(self.number_of_data_points)
 
         for i in range(self.number_of_data_points):
-            cl_model[i] = self.model.lift_coefficient(self.angles_of_attack_data[i])
+            cl_model[i] = foil_model.lift_coefficient(self.angles_of_attack_data[i])
 
         return np.sum((cl_model - self.cl_data) ** 2)
 
     def cd_objective_function(self, x):
         self.set_cd_parameters(x)
 
-        cd_model = np.zeros(self.number_of_data_points)
+        foil_model = self.get_foil_model()
 
+        cd_model = np.zeros(self.number_of_data_points)
         for i in range(self.number_of_data_points):
-            cd_model[i] = self.model.drag_coefficient(self.angles_of_attack_data[i])
+            cd_model[i] = foil_model.drag_coefficient(self.angles_of_attack_data[i])
 
         return np.sum((cd_model - self.cd_data) ** 2)
     
-    def get_tuned_model(self):
+    def tune_model(self):
         cl_x = opt.minimize(
             self.cl_objective_function, 
             [2 * np.pi, 0.01910, np.radians(14.0), np.radians(6.0)]
@@ -66,7 +77,5 @@ class FoilTuner:
         ).x
 
         self.set_cd_parameters(cd_x)
-
-        return self.model
 
 

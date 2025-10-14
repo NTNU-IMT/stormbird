@@ -11,13 +11,6 @@ use stormath::{
 
 use crate::error::Error;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub enum StallModel {
-    #[default]
-    Harmonic,
-    ConstantLift,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Parametric model of a foil profile that can compute lift and drag coefficients.
@@ -105,9 +98,6 @@ pub struct Foil {
     #[serde(default)]
     /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
     pub added_mass_factor: Float,
-    #[serde(default)]
-    /// Type of stall model to use. The default is harmonic.
-    pub stall_model: StallModel,
 }
 
 fn get_stall_angle(angle_of_attack: Float) -> Float {
@@ -144,44 +134,53 @@ impl Foil {
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
-        let cl_pre_stall  = self.lift_coefficient_pre_stall(angle_of_attack);
+        let cl_pre_stall  = self.lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack);
 
-        match self.stall_model {
-            StallModel::Harmonic => {
-                let stall_angle = get_stall_angle(angle_of_attack);
+        let cl_post_stall = self.lift_coefficient_post_stall_with_stall_weight(angle_of_attack);
 
-                let cl_post_stall = self.lift_coefficient_post_stall(stall_angle);
-
-                self.combine_pre_and_post_stall(angle_of_attack, cl_pre_stall, cl_post_stall)
-            },
-            StallModel::ConstantLift => {
-                let mean_stall_angle = if angle_of_attack >= 0.0 {
-                    self.mean_positive_stall_angle.abs()
-                } else {
-                    self.mean_negative_stall_angle.abs()
-                };
-
-                let cl_post_stall = self.lift_coefficient_pre_stall(mean_stall_angle * angle_of_attack.signum());
-
-                cl_pre_stall.abs().min(cl_post_stall.abs())*cl_pre_stall.signum()
-            }
-        }
+        cl_post_stall + cl_pre_stall
     }
 
-    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: Float) -> Float {
+    #[inline(always)]
+    pub fn lift_coefficient_linear(&self, angle_of_attack: Float) -> Float {
+        self.cl_zero_angle + self.cl_initial_slope * angle_of_attack
+    }
+
+    #[inline(always)]
+    pub fn lift_coefficient_pre_stall_raw(&self, angle_of_attack: Float) -> Float {
         let angle_high_power = if self.cl_high_order_power > 0.0 {
             angle_of_attack.abs().powf(self.cl_high_order_power) * angle_of_attack.signum()
         } else {
             0.0
         };
         
-        self.cl_zero_angle + 
-        self.cl_initial_slope * angle_of_attack +
+        self.lift_coefficient_linear(angle_of_attack) + 
         self.cl_high_order_factor * angle_high_power
     }
 
-    pub fn lift_coefficient_post_stall(&self, angle_of_attack: Float) -> Float {
-        self.cl_max_after_stall * (2.0 * angle_of_attack).sin()
+    #[inline(always)]
+    pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float) -> Float {
+        let amount_of_stall = self.amount_of_stall(angle_of_attack);
+
+        let cl_pre_stall_raw = self.lift_coefficient_pre_stall_raw(angle_of_attack);
+
+        cl_pre_stall_raw * (1.0 - amount_of_stall)
+    }
+
+    #[inline(always)]
+    pub fn lift_coefficient_post_stall_raw(&self, angle_of_attack: Float) -> Float {
+        let stall_angle = get_stall_angle(angle_of_attack);
+
+        self.cl_max_after_stall * (2.0 * stall_angle).sin()
+    }
+
+    #[inline(always)]
+    pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float) -> Float {
+        let cl_post_stall_raw = self.lift_coefficient_post_stall_raw(angle_of_attack);
+
+        let amount_of_stall = self.amount_of_stall(angle_of_attack);
+
+        cl_post_stall_raw * amount_of_stall
     }
 
     /// Calculates the drag coefficient for a given angle of attack.
@@ -259,8 +258,7 @@ impl Default for Foil {
             mean_positive_stall_angle: Self::default_mean_stall_angle(),
             mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),
-            added_mass_factor:      0.0,
-            stall_model:            StallModel::Harmonic,
+            added_mass_factor:      0.0
         }
     }
 }
