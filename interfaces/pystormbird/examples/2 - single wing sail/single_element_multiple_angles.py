@@ -40,8 +40,8 @@ if __name__ == "__main__":
         cd_2d[i] = foil_model.drag_coefficient(np.radians(angles_of_attack[i]))
         cl_2d[i] = foil_model.lift_coefficient(np.radians(angles_of_attack[i]))
 
-    dynamic = [False, True]
-    solver_types = [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative]
+    dynamic = [False, True, False, True]
+    solver_types = [SolverType.Linearized, SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative]
 
     w_plot = 18
     h_plot = w_plot / 2.35

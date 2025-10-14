@@ -86,6 +86,19 @@ impl SimpleIterative {
         let ctrl_points = &line_force_model.ctrl_points_global;
     
         let mut circulation_strength: Vec<Float> = initial_solution.to_vec();
+
+        if self.start_with_linearized_solution {
+            let linearized_solver = Linearized::default();
+
+            let linearized_result = linearized_solver.solve(
+                line_force_model,
+                felt_ctrl_points_freestream,
+                frozen_wake
+            );
+
+            circulation_strength = linearized_result.circulation_strength;
+        }
+        
         let mut ctrl_point_velocity = vec![SpatialVector::default(); ctrl_points.len()];
         let mut angles_of_attack = vec![0.0; ctrl_points.len()];
 

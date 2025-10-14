@@ -26,3 +26,4 @@ class SimpleIterative(StormbirdSetupBaseModel):
     residual_tolerance_absolute: float = 1e-4
     strength_difference_tolerance: float = 1e-6
     velocity_corrections: VelocityCorrections = VelocityCorrections()
+    start_with_linearized_solution: bool = False

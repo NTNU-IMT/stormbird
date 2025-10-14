@@ -85,8 +85,8 @@ class SimulationCase():
             match self.solver_type:
                 case SolverType.SimpleIterative:
                     solver = SimpleIterative(
-                        max_iterations_per_time_step = 20,
-                        damping_factor = 0.1,
+                        max_iterations_per_time_step = 40,
+                        damping_factor = 0.05,
                     )
                 case SolverType.Linearized:
                     solver = Linearized()
