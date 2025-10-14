@@ -1,8 +1,12 @@
- use super::*;
+// Copyright (C) 2024, NTNU
+// Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
+// License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
- use crate::line_force_model::LineForceModel;
+use super::*;
 
- impl DynamicWake {
+use crate::line_force_model::LineForceModel;
+
+impl DynamicWake {
     /// Function to initialize shape and strength of the wake, where the length is determined based
     /// on the input velocity and time step. This can be used at the beginning of a simulation.
     pub fn initialize_with_velocity_and_time_step(
