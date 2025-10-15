@@ -8,6 +8,8 @@ from ..base_model import StormbirdSetupBaseModel
 from .spatial_vector import SpatialVector
 from .section_models import SectionModel
 
+from .circulation_corrections import CirculationCorrectionBuilder
+
 from pydantic import Field
 
 
@@ -31,6 +33,8 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     local_wing_angles: list[float] = []
     rotation: SpatialVector = SpatialVector()
     translation: SpatialVector = SpatialVector()
+    circulation_correction: CirculationCorrectionBuilder = CirculationCorrectionBuilder()
 
     def add_wing_builder(self, wing_builder: WingBuilder):
         self.wing_builders.append(wing_builder)
+        self.local_wing_angles.append(0.0)

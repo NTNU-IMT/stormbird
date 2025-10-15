@@ -42,7 +42,7 @@ class SectionModel(StormbirdSetupBaseModel):
 
     @model_serializer
     def ser_model(self):
-        model_dict = self.model.model_dump(exclude_none=True)
+        model_dict = self.model.model_dump(exclude_none=True, mode='json')
 
         if isinstance(self.model, Foil):
             return {

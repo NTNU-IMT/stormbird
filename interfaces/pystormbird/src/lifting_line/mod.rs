@@ -4,14 +4,11 @@
 
 use pyo3::prelude::*;
 
-pub mod singularity_elements;
 pub mod simulation;
 pub mod complete_sail_model;
 
 #[pymodule]
 pub fn lifting_line(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<singularity_elements::PotentialTheorySettings>()?;
-    m.add_class::<singularity_elements::symmetry_condition::SymmetryCondition>()?;
     m.add_class::<simulation::Simulation>()?;
     m.add_class::<complete_sail_model::CompleteSailModel>()?;
     

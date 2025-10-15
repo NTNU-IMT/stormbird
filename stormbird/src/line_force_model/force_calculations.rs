@@ -296,7 +296,7 @@ impl LineForceModel {
         ctrl_point_acceleration: &[SpatialVector]
     ) -> SectionalForcesInput {
         let angles_of_attack = self.angles_of_attack(
-            &solver_result.output_ctrl_point_velocity, 
+            &solver_result.output_ctrl_points_velocity, 
             CoordinateSystem::Global
         );
 
@@ -306,7 +306,7 @@ impl LineForceModel {
         
         let mut rotation_velocity = self.rigid_body_motion.velocity_angular; 
 
-        let mut velocity = solver_result.output_ctrl_point_velocity.clone();
+        let mut velocity = solver_result.output_ctrl_points_velocity.clone();
 
         match self.output_coordinate_system {
             CoordinateSystem::Body => {
@@ -580,6 +580,9 @@ impl LineForceModel {
         ).collect()
     }
 
+
+    /// Calculates the input power based on the models specified for each wing and the local 
+    /// geometry and velocity
     pub fn input_power(&self, velocity: &[SpatialVector]) -> Vec<Float> {
         let nr_wings = self.nr_wings();
         let nr_span_lines = self.nr_span_lines();
@@ -617,12 +620,12 @@ impl LineForceModel {
         let integrated_forces = sectional_forces.integrate_forces(&self);
         let integrated_moments = sectional_forces.integrate_moments(&self);
 
-        let input_power = self.input_power(&solver_result.output_ctrl_point_velocity);
+        let input_power = self.input_power(&solver_result.output_ctrl_points_velocity);
 
         SimulationResult {
             time,
             ctrl_points,
-            solver_input_ctrl_point_velocity: solver_result.input_ctrl_point_velocity.clone(),
+            solver_input_ctrl_points_velocity: solver_result.input_ctrl_points_velocity.clone(),
             force_input,
             sectional_forces,
             integrated_forces,

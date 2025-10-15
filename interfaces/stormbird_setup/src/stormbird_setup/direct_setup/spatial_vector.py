@@ -13,3 +13,9 @@ class SpatialVector(StormbirdSetupBaseModel):
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
+
+    def as_tuple(self) -> tuple[float, float, float]:
+        return (self.x, self.y, self.z)
+    
+    def as_list(self) -> list[float]:
+        return [self.x, self.y, self.z]

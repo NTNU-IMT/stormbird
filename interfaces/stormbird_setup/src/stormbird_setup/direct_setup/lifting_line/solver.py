@@ -9,20 +9,19 @@ from .velocity_corrections import VelocityCorrections
 
 from enum import Enum
 
-class FinalCirculationCorrectionMethod(Enum):
+class InducedVelocityCorrectionMethod(Enum):
     NoCorrection = "NoCorrection"
-    IncludeViscousLiftInEffectiveCirculation = "IncludeViscousLiftInEffectiveCirculation"
     FullCorrection = "FullCorrection"
 
 class Linearized(StormbirdSetupBaseModel):
-    disable_viscous_corrections: bool = False
     velocity_corrections: VelocityCorrections = VelocityCorrections()
-    final_circulation_correction_method: FinalCirculationCorrectionMethod = FinalCirculationCorrectionMethod.FullCorrection
+    disable_viscous_corrections: bool = False
+    induced_velocity_correction_method: InducedVelocityCorrectionMethod = InducedVelocityCorrectionMethod.FullCorrection
 
 
 class SimpleIterative(StormbirdSetupBaseModel):
-    max_iterations_per_time_step: int
-    damping_factor: float
+    max_iterations_per_time_step: int = 20
+    damping_factor: float = 0.1
     residual_tolerance_absolute: float = 1e-4
     strength_difference_tolerance: float = 1e-6
     velocity_corrections: VelocityCorrections = VelocityCorrections()

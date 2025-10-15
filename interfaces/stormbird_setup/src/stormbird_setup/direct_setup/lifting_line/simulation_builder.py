@@ -37,7 +37,7 @@ class QuasiSteadySettings(StormbirdSetupBaseModel):
             }
 
 class DynamicSettings(StormbirdSetupBaseModel):
-    solver: Linearized | SimpleIterative = Linearized()
+    solver: SimpleIterative | Linearized = SimpleIterative()
     wake: DynamicWake = DynamicWake()
 
     @model_serializer

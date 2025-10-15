@@ -71,8 +71,8 @@ pub struct SimpleIterative {
 
 impl SimpleIterative {
     pub fn default_use_raw_circulation_during_iterations() -> bool {false}
-    pub fn default_max_iterations_per_time_step() -> usize {10}
-    pub fn default_damping_factor() -> Float {0.04}
+    pub fn default_max_iterations_per_time_step() -> usize {20}
+    pub fn default_damping_factor() -> Float {0.05}
     pub fn default_residual_tolerance_absolute() -> Float {1e-4}
     pub fn default_strength_difference_tolerance() -> Float {1e-6}
 
@@ -99,13 +99,13 @@ impl SimpleIterative {
             circulation_strength = linearized_result.circulation_strength;
         }
         
-        let mut ctrl_point_velocity = vec![SpatialVector::default(); ctrl_points.len()];
+        let mut ctrl_points_velocity = vec![SpatialVector::default(); ctrl_points.len()];
         let mut angles_of_attack = vec![0.0; ctrl_points.len()];
 
         let mut residual = line_force_model.average_residual_absolute(
             &circulation_strength, 
             &angles_of_attack,
-            &ctrl_point_velocity,
+            &ctrl_points_velocity,
         );
         
         let mut iterations = 0;
@@ -117,53 +117,46 @@ impl SimpleIterative {
                 &circulation_strength
             );
 
-            match &self.velocity_corrections {
-                VelocityCorrections::None => {
-                    for i in 0..ctrl_points.len() {
-                        ctrl_point_velocity[i] = felt_ctrl_points_freestream[i] + frozen_wake.induced_velocities_at_control_points[i];
-                    }
-                },
-                VelocityCorrections::MaxInducedVelocityMagnitudeRatio(ratio) => {
-                    ctrl_point_velocity = VelocityCorrections::max_induced_velocity_magnitude_ratio(
-                        *ratio, 
-                        felt_ctrl_points_freestream, 
-                        &frozen_wake.induced_velocities_at_control_points
-                    );
-                },
-                VelocityCorrections::FixedMagnitudeEqualToFreestream => {
-                    ctrl_point_velocity = VelocityCorrections::fixed_magnitude_equal_to_freestream(
-                        felt_ctrl_points_freestream, 
-                        &frozen_wake.induced_velocities_at_control_points
-                    );
-                },
+            let corrected_velocity = self.velocity_corrections.corrected_velocity(
+                felt_ctrl_points_freestream, 
+                &frozen_wake.induced_velocities_at_control_points
+            );
+
+            if let Some(velocity) = corrected_velocity {
+                ctrl_points_velocity = velocity
+            } else {
+                for i in 0..ctrl_points.len() {
+                    ctrl_points_velocity[i] = felt_ctrl_points_freestream[i] + 
+                        frozen_wake.induced_velocities_at_control_points[i];
+                }
             }
 
-            ctrl_point_velocity = line_force_model.remove_span_velocity(
-                &ctrl_point_velocity, 
+            ctrl_points_velocity = line_force_model.remove_span_velocity(
+                &ctrl_points_velocity, 
                 CoordinateSystem::Global
             );
 
             angles_of_attack = line_force_model.angles_of_attack(
-                &ctrl_point_velocity, 
+                &ctrl_points_velocity, 
                 CoordinateSystem::Global
             );
 
             let new_estimated_strength = if self.use_raw_circulation_during_iterations {
                 line_force_model.circulation_strength_raw(
                     &angles_of_attack,
-                    &ctrl_point_velocity
+                    &ctrl_points_velocity
                 )
             } else {
                 line_force_model.circulation_strength(
                     &angles_of_attack,
-                    &ctrl_point_velocity
+                    &ctrl_points_velocity
                 )
             };
     
             residual = line_force_model.average_residual_absolute(
                 &circulation_strength, 
                 &angles_of_attack,
-                &ctrl_point_velocity
+                &ctrl_points_velocity
             );
     
             if residual < self.residual_tolerance_absolute {
@@ -193,13 +186,13 @@ impl SimpleIterative {
 
         circulation_strength = line_force_model.circulation_strength(
             &angles_of_attack,
-            &ctrl_point_velocity,
+            &ctrl_points_velocity,
         );
 
         SolverResult {
-            input_ctrl_point_velocity: felt_ctrl_points_freestream.to_vec(),
+            input_ctrl_points_velocity: felt_ctrl_points_freestream.to_vec(),
             circulation_strength,
-            output_ctrl_point_velocity: ctrl_point_velocity,
+            output_ctrl_points_velocity: ctrl_points_velocity,
             iterations,
             residual
         }

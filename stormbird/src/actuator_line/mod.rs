@@ -303,9 +303,9 @@ impl ActuatorLine {
         );
 
         SolverResult {
-            input_ctrl_point_velocity: self.ctrl_points_velocity.clone(),
+            input_ctrl_points_velocity: self.ctrl_points_velocity.clone(),
             circulation_strength,
-            output_ctrl_point_velocity: corrected_ctrl_points_velocity,
+            output_ctrl_points_velocity: corrected_ctrl_points_velocity,
             iterations: 1,
             residual,
         }

@@ -12,7 +12,7 @@ from enum import Enum
 from pydantic import model_serializer
 
 class VelocityCorrectionType(Enum):
-    NoCorrection = "None"
+    NoCorrection = "NoCorrection"
     MaxInducedVelocityMagnitudeRatio = "MaxInducedVelocityMagnitudeRatio"
     FixedMagnitudeEqualToFreestream = "FixedMagnitudeEqualToFreestream"
 
@@ -23,7 +23,7 @@ class VelocityCorrections(StormbirdSetupBaseModel):
     @model_serializer
     def ser_model(self):
         if self.type == VelocityCorrectionType.NoCorrection:
-            return "None"
+            return "NoCorrection"
         elif self.type == VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio:
             return {
                 "MaxInducedVelocityMagnitudeRatio": self.value

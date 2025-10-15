@@ -20,8 +20,9 @@ class StormbirdSetupBaseModel(BaseModel):
         validate_assignment = True,
         extra = 'forbid',
         populate_by_name = True,
-        use_enum_values=False,
-        validate_default=True
+        use_enum_values = False,
+        validate_default = True,
+        ser_json_exclude_none=True
     )
 
     @classmethod
@@ -39,4 +40,4 @@ class StormbirdSetupBaseModel(BaseModel):
         file_path.write_text(self.to_json_string())
 
     def to_dict(self) -> dict:
-        return self.model_dump(exclude_none=True)
+        return self.model_dump(exclude_none=True, mode='json')
