@@ -48,6 +48,8 @@ impl VaryingFoil {
         let mean_positive_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_positive_stall_angle).collect();
         let mean_negative_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
         let stall_range_data: Vec<Float> = self.foils_data.iter().map(|x| x.stall_range).collect();
+        let cd_stall_angle_offset_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_stall_angle_offset).collect();
+        let cd_bump_during_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_bump_during_stall).collect();
 
         let added_mass_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
 
@@ -69,6 +71,8 @@ impl VaryingFoil {
             mean_positive_stall_angle: linear_interpolation(x, x_data, &mean_positive_stall_angle_data),
             mean_negative_stall_angle: linear_interpolation(x, x_data, &mean_negative_stall_angle_data),
             stall_range:               linear_interpolation(x, x_data, &stall_range_data),
+            cd_stall_angle_offset:     linear_interpolation(x, x_data, &cd_stall_angle_offset_data),
+            cd_bump_during_stall:      linear_interpolation(x, x_data, &cd_bump_during_stall_data),
             added_mass_factor:         linear_interpolation(x, x_data, &added_mass_factor_data)
         }
     }

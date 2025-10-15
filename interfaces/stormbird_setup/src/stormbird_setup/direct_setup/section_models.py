@@ -23,6 +23,8 @@ class Foil(StormbirdSetupBaseModel):
     mean_positive_stall_angle: float | None = None
     mean_negative_stall_angle: float | None = None
     stall_range: float | None = None
+    cd_stall_angle_offset: float | None = None
+    cd_bump_during_stall: float | None = None
     added_mass_factor: float | None = None
 
 class VaryingFoil(StormbirdSetupBaseModel):

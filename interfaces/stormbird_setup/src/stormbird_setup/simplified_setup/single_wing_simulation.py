@@ -27,7 +27,7 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
     chord_length: float
     height: float
     section_model: SectionModel
-    nr_sections: int = 32
+    nr_sections: int = 20
     density: float = 1.225
     z_symmetry: bool = False
     dynamic: bool = False
@@ -102,7 +102,7 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
                     solver = SimpleIterative(
                         max_iterations_per_time_step = 1000,
                         damping_factor = 0.05,
-                        start_with_linearized_solution = False
+                        start_with_linearized_solution = True
                     )
                 case SolverType.Linearized:
                     solver = Linearized()

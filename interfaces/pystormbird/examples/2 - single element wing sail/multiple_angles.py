@@ -18,9 +18,10 @@ if __name__ == "__main__":
     angles_of_attack_deg = np.arange(0.0, 20.5, 0.5)
     n_angles = len(angles_of_attack_deg)
 
-    dynamic = [False, False, False, True]
-    solver_types = [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative, SolverType.SimpleIterative]
-    smoothing_length = [0.0, 0.0, 0.1, 0.0]
+    dynamic = [False, False, False]
+    solver_types = [SolverType.Linearized, SolverType.SimpleIterative, 
+                    SolverType.SimpleIterative, SolverType.SimpleIterative]
+    smoothing_length = [0.0, 0.0, 0.1, 0.1]
 
     w_plot = 18
     h_plot = w_plot / 2.35
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     )
 
     #ax1.set_ylim(0, 1.2)
-    ax2.set_ylim(0, 0.25)
+    #ax2.set_ylim(0, 0.25)
     
     ax1.set_xlabel("Angle of attack [deg]")
     ax1.set_ylabel("Lift coefficient")

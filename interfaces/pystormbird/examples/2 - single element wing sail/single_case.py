@@ -8,6 +8,53 @@ from stormbird_setup.direct_setup.section_models import SectionModel, Foil
 
 from pystormbird.lifting_line import Simulation
 
+def get_section_model(solver: SolverType):
+    '''
+    Returns the section model as a function of the solver type.
+
+    The reason for using different section solvers for different solvers is due to a somewhat 
+    different behavior around stall. In general, the linearized solver will stall at a later stage
+    than the iterative solver. Principally speaking, the linearized solver is less accurate around 
+    stall, due to the binarization, but practically speaking it seems to give good results as long
+    as the section model is adjusted. As a general principle, tuning the exact stall behavior is 
+    seen as acceptable, while tuning the lift slope should be based on the actual 2D data
+
+    As such, the section model for the linearized solver is set to have a lower overall stall angle.
+    '''
+
+    # From example 1 - section models
+    cl_initial_slope = 5.794665  
+    cd_min = 0.0186
+    cd_second_order_factor = 0.9
+    cd_power_after_stall = 1.0 # Increase the fullness of the post-stall drag curve
+    cd_stall_angle_offset = np.radians(0.5) # Makes the drag curve stall a bit earlier
+
+    if solver == SolverType.Linearized:
+        return SectionModel(
+            model = Foil(
+                cl_initial_slope = cl_initial_slope,
+                cd_min = cd_min,
+                cd_second_order_factor=cd_second_order_factor,
+                mean_positive_stall_angle=np.radians(11.2),
+                stall_range=np.radians(6.0),
+                cd_power_after_stall=cd_power_after_stall,
+                cd_stall_angle_offset=cd_stall_angle_offset,
+            )
+        )
+    else:
+        return SectionModel(
+            model = Foil(
+                cl_initial_slope = cl_initial_slope,
+                cd_min = cd_min,
+                cd_second_order_factor=cd_second_order_factor,
+                mean_positive_stall_angle=np.radians(12.7), 
+                stall_range=np.radians(9.0),
+                cd_power_after_stall=cd_power_after_stall,
+                cd_stall_angle_offset=cd_stall_angle_offset,
+            )
+        )
+
+
 def simulate_single_case(
     *,
     angle_of_attack_deg: float,
@@ -15,16 +62,6 @@ def simulate_single_case(
     solver_type: SolverType = SolverType.Linearized,
     smoothing_length: float = 0.0,
 ) -> dict:
-    
-    section_model = SectionModel(
-        model = Foil(
-            cl_initial_slope = 5.794665, # From example 1 - section models which indicate slightly below 2*pi for the slope
-            cd_min = 0.0186,
-            cd_second_order_factor=1.052354,
-            mean_positive_stall_angle=np.radians(12.7), # Stall tuned based on 3D data, not sectional model. Generally necessary
-            stall_range=np.radians(7.0),
-        )
-    )
 
     chord_length = 1.0
     height = 4.5
@@ -39,7 +76,7 @@ def simulate_single_case(
     sim_settings = SingleWingSimulation(
         chord_length=1.0,
         height=4.5,
-        section_model=section_model,
+        section_model=get_section_model(solver_type),
         dynamic=dynamic,
         solver_type=solver_type,
         z_symmetry=True,
