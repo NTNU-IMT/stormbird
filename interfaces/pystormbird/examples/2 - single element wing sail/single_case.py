@@ -74,8 +74,8 @@ def simulate_single_case(
     dynamic_time_step = 0.25 * chord_length / velocity
 
     sim_settings = SingleWingSimulation(
-        chord_length=1.0,
-        height=4.5,
+        chord_length=chord_length,
+        height=height,
         section_model=get_section_model(solver_type),
         dynamic=dynamic,
         solver_type=solver_type,
