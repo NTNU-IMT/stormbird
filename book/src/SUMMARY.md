@@ -26,7 +26,6 @@
     - [Velocity sampling](./actuator_line/velocity_sampling.md)
     - [Force projection](./actuator_line/force_projection.md)
     - [CFD interface](./actuator_line/cfd_interface.md)
-- [Tutorials](./tutorials/tutorials.md)
 - [Literature](./literature/literature_intro.md)
     - [Simulation methods](./literature/similar_simulation_methods.md)
     - [Validation data](./literature/validation_data.md)

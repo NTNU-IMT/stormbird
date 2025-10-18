@@ -11,9 +11,9 @@ Stormbird is a library for simulating lifting surfaces, e.g., wings, in a simpli
 
 To achieve practical modeling capabilities for these use cases, the following physical effects are assumed to be particularly important:
 - **Various lift generation mechanisms**: modern sails have *sections* that range from classical foils, with and without flaps, rotating cylinders, and foils with boundary layer suction.
-- **Strong viscous effects:** For all lift generating mechanisms above, there will be high lift coefficients with strong viscous effects on both the lift and drag forces. For instance, wing sails tend to be operated close to stall and the lift on a rotating cylinder is strongly affected by partial flow separation.
+- **Strong viscous effects:** For all lift generating mechanisms above, there will be high lift coefficients with strong viscous effects on both the lift and drag forces. For instance, wing sails tend to be operated close to stall, the lift on a rotating cylinder is strongly affected by partial flow separation, and the lift on a suction sail is very dependent on the amount of boundary layer suction.
 - **Interaction effects between lifting surfaces:** Many wind-powered ships have several sails placed in close proximity. Interaction effects between multiple sails can therefore be important. 
-- **Interaction effects with other structures:** Independent of the number of sails, there can in some cases be interaction effects between the sails and other structures on deck, for instance the bridge or the part of the hull that is above the water line.
+- **Interaction effects with other structures:** Independent of the number of sails, there can be interaction effects between the sails and the rest of the ship, such as structures on deck or the part of the hull that is above the water line.
 - **Unsteady effects:** Ship applications often require modeling of unsteady effects, for instance, to model seakeeping behavior or maneuvering. The sail forces are assumed to be important for such cases, which also introduces dynamic effects on the sails. In addition, kites are often flown dynamically to increase the power extracted from the wind.
 
 At the same time, it is also often necessary that the computations are fast. The user will usually be interested in testing many different weather conditions, ship speeds, sail configurations, and operational variables. The goal is, therefore, to find the right balance between accuracy and speed for the intended use case. To achieve this, the library supports the following methods, that offer different levels of complexity and computational speed:
@@ -22,19 +22,15 @@ At the same time, it is also often necessary that the computations are fast. The
  2) **Discrete dynamic lifting line**, for unsteady or steady cases with large wake deformations
  3) **Actuator line**, for steady and unsteady cases where interaction with other structures is of interest
 
-The library is developed as part of the research project KSP WIND by the Department of Marine Technology at the [Norwegian University of Science and Technology](https://www.ntnu.edu/). The main developer is Jarle Vinje Kramer.
-
-## Developing principle
-
-Stormbird is a library that is primarily made for people with some programming experience. In addition, the goal is also to keep things simple and avoid [feature creep](https://en.wikipedia.org/wiki/Feature_creep). The idea is that a simple library is easier to maintain and less likely to contain bugs. Last but not least, **computational speed is important** and should not be sacrificed. As such, a guiding principle in the development is [data orientation](https://en.wikipedia.org/wiki/Data-oriented_design). That can mean different things, but in this context it means the following: 
-
-- **Use simple data structures:** It is better to use many arrays of simple data structures than a few arrays of complex data structures. 
-- **Don't be afraid to move complexity out of the main methods:** In some cases, complexity in the actual software can be avoided by allowing for more complexity in the setup and post-processing of results. A slightly more complex setup or post-processing phase is accepted in Stormbird if it simplifies the internal structure. 
-- **Don't implement hypothetical use cases:** Stormbird only implements features that are necessary for the intended use case - meaning simulation of wind power devices. There are many ways to extend Stormbird to also handle other use cases better, but this is not prioritized, at least not at the moment. The goal is to attempt to be **done** at some point. Hypothetical future use cases are a future problem we do not consider today
+The library is developed as part of the research project [KSP WIND](https://www.sintef.no/en/projects/2023/wind-enabling-zero-emission-shipping-with-wind-assisted-propulsion/) by the Department of Marine Technology at the [Norwegian University of Science and Technology](https://www.ntnu.edu/). The main developer is Jarle Vinje Kramer.
 
 ## Who the Book is for
-You should read this if you are interested in using Stormbird to run lifting line or actuator line simulations, or if you just want more information on the theory behind each method. The book is written primarily for *users*, and are therefore not focused directly on the underlying source code. However, there will often be examples from the source code when that is the easiest way to illustrate functionality. For instance, data structures will often be shown directly source code to illustrate what fields and settings that are available.
+You should read this if you are interested in using Stormbird to run lifting line or actuator line simulations, or if you just want more information on the theory behind each method. The book is intended to introduce the theory, available models, and overall concepts in the implementation. In other words, the goal is to give a bird' s-eye view of the library and its functionality. When appropriate, other literature will be referenced for more details. That is, it is written primarily for *users*, and are therefore not focused directly on the underlying source code. However, there will often be examples from the source code when that is the easiest way to illustrate functionality. For instance, data structures will often be shown directly source code to illustrate what fields and settings that are available.
 
-## How to Use This Book
-The book is intended to introduce the theory, available models, and overall concepts in the implementation. In other words, the goal is to give a bird' s-eye view of the library and its functionality. When appropriate, other literature will be referenced for more details. To truly learn how to use it, though, it is recommended to look at actual **input files** and **code examples**. This should be distributed along with the book. See the [tutorial chapter](./tutorials.md) for more on this 
+## Don forget to also look at the code!
 
+The text in this will not cover everything, and it may also, at times, be outdated relative to the latest version of the library. The only way to get a full insight into the inner workings is to look at the source code itself as well examples of how to use the code. Below is some relevant links for this purpose
+
+- The Stormbird guthub page can be found [here](https://github.com/NTNU-IMT/stormbird). It contains the core library, utility functionality, interfaces and examples.
+- More specifically, examples of how to use the Python interface of the code can be found [here](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/pystormbird/examples).
+- Automated code documentation can be found **here**(TO COME) for the core Stormbird library and **here**(TO COME) for the Stormath library, which contains mathematical utility functionality written for Stormbird.
