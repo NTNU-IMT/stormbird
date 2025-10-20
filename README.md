@@ -3,7 +3,7 @@ Stormbird is a library for simulating lifting surfaces, i.e. wings, under the as
 can be represented as *line-models*. Although this makes it usable for a variety of different cases, 
 it was primarily developed to offer efficient modeling of modern wind propulsion devices. 
 
-The library is developed by the [Department of Marine Technology](https://www.ntnu.edu/imt) at the [Norwegian University of Science and Technology](https://www.ntnu.edu/) as part of the research project [kSP WIND](https://www.sintef.no/en/projects/2023/wind-enabling-zero-emission-shipping-with-wind-assisted-propulsion/), funded by the [Norwegian Research Council](https://www.forskningsradet.no/en/). The primary developer is [Jarle Vinje Kramer](https://github.com/jarlekramer/).
+The library is developed by the [Department of Marine Technology](https://www.ntnu.edu/imt) at the [Norwegian University of Science and Technology](https://www.ntnu.edu/) as part of the research project [KSP WIND](https://www.sintef.no/en/projects/2023/wind-enabling-zero-emission-shipping-with-wind-assisted-propulsion/), funded by the [Norwegian Research Council](https://www.forskningsradet.no/en/). The primary developer is [Jarle Vinje Kramer](https://github.com/jarlekramer/).
 
 ## Folder structure
 The content of the folders in this repository can be described as follows:

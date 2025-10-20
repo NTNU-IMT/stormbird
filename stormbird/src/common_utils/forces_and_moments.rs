@@ -22,6 +22,7 @@ pub enum CoordinateSystem {
 /// Integrated values representing either forces or moments.
 pub struct IntegratedValues {
     pub circulatory: SpatialVector,
+    pub viscous_lift: SpatialVector,
     pub sectional_drag: SpatialVector,
     pub added_mass: SpatialVector,
     pub gyroscopic: SpatialVector,
@@ -53,6 +54,8 @@ pub struct SectionalForces {
     /// Forces due to the circulation on a line element. Computed from the lift part of the 
     /// sectional model.
     pub circulatory: Vec<SpatialVector>,
+    /// Viscous lift forces, such as lift forces after stall
+    pub viscous_lift: Vec<SpatialVector>,
     /// Forces due to the two dimensional drag on a line element. 
     /// 
     /// **Note**: this is often the viscous drag, but not always. In can also include three- 
@@ -74,6 +77,7 @@ impl SectionalForces {
         self.total = self.circulatory.clone();
         
         for i in 0..self.total.len() {
+            self.total[i] += self.viscous_lift[i];
             self.total[i] += self.sectional_drag[i];
             self.total[i] += self.added_mass[i];
             self.total[i] += self.gyroscopic[i];
@@ -108,6 +112,7 @@ impl SectionalForces {
 
             for i in wing_indices.start..wing_indices.end {
                 wing_result.circulatory += self.circulatory[i];
+                wing_result.viscous_lift += self.viscous_lift[i];
                 wing_result.sectional_drag += self.sectional_drag[i];
                 wing_result.added_mass += self.added_mass[i];
                 wing_result.gyroscopic += self.gyroscopic[i];
@@ -122,6 +127,7 @@ impl SectionalForces {
 
     pub fn integrate_moments(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
         let sectional_circulatory_moments = Self::sectional_moments(line_force_model, &self.circulatory, self.coordinate_system);
+        let sectional_viscous_lift_moments = Self::sectional_moments(line_force_model, &self.viscous_lift, self.coordinate_system);
         let sectional_drag_moments = Self::sectional_moments(line_force_model, &self.sectional_drag, self.coordinate_system);
         let sectional_added_mass_moments = Self::sectional_moments(line_force_model, &self.added_mass, self.coordinate_system);
         let sectional_gyroscopic_moments = Self::sectional_moments(line_force_model, &self.gyroscopic, self.coordinate_system);
@@ -134,6 +140,7 @@ impl SectionalForces {
 
             for i in wing_indices.start..wing_indices.end {
                 wing_result.circulatory += sectional_circulatory_moments[i];
+                wing_result.viscous_lift += sectional_viscous_lift_moments[i];
                 wing_result.sectional_drag += sectional_drag_moments[i];
                 wing_result.added_mass += sectional_added_mass_moments[i];
                 wing_result.gyroscopic += sectional_gyroscopic_moments[i];

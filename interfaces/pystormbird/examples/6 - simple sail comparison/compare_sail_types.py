@@ -1,11 +1,11 @@
 
-from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder
-from stormbird_setup.lifting_line.complete_sail_model import CompleteSailModelBuilder
-from stormbird_setup.lifting_line.solver import SimpleIterative
+from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder
+from stormbird_setup.direct_setup.lifting_line.complete_sail_model import CompleteSailModelBuilder
+from stormbird_setup.direct_setup.lifting_line.solver import SimpleIterative
 
-from stormbird_setup.simple_sail_setup import SimpleSailSetup, SailType
-from stormbird_setup.spatial_vector import SpatialVector
-from stormbird_setup.wind import WindEnvironment
+from stormbird_setup.simplified_setup.simple_sail_setup import SimpleSailSetup, SailType
+from stormbird_setup.direct_setup.spatial_vector import SpatialVector
+from stormbird_setup.direct_setup.wind import WindEnvironment
 
 from pystormbird.lifting_line import CompleteSailModel
 

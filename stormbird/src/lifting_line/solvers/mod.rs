@@ -25,7 +25,7 @@ pub enum Solver {
 
 impl Default for Solver {
     fn default() -> Self {
-        Solver::Linearized(Linearized::default())
+        Solver::SimpleIterative(SimpleIterative::default())
     }
 }
 

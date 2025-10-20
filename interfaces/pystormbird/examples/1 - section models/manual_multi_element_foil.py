@@ -3,9 +3,14 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pystormbird.section_models import VaryingFoil
+from stormbird_setup.direct_setup.section_models import Foil as FoilSetup
+from stormbird_setup.direct_setup.section_models import VaryingFoil as VaryingFoilSetup
+from stormbird_setup.direct_setup.section_models import SectionModel as SectionModelSetup
 
-def get_foil_dict(flap_angle: float = 0.0):
+from pystormbird.section_models import VaryingFoil as VaryingFoilModel
+
+
+def get_foil_setup(flap_angle: float = 0.0):
     '''
     Simplified setup of a multi-element foil model, to show how it can be generated manually. 
     Usually, the parameters in the foil model should be "fitted" to some externally generated data, 
@@ -24,21 +29,19 @@ def get_foil_dict(flap_angle: float = 0.0):
     foils_data = []
     for i_flap in range(len(flap_angles)):
         foils_data.append(
-            {
-                "cl_zero_angle": cl_zero_angle[i_flap],
-                "cd_min": cd_zero_angle[i_flap],
-                "cd_second_order_factor": cd_second_order_factor[i_flap],
-                "mean_positive_stall_angle": mean_stall_angle[i_flap]
-            }
+            FoilSetup(
+                cl_zero_angle = cl_zero_angle[i_flap],
+                cd_min = cd_zero_angle[i_flap],
+                cd_second_order_factor = cd_second_order_factor[i_flap],
+                mean_positive_stall_angle = mean_stall_angle[i_flap]
+            )
         )
 
-    foil_dict = {}
-
-    foil_dict["internal_state_data"] = flap_angles.tolist()
-    foil_dict["foils_data"] = foils_data
-    foil_dict["current_internal_state"] = flap_angle
-
-    return foil_dict
+    return VaryingFoilSetup(
+        internal_state_data = flap_angles.tolist(),
+        foils_data = foils_data,
+        current_internal_state = flap_angle
+    )
 
 def get_foil_model():
     '''
@@ -46,11 +49,18 @@ def get_foil_model():
     drag coefficients.
     '''
 
-    foil_dict = get_foil_dict()
+    foil_setup = get_foil_setup()
 
-    input_str = json.dumps(foil_dict)
+    return VaryingFoilModel(foil_setup.to_json_string())
 
-    return VaryingFoil(input_str)
+def get_section_model_setup(flap_angle: float = 0.0):
+    '''
+    Returns a SectionModelSetup object containing a VaryingFoil model.
+    '''
+
+    foil_setup = get_foil_setup(flap_angle=flap_angle)
+
+    return SectionModelSetup(model=foil_setup)
 
 
 if __name__ == '__main__':

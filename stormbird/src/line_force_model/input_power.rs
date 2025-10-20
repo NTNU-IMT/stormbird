@@ -21,9 +21,20 @@ pub struct InputPowerData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// An empirical model to calculate the input power required for driving a wind propulsion device.
+///
+/// It comes with different modes. Each mode represents different ways of calculating the data.
 pub enum InputPowerModel {
+    /// Default value. Respresnt a case where a sail does not need power at all
     NoPower,
+    /// Calculates the power using the internal state of the sectional model alone. This could, for
+    /// instance, be a power model where the power is calculated directly from the RPS of a rotor
+    /// sail
     FromInternalStateAlone(InputPowerData),
+    /// Calculates the power using the both the internal state and the velocity at each section.
+    /// This could, for instance, represent a model where the internal state is a non-dimensional
+    /// suction rate, so that the actual suction rate, and therefore the power, is dependent on the
+    /// velocity squared.
     FromInternalStateAndVelocity(InputPowerData),
 }
 
@@ -48,6 +59,7 @@ impl InputPowerModel {
         }
     }
 
+    /// The input power on a given strip, represented by a span lien and chord length.
     pub fn input_power_for_strip(
         &self,
         section_model_internal_state: Float,

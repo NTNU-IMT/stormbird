@@ -116,21 +116,5 @@ impl LineForceModel {
         internal_state
     }
 
-    pub fn lift_coefficient_derivatives(&self) -> Vec<Float> {
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index = self.wing_index_from_global(index);
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => foil.cl_initial_slope,
-                    SectionModel::VaryingFoil(varyin_foil) => {
-                        let foil = varyin_foil.get_foil();
-
-                        foil.cl_initial_slope
-                    },
-                    _ => panic!("Lift coefficient derivative requested for a section model that does not support this operation"),
-                }
-            }
-        ).collect()
-    }
+    
 }

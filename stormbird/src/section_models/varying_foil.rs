@@ -48,31 +48,32 @@ impl VaryingFoil {
         let mean_positive_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_positive_stall_angle).collect();
         let mean_negative_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
         let stall_range_data: Vec<Float> = self.foils_data.iter().map(|x| x.stall_range).collect();
+        let cd_stall_angle_offset_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_stall_angle_offset).collect();
+        let cd_bump_during_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_bump_during_stall).collect();
 
         let added_mass_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
 
         let x = self.current_internal_state;
         let x_data = &self.internal_state_data;
 
-        let stall_model = self.foils_data[0].stall_model.clone();
-
         Foil {
-            cl_zero_angle:          linear_interpolation(x, x_data, &cl_zero_angle_data),
-            cl_initial_slope:       linear_interpolation(x, x_data, &cl_initial_slope_data),
-            cl_high_order_factor:   linear_interpolation(x, x_data, &cl_high_order_factor_data),
-            cl_high_order_power:    linear_interpolation(x, x_data, &cl_high_order_power_data),
-            cl_max_after_stall:     linear_interpolation(x, x_data, &cl_max_after_stall_data),
-            cd_min:                 linear_interpolation(x, x_data, &cd_min_data),
-            angle_cd_min:          linear_interpolation(x, x_data, &angle_cd_min_data),
-            cd_second_order_factor: linear_interpolation(x, x_data, &cd_second_order_factor_data),
-            cd_max_after_stall:     linear_interpolation(x, x_data, &cd_max_after_stall_data),
-            cd_power_after_stall:   linear_interpolation(x, x_data, &cd_power_after_stall_data),
-            cdi_correction_factor:  linear_interpolation(x, x_data, &cdi_correction_factor_data),
+            cl_zero_angle:             linear_interpolation(x, x_data, &cl_zero_angle_data),
+            cl_initial_slope:          linear_interpolation(x, x_data, &cl_initial_slope_data),
+            cl_high_order_factor:      linear_interpolation(x, x_data, &cl_high_order_factor_data),
+            cl_high_order_power:       linear_interpolation(x, x_data, &cl_high_order_power_data),
+            cl_max_after_stall:        linear_interpolation(x, x_data, &cl_max_after_stall_data),
+            cd_min:                    linear_interpolation(x, x_data, &cd_min_data),
+            angle_cd_min:              linear_interpolation(x, x_data, &angle_cd_min_data),
+            cd_second_order_factor:    linear_interpolation(x, x_data, &cd_second_order_factor_data),
+            cd_max_after_stall:        linear_interpolation(x, x_data, &cd_max_after_stall_data),
+            cd_power_after_stall:      linear_interpolation(x, x_data, &cd_power_after_stall_data),
+            cdi_correction_factor:     linear_interpolation(x, x_data, &cdi_correction_factor_data),
             mean_positive_stall_angle: linear_interpolation(x, x_data, &mean_positive_stall_angle_data),
             mean_negative_stall_angle: linear_interpolation(x, x_data, &mean_negative_stall_angle_data),
-            stall_range:            linear_interpolation(x, x_data, &stall_range_data),
-            added_mass_factor:      linear_interpolation(x, x_data, &added_mass_factor_data),
-            stall_model:            stall_model,
+            stall_range:               linear_interpolation(x, x_data, &stall_range_data),
+            cd_stall_angle_offset:     linear_interpolation(x, x_data, &cd_stall_angle_offset_data),
+            cd_bump_during_stall:      linear_interpolation(x, x_data, &cd_bump_during_stall_data),
+            added_mass_factor:         linear_interpolation(x, x_data, &added_mass_factor_data)
         }
     }
 
@@ -85,8 +86,24 @@ impl VaryingFoil {
         self.get_foil().lift_coefficient(angle_of_attack)
     }
 
-    pub fn lift_coefficient_pre_stall(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient_pre_stall(angle_of_attack)
+    pub fn lift_coefficient_linear(&self, angle_of_attack: Float) -> Float {
+        self.get_foil().lift_coefficient_linear(angle_of_attack)
+    }
+
+    pub fn lift_coefficient_pre_stall_raw(&self, angle_of_attack: Float) -> Float {
+        self.get_foil().lift_coefficient_pre_stall_raw(angle_of_attack)
+    }
+
+    pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float) -> Float {
+        self.get_foil().lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack)
+    }
+
+    pub fn lift_coefficient_post_stall_raw(&self, angle_of_attack: Float) -> Float {
+        self.get_foil().lift_coefficient_post_stall_raw(angle_of_attack)
+    }
+
+    pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float) -> Float {
+        self.get_foil().lift_coefficient_post_stall_with_stall_weight(angle_of_attack)
     }
 
     pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {

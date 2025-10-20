@@ -163,9 +163,14 @@ impl LiftingLineCorrection {
                 corrected_ctrl_points_velocity[j] = ctrl_points_velocity[j] + self.velocity_correction_estimate[j];
             }
 
-            corrected_circulation_strength = line_force_model.circulation_strength(
+            let angles_of_attack = line_force_model.angles_of_attack(
                 &corrected_ctrl_points_velocity, 
                 CoordinateSystem::Global
+            );
+
+            corrected_circulation_strength = line_force_model.circulation_strength(
+                &angles_of_attack,
+                &corrected_ctrl_points_velocity
             );
         }
 

@@ -7,10 +7,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-fmu_from_struct = { path = "../../../fmu_from_struct/fmu_from_struct" }
+fmu_from_struct = { version = "0.1.2" }
 
-stormbird = { path = "../../stormbird"}
-stormath = { path = "../../stormath"}
+stormbird = { path = "../../../stormbird"}
+stormath = { path = "../../../stormath"}
 serde_json = "1.0.128"
 serde = { version = "1.0.215", features = ["derive"] }
 

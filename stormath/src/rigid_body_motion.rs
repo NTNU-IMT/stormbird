@@ -2,7 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-
+//! General functionality to represent rigid body motion. That is, a data structure and methods for
+//! storing and relating translation and rotation.
 
 use crate::spatial_vector::{
     SpatialVector,
@@ -16,7 +17,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// Struct to represent fields necessary to define the motion of a rigid body.
-/// 
+///
 /// Reference: <https://en.wikipedia.org/wiki/Rigid_body_dynamics>
 pub struct RigidBodyMotion {
     pub translation: SpatialVector,
@@ -37,12 +38,12 @@ impl RigidBodyMotion {
         vector.rotate(self.rotation, self.rotation_type)
     }
 
-    /// Returns the input vector in the body fixed coordinate system defined by the rigid body 
+    /// Returns the input vector in the body fixed coordinate system defined by the rigid body
     /// motion.
     pub fn vector_in_body_fixed_coordinate_system(&self, vector: SpatialVector) -> SpatialVector {
         vector.in_rotated_coordinate_system(self.rotation, self.rotation_type)
     }
-    
+
     /// Returns the relative position of the point to the center of the body.
     pub fn point_relative_to_body_center(&self, point: SpatialVector) -> SpatialVector {
         point - self.translation
@@ -53,7 +54,7 @@ impl RigidBodyMotion {
         self.velocity_angular.cross(self.point_relative_to_body_center(point))
     }
 
-    /// Computes the velocity at a point due to the motion of the rigid body. 
+    /// Computes the velocity at a point due to the motion of the rigid body.
     pub fn velocity_at_point(&self, point: SpatialVector) -> SpatialVector {
         self.velocity_linear + self.rotation_velocity_at_point(point)
     }
@@ -65,8 +66,8 @@ impl RigidBodyMotion {
     }
 
     pub fn update_translation_with_velocity_using_finite_difference(
-        &mut self, 
-        translation: SpatialVector, 
+        &mut self,
+        translation: SpatialVector,
         time_step: Float
     ) {
         let old_translation = self.translation.clone();
@@ -77,8 +78,8 @@ impl RigidBodyMotion {
     }
 
     pub fn update_rotation_with_velocity_using_finite_difference(
-        &mut self, 
-        rotation: SpatialVector, 
+        &mut self,
+        rotation: SpatialVector,
         time_step: Float
     ) {
         let old_rotation = self.rotation.clone();
@@ -87,7 +88,7 @@ impl RigidBodyMotion {
 
         let mut rotation_difference = self.rotation - old_rotation;
 
-        // Logic to handle situations where the input rotation might have switched quadrants. 
+        // Logic to handle situations where the input rotation might have switched quadrants.
         // WARNING: this implicitly assumes that the rotation will never be larger than PI during
         // one time step. This seems like a reasonable assumption, but it is not guaranteed.
         for i in 0..3 {
@@ -108,11 +109,11 @@ mod tests {
 
     use crate::consts::PI;
     use crate::type_aliases::Float;
-    
+
     #[test]
-    /// Test to compare the motion calculated by the rigid body motion struct against the a simpler, 
-    /// but less accurate, finite difference method. The purpose is to validate the correctness of 
-    /// the rigid body motion struct. It is assumed that any logic mistakes can be detected if the 
+    /// Test to compare the motion calculated by the rigid body motion struct against the a simpler,
+    /// but less accurate, finite difference method. The purpose is to validate the correctness of
+    /// the rigid body motion struct. It is assumed that any logic mistakes can be detected if the
     /// difference against the finite difference method is large.
     fn compare_motion_against_finite_difference() {
         let rotation_amplitude = Float::from(45.0).to_radians();
@@ -128,17 +129,17 @@ mod tests {
 
         let rotation_motion = |t: Float| rotation_amplitude * (angular_frequency * t).sin();
         let rotation_motion_derivative = |t: Float| rotation_amplitude * angular_frequency * (angular_frequency * t).cos();
-        
+
         let translation_motion = |t: Float| translation_amplitude * (angular_frequency * t).sin();
         let translation_motion_derivative = |t: Float| translation_amplitude * angular_frequency * (angular_frequency * t).cos();
-    
+
         let initial_point_to_check = SpatialVector::new(0.0, 1.3, 0.8);
 
         let max_rotational_velocity = rotation_amplitude * angular_frequency;
 
         let mut transformed_points: Vec<SpatialVector> = Vec::new();
         let mut motions: Vec<RigidBodyMotion> = Vec::new();
-        
+
         let mut t = 0.0;
         while t < end_time {
             let current_motion = RigidBodyMotion {

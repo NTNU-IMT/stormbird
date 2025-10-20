@@ -25,7 +25,7 @@ use crate::common_utils::forces_and_moments::{
 pub struct SimulationResult {
     pub time: Float,
     pub ctrl_points: Vec<SpatialVector>,
-    pub solver_input_ctrl_point_velocity: Vec<SpatialVector>,
+    pub solver_input_ctrl_points_velocity: Vec<SpatialVector>,
     pub force_input: SectionalForcesInput,
     pub sectional_forces: SectionalForces,
     pub integrated_forces: Vec<IntegratedValues>,
@@ -119,7 +119,7 @@ impl SimulationResult {
 
         for i in 0..nr_span_lines {
             out.push(
-                self.solver_input_ctrl_point_velocity[i] + 
+                self.solver_input_ctrl_points_velocity[i] + 
                 self.rigid_body_motion.rotation_velocity_at_point(self.ctrl_points[i])
             )
         }

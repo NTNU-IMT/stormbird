@@ -7,8 +7,7 @@
 use crate::lifting_line::prelude::*;
 use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
-    SimulationSettings,
-    QuasiSteadySettings
+    SimulationSettings
 };
 
 use super::test_setup::RectangularWing;
@@ -31,16 +30,18 @@ fn moment_test() {
 
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder,
-        simulation_settings: SimulationSettings::QuasiSteady(
-            QuasiSteadySettings::default()
-        ) 
+        simulation_settings: SimulationSettings::default()
     }.build();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
 
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
 
-    let result = sim.do_step(0.0, 1.0, &input_freestream_velocity);
+    let result = sim.do_step(
+        0.0, 
+        1.0, 
+        &input_freestream_velocity
+    );
 
     let force = result.integrated_forces_sum();
     let moment = result.integrated_moments_sum();

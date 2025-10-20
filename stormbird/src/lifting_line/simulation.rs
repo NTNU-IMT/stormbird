@@ -189,11 +189,11 @@ impl Simulation {
         self.previous_circulation_strength = solver_result.circulation_strength.clone();
 
         let ctrl_point_acceleration = self.flow_derivatives.acceleration(
-            &solver_result.output_ctrl_point_velocity, 
+            &solver_result.output_ctrl_points_velocity, 
             time_step
         );
         
-        self.flow_derivatives.update(&solver_result.output_ctrl_point_velocity);
+        self.flow_derivatives.update(&solver_result.output_ctrl_points_velocity);
 
         self.line_force_model.calculate_simulation_result(
             &solver_result, 

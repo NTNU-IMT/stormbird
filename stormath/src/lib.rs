@@ -5,10 +5,10 @@
 
 //! Collection of common mathematical utility functions.
 //!
-//! The library is developed in parallel to, and for, the *Stormbird library*. The functions 
-//! available is closely connected to what is needed here. However, the implementation of the 
-//! functionality in this crate is such that it may also be useful in other contexts. It is 
-//! therefore kept as a  separate crate. 
+//! The library is developed in parallel to, and for, the
+//! [Stormbird library](https://github.com/NTNU-IMT/stormbird). The functions available is closely
+//! connected to what is needed here. However, the implementation of the functionality in this crate
+//! is such that it may also be useful in other contexts. It is therefore kept as a separate crate.
 
 pub mod interpolation;
 pub mod integration;
@@ -25,14 +25,17 @@ pub mod rigid_body_motion;
 pub mod error;
 
 pub mod type_aliases {
+    //! Type aliase to easy switch between different floating point number represntations
+
     #[cfg(feature = "single_precision")]
     pub type Float = f32;
 
     #[cfg(not(feature = "single_precision"))]
-    pub type Float = f64;    
+    pub type Float = f64;
 }
 
 pub mod consts {
+    //! Different constant. Defined so that it should be easy load these with the Float type alias
     use super::type_aliases::Float;
 
     #[cfg(feature = "single_precision")]

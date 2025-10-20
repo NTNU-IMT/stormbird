@@ -11,16 +11,14 @@ The interface is made using pyo3: <https://pyo3.rs/>
 
 The layout and structure of the code follow the source code in Stormbird as much as possible. 
 
-The initialization of some classes, such as the DynamicSimulation class, is done using JSON strings, 
-to avoid unnecessary maintenance of code. One way to deal with this in a Python script is to use the
-JSON functionality in the standard library for dictionaries. 
+The initialization of most of the classes is done using JSON strings, to avoid unnecessary maintenance of code. One way to deal with this in a Python script is to use the JSON functionality in the standard library for dictionaries, or use the [stormbird_setup](../stormbird_setup/) help with the setup.
 
-It is not a goal in itself to offer an interface to every aspect of the Stormbird library. Rather, 
-an interface is only made when a specific use case has presented itself (see intended use cases 
-above). 
+It is not a goal in itself to offer an interface to every aspect of the Stormbird library. Rather, an interface is only made when a specific use case has presented itself (see intended use cases above). 
 
 ## Install instructions
-Can be installed by navigating into the pystormbird folder and execute:
+The Rust compiler and build system must be installed for this to work. More info about that [here](https://rust-lang.org/)
+
+It should then be possible to install the package by navigating into the pystormbird folder and execute:
 ```
 pip install . 
 ```

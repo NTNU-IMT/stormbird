@@ -241,9 +241,15 @@ impl ActuatorLine {
     /// result from the line force model.
     pub fn solve(&mut self, _time_step: Float) -> SolverResult {
         let mut corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity();
+
+        let mut angles_of_attack = self.line_force_model.angles_of_attack(
+            &corrected_ctrl_points_velocity, 
+            CoordinateSystem::Global
+        );
         
         let mut new_estimated_circulation_strength = self.line_force_model.circulation_strength(
-            &corrected_ctrl_points_velocity, CoordinateSystem::Global
+            &angles_of_attack,
+            &corrected_ctrl_points_velocity
         );
 
         if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
@@ -285,16 +291,21 @@ impl ActuatorLine {
             );
         }
 
-        let residual = self.line_force_model.average_residual_absolute(
-            &circulation_strength, 
-            &corrected_ctrl_points_velocity,
+        angles_of_attack = self.line_force_model.angles_of_attack(
+            &corrected_ctrl_points_velocity, 
             CoordinateSystem::Global
         );
 
+        let residual = self.line_force_model.average_residual_absolute(
+            &angles_of_attack,
+            &circulation_strength, 
+            &corrected_ctrl_points_velocity
+        );
+
         SolverResult {
-            input_ctrl_point_velocity: self.ctrl_points_velocity.clone(),
+            input_ctrl_points_velocity: self.ctrl_points_velocity.clone(),
             circulation_strength,
-            output_ctrl_point_velocity: corrected_ctrl_points_velocity,
+            output_ctrl_points_velocity: corrected_ctrl_points_velocity,
             iterations: 1,
             residual,
         }

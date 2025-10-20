@@ -10,8 +10,6 @@ use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalFor
 use stormbird::common_utils::forces_and_moments::IntegratedValues as IntegratedValuesRust;
 use stormbird::common_utils::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
 
-use crate::spatial_vector::SpatialVector;
-
 #[pyclass]
 #[derive(Clone)]
 pub struct SectionalForcesInput {
@@ -26,8 +24,8 @@ impl SectionalForcesInput {
     }
 
     #[getter]
-    pub fn velocity(&self) -> Vec<SpatialVector> {
-        self.data.velocity.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn velocity(&self) -> Vec<[f64; 3]> {
+        self.data.velocity.iter().map(|v| v.0).collect()
     }
 
     #[getter]
@@ -36,13 +34,13 @@ impl SectionalForcesInput {
     }
 
     #[getter]
-    pub fn acceleration(&self) -> Vec<SpatialVector> {
-        self.data.acceleration.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn acceleration(&self) -> Vec<[f64; 3]> {
+        self.data.acceleration.iter().map(|v| v.0).collect()
     }
 
     #[getter]
-    pub fn rotation_velocity(&self) -> SpatialVector {
-        SpatialVector::from(self.data.rotation_velocity.clone())
+    pub fn rotation_velocity(&self) -> [f64; 3] {
+        self.data.rotation_velocity.0
     }
 }
 
@@ -55,28 +53,28 @@ pub struct SectionalForces {
 #[pymethods]
 impl SectionalForces {
     #[getter]
-    pub fn circulatory(&self) -> Vec<SpatialVector> {
-        self.data.circulatory.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn circulatory(&self) -> Vec<[f64; 3]> {
+        self.data.circulatory.iter().map(|v| v.0).collect()
     }
 
     #[getter]
-    pub fn sectional_drag(&self) -> Vec<SpatialVector> {
-        self.data.sectional_drag.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn sectional_drag(&self) -> Vec<[f64; 3]> {
+        self.data.sectional_drag.iter().map(|v| v.0).collect()
     }
 
     #[getter]
-    pub fn added_mass(&self) -> Vec<SpatialVector> {
-        self.data.added_mass.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn added_mass(&self) -> Vec<[f64; 3]> {
+        self.data.added_mass.iter().map(|v| v.0).collect()
     }
 
     #[getter]
-    pub fn gyroscopic(&self) -> Vec<SpatialVector> {
-        self.data.gyroscopic.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn gyroscopic(&self) -> Vec<[f64; 3]> {
+        self.data.gyroscopic.iter().map(|v| v.0).collect()
     }
 
     #[getter]
-    pub fn total(&self) -> Vec<SpatialVector> {
-        self.data.total.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn total(&self) -> Vec<[f64; 3]> {
+        self.data.total.iter().map(|v| v.0).collect()
     }
 }
 
@@ -89,28 +87,28 @@ pub struct IntegratedValues {
 #[pymethods]
 impl IntegratedValues {
     #[getter]
-    pub fn circulatory(&self) -> SpatialVector {
-        SpatialVector::from(self.data.circulatory.clone())
+    pub fn circulatory(&self) -> [f64; 3] {
+        self.data.circulatory.0
     }
 
     #[getter]
-    pub fn sectional_drag(&self) -> SpatialVector {
-        SpatialVector::from(self.data.sectional_drag.clone())
+    pub fn sectional_drag(&self) -> [f64; 3] {
+        self.data.sectional_drag.0
     }
 
     #[getter]
-    pub fn added_mass(&self) -> SpatialVector {
-        SpatialVector::from(self.data.added_mass.clone())
+    pub fn added_mass(&self) -> [f64; 3] {
+        self.data.added_mass.0
     }
 
     #[getter]
-    pub fn gyroscopic(&self) -> SpatialVector {
-        SpatialVector::from(self.data.gyroscopic.clone())
+    pub fn gyroscopic(&self) -> [f64; 3] {
+        self.data.gyroscopic.0
     }
 
     #[getter]
-    pub fn total(&self) -> SpatialVector {
-        SpatialVector::from(self.data.total.clone())
+    pub fn total(&self) -> [f64; 3] {
+        self.data.total.0
     }
 }
 
@@ -130,8 +128,8 @@ impl SimulationResult {
     }
 
     #[getter]
-    pub fn ctrl_points(&self) -> Vec<SpatialVector> {
-        self.data.ctrl_points.iter().map(|v| SpatialVector::from(v.clone())).collect()
+    pub fn ctrl_points(&self) -> Vec<[f64; 3]> {
+        self.data.ctrl_points.iter().map(|v| v.0).collect()
     }
 
     #[getter]
@@ -168,12 +166,12 @@ impl SimulationResult {
         format!("{:?}", self.data)
     }
 
-    pub fn integrated_forces_sum(&self) -> SpatialVector {
-        SpatialVector::from(self.data.integrated_forces_sum())
+    pub fn integrated_forces_sum(&self) -> [f64; 3] {
+        self.data.integrated_forces_sum().0
     }
 
-    pub fn integrated_moments_sum(&self) -> SpatialVector {
-        SpatialVector::from(self.data.integrated_moments_sum())
+    pub fn integrated_moments_sum(&self) -> [f64; 3] {
+        self.data.integrated_moments_sum().0
     }
 }
 

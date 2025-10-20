@@ -1,12 +1,12 @@
 # General about input and output
 
-Stormbird, as any library, consist of many data structures. Some represents the settings for a simulations, such as wake and solver parameters, while others represent input to or result from a simulation. To create and run a simulation it is generally necessary to pass information to the library about the data structures that you whish to create. This is the case for all the interfaces. 
+Stormbird, as any library, consist of many data structures. Some represents the settings for a simulations, such as wake and solver parameters, while others represent input to or result from a simulation. To create and run a simulation it is generally necessary to pass information to the library about the data structures that you whish to create. This is the case for all the interfaces.
 
-To facilitate simple serialization and deserialization - at least from a coding perspective - Stormbird relies heavily on the [Serde](https://serde.rs/) library, which is "[..] a framework for **ser**ializing and **de**serializing Rust data structures efficiently and generically". In other words, it is a library to automate the conversion of data structures to and from different file formats. Serde supports many formats, but JSON has been chosen for Stormbird. This means that any input must be passed as JSON strings, and output will often be delivered as JSON strings. 
+To facilitate simple serialization and deserialization - at least from a coding perspective - Stormbird relies heavily on the [Serde](https://serde.rs/) library. This is "[..] a framework for **ser**ializing and **de**serializing Rust data structures efficiently and generically". In other words, it is a library to automate the conversion of data structures to and from different file formats. Serde supports many formats, but JSON has been chosen for Stormbird. This means that any input must be passed as JSON strings, and output will often also be delivered as JSON strings.
 
-Working with Stormbird is therefor often a matter of setting up the right input in a JSON format and then reading and post-processing the output from the resulting JSON format.
+Working with Stormbird is therefor often a matter of setting up the right input in a JSON format and then reading and parsing the output from the resulting JSON format.
 
-Throughout this book there will often be examples of data structures shown as Rust code. This is generally to show the available fields in a structure, to give an impression of which variables it is possible to set. All of these Rust-structures has a corresponding JSON representation. A simple example of how a generic Rust structure is converted to a JSON string from Serde is shown below. 
+Throughout this book there will be examples of data structures shown as Rust code. This is generally to show the available fields in a structure, to give an impression of which variables it is possible to set. All of these Rust-structures has a corresponding JSON representation. A simple example of how a generic Rust structure is converted to a JSON string from Serde is shown below.
 
 An example of a Rust struct first:
 
@@ -81,6 +81,9 @@ An example of a complete input string to Stormbird can be seen below. More expla
 ```
 
 ## Default values
-Default values are often given for structures representing settings or models. This means that is often not necessary to specify every field in a structure in the input. For instance, in the example above, the `"wake"` structure only has one specified variable. However, the complete wake structure has 12 fields, where some are other structures with more sub fields. The reason only the `"ratio_of_wake_affected_by_induced_velocities"` is given above is that this was the only setting where a different value than the default was wanted.
+Default values are often given for structures representing settings or models. This means that it may not be necessary to specify every field in a structure in the input. For instance, in the example above, the `"wake"` structure only has one specified variable. However, the complete wake structure has 12 fields, where some are other structures with more sub fields. The reason only the `"ratio_of_wake_affected_by_induced_velocities"` is given above is that this was the only setting where a different value than the default was wanted.
 
 The goal is to implement reasonable default values on as many variables as possible.
+
+## Helper library to create the right JSON settings
+Much of the setup of Stormbird models can be done using a Python library called `stormbird_setup`. This library is implemented independent of of the core library, and should be useful for all interfaces. It makes different settings available as Python classes that inherits from the [Pydantic BaseModel](https://docs.pydantic.dev/latest/api/base_model/). This makes serializing of the data structures straight forward, and the setup of the models come with typed check validation. That is, the only purpose of the library is to ease the generation of the right JSON strings, and can therefore be used no matter how stormbird is executed, and in combinations with manually generated strings if that is needed. The library also implements some high-level shortcut-functionality for generating typical simulation settings for different cases. See the package folder on GitHub or the examples in the pyfoamsetup folder for more on how to use `stormbird_setup`

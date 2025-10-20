@@ -45,19 +45,19 @@ impl LineForceModel {
     ///   strength.
     pub fn circulation_strength_smoothed(
         &self, 
-        velocity: &[SpatialVector], 
-        input_coordinate_system: CoordinateSystem,
+        angles_of_attack: &[Float],
+        velocity: &[SpatialVector],
         circulation_smoothing: &CirculationSmoothing,
     ) -> Vec<Float> {
         let raw_strength = self.circulation_strength_raw(
-            velocity, 
-            input_coordinate_system
+            angles_of_attack,
+            velocity
         );
 
         let values_to_subtract = if let Some(prescribed_circulation) = &circulation_smoothing.prescribed_to_subtract_before_smoothing {
             self.circulation_strength_prescribed(
-                velocity, 
-                input_coordinate_system,
+                angles_of_attack,
+                velocity,
                 prescribed_circulation
             )
         } else {
@@ -158,16 +158,16 @@ impl LineForceModel {
     /// * `input_coordinate_system` - The coordinate system in which the input velocity is given.
     pub fn circulation_strength_prescribed(
         &self, 
+        angles_of_attack: &[Float],
         velocity: &[SpatialVector], 
-        input_coordinate_system: CoordinateSystem,
         prescribed_circulation: &PrescribedCirculation, 
     ) -> Vec<Float> {
 
         let nr_wings = self.nr_wings();
 
         let raw_circulation_strength = self.circulation_strength_raw(
-            velocity, 
-            input_coordinate_system
+            angles_of_attack,
+            velocity
         );
 
         let velocity_squared: Vec<Float> = velocity.iter().map(

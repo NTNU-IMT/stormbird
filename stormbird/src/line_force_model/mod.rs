@@ -62,14 +62,13 @@ pub struct LineForceModel {
     /// Indices used to sort different wings from each other.
     pub wing_indices: Vec<Range<usize>>,
     /// A vector that contains booleans that indicate whether the circulation should be zero at the
-    /// ends or not. The variables are used both when initializing the circulation before a
-    /// simulation and in cases where smoothing is applied to the circulation.
-    /// The vector is structured as follows:
+    /// ends or not. The variables are mainly used when using corrections for the circulation 
+    /// distribution. The vector is structured as follows:
     /// - The first index is the wing index
     /// - The second index is the end index, where 0 means that start of the wing and 1 means the
     /// end
-    /// - When the boolean is false, the circulation is set to zero at the end, and when it is true,
-    ///  the circulation is assumed to be non-zero.
+    /// - When the boolean is true, it is a warning to any correction method that that it is not 
+    /// correct to assume zero circulation at that end.
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     /// Density used in force calculations
     pub density: Float,

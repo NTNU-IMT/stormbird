@@ -17,7 +17,7 @@ use stormath::type_aliases::Float;
 /// too high. The main use case for this is correcting rotor sail simulations.
 pub enum VelocityCorrections {
     #[default]
-    None,
+    NoCorrection,
     /// The induced velocity is capped using a ratio between the induced velocity and the freestream
     MaxInducedVelocityMagnitudeRatio(Float),
     /// The total velocity is kept at a fixed magnitude, equal to the freestream velocity 
@@ -25,7 +25,34 @@ pub enum VelocityCorrections {
 }
 
 impl VelocityCorrections {
-    pub fn max_induced_velocity_magnitude_ratio(
+    pub fn corrected_velocity(
+        &self,
+        freestream_velocities: &[SpatialVector],
+        induced_velocities: &[SpatialVector]
+    ) -> Option<Vec<SpatialVector>> {
+        match self {
+            Self::NoCorrection => None,
+            Self::MaxInducedVelocityMagnitudeRatio(ratio) => {
+                Some(
+                    Self::max_induced_velocity_magnitude_ratio(
+                        *ratio, 
+                        freestream_velocities, 
+                        induced_velocities
+                    )
+                )
+            },
+            Self::FixedMagnitudeEqualToFreestream => {
+                Some(
+                    Self::fixed_magnitude_equal_to_freestream(
+                        freestream_velocities, 
+                        induced_velocities
+                    )
+                )
+            }
+        }
+    }
+
+    fn max_induced_velocity_magnitude_ratio(
         ratio: Float,
         freestream_velocities: &[SpatialVector],
         induced_velocities: &[SpatialVector],
@@ -52,7 +79,7 @@ impl VelocityCorrections {
         ).collect()
     }
 
-    pub fn fixed_magnitude_equal_to_freestream(
+    fn fixed_magnitude_equal_to_freestream(
         freestream_velocities: &[SpatialVector],
         induced_velocities: &[SpatialVector],
     ) -> Vec<SpatialVector> {
