@@ -23,7 +23,7 @@ use stormbird::wind::{
     wind_condition::WindCondition
 };
 
-use stormbird::controllers::{
+use stormbird::controller::{
     Controller,
     ControllerBuilder,
     input::ControllerInput,
@@ -31,7 +31,7 @@ use stormbird::controllers::{
     measurements::FlowMeasurementSettings
 };
 
-use stormbird::extra_force_models::blendermann_superstructre_forces::BlendermannSuperstructureForces;
+use stormbird::empirical_models::blendermann_superstructre_forces::BlendermannSuperstructureForces;
 
 use fmu_from_struct::FmuInfo;
 
@@ -59,8 +59,8 @@ pub struct StormbirdLiftingLine {
     pub rotation_x: f64,
     pub rotation_y: f64,
     pub rotation_z: f64,
-    /// Optional variables that can be used to set velocity due to motion of the model. This can be 
-    /// used, for instance, if the motion of the models is estimated or measured externally, such as 
+    /// Optional variables that can be used to set velocity due to motion of the model. This can be
+    /// used, for instance, if the motion of the models is estimated or measured externally, such as
     /// in an experiment, or when the model is used together with a rigid body simulator.
     pub motion_velocity_linear_x: f64,
     pub motion_velocity_linear_y: f64,
@@ -177,6 +177,7 @@ pub struct StormbirdLiftingLine {
     pub moment_sail_10_y: f64,
     pub moment_sail_10_z: f64,
 
+    /// Forces on the superstructure, if that is included in the model
     pub force_superstructure_x: f64,
     pub force_superstructure_y: f64,
     pub force_superstructure_z: f64,
@@ -184,7 +185,7 @@ pub struct StormbirdLiftingLine {
     pub moment_superstructure_y: f64,
     pub moment_superstructure_z: f64,
 
-    /// Measurements of the effective angle of attack at different wings. Max 10 as output in the 
+    /// Measurements of the effective angle of attack at different wings. Max 10 as output in the
     /// FMU
     pub angle_of_attack_measurement_1: f64,
     pub angle_of_attack_measurement_2: f64,
@@ -281,10 +282,10 @@ impl FmuFunctions for StormbirdLiftingLine {
         } else {
             (current_time_in, time_step_in)
         };
-        
+
         self.apply_filters_to_input_if_activated();
 
-        let waiting_iterations_is_done = 
+        let waiting_iterations_is_done =
             self.iterations_completed >= self.parameters.number_of_iterations_before_building_model;
 
         if self.stormbird_model.is_some() && waiting_iterations_is_done {
@@ -308,10 +309,10 @@ impl FmuFunctions for StormbirdLiftingLine {
                     )
                 } else {
                     self.set_zero_force_output();
-                    
+
                     None
                 }
-                
+
             } else {
                 None
             };
@@ -334,8 +335,8 @@ impl FmuFunctions for StormbirdLiftingLine {
 impl StormbirdLiftingLine {
     fn apply_controller(
         &mut self,
-        current_time: f64, 
-        time_step: f64, 
+        current_time: f64,
+        time_step: f64,
         controller_input: &ControllerInput
     ) {
         if let Some(controller) = &self.controller {
@@ -344,10 +345,10 @@ impl StormbirdLiftingLine {
                 time_step,
                 &controller_input
             );
-            
+
             if let Some(output) = &controller_output {
                 self.set_model_control_values_from_controller_output(output);
-            } 
+            }
         }
     }
 
@@ -356,7 +357,7 @@ impl StormbirdLiftingLine {
         let section_models_internal_state = self.section_models_internal_state();
 
         if let Some(model) = &mut self.stormbird_model {
-            
+
             model.line_force_model.local_wing_angles = local_wing_angles;
 
             model.line_force_model
@@ -391,7 +392,7 @@ impl StormbirdLiftingLine {
                     translation,
                     time_step
                 );
-            
+
             // Apply rotation, and compute the velocity using finite difference
             model
                 .line_force_model
@@ -400,7 +401,7 @@ impl StormbirdLiftingLine {
                     rotation,
                     time_step
                 );
-            
+
             // Set the computed velocity to the outputs
             self.calculated_motion_velocity_linear_x = model.line_force_model.rigid_body_motion.velocity_linear[0];
             self.calculated_motion_velocity_linear_y = model.line_force_model.rigid_body_motion.velocity_linear[1];
@@ -412,9 +413,9 @@ impl StormbirdLiftingLine {
             // Override the computed velocities if motion velocity is used
             if self.parameters.use_motion_velocity {
                 model.line_force_model.rigid_body_motion.velocity_angular = motion_velocity_angular;
-                
-                // Only apply the linear velocity IF the linear motion velocity is NOT used as a 
-                // freestream condition. It does not make sense set these variables if the effect of 
+
+                // Only apply the linear velocity IF the linear motion velocity is NOT used as a
+                // freestream condition. It does not make sense set these variables if the effect of
                 // them is already included in the inflow velocity.
                 if !self.parameters.use_motion_velocity_linear_as_freestream {
                     model.line_force_model.rigid_body_motion.velocity_linear = motion_velocity_linear;
@@ -469,7 +470,7 @@ impl StormbirdLiftingLine {
         }
     }
 
-    /// Returns the rotation as a vector. If `angles_in_degrees` is set to true, the angles are 
+    /// Returns the rotation as a vector. If `angles_in_degrees` is set to true, the angles are
     /// converted to radians.
     fn rotation_vector(&self) -> SpatialVector {
         if self.parameters.angles_in_degrees {
@@ -480,8 +481,8 @@ impl StormbirdLiftingLine {
             ])
         } else {
             SpatialVector([
-                self.rotation_x, 
-                self.rotation_y, 
+                self.rotation_x,
+                self.rotation_y,
                 self.rotation_z
             ])
         }
@@ -499,7 +500,7 @@ impl StormbirdLiftingLine {
             self.motion_velocity_linear_y,
             self.motion_velocity_linear_z,
         ]);
-        
+
         if let Some(model) = &self.stormbird_model {
             if self.parameters.motion_velocity_in_body_fixed_frame {
                 let rotation = self.rotation_vector();
@@ -524,8 +525,8 @@ impl StormbirdLiftingLine {
             ])
         } else {
             SpatialVector([
-                self.motion_velocity_angular_x, 
-                self.motion_velocity_angular_y, 
+                self.motion_velocity_angular_x,
+                self.motion_velocity_angular_y,
                 self.motion_velocity_angular_z
             ])
         }
@@ -558,7 +559,7 @@ impl StormbirdLiftingLine {
             } else {
                 vec![]
             };
-        
+
         // Get the wind field from the wind environment, based on the wind condition
         let wind_condition = WindCondition {
             velocity: self.wind_velocity,
@@ -574,23 +575,25 @@ impl StormbirdLiftingLine {
 
         let out = if let Some(env) = &self.wind_environment {
             let mut freestream_velocity = env.apparent_wind_velocity_vectors_at_locations(
-                wind_condition, 
+                wind_condition,
                 &freestream_velocity_points,
                 linear_velocity
             );
 
             if let Some(model) = &self.stormbird_model {
-                let non_dimensional_span_distances = model.line_force_model.span_distance_in_local_coordinates();
+                let non_dimensional_span_distances = &model.line_force_model.ctrl_point_spanwise_distance_non_dimensional;
+
                 let wing_indices = model.line_force_model.wing_indices.clone();
+
                 env.apply_inflow_corrections(
                     &mut freestream_velocity,
-                    &non_dimensional_span_distances,
+                    non_dimensional_span_distances,
                     wing_indices
                 );
             }
 
             freestream_velocity
-            
+
         } else {
             panic!("Wind environment is not defined!")
         };
@@ -598,9 +601,10 @@ impl StormbirdLiftingLine {
        out
     }
 
+    /// Returns the local wing angles as a vector, based on the input
     fn local_wing_angles(&self) -> Vec<f64> {
         let nr_wings = self.nr_wings();
-        
+
         if nr_wings == 0 {
             return vec![];
         }
@@ -633,6 +637,7 @@ impl StormbirdLiftingLine {
         local_wing_angles
     }
 
+    /// Returns the internal state of the section model as a vector based on the input variables
     fn section_models_internal_state(&self) -> Vec<f64> {
         let nr_wings = self.nr_wings();
 
@@ -658,7 +663,7 @@ impl StormbirdLiftingLine {
         for i in 0..nr_wings {
             section_models_internal_state[i] = section_models_internal_state_raw[i];
         }
-        
+
         section_models_internal_state
     }
 
@@ -899,7 +904,7 @@ impl StormbirdLiftingLine {
     fn controller_input(&self, result: &SimulationResult) -> ControllerInput {
         match (&self.stormbird_model, &self.wind_environment, &self.controller) {
             (Some(model), Some(environment), Some(controller)) => {
-                return ControllerInput::new(
+                return ControllerInput::new_from_simulation_result(
                     self.controller_loading,
                     &model.line_force_model,
                     result,
@@ -909,7 +914,7 @@ impl StormbirdLiftingLine {
                 )
             },
             (Some(model), Some(environment), None) => {
-                return ControllerInput::new(
+                return ControllerInput::new_from_simulation_result(
                     self.controller_loading,
                     &model.line_force_model,
                     result,
@@ -924,7 +929,7 @@ impl StormbirdLiftingLine {
         }
     }
 
-    /// Takes a ControllerInput variable as input, an applies the data to the output variables in 
+    /// Takes a ControllerInput variable as input, an applies the data to the output variables in
     /// the FMU
     fn set_controller_measurement_output(&mut self, controller_input: &ControllerInput) {
         let output_size = 10;
@@ -933,7 +938,7 @@ impl StormbirdLiftingLine {
         let mut velocity_extended = vec![0.0; output_size];
         let mut apparent_wind_directions_extended = vec![0.0; output_size];
         let mut section_models_internal_state = vec![0.0; output_size];
-        
+
         let nr_wings = self.nr_wings();
 
         for i in 0..nr_wings {
