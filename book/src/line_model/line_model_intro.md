@@ -12,24 +12,28 @@ A view of source code that defines a line force model data structure can be seen
 ```rust
 pub struct LineForceModel {
     pub span_lines_local: Vec<SpanLine>,
-    pub chord_vectors_local:  Vec<SpatialVector<3>>,
+    pub chord_vectors_local_not_rotated: Vec<SpatialVector>,
+    pub chord_lengths: Vec<f64>,
     pub section_models: Vec<SectionModel>,
-    pub wing_indices:   Vec<Range<usize>>,
-    pub translation: SpatialVector<3>,
-    pub rotation: SpatialVector<3>,
-    pub local_wing_angles: Vec<f64>,
+    pub wing_indices: Vec<Range<usize>>,
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     pub density: f64,
-    pub circulation_corrections: CirculationCorrection,
-    pub ctrl_point_chord_factor: f64,
+    pub circulation_correction: CirculationCorrection,
+    pub angle_of_attack_correction: AngleOfAttackCorrection,
     pub output_coordinate_system: CoordinateSystem,
+    pub rigid_body_motion: RigidBodyMotion,
+    pub local_wing_angles: Vec<f64>,
+    pub chord_vectors_local: Vec<SpatialVector>,
+    pub chord_vectors_global: Vec<SpatialVector>,
+    pub chord_vectors_global_at_span_points: Vec<SpatialVector>,
+    pub span_lines_global: Vec<SpanLine>,
+    pub span_points_global: Vec<SpatialVector>,
+    pub ctrl_points_global: Vec<SpatialVector>,
+    pub ctrl_point_spanwise_distance: Vec<f64>,
+    pub ctrl_point_spanwise_distance_non_dimensional: Vec<f64>,
+    pub ctrl_point_spanwise_distance_circulation_model: Vec<f64>,
+    pub input_power_models: Vec<InputPowerModel>,
 }
 ```
 
-The `span_lines_local` and `chord_vectors_local` define the wing geometry in a local coordinate system. When the geometry is accessed in simulation methods, it is often the global geometry that is of interest. This is available through *getter methods* which apply the right transformations to the geometry. How to modify the geometry during a simulation is explained [here](./move_line_models.md). In short, it can be one by setting the `translation`, `rotation` and `local_wing_angles` fields.
-
-Multiple line elements are combined to make up either a single lifting surface or many lifting surfaces together. There are no assumptions about the location and orientation of the line elements. They can, therefore, be oriented into any shape (although most wind propulsion configurations will consist of many straight wings...). Due to the nature of the simulation methods, each line element is treated as a a separate entity, where forces are only dependent on local flow conditions and the geometry and models connected to each element. However, when building up a single wing, it is generally natural that one line element lies next to the other line elements belonging to that wing. As such, the line elements can be grouped together to form a wing by defining a *first* and *last* element (also known as a `Range` in `Rust`) for a wing. This is managed by the `wing_indices` field. 
-
-The `section_models` vector contain a section model for each wing in the line force model. 
-
-The `density`, `non_zero_circulation_at_ends`, `ctrl_point_chord_factor`, `circulation_corrections` and `output_coordinate_system` is explained further in the [builder chapter](./building_line_model.md).
+More details on each field can be found in the code documentation [LINK TO COME]. The constriuction of a line force model is generally not done with the structure directly, but rather through a [builder](/line_model/building_line_model.md)

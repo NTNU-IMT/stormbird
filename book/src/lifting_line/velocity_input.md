@@ -1,6 +1,6 @@
 # Velocity input
 
-As shown in the [simulation overview section](./simulation_overview.md), to simulate a single time step using the lifting line methods, it is necessary to call the `do_step` function with a vector (in Rust) or list (in Python) of three dimensional spatial vectors as input. This input is labeled the `freestream_velocity`, and represents the freestream velocity at all **relevant points** in the lifting line simulation. 
+As shown in the [simulation overview section](./simulation_overview.md), to simulate a single time step using the lifting line methods, it is necessary to call the `do_step` function with a vector (in Rust) or list (in Python) of three dimensional spatial vectors as input. This input is labeled the `freestream_velocity`, and represents the freestream velocity at all **relevant points** in the lifting line simulation.
 
 Which points this is depends on the type of simulation. For the quasi-steady cases, it is only the control points of the line force model, as the wake downstream of the wings are not affected by local velocities. For the dynamic simulation it is both the control points and the wake points, as the wake shape is integrated from the velocity field.
 
@@ -19,9 +19,9 @@ Generating the right velocity input consists of two steps. First, the user must 
 
 ```python
 from pystormbird.lifting_line import Simulation
-from pystormbird import SpatialVector
 
 # ----- code to set up the simulation first -----
+simulation = Simulation(setup_string)
 
 # Assumes this is a class in Python that models variation in wind speed as a function of height
 wind_model = AtmosphericBoundaryLayer(
@@ -36,19 +36,20 @@ freestream_velocity_points = simulation.get_freestream_velocity_points()
 # Generate velocity vectors for each point
 freestream_velocity = []
 for point in freestream_velocity_points:
-    freestream_velocity.append(
-        wind_model.get_velocity(point)
-    )
+    local_velocity = wind_model.get_velocity(point) # List, such as [u_x, u_y, u_z]
+
+    freestream_velocity.append(local_velocity)
 
 # Run the simulation with the generated freestream velocity input
 current_time = 0.0
+time_step = 0.1
 
 while current_time < end_time:
     result = simulation.do_step(
-        time = current_time, 
-        time_step = time_step, 
+        time = current_time,
+        time_step = time_step,
         freestream_velocity = freestream_velocity
     )
 
-    current_time += dt
+    current_time += time_step
 ```

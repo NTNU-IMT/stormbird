@@ -1,4 +1,4 @@
-// Copyright (C) 2024, NTNU 
+// Copyright (C) 2024, NTNU
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -29,6 +29,19 @@ impl Simulation {
         }
     }
 
+    pub fn set_translation_and_rotation_with_finite_difference_for_the_velocity(
+        &mut self,
+        time_step: f64,
+        translation: [f64; 3],
+        rotation: [f64; 3]
+    ) {
+        self.data.line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
+            time_step,
+            SpatialVector::from(translation),
+            SpatialVector::from(rotation)
+        )
+    }
+
     pub fn set_translation_with_velocity_using_finite_difference(
         &mut self, translation: [f64; 3], time_step: f64
     ) {
@@ -37,9 +50,11 @@ impl Simulation {
         );
 
         self.data.line_force_model.rigid_body_motion.update_translation_with_velocity_using_finite_difference(
-            translation_vector, 
+            translation_vector,
             time_step
         );
+
+        self.data.line_force_model.update_global_data_representations();
     }
 
     pub fn set_rotation_with_velocity_using_finite_difference(
@@ -48,19 +63,27 @@ impl Simulation {
         let rotation_vector = SpatialVector::from(rotation);
 
         self.data.line_force_model.rigid_body_motion.update_rotation_with_velocity_using_finite_difference(
-            rotation_vector, 
+            rotation_vector,
             time_step
         );
+
+        self.data.line_force_model.update_global_data_representations();
     }
 
-    pub fn set_translation_without_velocity(&mut self, translation: [f64; 3]) {
-        let translation_vector = SpatialVector::from(translation);
-
-        self.data.line_force_model.rigid_body_motion.translation = translation_vector;
+    pub fn set_translation_only(&mut self, translation: [f64; 3]) {
+        self.data.line_force_model.set_translation_only(SpatialVector::from(translation))
     }
 
-    pub fn set_rotation_without_velocity( &mut self, rotation: [f64; 3]) {
-        self.data.line_force_model.rigid_body_motion.rotation = SpatialVector::from(rotation);
+    pub fn set_rotation_only( &mut self, rotation: [f64; 3]) {
+        self.data.line_force_model.set_rotation_only(SpatialVector::from(rotation))
+    }
+
+    pub fn set_velocity_linear(&mut self, linear_velocity: [f64; 3]) {
+        self.data.line_force_model.rigid_body_motion.velocity_linear = SpatialVector::from(linear_velocity);
+    }
+
+    pub fn set_velocity_angular(&mut self, angular_velocity: [f64; 3]) {
+        self.data.line_force_model.rigid_body_motion.velocity_angular = SpatialVector::from(angular_velocity);
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {
@@ -70,6 +93,8 @@ impl Simulation {
         );
 
         self.data.line_force_model.local_wing_angles = local_wing_angles;
+
+        self.data.line_force_model.update_global_data_representations();
     }
 
     pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
@@ -86,13 +111,13 @@ impl Simulation {
 
     #[pyo3(signature=(
         *,
-        time, 
+        time,
         time_step,
         freestream_velocity,
     ))]
     pub fn do_step(
-        &mut self, 
-        time: f64, 
+        &mut self,
+        time: f64,
         time_step: f64,
         freestream_velocity: Vec<[f64; 3]>,
     ) -> SimulationResult {
@@ -103,7 +128,7 @@ impl Simulation {
 
         SimulationResult {
             data: self.data.do_step(
-                time, 
+                time,
                 time_step,
                 &rust_freestream_velocity
             )
