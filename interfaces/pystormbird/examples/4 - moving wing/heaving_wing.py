@@ -1,5 +1,5 @@
 '''
-Script that simulates a heaving wing with both dynamic and quasi-static lifting line models. The 
+Script that simulates a heaving wing with both dynamic and quasi-static lifting line models. The
 result are compared against each other and against a theoretical (simplified) model.
 '''
 
@@ -11,8 +11,14 @@ import numpy as np
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 
+from stormbird_setup.direct_setup.spatial_vector import SpatialVector
+from stormbird_setup.direct_setup.section_models import SectionModel, Foil
+from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
+from stormbird_setup.direct_setup.lifting_line.wake import DynamicWakeBuilder
+
+
 from pystormbird.lifting_line import Simulation
-from pystormbird import SpatialVector
 
 import argparse
 
@@ -20,16 +26,16 @@ def get_motion_functions(*, amplitude: float, radial_frequency: float):
     '''
     Create closures for the motion as a function of time, based on the amplitude and radial frequency.
     '''
-    def position(t: float):
+    def position(t: float) -> float:
         return amplitude * np.sin(radial_frequency * t)
 
-    def velocity(t: float):
+    def velocity(t: float) -> float:
         return amplitude * radial_frequency * np.cos(radial_frequency * t)
 
     return position, velocity
 
 def theodorsen_lift_reduction_data(reduced_frequency: float) -> float:
-    ''' 
+    '''
     Reduction of the lift due to dynamic effects according to Theodorsen's function, as presented
     in: "Bøckmann, E., 2015, "Wave Propulsion of Ships", page 28, Figure 3.3
     '''
@@ -40,7 +46,7 @@ def theodorsen_lift_reduction_data(reduced_frequency: float) -> float:
     ])
 
     y_data = np.array([
-        0.9999999999999999, 0.8254545454545454, 0.7185454545454544, 0.6552727272727272, 0.6094545454545454, 0.5745454545454544, 
+        0.9999999999999999, 0.8254545454545454, 0.7185454545454544, 0.6552727272727272, 0.6094545454545454, 0.5745454545454544,
         0.5516363636363635, 0.5363636363636362, 0.5254545454545453, 0.5199999999999998, 0.5134545454545453
     ])
 
@@ -57,7 +63,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    
+
     if args.write_wake_files:
         wake_files_folder_path  = Path("wake_files_output")
 
@@ -96,106 +102,63 @@ if __name__ == "__main__":
 
     force_factor = 0.5 * chord_length * span * density * velocity**2
 
-    wings = [
-        {
-            "section_points": [
-                {"x": 0.0, "y": 0.0, "z": -span/2.0},
-                {"x": 0.0, "y": 0.0, "z": span/2.0}
-            ],
-            "chord_vectors": [
-                {"x": chord_length, "y": 0.0, "z": 0.0},
-                {"x": chord_length, "y": 0.0, "z": 0.0}
-            ],
-            "section_model": {
-                "Foil": {}
-            },
-            "non_zero_circulation_at_ends": [False, False]
-        }
-    ]
-
-    line_force_model_stat = {
-        "wing_builders": wings,
-        "nr_sections": nr_sections,
-    }
-
-    line_force_model_dyn = {
-        "wing_builders": wings,
-        "nr_sections": nr_sections
-    }
-
-    line_force_model_dyn_prescribed = {
-        "wing_builders": wings,
-        "nr_sections": nr_sections,
-        "circulation_correction": {
-            "Prescribed": {}
-        }
-    }
-
-    solver_settings = {
-        "max_iterations_per_time_step": 10,
-        "damping_factor": 0.5,
-    }
-
     dt = 0.25 * chord_length / velocity
     final_time = 5.0 * period
 
     first_panel_relative_length = dt * velocity / chord_length
 
-    dynamic_settings = {
-        "Dynamic": {
-            "solver": solver_settings,
-            "wake": {
-                "first_panel_relative_length": first_panel_relative_length,
-                "last_panel_relative_length": 20.0,
-                "nr_panels_per_line_element": 400
-            }
-        }
-    }
+    wing_builder = WingBuilder(
+        section_points = [
+            SpatialVector(z=-span/2.0),
+            SpatialVector(z=span/2.0)
+        ],
+        chord_vectors = [
+            SpatialVector(x=chord_length),
+            SpatialVector(x=chord_length)
+        ],
+        section_model = SectionModel(model=Foil()),
+    )
 
-    if args.write_wake_files:
-        dynamic_settings["Dynamic"]["wake"]["write_wake_data_to_file"] = True
-        dynamic_settings["Dynamic"]["wake"]["wake_files_folder_path"] = str(wake_files_folder_path)
+    line_force_model = LineForceModelBuilder()
+    line_force_model.add_wing_builder(wing_builder)
 
-    steady_settings = {
-        "QuasiSteady": {
-            "solver": solver_settings,
-        }
-    }
+    simulation_builder_quasi_steady = SimulationBuilder(
+        line_force_model = line_force_model,
+        simulation_settings = QuasiSteadySettings()
+    )
 
-    sim_settings_list = [
-        dynamic_settings,
-        dynamic_settings,
-        steady_settings
+    simulation_builder_dynamic = SimulationBuilder(
+        line_force_model = line_force_model,
+        simulation_settings = DynamicSettings(
+            wake = DynamicWakeBuilder(
+                first_panel_relative_length = first_panel_relative_length
+            )
+        )
+    )
+
+
+
+    sim_builder_list = [
+        simulation_builder_quasi_steady,
+        simulation_builder_dynamic
     ]
 
-    line_force_model_list = [line_force_model_dyn, line_force_model_dyn_prescribed, line_force_model_stat]
-    #line_force_model_list = [line_force_model_dyn]
-
-    label_list = ["Dynamic", "Dynamic, prescribed", "Quasi-steady"]
-    color_list = [default_colors[0], default_colors[2], default_colors[1]]
-
+    label_list = ["Quasi-steady", "Dynamic"]
+    color_list = [default_colors[0], default_colors[2]]
 
     w_plot = 14
     fig = plt.figure(figsize=(w_plot, w_plot / 3.0))
 
     max_cl = []
 
-    for simulation_settings, line_force_model, label, color in zip(
-        sim_settings_list,
-        line_force_model_list,
+    for builder, label, color in zip(
+        sim_builder_list,
         label_list,
         color_list
     ):
         print("Running ", label, "simulations:")
 
-        setup = {
-            "line_force_model": line_force_model,
-            "simulation_settings": simulation_settings
-        }
-
-        setup_string = json.dumps(setup)
-
-        simulation = Simulation(setup_string = setup_string)
+        simulation = Simulation(builder.to_json_string())
 
         time = []
         lift = []
@@ -204,7 +167,7 @@ if __name__ == "__main__":
         t = 0.0
 
         '''
-        Query the simulation struct for points where the freestream velocity is defined. This is 
+        Query the simulation struct for points where the freestream velocity is defined. This is
         only done once in this case as the velocity is not dependent on the position of the wing.
         Also, because there is noe spatial variation in the velocity, the freestream velocity is
         the same for all points.
@@ -213,36 +176,36 @@ if __name__ == "__main__":
 
         freestream_velocity = []
         for point in freestream_velocity_points:
-            freestream_velocity.append(SpatialVector(velocity, 0.0, 0.0))
+            freestream_velocity.append([velocity, 0.0, 0.0])
 
         start_time = time_func.time()
         while t < final_time:
             print("Running sim at time = ", t)
             simulation.set_translation_with_velocity_using_finite_difference(
-                SpatialVector(0.0, position_func(t), 0.0),
+                [0.0, position_func(t), 0.0],
                 dt
             )
 
             result = simulation.do_step(
-                time = t, 
-                time_step = dt, 
+                time = t,
+                time_step = dt,
                 freestream_velocity = freestream_velocity,
             )
 
             forces = result.integrated_forces_sum()
 
             time.append(t)
-            lift.append(forces.y / force_factor)
-            drag.append(forces.x / force_factor)
+            lift.append(forces[1] / force_factor)
+            drag.append(forces[0] / force_factor)
 
-            
+
             print("Number of iterations: ", result.iterations)
 
             t += dt
 
         end_time = time_func.time()
 
-        elapsed_time = end_time - start_time    
+        elapsed_time = end_time - start_time
         print("Elapsed time: ", elapsed_time)
         print("Time speed up: ", final_time / elapsed_time)
 
@@ -259,15 +222,15 @@ if __name__ == "__main__":
     cl_theodorsen = cl_quasi_steady_theory * theodorsen_reduction
 
     plt.plot(
-        time, 
-        cl_theodorsen, 
-        label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color=color_list[0]
+        time,
+        cl_theodorsen,
+        label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color=color_list[1]
     )
 
     plt.plot(
-        time, 
-        cl_quasi_steady_theory, 
-        label="Simplified quasi-steady", linestyle="--", color=color_list[1]
+        time,
+        cl_quasi_steady_theory,
+        label="Simplified quasi-steady", linestyle="--", color=color_list[0]
     )
 
     print("Theodorsen ratio", theodorsen_reduction)

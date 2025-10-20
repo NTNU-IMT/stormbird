@@ -10,9 +10,6 @@ from .section_models import SectionModel
 
 from .circulation_corrections import CirculationCorrectionBuilder
 
-from pydantic import Field
-
-
 class WingBuilder(StormbirdSetupBaseModel):
     '''
     Class for defining a wing model builder
