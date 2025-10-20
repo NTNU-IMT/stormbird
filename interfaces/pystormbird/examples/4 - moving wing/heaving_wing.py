@@ -4,10 +4,11 @@ result are compared against each other and against a theoretical (simplified) mo
 '''
 
 import time as time_func
-import json
 from pathlib import Path
+from typing import cast, Any
 
 import numpy as np
+import math
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
 
@@ -26,15 +27,15 @@ def get_motion_functions(*, amplitude: float, radial_frequency: float):
     '''
     Create closures for the motion as a function of time, based on the amplitude and radial frequency.
     '''
-    def position(t: float) -> float:
+    def position(t: np.ndarray) -> np.ndarray:
         return amplitude * np.sin(radial_frequency * t)
 
-    def velocity(t: float) -> float:
+    def velocity(t: np.ndarray) -> np.ndarray:
         return amplitude * radial_frequency * np.cos(radial_frequency * t)
 
     return position, velocity
 
-def theodorsen_lift_reduction_data(reduced_frequency: float) -> float:
+def theodorsen_lift_reduction_data(reduced_frequency: np.ndarray) -> np.ndarray:
     '''
     Reduction of the lift due to dynamic effects according to Theodorsen's function, as presented
     in: "Bøckmann, E., 2015, "Wave Propulsion of Ships", page 28, Figure 3.3
@@ -56,15 +57,15 @@ def theodorsen_lift_reduction_data(reduced_frequency: float) -> float:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run simulation of a heaving wing")
-    parser.add_argument("-rf", "--reduced-frequency", type=float, default = 0.3, help="Reduced frequency")
-    parser.add_argument("--amplitude-factor", type=float, default = 0.1, help="Amplitude relative to chord length of heaving motion")
-    parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
+    _ = parser.add_argument("--reduced-frequency", type=float, default = 0.3, help="Reduced frequency")
+    _ = parser.add_argument("--amplitude-factor", type=float, default = 0.1, help="Amplitude relative to chord length of heaving motion")
+    _ = parser.add_argument("--write-wake-files", action="store_true", help="Write wake files")
 
     args = parser.parse_args()
 
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
-    if args.write_wake_files:
+    if cast(bool, args.write_wake_files):
         wake_files_folder_path  = Path("wake_files_output")
 
         if not wake_files_folder_path.exists():
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     else:
         wake_files_folder_path = ''
 
-    reduced_frequency = args.reduced_frequency
+    reduced_frequency = cast(float, args.reduced_frequency)
 
     velocity = 8.0
     chord_length = 1.0 # Deliberately chosen to be small, as the dynamic effects are easier to compare against theory when the 3D effects are small
@@ -84,7 +85,7 @@ if __name__ == "__main__":
 
     aspect_ratio = span / chord_length
 
-    amplitude = args.amplitude_factor * chord_length
+    amplitude = cast(float, args.amplitude_factor) * chord_length
 
     radial_frequency = reduced_frequency * velocity / (0.5 * chord_length)
     frequency = radial_frequency / (2.0 * np.pi)
@@ -96,7 +97,7 @@ if __name__ == "__main__":
 
     max_vertical_velocity = amplitude * radial_frequency
 
-    max_angle_of_attack = np.arctan(max_vertical_velocity / velocity)
+    max_angle_of_attack = math.atan(max_vertical_velocity / velocity)
 
     max_cl_theory = 2.0 * np.pi * max_angle_of_attack / (1 + 2/aspect_ratio)
 
@@ -127,16 +128,20 @@ if __name__ == "__main__":
         simulation_settings = QuasiSteadySettings()
     )
 
+    dynamic_wake = DynamicWakeBuilder(
+        first_panel_relative_length = first_panel_relative_length
+    )
+
+    if args.write_wake_files:
+        dynamic_wake.write_wake_data_to_file = True
+        dynamic_wake.wake_files_folder_path = "wake_files_output"
+
     simulation_builder_dynamic = SimulationBuilder(
         line_force_model = line_force_model,
         simulation_settings = DynamicSettings(
-            wake = DynamicWakeBuilder(
-                first_panel_relative_length = first_panel_relative_length
-            )
+            wake = dynamic_wake
         )
     )
-
-
 
     sim_builder_list = [
         simulation_builder_quasi_steady,
@@ -148,6 +153,7 @@ if __name__ == "__main__":
 
     w_plot = 14
     fig = plt.figure(figsize=(w_plot, w_plot / 3.0))
+    ax = fig.add_subplot(111)
 
     max_cl = []
 
@@ -198,7 +204,6 @@ if __name__ == "__main__":
             lift.append(forces[1] / force_factor)
             drag.append(forces[0] / force_factor)
 
-
             print("Number of iterations: ", result.iterations)
 
             t += dt
@@ -209,7 +214,7 @@ if __name__ == "__main__":
         print("Elapsed time: ", elapsed_time)
         print("Time speed up: ", final_time / elapsed_time)
 
-        plt.plot(time, lift, label=label, color=color)
+        ax.plot(time, lift, label=label, color=color)
 
         max_cl.append(np.max(lift))
 
@@ -221,13 +226,13 @@ if __name__ == "__main__":
     cl_quasi_steady_theory = -2 * np.pi * three_dim_reduction* velocity_func(np.array(time)) / velocity
     cl_theodorsen = cl_quasi_steady_theory * theodorsen_reduction
 
-    plt.plot(
+    ax.plot(
         time,
         cl_theodorsen,
         label="Simplified quasi-steady * Real(Theodorsen)", linestyle="--", color=color_list[1]
     )
 
-    plt.plot(
+    ax.plot(
         time,
         cl_quasi_steady_theory,
         label="Simplified quasi-steady", linestyle="--", color=color_list[0]
@@ -236,11 +241,11 @@ if __name__ == "__main__":
     print("Theodorsen ratio", theodorsen_reduction)
     #print("CL ratio", max_cl[0] / max_cl[1])
 
-    plt.xlim(1.0 * period, 5 * period)
-    plt.ylim(-1.1 * max_cl_theory, 1.1 * max_cl_theory)
-    plt.xlabel("Time")
-    plt.ylabel("Lift coefficient")
-    plt.legend()
+    ax.set_xlim(1.0 * period, 5 * period)
+    ax.set_ylim(-1.1 * max_cl_theory, 1.1 * max_cl_theory)
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Lift coefficient")
+    ax.legend()
 
     plt.tight_layout()
     plt.savefig("heaving_wing.png", dpi=300, bbox_inches="tight")

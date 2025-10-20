@@ -42,14 +42,14 @@ fn steady_lift() {
         aspect_ratio,
         cl_zero_angle,
         angle_of_attack,
-        nr_strips: 128,
+        nr_strips: 64,
         ..Default::default()
     }.build();
 
     let mut prescribed_wing_builder = wing_builder.clone();
 
     let mut prescribed_circulation = PrescribedCirculation::default();
-    prescribed_circulation.curve_fit_shape_parameters = true; 
+    prescribed_circulation.curve_fit_shape_parameters = true;
 
     prescribed_wing_builder.circulation_correction = CirculationCorrectionBuilder::Prescribed(
         prescribed_circulation
@@ -60,9 +60,9 @@ fn steady_lift() {
 
     let nr_time_steps = 200;
 
-    let time_step = 0.25;
-
     let velocity = SpatialVector::from([1.2, 0.0, 0.0]);
+
+    let time_step = 0.25 / velocity.length();
 
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
@@ -89,8 +89,8 @@ fn steady_lift() {
 
     let start = Instant::now();
     let result_steady  = steady_sim.do_step(
-        0.0, 
-        time_step, 
+        0.0,
+        time_step,
         &static_velocity_freestream
     );
 
@@ -103,8 +103,8 @@ fn steady_lift() {
 
     let start = Instant::now();
     let result_prescribed = prescribed_sim.do_step(
-        0.0, 
-        time_step, 
+        0.0,
+        time_step,
         &static_velocity_freestream
     );
 
@@ -122,21 +122,21 @@ fn steady_lift() {
     let start = Instant::now();
     for i in 0..nr_time_steps {
         let time = (i as Float) * time_step;
-        
+
         result_dynamic = dynamic_sim.do_step(
-            time, 
-            time_step, 
+            time,
+            time_step,
             &dynamic_velocity_freestream
         );
 
         cd_dynamic = result_dynamic.integrated_forces_sum()[0] / force_factor;
-        cl_dynamic = result_dynamic.integrated_forces_sum()[1] / force_factor;         
+        cl_dynamic = result_dynamic.integrated_forces_sum()[1] / force_factor;
     }
 
     println!("Time to run dynamic simulation: {} secs", start.elapsed().as_secs_f64());
     println!("Number of dynamic iterations on last time step: {}", result_dynamic.iterations);
     println!("Residual for dynamic simulation: {}", result_dynamic.residual);
-    
+
 
     println!("Theory");
     dbg!(cd_theory, cl_theory);

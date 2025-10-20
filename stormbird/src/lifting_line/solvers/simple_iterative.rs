@@ -71,8 +71,8 @@ pub struct SimpleIterative {
 
 impl SimpleIterative {
     pub fn default_use_raw_circulation_during_iterations() -> bool {false}
-    pub fn default_max_iterations_per_time_step() -> usize {20}
-    pub fn default_damping_factor() -> Float {0.1}
+    pub fn default_max_iterations_per_time_step() -> usize {40}
+    pub fn default_damping_factor() -> Float {0.05}
     pub fn default_residual_tolerance_absolute() -> Float {1e-4}
     pub fn default_strength_difference_tolerance() -> Float {1e-6}
 
