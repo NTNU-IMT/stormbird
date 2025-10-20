@@ -4,11 +4,18 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 
+//! Implementation block for matrix operators. This includes the follwing:
+//!
+//! - General add, subtract and multiply
+//! - Indexing into the matrix
+//! - Special functions for [matrix multiplication](Matrix::matrix_multiply) and
+//! [matrix and vector multiplication](Matrix::vector_multiply)
+
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
 
 use super::*;
 
-impl<T> Index<[usize; 2]> for Matrix<T> 
+impl<T> Index<[usize; 2]> for Matrix<T>
 where T: Default + Clone + Copy + Debug,
 {
     type Output = T;
@@ -19,91 +26,92 @@ where T: Default + Clone + Copy + Debug,
     }
 }
 
-impl<T> IndexMut<[usize; 2]> for Matrix<T> 
+impl<T> IndexMut<[usize; 2]> for Matrix<T>
 where T: Default + Clone + Copy + Debug,
 {
     fn index_mut(&mut self, indices: [usize; 2]) -> &mut Self::Output {
         let flat_index = self.flat_index(indices);
-        
+
         &mut self.data[flat_index]
     }
 }
 
-impl<T> Add for Matrix<T> 
+impl<T> Add for Matrix<T>
 where T: Default + Clone + Copy + Debug + Add<Output = T>,
 {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
         assert_eq!(self.shape, other.shape, "Shapes do not match");
-        
+
         let mut result = self.clone();
-        
+
         for i in 0..self.data.len() {
             result.data[i] = self.data[i] + other.data[i];
         }
-        
+
         result
     }
 }
 
-impl<T> Sub for Matrix<T> 
+impl<T> Sub for Matrix<T>
 where T: Default + Clone + Copy + Debug + Sub<Output = T>,
 {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
         assert_eq!(self.shape, other.shape, "Shapes do not match");
-        
+
         let mut result = self.clone();
-        
+
         for i in 0..self.data.len() {
             result.data[i] = self.data[i] - other.data[i];
         }
-        
+
         result
     }
 }
 
-impl<T> Mul<Float> for Matrix<T> 
+impl<T> Mul<Float> for Matrix<T>
 where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
 {
     type Output = Self;
 
     fn mul(self, scalar: Float) -> Self {
         let mut result = self.clone();
-        
+
         for i in 0..self.data.len() {
             result.data[i] = self.data[i] * scalar;
         }
-        
+
         result
     }
 }
 
-impl<T> Mul<Matrix<T>> for Float 
+impl<T> Mul<Matrix<T>> for Float
 where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
 {
     type Output = Matrix<T>;
 
     fn mul(self, matrix: Matrix<T>) -> Matrix<T> {
         let mut result = matrix.clone();
-        
+
         for i in 0..matrix.data.len() {
             result.data[i] = matrix.data[i] * self;
         }
-        
+
         result
     }
 }
 
 
 impl<T> Matrix<T>
-where T: Default + Clone + Copy + Debug + 
+where T: Default + Clone + Copy + Debug +
     Mul<Output = T> +
     Add<Output = T>,
 
 {
+    /// Performs a matrix multiplciation with the supplied matrix
     pub fn matrix_multiply(&self, other: &Matrix<T>) -> Matrix<T> {
         assert_eq!(self.shape[1], other.shape[0], "Matrix shapes do not match for multiplication");
 
@@ -122,6 +130,7 @@ where T: Default + Clone + Copy + Debug +
         result
     }
 
+    /// Performs a multiplcaiton with the supplied vector
     pub fn vector_multiply(&self, vector: &[T]) -> Vec<T> {
         assert_eq!(self.shape[1], vector.len(), "Matrix and vector shapes do not match for multiplication");
 
