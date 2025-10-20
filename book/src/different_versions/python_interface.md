@@ -1,18 +1,17 @@
 # Python interface
 The Python interface to Stormbird is made using a Rust library called [PyO3](https://pyo3.rs/). As a general principle, there is a one-to-one relationship between the functionality available in Python and Rust equivalent functionality. That is, names are kept identical in both languages, and the programming constructs are kept as similar as possible (e.g, data structures in Rust becomes classes in Python, etc.)
 
+Examples of how to use the Python functionality can be found in the [pystormbird examples folder](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/pystormbird/examples) at the Stormbird github page
+
 ## Installation
 
-To build and install the package, it is necessary to have a Rust compiler installed on your system as well as Python. With this in place, in should be as easy as a normal pip installation. 
+To build and install the package, it is necessary to have a Rust compiler installed on your system as well as Python. With this in place, in should be as easy as a normal pip installation.
 
-For instance, you can navigate to the `pystormbird` folder in a terminal and execute 
+For instance, you can navigate to the `pystormbird` folder in a terminal and execute
 
 ```
 pip install .
 ```
-
-## Examples
-Examples of how to use the Python functionality can be found in the [tutorial chapter](./../tutorials/tutorials.md). 
 
 ## Still a lot of JSON input and output
 Only a limited set of the Rust library has a direct Python interface. For instance, data structures that primarily contains input, and which are therefore not needed directly in a high-level interfaces (such as `builder` structures) do not have a direct implementation in `pystormbird`. It is generally seen as uncesseary as the same settings can be passed as JSON strings, which are then deserialized into the right structures on the Rust side. Avoiding a direct Python implementation drastically reduces the development overhead when, for instance, something changes in the core library.
