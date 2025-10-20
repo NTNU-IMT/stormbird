@@ -6,7 +6,7 @@ from stormbird_setup.direct_setup.lifting_line.simulation_builder import Simulat
 from stormbird_setup.direct_setup.section_models import SectionModel
 
 from stormbird_setup.direct_setup.lifting_line.solver import Linearized, SimpleIterative
-from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWake, DynamicWake, SymmetryCondition
+from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWakeSettings, DynamicWakeBuilder, SymmetryCondition
 
 from stormbird_setup.direct_setup.circulation_corrections import CirculationCorrectionBuilder
 
@@ -20,8 +20,8 @@ class SolverType(Enum):
 
 class SingleWingSimulation(StormbirdSetupBaseModel):
     '''
-    Simplified setup when the goal is to test only a single wing. A typical use case could be to 
-    compare different simulation strategies and tune models against other more high-fidelity data 
+    Simplified setup when the goal is to test only a single wing. A typical use case could be to
+    compare different simulation strategies and tune models against other more high-fidelity data
     sources
     '''
     chord_length: float
@@ -69,7 +69,7 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
         line_force_model.add_wing_builder(wing_builder)
 
         return line_force_model
-    
+
     def get_simulation_builder(self) -> SimulationBuilder:
         line_force_model = self.get_line_force_model()
 
@@ -85,10 +85,10 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
                 case SolverType.Linearized:
                     solver = Linearized()
 
-            wake = DynamicWake(
+            wake = DynamicWakeBuilder(
                 symmetry_condition=symmetry_condition,
             )
-            
+
             simulation_builder = SimulationBuilder(
                 line_force_model = line_force_model,
                 simulation_settings = DynamicSettings(
@@ -107,7 +107,7 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
                 case SolverType.Linearized:
                     solver = Linearized()
 
-            wake = QuasiSteadyWake(
+            wake = QuasiSteadyWakeSettings(
                 symmetry_condition=symmetry_condition,
             )
 
@@ -120,4 +120,3 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
             )
 
         return simulation_builder
-    

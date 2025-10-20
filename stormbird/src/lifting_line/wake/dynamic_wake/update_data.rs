@@ -11,19 +11,19 @@ use crate::line_force_model::LineForceModel;
 impl DynamicWake {
     /// Function that updates the wake data before the solver executes a new time step. The main job
     /// is to ensure that geometry of the wake and the strength behind the first panels is correct.
-    /// 
+    ///
     /// # Steps that are performed in this function
-    /// Since the last time step, the line force model might have moved, and the wake points have 
+    /// Since the last time step, the line force model might have moved, and the wake points have
     /// streamed downstream. That means that the following must happen:
-    /// - Synchronize the geometry for the first points in the wake to the geometry of the line 
+    /// - Synchronize the geometry for the first points in the wake to the geometry of the line
     /// force model.
     /// - Stream the old wake points downstream.
     /// - Shift the strength of the panels downstream.
-    /// 
+    ///
     /// # Arguments
     /// * `time_step` - The current value of the time step
     /// * `line_force_model` - The line force model that the wake is based on
-    /// * `wake_points_freestream` - The freestream velocity at the points in the wake for the 
+    /// * `wake_points_freestream` - The freestream velocity at the points in the wake for the
     /// current time step
     pub fn update_before_solving(
         &mut self,
@@ -32,11 +32,11 @@ impl DynamicWake {
         felt_span_points_freestream: &[SpatialVector]
     ) {
         self.update_wake_points_before_solving(
-            time_step, 
+            time_step,
             line_force_model,
             felt_span_points_freestream
         );
-        
+
         self.update_panel_data();
         self.stream_strength_values_downstream();
     }
@@ -69,29 +69,29 @@ impl DynamicWake {
         felt_span_points_freestream: &[SpatialVector]
     ) {
         self.synchronize_first_points_to_wing_geometry(line_force_model);
-        
+
         self.stream_free_wake_points_based_on_stored_velocity(time_step);
-        
+
         if self.settings.shape_damping_factor > 0.0 {
             self.move_first_free_wake_points_with_damping(line_force_model, felt_span_points_freestream);
         } else {
             self.move_first_free_wake_points_no_damping(line_force_model, felt_span_points_freestream);
         }
-        
+
         self.move_last_wake_points(felt_span_points_freestream);
     }
 
     /// Takes a line force vector as input, that might have a different position and orientation
-    /// than the previous time step, and updates the first points in the wake to match the new 
+    /// than the previous time step, and updates the first points in the wake to match the new
     /// geometry.
     ///
     /// # Argument
     /// * `line_force_model` - The line force model that the wake is based on
     pub fn synchronize_first_points_to_wing_geometry(
-        &mut self, 
+        &mut self,
         line_force_model: &LineForceModel
     ) {
-        let nr_span_points = line_force_model.span_lines_global.len();
+        let nr_span_points = line_force_model.span_points_global.len();
 
         for i in 0..nr_span_points {
             self.points[i] = line_force_model.span_points_global[i];
@@ -104,13 +104,13 @@ impl DynamicWake {
             let (stream_index, span_index) = self.indices.reverse_panel_index(i);
 
             let panel_points = self.panel_points(stream_index, span_index);
-            
+
             self.panels[i] = Panel::new(
                 panel_points,
                 self.potential_theory_settings.far_field_ratio,
                 self.panels_viscous_core_length[i]
             );
-            
+
         }
     }
 
@@ -126,7 +126,7 @@ impl DynamicWake {
         for i in 0..self.points.len() {
             self.velocity_at_points[i] = wake_points_freestream[i];
         }
-        
+
         let end_index = self.settings.end_index_induced_velocities_on_wake.min(
             self.points.len()
         );
@@ -151,7 +151,7 @@ impl DynamicWake {
 
     /// Moves the first wake points after the wing geometry itself.
     ///
-    /// In general, the principle is that the first free wake points are moved from the wing 
+    /// In general, the principle is that the first free wake points are moved from the wing
     /// geometry and then *either* in the direction of the chord vector or the velocity vector.
     fn move_first_free_wake_points_no_damping(
         &mut self,
@@ -187,7 +187,7 @@ impl DynamicWake {
 
     /// Moves the first wake points after the wing geometry itself.
     ///
-    /// In general, the principle is that the first free wake points are moved from the wing 
+    /// In general, the principle is that the first free wake points are moved from the wing
     /// geometry and then *either* in the direction of the chord vector or the velocity vector.
     fn move_first_free_wake_points_with_damping(
         &mut self,
@@ -239,7 +239,7 @@ impl DynamicWake {
     pub fn move_last_wake_points(
         &mut self,
         felt_span_points_freestream: &[SpatialVector],
-    ) { 
+    ) {
         let nr_points = self.points.len();
         let nr_points_along_span = self.indices.nr_points_along_span;
 
@@ -292,7 +292,7 @@ impl DynamicWake {
         }
     }
 
-    /// Shifts the strength of the panels downstream. 
+    /// Shifts the strength of the panels downstream.
     pub fn stream_strength_values_downstream(&mut self) {
         for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
             for i_span in 0..self.indices.nr_panels_along_span {

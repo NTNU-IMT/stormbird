@@ -10,11 +10,11 @@ from ...base_model import StormbirdSetupBaseModel
 from ..line_force_model import LineForceModelBuilder
 
 from .solver import Linearized, SimpleIterative
-from .wake import QuasiSteadyWake, DynamicWake
+from .wake import QuasiSteadyWakeSettings, DynamicWakeBuilder
 
 class QuasiSteadySettings(StormbirdSetupBaseModel):
     solver: Linearized | SimpleIterative = Linearized()
-    wake: QuasiSteadyWake = QuasiSteadyWake()
+    wake: QuasiSteadyWakeSettings  = QuasiSteadyWakeSettings ()
 
     @model_serializer
     def ser_model(self):
@@ -38,7 +38,7 @@ class QuasiSteadySettings(StormbirdSetupBaseModel):
 
 class DynamicSettings(StormbirdSetupBaseModel):
     solver: SimpleIterative | Linearized = SimpleIterative()
-    wake: DynamicWake = DynamicWake()
+    wake: DynamicWakeBuilder = DynamicWakeBuilder()
 
     @model_serializer
     def ser_model(self):
@@ -83,6 +83,3 @@ class SimulationBuilder(StormbirdSetupBaseModel):
                     "Dynamic": simulation_settings_dict
                 }
             }
-        
-
-
