@@ -1,14 +1,20 @@
 import pandas as pd
 import numpy as np
 
-def write_motion_data(*, period, end_time, time_step, file_path):
+def write_motion_data(
+    *,
+    period: float,
+    end_time: float,
+    time_step: float,
+    file_path: str
+):
     t = np.arange(0, end_time + 1e-6, time_step)
 
     omega = 2 * np.pi / period
 
     x_position = np.zeros_like(t)
     y_position = 0.0 * np.sin(omega * t)
-    x_rotation = 5.0 * np.sin(omega * t)
+    x_rotation = 10.0 * np.sin(omega * t)
 
     out_dict = {
         "time": t,
