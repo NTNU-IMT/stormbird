@@ -9,9 +9,14 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 import json
 
+from stormbird_setup.direct_setup.spatial_vector import SpatialVector
+from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.direct_setup.section_models import SectionModel, Foil
+
 from typing import Any
 
 import numpy as np
+import math
 
 @dataclass(kw_only=True)
 class WindEnvironment:
@@ -32,40 +37,13 @@ class WindEnvironment:
 
 
 @dataclass(kw_only=True)
-class SailController:
-    target_angle: float = -10.0
-    max_rotational_speed: float = 10.0
-    nr_sails: int = 2
-    initial_wing_angle: float = 120.0
-    angles_in_degrees: bool = True
-    moving_average_window_size: int = 2
-    update_factor: float = 0.2
-
-    def to_dict(self):
-        target_angles_of_attack = [self.target_angle] * self.nr_sails
-        initial_wing_angles = [self.initial_wing_angle] * self.nr_sails
-
-        return {
-            "target_angles_of_attack": target_angles_of_attack,
-            "max_rotational_speed": self.max_rotational_speed,
-            "angles_in_degrees": self.angles_in_degrees,
-            "initial_wing_angles": initial_wing_angles,
-            "moving_average_window_size": self.moving_average_window_size,
-            "update_factor": self.update_factor
-        }
-
-    def to_json_file(self, file_path):
-        with open(file_path, "w") as f:
-            json.dump(self.to_dict(), f, indent=4)
-
-@dataclass(kw_only=True)
 class LiftingLineSimulation:
     chord: float = 11.0
     span: float = 33.0
     start_height: float = 10.0
     stall_angle_deg: float = 40.0
-    x_locations: list = field(default_factory = lambda: [-60, 60])
-    y_locations: list = field(default_factory = lambda: [0.0, 0.0])
+    x_locations: list[float] = field(default_factory = lambda: [-60, 60])
+    y_locations: list[float] = field(default_factory = lambda: [0.0, 0.0])
     nr_sections: int = 20
     write_wake_files: bool = False
     use_smoothing: bool = True
@@ -78,58 +56,44 @@ class LiftingLineSimulation:
     def z_locations(self) -> list[float]:
         return [self.start_height] * self.nr_sails
 
-    @property
-    def section_model(self) -> dict[str, Any]:
-        return {
-            "Foil": {
-                "cl_zero_angle": 0.0,
-                "mean_positive_stall_angle": np.radians(self.stall_angle_deg),
-                "mean_negative_stall_angle": np.radians(self.stall_angle_deg),
-            }
-        }
+    def section_model(self) -> SectionModel:
+        return SectionModel(
+            model = Foil(
+                mean_negative_stall_angle = math.radians(self.stall_angle_deg),
+                mean_positive_stall_angle = math.radians(self.stall_angle_deg)
+            )
+        )
 
     @property
     def chord_vector(self) -> dict[str, Any]:
         return {"x": -self.chord, "y": 0.0, "z": 0.0}
 
-    @property
-    def non_zero_circulation_at_ends(self):
-        return [False, False]
-
-    def line_force_model_dict(self) -> dict[str, Any]:
-        out_dict = OrderedDict()
-
-        wing_builders = []
+    def line_force_model_builder(self) ->LineForceModelBuilder:
+        line_force_model_builder = LineForceModelBuilder()
 
         for i in range(self.nr_sails):
-            wing_builders.append(
-                {
-                    "section_points": [
-                        {"x": self.x_locations[i], "y": self.y_locations[i], "z": -self.z_locations[i]},
-                        {"x": self.x_locations[i], "y": self.y_locations[i], "z": -(self.z_locations[i] + self.span)}
-                    ],
-                    "chord_vectors": [self.chord_vector, self.chord_vector],
-                    "section_model": self.section_model,
-                    "non_zero_circulation_at_ends": self.non_zero_circulation_at_ends
-                }
+            chord_vector = SpatialVector(x = -self.chord)
+
+            wing_builder = WingBuilder(
+                section_points = [
+                    SpatialVector(
+                        x = self.x_locations[i],
+                        y = self.y_locations[i],
+                        z = self.z_locations[i]
+                    ),
+                    SpatialVector(
+                        x = self.x_locations[i],
+                        y = self.y_locations[i],
+                        z = self.z_locations[i] + self.span
+                    )
+                ],
+                chord_vectors = [chord_vector, chord_vector],
+                section_model = self.section_model(),
             )
 
-        out_dict["wing_builders"] = wing_builders
-        out_dict["nr_sections"] = self.nr_sections
-        out_dict["output_coordinate_system"] = "Body"
+            line_force_model_builder.add_wing_builder(wing_builder)
 
-        if self.use_smoothing:
-            gaussian_smoothing = {
-                "length_factor": 0.1,
-                "end_corrections_delta_span_factor": 1.0,
-                "end_corrections_number_of_insertions": 3
-            }
-
-            out_dict["circulation_corrections"] = {
-                "GaussianSmoothing": gaussian_smoothing
-            }
-
-        return out_dict
+        return line_force_model_builder
 
     def wake_settings_dict(self) -> dict[str, Any]:
         return {
@@ -166,6 +130,6 @@ class LiftingLineSimulation:
 
         return out_dict
 
-    def to_json_file(self, file_path):
+    def to_json_file(self, file_path: str):
         with open(file_path, "w") as f:
             json.dump(self.to_dict(), f, indent=4)
