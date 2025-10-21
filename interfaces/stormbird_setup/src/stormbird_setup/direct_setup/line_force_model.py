@@ -10,6 +10,13 @@ from .section_models import SectionModel
 
 from .circulation_corrections import CirculationCorrectionBuilder
 
+from enum import Enum
+
+class CoordinateSystem(Enum):
+    Global = "Global"
+    Body = "Body"
+
+
 class WingBuilder(StormbirdSetupBaseModel):
     '''
     Class for defining a wing model builder
@@ -31,6 +38,7 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     rotation: SpatialVector = SpatialVector()
     translation: SpatialVector = SpatialVector()
     circulation_correction: CirculationCorrectionBuilder = CirculationCorrectionBuilder()
+    output_coordinate_system: CoordinateSystem = CoordinateSystem.Global
 
     def add_wing_builder(self, wing_builder: WingBuilder):
         self.wing_builders.append(wing_builder)

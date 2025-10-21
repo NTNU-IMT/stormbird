@@ -5,36 +5,16 @@ However, the logic is also kept simple to make it easy to understand. More varia
 can be added.
 '''
 
-from collections import OrderedDict
 from dataclasses import dataclass, field
-import json
 
 from stormbird_setup.direct_setup.spatial_vector import SpatialVector
 from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.direct_setup.circulation_corrections import CirculationCorrectionBuilder
 from stormbird_setup.direct_setup.section_models import SectionModel, Foil
+from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings
 
-from typing import Any
 
-import numpy as np
 import math
-
-@dataclass(kw_only=True)
-class WindEnvironment:
-    reference_height: float = 10.0
-    power_factor: float = 1.0 / 9.0
-
-    def to_dict(self):
-        return {
-            "PowerModel": {
-                "reference_height": self.reference_height,
-                "power_factor": self.power_factor
-            }
-        }
-
-    def to_json_file(self, file_path):
-        with open(file_path, "w") as f:
-            json.dump(self.to_dict(), f, indent=4)
-
 
 @dataclass(kw_only=True)
 class LiftingLineSimulation:
@@ -46,7 +26,6 @@ class LiftingLineSimulation:
     y_locations: list[float] = field(default_factory = lambda: [0.0, 0.0])
     nr_sections: int = 20
     write_wake_files: bool = False
-    use_smoothing: bool = True
 
     @property
     def nr_sails(self) -> int:
@@ -63,10 +42,6 @@ class LiftingLineSimulation:
                 mean_positive_stall_angle = math.radians(self.stall_angle_deg)
             )
         )
-
-    @property
-    def chord_vector(self) -> dict[str, Any]:
-        return {"x": -self.chord, "y": 0.0, "z": 0.0}
 
     def line_force_model_builder(self) ->LineForceModelBuilder:
         line_force_model_builder = LineForceModelBuilder()
@@ -93,43 +68,19 @@ class LiftingLineSimulation:
 
             line_force_model_builder.add_wing_builder(wing_builder)
 
+        line_force_model_builder.nr_sections = self.nr_sections
+
+        line_force_model_builder.circulation_correction = CirculationCorrectionBuilder.new_gaussian_smoothing()
+
         return line_force_model_builder
 
-    def wake_settings_dict(self) -> dict[str, Any]:
-        return {
-            "wake_length": {
-                "NrPanels": 100
-            },
-            "last_panel_relative_length": 5.0,
-            "ratio_of_wake_affected_by_induced_velocities": 0.0,
-            "use_chord_direction": True,
-            "symmetry_condition": "Z",
-            "strength_damping": "DirectFromStall"
-        }
+    def simulation_builder(self) -> SimulationBuilder:
+        simulation_builder = SimulationBuilder(
+            line_force_model = self.line_force_model_builder(),
+            simulation_settings = DynamicSettings()
+        )
 
-    def solver_settings_dict(self) -> dict[str, Any]:
-        return {
-            "max_iterations_per_time_step": 10,
-            "damping_factor": 0.05,
-        }
+        simulation_builder.simulation_settings.wake.write_wake_data_to_file = self.write_wake_files
+        simulation_builder.simulation_settings.wake.wake_files_folder_path = "wake_files"
 
-    def to_dict(self) -> dict[str, Any]:
-        out_dict = OrderedDict()
-
-        out_dict["line_force_model"] = self.line_force_model_dict()
-
-        out_dict["simulation_mode"] = {
-            "Dynamic": {
-                "wake": self.wake_settings_dict(),
-                "solver": self.solver_settings_dict()
-            }
-        }
-
-        out_dict["write_wake_data_to_file"] = self.write_wake_files
-        out_dict["wake_files_folder_path"] = "wake_files"
-
-        return out_dict
-
-    def to_json_file(self, file_path: str):
-        with open(file_path, "w") as f:
-            json.dump(self.to_dict(), f, indent=4)
+        return simulation_builder

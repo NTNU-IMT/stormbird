@@ -2,7 +2,7 @@
 <OspSystemStructure xmlns="http://opensimulationplatform.com/MSMI/OSPSystemStructure" version="0.1">
 
     <StartTime>0.0</StartTime>
-    <BaseStepSize>0.05</BaseStepSize>
+    <BaseStepSize>0.1</BaseStepSize>
     <Algorithm>fixedStep</Algorithm>
 
     <Simulators>
@@ -10,7 +10,7 @@
             <InitialValues>
                 <InitialValue variable = "parameters_path"> <String value="stormbird_parameters.json"/> </InitialValue>
 
-                <InitialValue variable = "translational_velocity_x"> <Real value="4.0"/> </InitialValue>
+                <InitialValue variable = "motion_velocity_linear_x"> <Real value="4.0"/> </InitialValue>
                 <InitialValue variable = "wind_velocity"> <Real value="6.0"/> </InitialValue>
                 <InitialValue variable = "wind_direction_coming_from"> <Real value="90.0"/> </InitialValue>
             </InitialValues>
@@ -27,75 +27,33 @@
     <Connections>
         <VariableConnection>
             <Variable simulator="motion" name="x_position"/>
-            <Variable simulator="wing_sails" name="x_position"/>
+            <Variable simulator="wing_sails" name="translation_x"/>
         </VariableConnection>
 
         <VariableConnection>
             <Variable simulator="motion" name="y_position"/>
-            <Variable simulator="wing_sails" name="y_position"/>
+            <Variable simulator="wing_sails" name="translation_y"/>
         </VariableConnection>
 
         <VariableConnection>
             <Variable simulator="motion" name="z_position"/>
-            <Variable simulator="wing_sails" name="z_position"/>
+            <Variable simulator="wing_sails" name="translation_z"/>
         </VariableConnection>
 
         <VariableConnection>
             <Variable simulator="motion" name="x_rotation"/>
-            <Variable simulator="wing_sails" name="x_rotation"/>
+            <Variable simulator="wing_sails" name="rotation_x"/>
         </VariableConnection>
 
         <VariableConnection>
             <Variable simulator="motion" name="y_rotation"/>
-            <Variable simulator="wing_sails" name="y_rotation"/>
+            <Variable simulator="wing_sails" name="rotation_y"/>
         </VariableConnection>
 
         <VariableConnection>
             <Variable simulator="motion" name="z_rotation"/>
-            <Variable simulator="wing_sails" name="z_rotation"/>
+            <Variable simulator="wing_sails" name="rotation_z"/>
         </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="wing_sails" name="angle_of_attack_measurement_1"/>
-            <Variable simulator="controller" name="angle_of_attack_measurement_1"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="wing_sails" name="angle_of_attack_measurement_2"/>
-            <Variable simulator="controller" name="angle_of_attack_measurement_2"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="wing_sails" name="angle_of_attack_measurement_3"/>
-            <Variable simulator="controller" name="angle_of_attack_measurement_3"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="wing_sails" name="angle_of_attack_measurement_4"/>
-            <Variable simulator="controller" name="angle_of_attack_measurement_4"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="controller" name="local_wing_angle_1"/>
-            <Variable simulator="wing_sails" name="local_wing_angle_1"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="controller" name="local_wing_angle_2"/>
-            <Variable simulator="wing_sails" name="local_wing_angle_2"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="controller" name="local_wing_angle_3"/>
-            <Variable simulator="wing_sails" name="local_wing_angle_3"/>
-        </VariableConnection>
-
-        <VariableConnection>
-            <Variable simulator="controller" name="local_wing_angle_4"/>
-            <Variable simulator="wing_sails" name="local_wing_angle_4"/>
-        </VariableConnection>
-
-
     </Connections>
 
 </OspSystemStructure>

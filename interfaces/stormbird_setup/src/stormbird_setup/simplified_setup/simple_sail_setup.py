@@ -52,7 +52,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
             case SailType.WingSailSingleElement:
                 section_model = SectionModel(model=Foil())
             case SailType.WingSailFlapped:
-                internal_state_data = np.radians([-15.0, 0.0, 15.0])
+                internal_state_data = np.radians([-15.0, 0.0, 15.0]).tolist()
 
                 foils_data = [
                     Foil(cl_zero_angle = -1.75),
@@ -79,7 +79,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
             section_model=section_model,
             non_zero_circulation_at_ends=non_zero_circulation_at_ends
         )
-    
+
     def controller_builder(self) -> ControllerBuilder:
         match self.sail_type:
             case SailType.WingSailSingleElement:

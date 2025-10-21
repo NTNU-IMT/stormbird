@@ -8,8 +8,13 @@ import os
 
 import argparse
 
-from stormbird_setup import LiftingLineSimulation, SailController, WindEnvironment
+from simulation_builder import LiftingLineSimulation
+
+from stormbird_setup.direct_setup.wind import WindEnvironment
+
 from motion_data import write_motion_data
+
+import json
 
 def delete_all_result_files_in_folder(folder_path: Path):
     '''
@@ -36,23 +41,34 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    sim_setup = LiftingLineSimulation(
+        write_wake_files = args.write_wake_files
+    )
+
     write_motion_data(
-        period = args.end_time / 2.0,
+        period = args.end_time / 4.0,
         end_time = args.end_time,
         time_step = 0.1,
         file_path = 'motion.csv'
     )
 
-    lifting_line_simulation = LiftingLineSimulation(
-        write_wake_files=args.write_wake_files
-    )
-    lifting_line_simulation.to_json_file('lifting_line_setup.json')
+    simulation_builder = sim_setup.simulation_builder()
 
-    controller = SailController()
-    controller.to_json_file('sail_controller_setup.json')
+
+    simulation_builder.to_json_file(Path('lifting_line_setup.json'))
 
     wind_environment = WindEnvironment()
-    wind_environment.to_json_file('wind_environment_setup.json')
+    wind_environment.to_json_file(Path('wind_environment_setup.json'))
+
+    stormbird_parameters = {
+        "lifting_line_setup_file_path": "lifting_line_setup.json",
+        "wind_environment_setup_file_path": "wind_environment_setup.json",
+        "use_motion_velocity_linear_as_freestream": True,
+        "angles_in_degrees": True
+    }
+
+    with open("stormbird_parameters.json", "w") as f:
+        json.dump(stormbird_parameters, f, indent=4)
 
     output_path = Path('output')
     wake_files_path = Path('wake_files')
