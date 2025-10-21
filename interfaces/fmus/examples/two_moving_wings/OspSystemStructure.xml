@@ -22,12 +22,6 @@
             </InitialValues>
         </Simulator>
 
-        <Simulator name="controller" source="../../wing_sail_controller/WingSailController.fmu">
-            <InitialValues>
-                <InitialValue variable = "setup_file_path"> <String value="sail_controller_setup.json"/></InitialValue>
-            </InitialValues>
-        </Simulator>
-
     </Simulators>
 
     <Connections>

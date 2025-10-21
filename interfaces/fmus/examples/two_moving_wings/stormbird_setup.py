@@ -8,7 +8,8 @@ can be added.
 from collections import OrderedDict
 from dataclasses import dataclass, field
 import json
-from typing import List, Dict
+
+from typing import Any
 
 import numpy as np
 
@@ -63,8 +64,8 @@ class LiftingLineSimulation:
     span: float = 33.0
     start_height: float = 10.0
     stall_angle_deg: float = 40.0
-    x_locations: List = field(default_factory = lambda: [-60, 60])
-    y_locations: List = field(default_factory = lambda: [0.0, 0.0])
+    x_locations: list = field(default_factory = lambda: [-60, 60])
+    y_locations: list = field(default_factory = lambda: [0.0, 0.0])
     nr_sections: int = 20
     write_wake_files: bool = False
     use_smoothing: bool = True
@@ -74,11 +75,11 @@ class LiftingLineSimulation:
         return len(self.x_locations)
 
     @property
-    def z_locations(self) -> List:
+    def z_locations(self) -> list[float]:
         return [self.start_height] * self.nr_sails
 
     @property
-    def section_model(self) -> Dict:
+    def section_model(self) -> dict[str, Any]:
         return {
             "Foil": {
                 "cl_zero_angle": 0.0,
@@ -88,14 +89,14 @@ class LiftingLineSimulation:
         }
 
     @property
-    def chord_vector(self) -> Dict:
+    def chord_vector(self) -> dict[str, Any]:
         return {"x": -self.chord, "y": 0.0, "z": 0.0}
 
     @property
     def non_zero_circulation_at_ends(self):
         return [False, False]
 
-    def line_force_model_dict(self) -> Dict:
+    def line_force_model_dict(self) -> dict[str, Any]:
         out_dict = OrderedDict()
 
         wing_builders = []
@@ -130,7 +131,7 @@ class LiftingLineSimulation:
 
         return out_dict
 
-    def wake_settings_dict(self) -> Dict:
+    def wake_settings_dict(self) -> dict[str, Any]:
         return {
             "wake_length": {
                 "NrPanels": 100
@@ -142,13 +143,13 @@ class LiftingLineSimulation:
             "strength_damping": "DirectFromStall"
         }
 
-    def solver_settings_dict(self) -> Dict:
+    def solver_settings_dict(self) -> dict[str, Any]:
         return {
             "max_iterations_per_time_step": 10,
             "damping_factor": 0.05,
         }
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict[str, Any]:
         out_dict = OrderedDict()
 
         out_dict["line_force_model"] = self.line_force_model_dict()

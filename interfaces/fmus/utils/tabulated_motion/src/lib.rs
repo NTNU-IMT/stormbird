@@ -2,7 +2,7 @@
 use fmu_from_struct::prelude::*;
 use serde::{Deserialize, Serialize};
 use csv::Reader;
-use math_utils::interpolation::linear_interpolation;
+use stormath::interpolation::linear_interpolation;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
