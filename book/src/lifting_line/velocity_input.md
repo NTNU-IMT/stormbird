@@ -15,7 +15,7 @@ The point of specifying the velocity at each of these points individually is tha
 
 ## Code example
 
-Generating the right velocity input consists of two steps. First, the user must query the simulation model for the relevant points. This happens by calling the `get_freestream_velocity_points` method. The `Simulation` structure/class will then return the right points, which as allready mentioned, depends on the method used. These points can then be processed by the suer to generate a vector/list of spatial vectors for each of the relevant points, which are later given as input to the `do_step` method. A slightly simplified example is shown below. See the [code examples](./../tutorials.md) for more.
+Generating the right velocity input consists of two steps. First, the user must query the simulation model for the relevant points. This happens by calling the `get_freestream_velocity_points` method. The `Simulation` structure/class will then return the right points, which as already mentioned, depends on the method used. These points can then be processed by the suer to generate a vector/list of spatial vectors for each of the relevant points, which are later given as input to the `do_step` method. A slightly simplified example is shown below. See the [code examples](./../tutorials.md) for more.
 
 ```python
 from pystormbird.lifting_line import Simulation

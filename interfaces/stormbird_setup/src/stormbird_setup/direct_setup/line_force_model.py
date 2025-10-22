@@ -10,12 +10,13 @@ from .section_models import SectionModel
 
 from .circulation_corrections import CirculationCorrectionBuilder
 
+from .input_power import InputPowerModel
+
 from enum import Enum
 
 class CoordinateSystem(Enum):
     Global = "Global"
     Body = "Body"
-
 
 class WingBuilder(StormbirdSetupBaseModel):
     '''
@@ -26,6 +27,7 @@ class WingBuilder(StormbirdSetupBaseModel):
     section_model: SectionModel
     non_zero_circulation_at_ends: tuple[bool, bool] = (False, False)
     nr_sections: int | None = None
+    input_power_model: InputPowerModel = InputPowerModel()
 
 class LineForceModelBuilder(StormbirdSetupBaseModel):
     '''

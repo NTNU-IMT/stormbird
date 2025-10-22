@@ -6,17 +6,17 @@ To solvers currently exists: a linearized solver with viscous corrections and a 
 
 ## Linearized solver with a simple viscous correction
 
-The linearized solver creates an equation system like the original lifting line method. The lift-induced velocities are assued to only affect the angle of attack and the lift as a function of angle of attack is assumed to be linear. More in depth explanations may be found in text books like Anderson (2005).
+The linearized solver creates an equation system like the original lifting line method. The lift-induced velocities are assumed to only affect the angle of attack and the lift as a function of angle of attack is assumed to be linear. More in depth explanations may be found in text books like Anderson (2005).
 
-The result of applying the normal lifting line assumptions is a linear equation system that can be solved for using a conventional linear solver. This solver therefore works by first setting up the system as a matrix and a righ-hand side vector, before solving it using Gaussian eliminiation.
+The result of applying the normal lifting line assumptions is a linear equation system that can be solved for using a conventional linear solver. This solver therefore works by first setting up the system as a matrix and a righ-hand side vector, before solving it using Gaussian elimination.
 
-However, due to the assumption of linear lift as a function of angle of attack, the resulting circulation that is returned from the solver is without any stall- or other non-linear effects on the lfit. To correct for this in a simple viscous correction methods is applied. It consists of the following steps:
-1) Calcualte the lift-induced velocities and resulting effective angle of attack with the solved circulation strength
+However, due to the assumption of linear lift as a function of angle of attack, the resulting circulation that is returned from the solver is without any stall- or other non-linear effects on the lift. To correct for this in a simple viscous correction methods is applied. It consists of the following steps:
+1) Calculate the lift-induced velocities and resulting effective angle of attack with the solved circulation strength
 2) Calculate the lift both with a linearized sectional model and the full sectional model, including stall effects
-3) Correct the solved circulation strength by multiplying it with the full lift and divding it by the linearized lift
-4) Recalcualte lift-induced velocities and effective angles of attack for the final force calculations
+3) Correct the solved circulation strength by multiplying it with the full lift and dividing it by the linearized lift
+4) Recalculate lift-induced velocities and effective angles of attack for the final force calculations
 
-This solver is found to work fine for **quasi-steady** cases, but tend to predict **stall at a larger angle of attack** than the full non-linear solver below. However, the stall-issue can be handled by tuning the stall behaviour of the sectional model to 3D data of a single sail. For quasi-steady cases it will be signficnatly faster than running the full non-linear solver described in the next section.
+This solver is found to work fine for **quasi-steady** cases, but tend to predict **stall at a larger angle of attack** than the full non-linear solver below. However, the stall-issue can be handled by tuning the stall behavior of the sectional model to 3D data of a single sail. For quasi-steady cases it will be significantly faster than running the full non-linear solver described in the next section.
 
 ## Non-linear solver using damped iterations
 
@@ -64,7 +64,7 @@ pub enum QuasiSteadySolverBuilder {
 
 ### Linearized settings
 
-For the linearized settings, the follwoing source code show the available fields:
+For the linearized settings, the following source code show the available fields:
 
 ```rust
 pub struct Linearized {
