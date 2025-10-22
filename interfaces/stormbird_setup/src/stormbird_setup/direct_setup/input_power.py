@@ -10,9 +10,11 @@ from enum import Enum
 
 from pydantic import model_serializer
 
+import numpy as np
+
 class InputPowerData(StormbirdSetupBaseModel):
     section_models_internal_state_data: list[float]
-    input_power_per_wing_data: list[float]
+    input_power_coefficient_data: list[float]
 
 class InputPowerDataType(Enum):
     NoPower = "NoPower"
@@ -25,6 +27,37 @@ class InputPowerModel(StormbirdSetupBaseModel):
     '''
     input_power_type: InputPowerDataType = InputPowerDataType.NoPower
     input_power_data: InputPowerData | None = None
+
+    @classmethod
+    def new_polynomial_rotor_sail_model(
+        cls,
+        max_power: float,
+        max_rps: float,
+        area: float
+    ) -> "InputPowerModel":
+        '''
+        Simple model for the power based on a polynomial relationship between the power and RPS.
+
+        The polynomial power is set to 2.5, which comes from data fitted to data from the SWOPP
+        project. However, the actual power is scaled based on the supplied values for max_power
+        and max_rps.
+        '''
+
+        section_models_internal_state_data = np.linspace(0, max_rps, 20)
+
+        power = 2.5
+
+        factor = max_power / (max_rps**power * area)
+
+        input_power_coefficient_data = factor * (section_models_internal_state_data**power)
+
+        return cls(
+            input_power_type=InputPowerDataType.FromInternalStateAlone,
+            input_power_data=InputPowerData(
+                section_models_internal_state_data = section_models_internal_state_data.tolist(),
+                input_power_coefficient_data = input_power_coefficient_data.tolist()
+            )
+        )
 
     @model_serializer
     def ser_model(self) -> dict[str, object] | str:

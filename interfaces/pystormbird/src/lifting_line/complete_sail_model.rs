@@ -1,4 +1,4 @@
-// Copyright (C) 2024, NTNU 
+// Copyright (C) 2024, NTNU
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -32,7 +32,7 @@ impl CompleteSailModel {
 
     #[pyo3(signature=(
         *,
-        time, 
+        time,
         time_step,
         wind_velocity,
         wind_direction,
@@ -40,8 +40,8 @@ impl CompleteSailModel {
         controller_loading
     ))]
     pub fn do_step(
-        &mut self, 
-        time: f64, 
+        &mut self,
+        time: f64,
         time_step: f64,
         wind_velocity: f64,
         wind_direction: f64,
@@ -77,7 +77,7 @@ impl CompleteSailModel {
         nr_time_steps = 1
     ))]
     pub fn simulate_condition(
-        &mut self, 
+        &mut self,
         wind_velocity: f64,
         wind_direction: f64,
         ship_velocity: f64,
@@ -102,5 +102,9 @@ impl CompleteSailModel {
         SimulationResult {
             data: result_rs
         }
+    }
+
+    pub fn section_models_internal_state(&self) -> Vec<f64> {
+        self.data.lifting_line_simulation.line_force_model.section_models_internal_state()
     }
 }

@@ -19,6 +19,8 @@ if __name__ == "__main__":
         SailType.RotorSail
     ]
 
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
     chord_length = 5.0
     height = 35.0
     area = chord_length * height
@@ -27,9 +29,15 @@ if __name__ == "__main__":
     ship_velocity = 12.0 * 0.5144444
     wind_velocity = 8.0
     density = 1.225
-    wind_directions_deg = np.linspace(-180, 180, 90)
+    wind_directions_deg = np.arange(-180.0, 181, 2)
 
-    for sail_type in sail_types_to_compare:
+    w_plot = 16
+    h_plot = w_plot / 2.35
+    fig = plt.figure(figsize=(w_plot, h_plot))
+    ax_power = fig.add_subplot(1, 2, 1)
+    ax_control = fig.add_subplot(1, 2, 2)
+
+    for sail_index, sail_type in enumerate(sail_types_to_compare):
         simulation_builder = SimulationBuilder()
 
         sail = SimpleSailSetup(
@@ -53,16 +61,19 @@ if __name__ == "__main__":
             wind_environment=wind_environment,
         )
 
-        #if sail_type == SailType.RotorSail:
         model_builder.lifting_line_simulation.simulation_settings.solver = SimpleIterative(
-            max_iterations_per_time_step = 200,
-            damping_factor = 0.1
+            max_iterations_per_time_step = 1000,
+            damping_factor = 0.02
         )
 
         model = CompleteSailModel(model_builder.to_json_string())
 
         thrust = np.zeros_like(wind_directions_deg)
+        propulsive_power = np.zeros_like(wind_directions_deg)
+        power_net = np.zeros_like(wind_directions_deg)
         apparent_wind_direction = np.zeros_like(wind_directions_deg)
+
+        section_model_internal_state = np.zeros_like(wind_directions_deg)
 
         for index, wind_dir_deg in enumerate(wind_directions_deg):
             wind_dir_rad = np.radians(wind_dir_deg)
@@ -80,10 +91,46 @@ if __name__ == "__main__":
                 ship_velocity = ship_velocity,
             )
 
-            thrust[index] = -result.integrated_forces_sum().x / (0.5 * density * area * u_inf**2)
+            thrust[index] = -result.integrated_forces_sum()[0]
 
-        plt.plot(np.degrees(apparent_wind_direction), thrust, label=sail_type.value)
+            propulsive_power[index] = thrust[index] * ship_velocity
+            power_net[index] = propulsive_power[index] - result.input_power_sum()
+
+            section_model_internal_state[index] = model.section_models_internal_state()[0]
+
+        ax_power.plot(
+            wind_directions_deg,
+            power_net / 1000.0,
+            label=f"{sail_type.value} effective",
+            color=default_colors[sail_index]
+        )
+
+        if sail.sail_type.consumes_power():
+            ax_power.plot(
+                wind_directions_deg,
+                propulsive_power / 1000.0,
+                linestyle='--',
+                label=f"{sail_type.value} propulsive",
+                color=default_colors[sail_index]
+            )
+
+        ax_control.plot(
+            wind_directions_deg,
+            section_model_internal_state,
+            label=sail_type.value,
+            color=default_colors[sail_index]
+        )
+
+    ax_power.set_xlabel("Wind direction (deg)")
+    ax_control.set_xlabel("Wind direction (deg)")
+
+    ax_power.set_ylabel("Power (kW)")
+    ax_control.set_ylabel("Control Surface Setting (rad or spin ratio)")
+
+    ax_power.legend()
+
+    ax_power.set_title(
+        f"Ship velocity: {ship_velocity/0.5144444:.1f} kn, Wind velocity: {wind_velocity:.1f} m/s"
+    )
 
     plt.show()
-
-            

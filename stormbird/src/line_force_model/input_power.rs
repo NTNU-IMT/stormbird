@@ -25,7 +25,7 @@ pub struct InputPowerData {
 ///
 /// It comes with different modes. Each mode represents different ways of calculating the data.
 pub enum InputPowerModel {
-    /// Default value. Respresnt a case where a sail does not need power at all
+    /// Default value. Represent a case where a sail does not need power at all
     NoPower,
     /// Calculates the power using the internal state of the sectional model alone. This could, for
     /// instance, be a power model where the power is calculated directly from the RPS of a rotor

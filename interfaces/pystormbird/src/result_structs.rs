@@ -1,4 +1,4 @@
-// Copyright (C) 2024, NTNU 
+// Copyright (C) 2024, NTNU
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -153,6 +153,11 @@ impl SimulationResult {
     }
 
     #[getter]
+    pub fn input_power(&self) -> Vec<f64> {
+        self.data.input_power.clone()
+    }
+
+    #[getter]
     pub fn iterations(&self) -> usize {
         self.data.iterations
     }
@@ -173,5 +178,8 @@ impl SimulationResult {
     pub fn integrated_moments_sum(&self) -> [f64; 3] {
         self.data.integrated_moments_sum().0
     }
-}
 
+    pub fn input_power_sum(&self) -> f64 {
+        self.data.input_power.iter().sum()
+    }
+}
