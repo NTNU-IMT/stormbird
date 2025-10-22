@@ -8,12 +8,10 @@ from enum import Enum
 
 from ..base_model import StormbirdSetupBaseModel
 from ..direct_setup.spatial_vector import SpatialVector
-
 from ..direct_setup.line_force_model import WingBuilder
-
 from ..direct_setup.section_models import SectionModel, Foil, VaryingFoil, RotatingCylinder
-
 from ..direct_setup.controller import ControllerBuilder, ControllerLogic, InternalStateType, SpinRatioConversion
+from ..direct_setup.input_power import InputPowerModel, InputPowerData, InputPowerDataType
 
 import numpy as np
 
@@ -73,12 +71,14 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
 
         non_zero_circulation_at_ends = (False, False)
 
-        return WingBuilder(
+        wing_builder =  WingBuilder(
             section_points=section_points,
             chord_vectors=chord_vectors,
             section_model=section_model,
             non_zero_circulation_at_ends=non_zero_circulation_at_ends
         )
+
+        return wing_builder
 
     def controller_builder(self) -> ControllerBuilder:
         match self.sail_type:

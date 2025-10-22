@@ -9,6 +9,11 @@ Stormbird is a library for simulating lifting surfaces, e.g., wings, in a simpli
 3) Suction sails
 4) Kites
 
+<figure>
+    <img src="static/actualtor_line_streamlines.png" alt="Actuator line streamlines">
+    <figcaption>Figure 1: Examples of stramlines around wing sails that are simualted with this library.</figcaption>
+</figure>
+
 To achieve practical modeling capabilities for these use cases, the following physical effects are assumed to be particularly important:
 - **Various lift generation mechanisms**: modern sails have *sections* that range from classical foils, with and without flaps, rotating cylinders, and foils with boundary layer suction.
 - **Strong viscous effects:** For all lift generating mechanisms above, there will be high lift coefficients with strong viscous effects on both the lift and drag forces. For instance, wing sails tend to be operated close to stall, the lift on a rotating cylinder is strongly affected by partial flow separation, and the lift on a suction sail is very dependent on the amount of boundary layer suction.
@@ -33,4 +38,4 @@ The text in this book will not cover everything! It may also, at times, be outda
 
 - The Stormbird guthub page can be found [here](https://github.com/NTNU-IMT/stormbird). It contains the core library, utility functionality, interfaces and examples.
 - More specifically, examples of how to use the Python interface of the code can be found [here](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/pystormbird/examples).
-- Automated code documentation can be found **here**(TO COME) for the core Stormbird library and **here**(TO COME) for the Stormath library, which contains mathematical utility functionality written for Stormbird.
+- Automated code documentation can be found [here](https://docs.rs/stormbird/0.6.0/stormbird/) for the core Stormbird library and [here](https://docs.rs/stormath/0.1.1/stormath/) for the Stormath library, which contains mathematical utility functionality written for Stormbird.
