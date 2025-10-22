@@ -11,7 +11,7 @@ The content of the folders in this repository can be described as follows:
 - The [interfaces](/interfaces/) folder contains various interfaces to use the core library in other languages than Rust. They are generally *high-level*, in the sense that none of them contain access to the entirety of the core library, but some selected functionalities depending on the type of interface. Examples are two Python libraries (one to assist with the setup of models and one for actually running the core library), functional mockup units, and an interface to use the core library within OpenFOAM.
 
 ## Documentation
-- A more comprehensive documentation of the library can be found here [LINK TO COME].
+- A more comprehensive documentation of the library can be found [here](https://jarlekramer.github.io/stormbird_book_pages/).
 - Automatic code documentation for core library [here](https://docs.rs/stormbird/0.6.0/stormbird/)
 - Automatic code documentation for the math utilities [here](https://docs.rs/stormath/0.1.1/stormath/)
 
