@@ -14,14 +14,14 @@ class StormbirdSettings():
     @property
     def force_factor(self) -> float:
         return 0.5 * self.chord_length * self.span * self.velocity**2
-    
+
     def get_line_force_model_dict(self):
         chord_vector = {
             "x": self.chord_length * np.cos(np.radians(self.angle_of_attack_deg)),
             "y": -self.chord_length * np.sin(np.radians(self.angle_of_attack_deg)),
             "z": 0.0
         }
-        
+
         wing_builder = {
             "section_points": [
                 {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -43,28 +43,18 @@ class StormbirdSettings():
         }
 
         return line_force_model
-    
+
     def get_actuator_line_setup_dict(self):
         line_force_model = self.get_line_force_model_dict()
 
-        projection = {
-            "Gaussian": {
-                "chord_factor": 0.4,
-                "thickness_factor": 0.1
-            }
-        }
-
         return {
             "line_force_model": line_force_model,
-            "projection": projection,
-            "solver_settings": {
-                "strength_damping": 0.1
-            }
+            "lifting_line_correction": {}
         }
-    
+
     def write_actuator_line_setup_to_file(self, file_path):
         setup_dict = self.get_actuator_line_setup_dict()
-        
+
         with open(file_path, 'w') as f:
             json.dump(setup_dict, f, indent=4)
 

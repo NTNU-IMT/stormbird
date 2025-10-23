@@ -10,4 +10,4 @@ crate-type = ["staticlib"]
 cxx = "1.0"
 
 stormbird = {path = "../../../stormbird"}
-stormath = {path = "../../../stormath"}
+stormath = { version = "0.1.1"}

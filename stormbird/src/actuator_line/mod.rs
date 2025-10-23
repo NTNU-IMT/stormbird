@@ -312,6 +312,10 @@ impl ActuatorLine {
     /// Writes the resulting values from the line force model to a file.
     pub fn write_results(&self, folder_path: &str) {
         if let Some(simulation_result) = &self.simulation_result {
+            let overall_folder_path = Path::new(folder_path);
+
+            io_utils::folder_management::ensure_folder_exists(overall_folder_path).unwrap();
+
             let (header, data) = simulation_result.as_reduced_flatten_csv_string();
 
             let force_file_path = format!("{}/stormbird_forces.csv", folder_path);

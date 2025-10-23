@@ -1,17 +1,14 @@
 
 import shutil
 import subprocess
-import json
-
+import pandas as pd
+import matplotlib.pyplot as plt
 import argparse
 
 from stormbird_settings import StormbirdSettings
 from openfoam_settings import SimulationSettings, FolderPaths
 
-from pystormbird import SimulationResult
 
-import numpy as np
-import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -34,7 +31,7 @@ if __name__ == '__main__':
 
     shutil.copytree(folder_paths.base_folder, folder_paths.run_folder)
 
-    stormbird_settings.write_actuator_line_setup_to_file(folder_paths.run_folder / 'actuator_line.json')
+    stormbird_settings.write_actuator_line_setup_to_file(folder_paths.run_folder / 'system' /'stormbird_actuator_line.json')
     stormbird_settings.write_dimensions(folder_paths.run_folder / 'dimensions.txt')
 
     simulation_settings = SimulationSettings()
@@ -44,22 +41,14 @@ if __name__ == '__main__':
 
     subprocess.run(['bash run.sh'], cwd=folder_paths.run_folder, shell=True)
 
-    result_history = SimulationResult.result_history_from_file(
-        str(folder_paths.run_folder / "actuator_line_results.json")
-    )
+    forces_df = pd.read_csv(folder_paths.run_folder / 'postProcessing' / 'stormbird_forces.csv')
 
-    n_time_steps = len(result_history)
+    plt.plot(forces_df['time'], forces_df['force_0.x'], label="x")
+    plt.plot(forces_df['time'], forces_df['force_0.y'], label="y")
 
-    x_forces = np.zeros(n_time_steps)
-    y_forces = np.zeros(n_time_steps)
-
-    for i in range(n_time_steps):
-        x_forces[i] = result_history[i].integrated_forces[0].total.x
-        y_forces[i] = result_history[i].integrated_forces[0].total.y
-
-    plt.plot(x_forces, label="x")
-    plt.plot(y_forces, label="y")
+    print('Last force, x', forces_df['force_0.x'].iloc[-1])
+    print('Last force, y', forces_df['force_0.y'].iloc[-1])
 
     plt.legend()
-    
+
     plt.savefig(folder_paths.run_folder / "force_plot.png", dpi=300, bbox_inches='tight')

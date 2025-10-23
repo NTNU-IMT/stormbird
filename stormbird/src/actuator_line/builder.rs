@@ -45,7 +45,7 @@ pub struct ActuatorLineBuilder {
 }
 
 impl ActuatorLineBuilder {
-    pub fn default_write_iterations_full_result() -> usize {500}
+    pub fn default_write_iterations_full_result() -> usize {100}
 
     pub fn new(line_force_model: LineForceModelBuilder) -> Self {
         Self {
