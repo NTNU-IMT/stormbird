@@ -24,7 +24,6 @@ pub struct SamplingSettings {
     pub remove_span_velocity: bool,
     #[serde(default="SamplingSettings::default_one")]
     pub correction_factor: Float
-
 }
 
 impl SamplingSettings {

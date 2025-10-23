@@ -48,6 +48,16 @@ In particular, the interface to the FMU was changed to fit better with the needs
 - All parameters where moved to separate JSON files. The reason was simply that the current lab software used for doing hybrid tests only supports float variables directly in the FMU. There was therefore a need to move all non-float parameters to a separate interface. To make the setup consistent, all parameters where therefore moved to a separate JSON file. The file path can still be specified in the FMU, but it also has a default value suitable for hybrid testing (the default value only makes sense for the hybrid testing setup, so please specify the path in any other case)
 - Adding the possibility of specifying "translational velocity" as input to the FMU. This is an alternative to applying motion directly through updates to the position, and instead specify the motion velocity directly. That is, the velocity due to translational motion, not rotational (that might come later but was not necessary in this case)
 
-## 0.6.0 - 2025-10-30
+## 0.6.0 - 2025-10-21
 ### Highlights
-TO COME!
+Internal rewrite of some functionality, with the goal of simplifying and speeding up the code. Some new features were also added.
+
+- Now storing global versions of geometry data directly in the line force model. This was to, potentially, avoid unnecessary repeated transformations of the local geometry when evaluating the forces and updating the wake
+- New linearized solver, as a faster alternative to the full non-linear solver.
+- New ways (or rather, back to an old way) to create a steady wake; direct from horseshoe vortices, rather through a reduced dynamic wake structure as before. A little faster.
+- Start of "complete sail model" functionality, where the goal is to collect the typical functionality needed to model a "complete" sail for route simulation. This includes a lifting line model for the sails, controllers and a model of the wind conditions.
+- Added empirical models for input power to the line force model
+
+## 0.7.0 - 2025-10-30
+### Highlights
+- Cleanup and restructuring of the actuator line functionality. In particular with focus on finalizing the correction methods, and removing methods that were tested but not found useful.

@@ -18,7 +18,6 @@ pub struct ActuatorLineBuilder {
     pub start_iteration: usize,
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
-    pub empirical_angle_of_attack_correction: Option<EmpiricalAngleOfAttackCorrection>,
 }
 ```
 
