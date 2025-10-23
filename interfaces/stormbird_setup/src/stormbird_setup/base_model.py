@@ -8,12 +8,13 @@ from typing import TypeVar, Type
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
+from pydantic.type_adapter import TypeAdapterT
 
 T = TypeVar('T', bound='StormbirdSetupBaseModel')
 
 class StormbirdSetupBaseModel(BaseModel):
     '''
-    Base class for the classes that define the setup of stormbird simulations. 
+    Base class for the classes that define the setup of stormbird simulations.
     '''
     model_config = ConfigDict(
         frozen = False,
@@ -32,12 +33,20 @@ class StormbirdSetupBaseModel(BaseModel):
     @classmethod
     def from_json_file(cls: Type[T], file_path: Path) -> T:
         return cls.model_validate_json(file_path.read_text())
-    
+
     def to_json_string(self) -> str:
         return self.model_dump_json(exclude_none=True)
 
-    def to_json_file(self, file_path: Path) -> None:
-        file_path.write_text(self.to_json_string())
+    def to_json_file(self, file_path: Path | str) -> None:
+
+        if isinstance(file_path, str):
+            file_path_out = Path(file_path)
+        elif isinstance(file_path, Path):
+            file_path_out = file_path
+        else:
+            raise TypeError(f"Input must be of type Path or str. Right now it is {type(file_path)}")
+
+        file_path_out.write_text(self.to_json_string())
 
     def to_dict(self) -> dict:
         return self.model_dump(exclude_none=True, mode='json')

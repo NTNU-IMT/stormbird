@@ -16,7 +16,7 @@ class Foil(StormbirdSetupBaseModel):
     cl_max_after_stall: float | None = None
     cd_min: float | None = None
     angle_cd_min: float | None = None
-    cd_second_order_factor: float | None = None 
+    cd_second_order_factor: float | None = None
     cd_max_after_stall: float | None = None
     cd_power_after_stall: float | None = None
     cdi_correction_factor: float | None = None
@@ -33,7 +33,7 @@ class VaryingFoil(StormbirdSetupBaseModel):
     current_internal_state: float | None = None
 
 class RotatingCylinder(StormbirdSetupBaseModel):
-    revolutions_per_second: float | None = None
+    revolutions_per_second: float  = 0.0
     spin_ratio_data: list[float] | None = None
     cl_data: list[float]| None = None
     cd_data: list[float] | None = None

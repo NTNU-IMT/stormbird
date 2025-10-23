@@ -289,6 +289,7 @@ impl FmuFunctions for StormbirdLiftingLine {
             self.iterations_completed >= self.parameters.number_of_iterations_before_building_model;
 
         if self.stormbird_model.is_some() && waiting_iterations_is_done {
+
             self.set_line_force_model_state(time_step);
 
             let freestream_velocity = self.freestream_velocity();

@@ -139,25 +139,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                     logic = logic
                 )
             case SailType.RotorSail:
-                apparent_wind_directions_data = np.radians([-180, -50, -30, 30, 50, 180])
-                section_model_internal_state_set_points_data = [6.0, 3.0, 0.0, 0.0, -3.0, -6.0]
-
-                internal_state_type = InternalStateType.SpinRatio
-                internal_state_conversion = SpinRatioConversion(
-                    diameter = self.chord_length,
-                    max_rps = 180.0 / 60.0
-                )
-
-                logic = ControllerLogic(
-                    apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
-                    section_model_internal_state_set_points_data = section_model_internal_state_set_points_data,
-                    internal_state_type = internal_state_type,
-                    internal_state_conversion = internal_state_conversion
-                )
-
-                return ControllerBuilder(
-                    logic = logic
-                )
+                return ControllerBuilder.new_default_rotor_sail(diameter=self.chord_length, max_rps = 180.0/60.0)
             case SailType.SuctionSail:
                 raise NotImplementedError("Suction sail not implemented yet")
             case _:

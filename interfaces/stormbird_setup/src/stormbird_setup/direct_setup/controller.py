@@ -10,6 +10,8 @@ from enum import Enum
 
 from pydantic import field_serializer, Field
 
+import numpy as np
+
 class InternalStateType(Enum):
     Generic = "Generic"
     SpinRatio = "SpinRatio"
@@ -40,7 +42,7 @@ class ControllerLogic(StormbirdSetupBaseModel):
             case _:
                 raise ValueError("Unsupported internal state type:", value)
 
-    
+
 class MeasurementType(Enum):
     Mean = "Mean"
     Max = "Max"
@@ -55,7 +57,7 @@ class FlowMeasurementSettings(StormbirdSetupBaseModel):
     angle_of_attack: MeasurementSettings = MeasurementSettings()
     wind_direction: MeasurementSettings = MeasurementSettings()
     wind_velocity: MeasurementSettings = MeasurementSettings()
-    
+
 class ControllerBuilder(StormbirdSetupBaseModel):
     logic: ControllerLogic
     flow_measurement_settings: FlowMeasurementSettings = FlowMeasurementSettings()
@@ -66,4 +68,28 @@ class ControllerBuilder(StormbirdSetupBaseModel):
     moving_average_window_size: int | None = None
     use_input_velocity_for_apparent_wind_direction: bool = False
 
+    @classmethod
+    def new_default_rotor_sail(cls, *, diameter: float, max_rps: float):
+        '''
+        Helper function to quickly set up a suitable controller for a rotor sail. Assumed to be
+        fairly general
+        '''
+        apparent_wind_directions_data = np.radians([-180, -50, -30, 30, 50, 180])
+        section_model_internal_state_set_points_data = [6.0, 3.0, 0.0, 0.0, -3.0, -6.0]
 
+        internal_state_type = InternalStateType.SpinRatio
+        internal_state_conversion = SpinRatioConversion(
+            diameter = diameter,
+            max_rps = max_rps
+        )
+
+        logic = ControllerLogic(
+            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
+            section_model_internal_state_set_points_data = section_model_internal_state_set_points_data,
+            internal_state_type = internal_state_type,
+            internal_state_conversion = internal_state_conversion
+        )
+
+        return ControllerBuilder(
+            logic = logic
+        )
