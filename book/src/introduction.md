@@ -11,7 +11,7 @@ Stormbird is a library for simulating lifting surfaces, e.g., wings, in a simpli
 
 <figure>
     <img src="static/actualtor_line_streamlines.png" alt="Actuator line streamlines">
-    <figcaption>Figure 1: Examples of stramlines around wing sails that are simualted with this library.</figcaption>
+    <figcaption>Figure 1: Examples of streamlines around wing sails that are simulated with this library.</figcaption>
 </figure>
 
 To achieve practical modeling capabilities for these use cases, the following physical effects are assumed to be particularly important:

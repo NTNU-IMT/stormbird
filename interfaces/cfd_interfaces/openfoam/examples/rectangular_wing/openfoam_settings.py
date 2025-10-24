@@ -4,7 +4,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 @dataclass(kw_only=True, slots=True)
-class SimulationSettings:
+class OpenFOAMSettings:
     number_of_threads: int | None = None
 
     def __post_init__(self):

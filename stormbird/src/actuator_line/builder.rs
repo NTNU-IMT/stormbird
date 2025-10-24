@@ -18,7 +18,6 @@ use super::ActuatorLine;
 use super::corrections::{
     lifting_line::LiftingLineCorrectionBuilder,
     empirical_circulation::EmpiricalCirculationCorrection,
-    empirical_angle_of_attack::EmpiricalAngleOfAttackCorrection,
 };
 
 
@@ -33,22 +32,20 @@ pub struct ActuatorLineBuilder {
     pub solver_settings: SolverSettings,
     #[serde(default)]
     pub sampling_settings: SamplingSettings,
-    #[serde(default)]
-    pub controller: Option<ControllerBuilder>,
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
     pub write_iterations_full_result: usize,
     #[serde(default)]
     pub start_iteration: usize,
     #[serde(default)]
+    pub controller: Option<ControllerBuilder>,
+    #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
-    #[serde(default)]
-    pub empirical_angle_of_attack_correction: Option<EmpiricalAngleOfAttackCorrection>,
 }
 
 impl ActuatorLineBuilder {
-    pub fn default_write_iterations_full_result() -> usize {500}
+    pub fn default_write_iterations_full_result() -> usize {100}
 
     pub fn new(line_force_model: LineForceModelBuilder) -> Self {
         Self {
@@ -61,7 +58,6 @@ impl ActuatorLineBuilder {
             start_iteration: 0,
             lifting_line_correction: None,
             empirical_circulation_correction: None,
-            empirical_angle_of_attack_correction: None,
         }
     }
 
@@ -82,7 +78,7 @@ impl ActuatorLineBuilder {
                 self.projection_settings.projection_function.chord_factor +
                 self.projection_settings.projection_function.thickness_factor
             );
-            
+
             Some(
                 lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)
             )
@@ -103,8 +99,6 @@ impl ActuatorLineBuilder {
             simulation_result: None,
             lifting_line_correction,
             empirical_circulation_correction: self.empirical_circulation_correction.clone(),
-            empirical_angle_of_attack_correction: self.empirical_angle_of_attack_correction.clone(),
         }
     }
 }
-

@@ -3,10 +3,9 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use crate::lifting_line::wake::frozen_wake::FrozenWake;
+use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondition;
 
 use crate::line_force_model::LineForceModel;
-
-use crate::common_utils::prelude::*;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
@@ -20,20 +19,16 @@ use serde::{Serialize, Deserialize};
 pub struct LiftingLineCorrectionBuilder {
     #[serde(default = "LiftingLineCorrectionBuilder::default_wake_length_factor")]
     pub wake_length_factor: Float,
-    #[serde(default = "LiftingLineCorrectionBuilder::default_solver_damping_factor")]
-    pub solver_damping_factor: Float,
-    #[serde(default = "LiftingLineCorrectionBuilder::default_nr_solver_iterations")]
-    pub nr_solver_iterations: usize
+    #[serde(default)]
+    pub symmetry_condition: SymmetryCondition
 }
 
 impl LiftingLineCorrectionBuilder {
     fn default_wake_length_factor() -> Float {100.0}
-    fn default_solver_damping_factor() -> Float {0.1}
-    fn default_nr_solver_iterations() -> usize {20}
 
     pub fn build(
-        &self, 
-        viscous_core_length_factor: Float, 
+        &self,
+        viscous_core_length_factor: Float,
         line_force_model: &LineForceModel
     ) -> LiftingLineCorrection {
         let chord_lengths: Vec<Float> = line_force_model.chord_lengths.clone();
@@ -42,33 +37,35 @@ impl LiftingLineCorrectionBuilder {
 
         let viscous_core_length = viscous_core_length_factor * average_chord_length;
 
-        let nr_of_lines = line_force_model.nr_span_lines();
-
-        let velocity_correction_estimate = vec![SpatialVector::default(); nr_of_lines];
-
         LiftingLineCorrection {
-            initialized: false,
             viscous_core_length,
-            nr_solver_iterations: self.nr_solver_iterations,
-            solver_damping_factor: self.solver_damping_factor,
-            velocity_correction_estimate
+            wake_length_factor: self.wake_length_factor,
+            symmetry_condition: self.symmetry_condition
         }
     }
 }
 
 #[derive(Debug, Clone)]
-/// A structure used to compute corrections for the velocity, based on a lifting line model.
+/// A structure used to compute corrections for the velocity, based on a lifting line model. The
+/// model computes two versions of induced velocities using a lifting line representation; one where
+/// the viscous core length is set to a small value, and one where it is set to a value equal to the
+/// force projection width. The difference in induced velocities are then added to the velocity that
+/// is sampled directly from the flow field. This is to account for the fact that realistic force
+/// projection widths tend to smear out the tip vortices, leading to under predicted induced
+/// velocities
 pub struct LiftingLineCorrection {
-    pub initialized: bool,
     pub viscous_core_length: Float,
-    pub nr_solver_iterations: usize,
-    pub solver_damping_factor: Float,
-    velocity_correction_estimate: Vec<SpatialVector>
+    pub wake_length_factor: Float,
+    pub symmetry_condition: SymmetryCondition
 }
 
 impl LiftingLineCorrection {
+    /// Computes a difference in the induced velocities between two lifting line simualtions; one
+    /// with a viscous core length equal to the force projection width, and one with a small viscous
+    /// core length. The difference is then returned as a vector of induced velocities at the control
+    /// points of the line force model
     pub fn velocity_correction(
-        &mut self,
+        &self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
         circulation_strength: &[Float],
@@ -94,25 +91,23 @@ impl LiftingLineCorrection {
                 wind_indices.clone()
             ];
 
-            let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector>() 
+            let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector>()
                 / wing_ctrl_points_velocity.len() as Float;
 
-            let wake_vector = averaged_ctrl_points_velocity.normalize() * 100.0;
-
-            let far_field_ratio = 5.0; // Ratio of far field length to viscous core length
+            let wake_vector = averaged_ctrl_points_velocity.normalize() * self.wake_length_factor;
 
             let mut frozen_wake_viscous = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length,
-                far_field_ratio, // far_field_ratio
+                self.symmetry_condition
             );
 
             let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length / 10.0,
-                far_field_ratio, // far_field_ratio
+                self.symmetry_condition
             );
 
             frozen_wake_viscous.update_induced_velocities_at_control_points(
@@ -123,57 +118,14 @@ impl LiftingLineCorrection {
                 &wing_circulation_strength
             );
 
-            let u_i_viscous = &frozen_wake_viscous.induced_velocities_at_control_points;
-            let u_i_default = &frozen_wake_default.induced_velocities_at_control_points;
-
             for i in 0..nr_span_lines {
-                u_i_correction.push(u_i_default[i] - u_i_viscous[i]);
+                u_i_correction.push(
+                    frozen_wake_default.induced_velocities_at_control_points[i] -
+                    frozen_wake_viscous.induced_velocities_at_control_points[i]
+                );
             }
         }
-        
-        u_i_correction   
-    }
 
-    pub fn solve_correction(
-        &mut self,
-        line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector],
-        circulation_strength: &[Float],
-    ) -> (
-        Vec<SpatialVector>,
-        Vec<Float>
-    ) {
-        let mut corrected_ctrl_points_velocity = ctrl_points_velocity.to_vec();
-        let mut corrected_circulation_strength = circulation_strength.to_vec();
-
-        for _ in 0..self.nr_solver_iterations {
-            let new_velocity_correction_estimate: Vec<SpatialVector> = self.velocity_correction(
-                line_force_model,
-                ctrl_points_velocity,
-                &corrected_circulation_strength,
-            );
-
-            for j in 0..corrected_ctrl_points_velocity.len() {
-                let current_velocity_correction = self.velocity_correction_estimate[j];
-
-                self.velocity_correction_estimate[j] += (
-                    new_velocity_correction_estimate[j] - current_velocity_correction
-                ) * self.solver_damping_factor;
-
-                corrected_ctrl_points_velocity[j] = ctrl_points_velocity[j] + self.velocity_correction_estimate[j];
-            }
-
-            let angles_of_attack = line_force_model.angles_of_attack(
-                &corrected_ctrl_points_velocity, 
-                CoordinateSystem::Global
-            );
-
-            corrected_circulation_strength = line_force_model.circulation_strength(
-                &angles_of_attack,
-                &corrected_ctrl_points_velocity
-            );
-        }
-
-        (corrected_ctrl_points_velocity, corrected_circulation_strength)
+        u_i_correction
     }
 }

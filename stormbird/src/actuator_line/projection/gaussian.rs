@@ -21,27 +21,27 @@ pub struct Gaussian {
 impl Default for Gaussian {
     fn default() -> Self {
         Self {
-            chord_factor: 0.4,
-            thickness_factor: 0.2
+            chord_factor: 0.25,
+            thickness_factor: 0.25
         }
     }
 }
 
 impl Gaussian {
     pub fn projection_value_at_point(
-        &self, 
-        point: SpatialVector, 
-        chord_vector: SpatialVector, 
+        &self,
+        point: SpatialVector,
+        chord_vector: SpatialVector,
         span_line: &SpanLine
     ) -> Float {
         let chord_length = chord_vector.length();
         let line_length = span_line.length();
 
         let point_lc = span_line.line_coordinates(point, chord_vector);
-        
+
         let e_chord     = self.chord_factor * chord_length;
         let e_thickness = self.thickness_factor * chord_length;
-        
+
         let chord_term     = (point_lc.chord / e_chord).powi(2);
         let thickness_term = (point_lc.thickness / e_thickness).powi(2);
 
@@ -56,7 +56,7 @@ impl Gaussian {
         } else {
             0.0
         };
-        
+
         (1.0 / const_denominator ) * exp_factor.exp() * span_factor
     }
 }

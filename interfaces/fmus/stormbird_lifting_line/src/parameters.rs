@@ -12,15 +12,15 @@ use stormbird::error::Error;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Parameters for the Stormbird lifting line FMU. These variables could also be part of the FMU 
-/// directly. However, they are stored in a separate JSON file to facilitate easier usage when using 
+/// Parameters for the Stormbird lifting line FMU. These variables could also be part of the FMU
+/// directly. However, they are stored in a separate JSON file to facilitate easier usage when using
 /// the FMU with runtimes that have limited to no support for other data types than f64.
 pub struct FmuParameters {
     /// Path to the JSON file describing the lifting line model.
     pub lifting_line_setup_file_path: String,
     #[serde(default)]
-    /// Path to the JSON file describing the wind environment, if any thing different than the 
-    // default should be used.
+    /// Path to the JSON file describing the wind environment, if any thing different than the
+    /// default should be used.
     pub wind_environment_setup_file_path: String,
     #[serde(default)]
     /// Path to the JSON file describing the controller, if used
@@ -37,9 +37,9 @@ pub struct FmuParameters {
     /// Switch to specify which coordinate system the input motion velocity is given in.
     pub motion_velocity_in_body_fixed_frame: bool,
     #[serde(default)]
-    /// Switch to specify whether to apply the motion velocity directly or to use the linear 
-    /// velocity as freestream. WARNING: this switch must be used with care. It does not make sense 
-    /// to set this to true if the translation is also actively used. This should only be used if 
+    /// Switch to specify whether to apply the motion velocity directly or to use the linear
+    /// velocity as freestream. WARNING: this switch must be used with care. It does not make sense
+    /// to set this to true if the translation is also actively used. This should only be used if
     /// the translation is always zero. It can be used with rotation.
     pub use_motion_velocity_linear_as_freestream: bool,
     #[serde(default)]
@@ -50,7 +50,7 @@ pub struct FmuParameters {
     pub input_moving_average_window_size: usize,
     #[serde(default)]
     /// If larger than zero, this variable can be used to delay the construction of the model. This
-    /// is useful if situations where the input velocity may not be properly set until a couple if 
+    /// is useful if situations where the input velocity may not be properly set until a couple if
     /// time steps in to the simulation.
     pub number_of_iterations_before_building_model: usize
 }

@@ -1,11 +1,11 @@
 [package]
 name = "pystormbird"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "Python interface to the Stormbird library."
-homepage = "https://github.com/jarlekramer/stormbird"
+homepage = "https://github.com/NTNU-IMT/stormbird"
 readme = "../../README.md"
-repository = "https://github.com/jarlekramer/stormbird"
+repository = "https://github.com/NTNU-IMT/stormbird"
 license = "GPL-3.0"
 edition = "2021"
 

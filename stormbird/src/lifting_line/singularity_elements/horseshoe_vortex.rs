@@ -6,6 +6,8 @@
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 
+use crate::line_force_model::span_line::SpanLine;
+
 use super::vortex_line;
 
 #[derive(Clone, Debug)]
@@ -45,5 +47,29 @@ impl HorseshoeVortex {
         );
 
         induced_velocity
+    }
+
+    /// Helper function to create a vector of horseshoe vortices from span lines and wake vectors.
+    pub fn vortices_from_span_lines_and_wake_vectors(
+        span_lines: &[SpanLine],
+        wake_vectors: &[SpatialVector],
+        viscous_core_length: Float
+    ) -> Vec<Self> {
+        let nr_span_lines = span_lines.len();
+
+        let mut horseshoe_vortices: Vec<Self> = Vec::with_capacity(nr_span_lines);
+
+        for i in 0..nr_span_lines {
+            let vortex = Self{
+                bound_vortex: [span_lines[i].start_point, span_lines[i].end_point],
+                start_trailing_vortex: [span_lines[i].start_point + wake_vectors[i], span_lines[i].start_point],
+                end_trailing_vortex: [span_lines[i].end_point, span_lines[i].end_point + wake_vectors[i + 1]],
+                viscous_core_length,
+            };
+
+            horseshoe_vortices.push(vortex);
+        }
+
+        horseshoe_vortices
     }
 }
