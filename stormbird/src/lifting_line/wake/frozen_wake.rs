@@ -5,6 +5,7 @@
 use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 use crate::lifting_line::singularity_elements::horseshoe_vortex::HorseshoeVortex;
+use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondition;
 use crate::lifting_line::wake::settings::{QuasiSteadyWakeSettings, ViscousCoreLength};
 
 use stormath::matrix::Matrix;
@@ -131,6 +132,7 @@ impl FrozenWake {
         span_lines: &[SpanLine],
         wake_vector: SpatialVector,
         viscous_core_length: Float,
+        symmetry_condition: SymmetryCondition
     ) -> Self {
         let nr_span_lines = span_lines.len();
 
@@ -159,7 +161,16 @@ impl FrozenWake {
 
                 let u_i = vortex.induced_velocity_with_unit_strength(ctrl_point);
 
-                variable_velocity_factors[[row_index, col_index]] = u_i;
+                let point_mirrored = symmetry_condition.mirrored_point(ctrl_point);
+
+                let u_i_corrected = if let Some(p_m) = point_mirrored {
+                    let u_i_mirrored = vortex.induced_velocity_with_unit_strength(p_m);
+                    symmetry_condition.corrected_velocity(u_i, u_i_mirrored)
+                } else {
+                    u_i
+                };
+
+                variable_velocity_factors[[row_index, col_index]] = u_i_corrected;
             }
         }
 

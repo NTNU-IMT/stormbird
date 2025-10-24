@@ -32,12 +32,12 @@ pub struct ActuatorLineBuilder {
     pub solver_settings: SolverSettings,
     #[serde(default)]
     pub sampling_settings: SamplingSettings,
-    #[serde(default)]
-    pub controller: Option<ControllerBuilder>,
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
     pub write_iterations_full_result: usize,
     #[serde(default)]
     pub start_iteration: usize,
+    #[serde(default)]
+    pub controller: Option<ControllerBuilder>,
     #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]

@@ -6,13 +6,14 @@ import matplotlib.pyplot as plt
 import argparse
 
 from stormbird_settings import StormbirdSettings
-from openfoam_settings import SimulationSettings, FolderPaths
+from openfoam_settings import OpenFOAMSettings, FolderPaths
 
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--angle-of-attack", type=float, required=True, help="Angle of attacks to simulate")
+    parser.add_argument("--use-ll-correction", action='store_true')
 
     args = parser.parse_args()
 
@@ -21,7 +22,8 @@ if __name__ == '__main__':
     angle = args.angle_of_attack
 
     stormbird_settings = StormbirdSettings(
-        angle_of_attack_deg=angle
+        angle_of_attack_deg=angle,
+        use_ll_correction=args.use_ll_correction
     )
 
     folder_paths = FolderPaths(angle_of_attack_deg=angle)
@@ -34,20 +36,23 @@ if __name__ == '__main__':
     stormbird_settings.write_actuator_line_setup_to_file(folder_paths.run_folder / 'system' /'stormbird_actuator_line.json')
     stormbird_settings.write_dimensions(folder_paths.run_folder / 'dimensions.txt')
 
-    simulation_settings = SimulationSettings()
+    openfoam_settings = OpenFOAMSettings()
 
-    simulation_settings.write_to_file(folder_paths.run_folder / "simulation_settings.txt")
-    simulation_settings.set_as_environmental_variables()
+    openfoam_settings.write_to_file(folder_paths.run_folder / "simulation_settings.txt")
+    openfoam_settings.set_as_environmental_variables()
 
     subprocess.run(['bash run.sh'], cwd=folder_paths.run_folder, shell=True)
 
     forces_df = pd.read_csv(folder_paths.run_folder / 'postProcessing' / 'stormbird_forces.csv')
 
-    plt.plot(forces_df['time'], forces_df['force_0.x'], label="x")
-    plt.plot(forces_df['time'], forces_df['force_0.y'], label="y")
+    force_x = forces_df['force_0.x'].to_numpy() / stormbird_settings.force_factor
+    force_y = forces_df['force_0.y'].to_numpy() / stormbird_settings.force_factor
 
-    print('Last force, x', forces_df['force_0.x'].iloc[-1])
-    print('Last force, y', forces_df['force_0.y'].iloc[-1])
+    plt.plot(forces_df['time'], force_x, label="x")
+    plt.plot(forces_df['time'], force_y, label="y")
+
+    print('Last force, x', force_x[-1])
+    print('Last force, y', force_y[-1])
 
     plt.legend()
 

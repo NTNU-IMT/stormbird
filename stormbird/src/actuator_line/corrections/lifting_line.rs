@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use crate::lifting_line::wake::frozen_wake::FrozenWake;
+use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondition;
 
 use crate::line_force_model::LineForceModel;
 
@@ -18,6 +19,8 @@ use serde::{Serialize, Deserialize};
 pub struct LiftingLineCorrectionBuilder {
     #[serde(default = "LiftingLineCorrectionBuilder::default_wake_length_factor")]
     pub wake_length_factor: Float,
+    #[serde(default)]
+    pub symmetry_condition: SymmetryCondition
 }
 
 impl LiftingLineCorrectionBuilder {
@@ -36,7 +39,8 @@ impl LiftingLineCorrectionBuilder {
 
         LiftingLineCorrection {
             viscous_core_length,
-            wake_length_factor: self.wake_length_factor
+            wake_length_factor: self.wake_length_factor,
+            symmetry_condition: self.symmetry_condition
         }
     }
 }
@@ -51,7 +55,8 @@ impl LiftingLineCorrectionBuilder {
 /// velocities
 pub struct LiftingLineCorrection {
     pub viscous_core_length: Float,
-    pub wake_length_factor: Float
+    pub wake_length_factor: Float,
+    pub symmetry_condition: SymmetryCondition
 }
 
 impl LiftingLineCorrection {
@@ -95,12 +100,14 @@ impl LiftingLineCorrection {
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length,
+                self.symmetry_condition
             );
 
             let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length / 10.0,
+                self.symmetry_condition
             );
 
             frozen_wake_viscous.update_induced_velocities_at_control_points(

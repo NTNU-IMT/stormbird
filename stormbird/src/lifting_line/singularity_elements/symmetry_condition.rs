@@ -1,14 +1,14 @@
-// Copyright (C) 2024, NTNU 
+// Copyright (C) 2024, NTNU
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use serde::{Serialize, Deserialize};
 use stormath::spatial_vector::SpatialVector;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Enum that represent a symmetry plane. 
-/// 
+/// Enum that represent a symmetry plane.
+///
 /// To be used when calculating induced velocities in space from a potential theory velocity model.
 pub enum SymmetryCondition {
     NoSymmetry,

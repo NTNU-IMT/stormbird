@@ -23,5 +23,5 @@ impl Default for SolverSettings {
 }
 
 impl SolverSettings {
-    fn default_damping_factor() -> Float {0.25}
+    fn default_damping_factor() -> Float {0.1}
 }
