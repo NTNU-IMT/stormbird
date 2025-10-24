@@ -4,7 +4,6 @@
 
 use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
-use crate::lifting_line::singularity_elements::panel::Panel;
 use crate::lifting_line::singularity_elements::horseshoe_vortex::HorseshoeVortex;
 use crate::lifting_line::wake::settings::{QuasiSteadyWakeSettings, ViscousCoreLength};
 
@@ -18,27 +17,27 @@ use crate::line_force_model::LineForceModel;
 use crate::lifting_line::wake::dynamic_wake::DynamicWake;
 
 #[derive(Debug, Clone)]
-/// Represents a wake where the shape is assumed to be frozen, but where the strength on parts of 
+/// Represents a wake where the shape is assumed to be frozen, but where the strength on parts of
 /// the wake can be updated. That is, it is intended to be used while solving for the circulation
 /// strength in a lifting line simulation. Two primary scenarios exists:
-/// 
-/// - The wake is steady, and consists of just one panel/horseshoe vortex per span line, where the 
+///
+/// - The wake is steady, and consists of just one panel/horseshoe vortex per span line, where the
 /// strength is unknown
-/// - The wake is actually dynamic, but most of the wake consists of panels where the strength is 
-/// known from previous time steps. The only unknown strength is the strength of the first panels 
-/// right behind the span lines making up the wings. The induced velocities therefore comes from 
+/// - The wake is actually dynamic, but most of the wake consists of panels where the strength is
+/// known from previous time steps. The only unknown strength is the strength of the first panels
+/// right behind the span lines making up the wings. The induced velocities therefore comes from
 /// both the panels with known strength and the panels with unknown strength.
 pub struct FrozenWake {
-    /// Vector containing values for the induced velocities that are constant for each control point 
+    /// Vector containing values for the induced velocities that are constant for each control point
     /// in the simulation. That is, velocities that do not depend on the circulation strength of the
     /// panels right behind the line model.
     pub fixed_velocities: Vec<SpatialVector>,
-    /// Matrix containing coefficients that can be used to calculate induced velocities as a 
-    /// function of the strength of each vortex line. 
-    /// 
+    /// Matrix containing coefficients that can be used to calculate induced velocities as a
+    /// function of the strength of each vortex line.
+    ///
     /// The shape of the matrix is (nr_span_lines, nr_span_lines). Each row corresponds to a control
-    /// point. Each column for a given row corresponds to the induced velocity from each panel. The 
-    /// induced velocity can therefore be calculated as the dot product of the row and the 
+    /// point. Each column for a given row corresponds to the induced velocity from each panel. The
+    /// induced velocity can therefore be calculated as the dot product of the row and the
     /// circulation strength.
     pub variable_velocity_factors: Matrix<SpatialVector>,
     /// Allocate space for the induced velocities at the control points, to avoid reallocating
@@ -63,6 +62,8 @@ impl FrozenWake {
         }
     }
 
+    /// Function that updates the variable velocity factors assuming a steady wake, given a line
+    /// force model and the velocities at the span points.
     pub fn update_as_steady_from_line_force_model_and_velocities(
         &mut self,
         line_force_model: &LineForceModel,
@@ -73,10 +74,9 @@ impl FrozenWake {
 
         let span_lines = &line_force_model.span_lines_global;
 
-        let mut horseshoe_vortices: Vec<HorseshoeVortex> = Vec::with_capacity(nr_span_lines);
+        let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() /
+            (nr_span_lines as Float);
 
-        let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() / (nr_span_lines as Float);
-        
         let wake_length = wake_settings.wake_length_factor * average_chord_length;
 
         // Pre-calculate normalized wake vectors to avoid repeated normalization
@@ -97,16 +97,11 @@ impl FrozenWake {
             ViscousCoreLength::NoViscousCore => 0.0,
         };
 
-        for i in 0..nr_span_lines {
-            let vortex = HorseshoeVortex{
-                bound_vortex: [span_lines[i].start_point, span_lines[i].end_point],
-                start_trailing_vortex: [span_lines[i].start_point + wake_vectors[i], span_lines[i].start_point],
-                end_trailing_vortex: [span_lines[i].end_point, span_lines[i].end_point + wake_vectors[i + 1]],
-                viscous_core_length,
-            };
-
-            horseshoe_vortices.push(vortex);
-        }
+        let horseshoe_vortices = HorseshoeVortex::vortices_from_span_lines_and_wake_vectors(
+            &span_lines,
+            &wake_vectors,
+            viscous_core_length
+        );
 
         for row_index in 0..nr_span_lines {
             let ctrl_point = line_force_model.ctrl_points_global[row_index];
@@ -136,7 +131,6 @@ impl FrozenWake {
         span_lines: &[SpanLine],
         wake_vector: SpatialVector,
         viscous_core_length: Float,
-        far_field_ratio: Float,
     ) -> Self {
         let nr_span_lines = span_lines.len();
 
@@ -149,32 +143,23 @@ impl FrozenWake {
             [nr_span_lines, nr_span_lines]
         );
 
-        let mut panels: Vec<Panel> = Vec::with_capacity(nr_span_lines);
+        let wake_vectors = vec![wake_vector; nr_span_lines + 1];
 
-        for i in 0..nr_span_lines {
-            let points = [
-                span_lines[i].start_point + wake_vector,
-                span_lines[i].start_point,
-                span_lines[i].end_point,
-                span_lines[i].end_point + wake_vector,
-            ];
-            let panel = Panel::new(
-                points,
-                far_field_ratio, 
-                viscous_core_length,
-            );
-            panels.push(panel);
-        }
+        let horseshoe_vortices = HorseshoeVortex::vortices_from_span_lines_and_wake_vectors(
+            &span_lines,
+            &wake_vectors,
+            viscous_core_length
+        );
 
         for row_index in 0..nr_span_lines {
             let ctrl_point = ctrl_points[row_index];
 
             for col_index in 0..nr_span_lines {
-                let panel = &panels[col_index];
+                let vortex = &horseshoe_vortices[col_index];
 
-                let induced_velocity = panel.induced_velocity_with_unit_strength(ctrl_point);
+                let u_i = vortex.induced_velocity_with_unit_strength(ctrl_point);
 
-                variable_velocity_factors[[row_index, col_index]] = induced_velocity;
+                variable_velocity_factors[[row_index, col_index]] = u_i;
             }
         }
 
@@ -197,7 +182,11 @@ impl FrozenWake {
         self.fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
     }
 
-    fn update_variable_velocity_factors_full(&mut self, ctrl_points: &[SpatialVector], wake: &DynamicWake) {
+    fn update_variable_velocity_factors_full(
+        &mut self,
+        ctrl_points: &[SpatialVector],
+        wake: &DynamicWake
+    ) {
         let [nr_ctrl_points, nr_panels] = self.variable_velocity_factors.shape;
 
         for panel_index in 0..nr_panels {
@@ -205,8 +194,8 @@ impl FrozenWake {
                 let ctrl_point = ctrl_points[ctrl_point_index];
 
                 let induced_velocity = wake.unit_strength_induced_velocity_from_panel(
-                    0, 
-                    panel_index, 
+                    0,
+                    panel_index,
                     ctrl_point
                 );
 
@@ -215,7 +204,11 @@ impl FrozenWake {
         }
     }
 
-    fn update_variable_velocity_factors_neglect_self_induced(&mut self, ctrl_points: &[SpatialVector], wake: &DynamicWake) {
+    fn update_variable_velocity_factors_neglect_self_induced(
+        &mut self,
+        ctrl_points: &[SpatialVector],
+        wake: &DynamicWake
+    ) {
         let [nr_ctrl_points, nr_panels] = self.variable_velocity_factors.shape;
 
         for panel_index in 0..nr_panels {
@@ -226,21 +219,27 @@ impl FrozenWake {
                 let panel_wing_index      = wake.wing_index(panel_index);
 
                 if ctrl_point_wing_index == panel_wing_index {
-                    self.variable_velocity_factors[[ctrl_point_index, panel_index]] = SpatialVector::default();
+                    self.variable_velocity_factors[[ctrl_point_index, panel_index]] =
+                        SpatialVector::default();
                 } else {
                     let induced_velocity = wake.unit_strength_induced_velocity_from_panel(
-                        0, 
-                        panel_index, 
+                        0,
+                        panel_index,
                         ctrl_point
                     );
 
-                    self.variable_velocity_factors[[ctrl_point_index, panel_index]] = induced_velocity;
+                    self.variable_velocity_factors[[ctrl_point_index, panel_index]] =
+                        induced_velocity;
                 }
             }
         }
     }
 
-    pub fn update_variable_velocity_factors(&mut self, ctrl_points: &[SpatialVector], wake: &DynamicWake) {
+    pub fn update_variable_velocity_factors(
+        &mut self,
+        ctrl_points: &[SpatialVector],
+        wake: &DynamicWake
+    ) {
         if wake.settings.neglect_self_induced_velocities {
             self.update_variable_velocity_factors_neglect_self_induced(ctrl_points, wake);
         } else {
@@ -249,9 +248,9 @@ impl FrozenWake {
     }
 
     /// Update the stored induced velocity at the control points, given the circulation strength.
-    /// 
+    ///
     /// # Arguments
-    /// * `circulation_strength` - the circulation strength of the span lines that make up the 
+    /// * `circulation_strength` - the circulation strength of the span lines that make up the
     /// wake. The strength is assumed to be constant along the length of the span line.
     pub fn update_induced_velocities_at_control_points(
         &mut self,
@@ -264,7 +263,7 @@ impl FrozenWake {
 
         for i_row in 0..nr_rows {
             let row_start = i_row * nr_cols;
-            
+
             // Separate the components to help auto-vectorization
             let mut sum_x = 0.0;
             let mut sum_y = 0.0;
@@ -275,7 +274,7 @@ impl FrozenWake {
                 let idx = row_start + i_col;
                 let strength = circulation_strength[i_col];
                 let factor = &self.variable_velocity_factors.data[idx];
-                
+
                 sum_x += factor.0[0] * strength;
                 sum_y += factor.0[1] * strength;
                 sum_z += factor.0[2] * strength;

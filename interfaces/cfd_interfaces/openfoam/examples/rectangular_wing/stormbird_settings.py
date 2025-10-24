@@ -38,7 +38,7 @@ class StormbirdSettings():
 
         line_force_model = {
             "wing_builders": [wing_builder],
-            "nr_sections": 64,
+            "nr_sections": 32,
             "density": 1.0
         }
 
@@ -49,7 +49,10 @@ class StormbirdSettings():
 
         return {
             "line_force_model": line_force_model,
-            "lifting_line_correction": {}
+            "lifting_line_correction": {},
+            "solver_settings": {
+                "damping_factor": 0.1
+            }
         }
 
     def write_actuator_line_setup_to_file(self, file_path):

@@ -36,7 +36,7 @@ impl LiftingLineCorrectionBuilder {
 
         LiftingLineCorrection {
             viscous_core_length,
-            wake_length_factor: self.wake_length_factor,
+            wake_length_factor: self.wake_length_factor
         }
     }
 }
@@ -51,10 +51,14 @@ impl LiftingLineCorrectionBuilder {
 /// velocities
 pub struct LiftingLineCorrection {
     pub viscous_core_length: Float,
-    pub wake_length_factor: Float,
+    pub wake_length_factor: Float
 }
 
 impl LiftingLineCorrection {
+    /// Computes a difference in the induced velocities between two lifting line simualtions; one
+    /// with a viscous core length equal to the force projection width, and one with a small viscous
+    /// core length. The difference is then returned as a vector of induced velocities at the control
+    /// points of the line force model
     pub fn velocity_correction(
         &self,
         line_force_model: &LineForceModel,
@@ -87,20 +91,16 @@ impl LiftingLineCorrection {
 
             let wake_vector = averaged_ctrl_points_velocity.normalize() * self.wake_length_factor;
 
-            let far_field_ratio = 5.0; // Ratio of far field length to viscous core length
-
             let mut frozen_wake_viscous = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length,
-                far_field_ratio, // far_field_ratio
             );
 
             let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length / 10.0,
-                far_field_ratio, // far_field_ratio
             );
 
             frozen_wake_viscous.update_induced_velocities_at_control_points(
@@ -111,11 +111,11 @@ impl LiftingLineCorrection {
                 &wing_circulation_strength
             );
 
-            let u_i_viscous = &frozen_wake_viscous.induced_velocities_at_control_points;
-            let u_i_default = &frozen_wake_default.induced_velocities_at_control_points;
-
             for i in 0..nr_span_lines {
-                u_i_correction.push(u_i_default[i] - u_i_viscous[i]);
+                u_i_correction.push(
+                    frozen_wake_default.induced_velocities_at_control_points[i] -
+                    frozen_wake_viscous.induced_velocities_at_control_points[i]
+                );
             }
         }
 
