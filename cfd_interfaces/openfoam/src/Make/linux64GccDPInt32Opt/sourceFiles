@@ -1,6 +1,0 @@
-SOURCE = \
-actuator_line.cpp \
-sampling.cpp \
-cpp_actuator_line.cpp \
-
-# sources
