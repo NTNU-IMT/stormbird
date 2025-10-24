@@ -1,4 +1,4 @@
-// Copyright (C) 2024, NTNU 
+// Copyright (C) 2024, NTNU
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see seperate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -24,9 +24,9 @@ namespace Foam {
 
 // Constructor
 Foam::fv::ActuatorLine::ActuatorLine(
-    const word& name, 
-    const word& modelType, 
-    const dictionary& dict, 
+    const word& name,
+    const word& modelType,
+    const dictionary& dict,
     const fvMesh& mesh
 ): cellSetOption(name, modelType, dict, mesh) {
 
@@ -68,7 +68,7 @@ void Foam::fv::ActuatorLine::sync_line_force_model_state() {
     for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
         local_wing_angles.push_back(0.0);
     }
-    
+
     if (Pstream::master()) {
         for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
             local_wing_angles[wing_index] = this->model->get_local_wing_angle(wing_index);
@@ -86,7 +86,7 @@ void Foam::fv::ActuatorLine::sync_line_force_model_state() {
 }
 
 void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
-{   
+{
     const scalarField& cell_volumes = mesh_.V();
     double time_step = mesh_.time().deltaTValue();
     double time = mesh_.time().value();
@@ -103,12 +103,12 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
             this->set_velocity_sampling_data_interpolation();
         } else {
             this->set_velocity_sampling_data_integral();
-            
+
         }
     }
 
     const labelList& cell_ids = this->relevant_cells_for_projection;
-    
+
     // Set the velocity field for the actuator line model
     if (this->model->use_point_sampling()) {
         this->set_interpolated_velocity(velocity_field);
@@ -153,31 +153,31 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
     this->need_update = false;
     if (Pstream::master()) {
         this->need_update = model->update_controller(time, time_step);
-        
+
         this->model->write_results("postProcessing");
     }
     reduce(this->need_update, orOp<bool>());
 }
 
 void Foam::fv::ActuatorLine::addSup(
-    fvMatrix<vector>& eqn, 
+    fvMatrix<vector>& eqn,
     const label field
 ) {
     this->add(eqn.psi(), eqn);
 }
 
 void Foam::fv::ActuatorLine::addSup(
-    const volScalarField& rho, 
-    fvMatrix<vector>& eqn, 
+    const volScalarField& rho,
+    fvMatrix<vector>& eqn,
     const label field
 ) {
     this->add(eqn.psi(), eqn);
 }
 
 void Foam::fv::ActuatorLine::addSup(
-    const volScalarField& alpha, 
-    const volScalarField& rho, 
-    fvMatrix<vector>& eqn, 
+    const volScalarField& alpha,
+    const volScalarField& rho,
+    fvMatrix<vector>& eqn,
     const label field
 ) {
     this->add(eqn.psi(), eqn);
