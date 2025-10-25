@@ -8,15 +8,16 @@ To solvers currently exists: a linearized solver with viscous corrections and a 
 
 The linearized solver creates an equation system like the original lifting line method. The lift-induced velocities are assumed to only affect the angle of attack and the lift as a function of angle of attack is assumed to be linear. More in depth explanations may be found in text books like Anderson (2005).
 
-The result of applying the normal lifting line assumptions is a linear equation system that can be solved for using a conventional linear solver. This solver therefore works by first setting up the system as a matrix and a righ-hand side vector, before solving it using Gaussian elimination.
+The result of applying the normal lifting line assumptions is a linear equation system that can be solved using a conventional linear algebra solver. The linearized solver therefore works by first setting up the equation system as a matrix and a right-hand side vector, before solving it using conventional Gaussian elimination.
 
-However, due to the assumption of linear lift as a function of angle of attack, the resulting circulation that is returned from the solver is without any stall- or other non-linear effects on the lift. To correct for this in a simple viscous correction methods is applied. It consists of the following steps:
+However, the **procedure above is only the first step**. Due to the assumption of linear lift as a function of angle of attack, the resulting circulation that is returned from the solver is without any stall- or other non-linear effects on the lift. To account for this, a simplified viscous correction methods is applied after solving for the circulation strength using a linear solver. It consists of the following steps:
+
 1) Calculate the lift-induced velocities and resulting effective angle of attack with the solved circulation strength
 2) Calculate the lift both with a linearized sectional model and the full sectional model, including stall effects
 3) Correct the solved circulation strength by multiplying it with the full lift and dividing it by the linearized lift
 4) Recalculate lift-induced velocities and effective angles of attack for the final force calculations
 
-This solver is found to work fine for **quasi-steady** cases, but tend to predict **stall at a larger angle of attack** than the full non-linear solver below. However, the stall-issue can be handled by tuning the stall behavior of the sectional model to 3D data of a single sail. For quasi-steady cases it will be significantly faster than running the full non-linear solver described in the next section.
+This solver is found to work fine for **quasi-steady** cases, but do also tend to predict **stall at a larger angle of attack** than the full non-linear solver below. However, the stall-issue can be handled by tuning the stall behavior of the sectional model to 3D data of a single sail. For quasi-steady cases it will be significantly faster than running the full non-linear solver described in the next section, and is therefore set to the default solver for such cases.
 
 ## Non-linear solver using damped iterations
 
@@ -32,7 +33,7 @@ To write step 3 as an equation: The circulation strength at the iteration \\( i 
     \Gamma_i = \Gamma_{i-1} + d (\Gamma_{i, estimated} - \Gamma_{i-1})
 \\]
 
-The benefit of this solver is that it is simple, and generally robust **if** the damping factor is set low enough. More *fancy* solvers may produce quicker results, but can sometimes struggle with instabilities in very non-linear flow conditions. When running unsteady simulations, it is typically not necessary with many iterations for each time step, as the change in the circulation strength is small.
+The benefit of this solver is that it is simple and techncially more correct than the linearized solver, as there are no assumptions about small lift-induced velocities. It will also handle non-linear effects on the lift directly, without any post-solver corrections, like in the case for the linearized solver. It is generally robust **if the damping factor is set low enough**, but may also give noise in the final results right at the stall point in some cases. This is typically handled by applying some [smoothing to the circulation strength](../line_model/circulation_strength.md) in the line force model. It is also the **most suitable solver for unsteady simulations**, which typically do not require many iterations for each time step, as the change in the circulation strength is small.
 
 ## Residual, damping factor, and convergence testing
 
@@ -103,7 +104,7 @@ An explanation of each field is given below:
 - `start_with_linearized_solution`: A boolean that can be set to true if you want the first iteration to estimate the circulation distribution using a linear solver. The rest of the iterations will then use the normal non-linear iterations to update from the linearized solver.
 
 ## Velocity corrections
-Velocity corrections are special models that can be used to alter the resulting lift-induced velocities computed from the circualtion distributions in the solvers. The purpose is two-fold. For once, applying corrections to the lift-induced velocities may stabilize the solver. Second, the velocity corrections may be used to correct for physical effects that are not directly part of the line force model model such as end-disks. The drag on rotor sails, in particular, may be estimated to be too high compared to values estimated with high-fidelity CFD simualtions without some corrections applied to the lift-induced velocties, which is likely due to the presence of the large end-disks on such sails.
+Velocity corrections are special models that can be used to alter the resulting lift-induced velocities computed from the circulation distributions in the solvers. The purpose is two-fold. For one, applying corrections to the lift-induced velocities may stabilize the solver. Second, the velocity corrections may be used to correct for physical effects that are not directly part of the line force model model such as end-disks. The drag on rotor sails, in particular, may be estimated to be too high compared to values estimated with high-fidelity CFD simulations without some corrections applied to the lift-induced velocities, which is likely due to the presence of the large end-disks on such sails.
 
 The velocity corrections are represented by en enum that looks like the following:
 
@@ -116,10 +117,10 @@ pub enum VelocityCorrections {
 }
 ```
 
-The default is to use no corrections, so that the lift-induced velocities from the solver is calculated based on the raw circualtion strength. Then there are two correction methods to chose from:
+The default is to use no corrections, so that the lift-induced velocities from the solver is calculated based on the raw circulation strength. Then there are two correction methods to chose from:
 
-- `MaxInducedVelocityMagnitudeRatio` makes sure the lift-induced velocity magnitude never exceeds a ratio of the freestream velocity. The ratio is supplied as an input. A typical value could to set the ratio to 1.0, which would be the same as saying that the lift-induced velocity should never exceed the freestream magnitude.
-- `FixedMagnitudeEqualToFreestream` computes a velocity vector based on the raw lift-induced velocity and the freestream that is limited in magnitude to the freestream velocity. That is, this correction allows the lif-induced velocity to change the orientation of the effective velocity at each line segmwent, but not the magnitude. This can, for instance, force the non-linear solver to behave more like a linear solver.
+- `MaxInducedVelocityMagnitudeRatio` makes sure the lift-induced velocity magnitude never exceeds a ratio of the freestream velocity. The ratio is supplied as an input. A typical value could be to set the ratio to 1.0, which would be the same as saying that the lift-induced velocity should never exceed the freestream magnitude.
+- `FixedMagnitudeEqualToFreestream` computes a velocity vector based on the raw lift-induced velocity and the freestream that is limited in magnitude to the freestream velocity but allowed to rotate freely. That is, this correction allows the lift-induced velocity to change the orientation of the effective velocity at each line segment, but not the magnitude. This can, for instance, be used to force the non-linear solver to behave more like a linear solver.
 
 ## References
 - Anderson, J. D., 2005. Fundamentals of Aerodynamics. Fourth edition. McGraw hill
