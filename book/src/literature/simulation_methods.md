@@ -38,7 +38,13 @@ By R. F. Mikkelsen. A PhD thesis that include investigations of actuator line mo
 By L A. Martinez et al. A paper that tests different settings for actuator line simulations. Can be downloaded [here](https://www.researchgate.net/publication/271374677_A_Comparison_of_Actuator_Disk_and_Actuator_Line_Wind_Turbine_Models_and_Best_Practices_for_Their_Use)
 
 #### An Advanced Actuator Line Method for Wind Energy Applications and Beyond, 2017
-By M. Churchfield et al. Introduces two "advanced" functionalities for actuator line simulations (both of which are also available in Stormbird): the concept of an anisotropic force distribution and weighted integral sampling of the control point velocity. Can be downloaded [here](https://www.nrel.gov/docs/fy17osti/67611.pdf)
+By M. Churchfield et al. Introduces two "advanced" functionalities for actuator line simulations (both of which are also available in Stormbird): the concept of an anisotropic force distribution and weighted integral sampling of the control point velocity. Results from this paper suggest that the shape of the force projection can have a large influence on the accuracy, and that an anisotropic force projection is more correct than an isotropic one. Can be downloaded [here](https://www.nrel.gov/docs/fy17osti/67611.pdf)
+
+#### Spanwise Flow Corrections for Tidal Turbines, 2018
+By A. Wimshurst and R. Willden. A paper that discusses different spanwise flow corrections in the context of using actautor line models for tidal turbines. Can be downloaded [here](https://www.researchgate.net/publication/336979652_Spanwise_flow_corrections_for_tidal_turbines)
+
+#### A new tip correction for actuator line computations, 2020
+By K. O. Dag and J. N. Sørensen. A paper that introduces a new tip correction method for actuator line simulations based on lifting line theory. They suggest to run to lifting line calculations in parallel with the actuator line simulation; one with a viscous core length equal to the force projection width, and one with a very small core length. The difference in velocity can then be used to correct the raw sampled velocity from the CFD grid. The same method is available in Stormbird. Can be downloaded [here](https://onlinelibrary.wiley.com/doi/epdf/10.1002/we.2419)
 
 #### A RANS-BEM Method to Efficiently Include Appendage Effects in RANS-Based Hull Shape Evaluation, 2021
 By H. Renzsch et al. A paper about the use of actuator lines to model a sail boat keel.Can be downloaded [here](https://www.researchgate.net/publication/350027407_A_RANS-BEM_Method_to_Efficiently_Include_Appendage_Effects_in_RANS-Based_Hull_Shape_Evaluation)
