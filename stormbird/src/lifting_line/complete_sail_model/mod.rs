@@ -117,10 +117,11 @@ impl CompleteSailModel {
         let linear_velocity = ship_velocity * self.wind_environment.zero_direction_vector;
 
         let freestream_velocity = self.wind_environment
-            .apparent_wind_velocity_vectors_at_locations(
+            .apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
                 wind_condition,
                 &freestream_velocity_points,
-                linear_velocity
+                linear_velocity,
+                &self.lifting_line_simulation.line_force_model,
             );
 
         freestream_velocity

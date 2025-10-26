@@ -21,7 +21,7 @@ This solver is found to work fine for **quasi-steady** cases, but do also tend t
 
 ## Non-linear solver using damped iterations
 
-The second solver is inspired by a simple approach outlined in Anderson (2005), chapter 5.4. The basic principle is to start with a first guess of the circulation distribution and then slowly update the values based on iterative calculations of the lift-induced velocities. In short, for every iteration of a lifting line solver, the following is calculated:
+The second solver is inspired by a simple approach outlined in [Anderson (2005), chapter 5.4](../literature/simulation_methods.md#fundamentals-of-aerodynamics-2005). The basic principle is to start with a first guess of the circulation distribution and then slowly update the values based on iterative calculations of the lift-induced velocities. In short, for every iteration of a lifting line solver, the following is calculated:
 
 1) The lift-induced velocities from the [wake model](wake.md), where the circulation strength from the last iteration (or initial guess, if it is the first iteration) is used as input to the wake model.
 2) A new estimation of the [circulation strength on the line force model](./../line_model/circulation_strength.md) with the current estimate of the lift-induced velocities as input.
@@ -121,6 +121,3 @@ The default is to use no corrections, so that the lift-induced velocities from t
 
 - `MaxInducedVelocityMagnitudeRatio` makes sure the lift-induced velocity magnitude never exceeds a ratio of the freestream velocity. The ratio is supplied as an input. A typical value could be to set the ratio to 1.0, which would be the same as saying that the lift-induced velocity should never exceed the freestream magnitude.
 - `FixedMagnitudeEqualToFreestream` computes a velocity vector based on the raw lift-induced velocity and the freestream that is limited in magnitude to the freestream velocity but allowed to rotate freely. That is, this correction allows the lift-induced velocity to change the orientation of the effective velocity at each line segment, but not the magnitude. This can, for instance, be used to force the non-linear solver to behave more like a linear solver.
-
-## References
-- Anderson, J. D., 2005. Fundamentals of Aerodynamics. Fourth edition. McGraw hill

@@ -1,5 +1,5 @@
 # Lifting line simulations
-The basics of the lifting line simulations in Stormbird have a lot in common with the classical approaches made by Lanchester (1907) and Prandtl (1918) more than 100 years ago, and which are also often taught in many introduction courses for fluid dynamics and lifting surfaces (e.g., in text books like Anderson (2005)). That is, the overall concept and equations is the same. The wing geometry is reduced to vortex lines along the span, the lift and circulation on the line elements are estimated from the local velocity and angle of attack based on a two-dimensional sectional model, and the lift-induced velocities due to the estimated circulation is calculated based on a potential theory wake model.
+The basics of the lifting line simulations in Stormbird have a lot in common with the classical approaches made by Lanchester (1907) and Prandtl (1918) more than 100 years ago, and which are also often taught in many introduction courses for fluid dynamics and lifting surfaces (e.g., the text books in the [literature chapters](../literature/simulation_methods.md)). That is, the overall concept and equations is the same. The wing geometry is reduced to vortex lines along the span, the lift and circulation on the line elements are estimated from the local velocity and angle of attack based on a two-dimensional sectional model, and the lift-induced velocities due to the estimated circulation is calculated based on a potential theory wake model.
 
 However, the Stormbird implementation also differs from the classical lifting line approach in at least three broad-stroke ways, explained further in the subsections below
 
@@ -17,9 +17,7 @@ The classical methods assumes that both the wing and the wake is completely flat
 
 As already explained in the [line model chapter](./../line_model/line_model_intro.md), simulation models are built up of several discrete line elements. This makes it possible to have arbitrary shaped wings, and have multiple wings together in the same simulations. To make this possible in a lifting line simulation, it is necessary with some way to calculate *induced velocities* from a line element. This is done by assuming that each line line element is a *constant strength vortex line*.
 
-Such vortex lines are also often used in panel methods or vortex lattice methods to represent *doublet panels*. See for instance Katz and Plotkin (2001) for more details of such methods.
-
-The exact formulation for the induced velocity as a function of line geometry and strength are taken from the [VSAERO theory document](https://ntrs.nasa.gov/api/citations/19900004884/downloads/19900004884.pdf), found in the link or in Maskew (1987)
+Such vortex lines are also often used in panel methods or vortex lattice methods to represent *doublet panels*. The exact formulation for the induced velocity as a function of line geometry and strength are taken from the [VSAERO theory document](../literature/simulation_methods.md#vsaero-theory-document-1987)
 
 ## Unsteady simulations and dynamic wakes
 
@@ -34,8 +32,5 @@ For a single conventional wing, the shape of the vortex wake is typically not th
 [^note]: It is also possible to turn this of to increase the computational speed. See the [wake builders section](./wake_builders.md) for more
 
 ## References
-- Anderson, J. D., 2005. Fundamentals of Aerodynamics. Fourth edition. McGraw hill
-- Katz, J., Plotkin, A., 2001. Low-speed aerodynamics. Vol 13. Cambridge university press
 - Lanchester, F. W., 1907. Aerodynamics: Constituting the First Volume of a Complete Work on Aerial Flight
-- Maskew, B., 1987. Program VSAERO Theory Document. NASA technical report.
 - Prandtl, L., 1918. Tragflügeltheorie. Königliche Gesellschaft der Wissenschaften zu Göttingen.

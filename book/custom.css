@@ -1,0 +1,7 @@
+h4 {
+    margin-bottom: 0.1em; /* Adjust this value as needed */
+}
+
+h4 + p {
+    margin-top: 0.2em;
+}

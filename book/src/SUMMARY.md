@@ -29,7 +29,7 @@
     - [Corrections](./actuator_line/corrections.md)
     - [OpenFOAM interface](./actuator_line/openfoam_interface.md)
 - [Other functionalities](./utils/utils_intro.md)
-    - [Effective wind model](./utils/wind_model.md)
+    - [Wind environment](./utils/wind_environment.md)
     - [Control system](./utils/control_system.md)
     - [Empirical models](./utils/empirical_models.md)
 - [Literature](./literature/literature_intro.md)

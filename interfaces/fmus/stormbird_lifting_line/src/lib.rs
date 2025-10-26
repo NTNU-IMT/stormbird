@@ -575,6 +575,11 @@ impl StormbirdLiftingLine {
         };
 
         let out = if let Some(env) = &self.wind_environment {
+            let apparent_wind_direction = env.apparent_wind_direction_from_condition_and_linear_velocity(
+                wind_condition,
+                linear_velocity
+            );
+
             let mut freestream_velocity = env.apparent_wind_velocity_vectors_at_locations(
                 wind_condition,
                 &freestream_velocity_points,
@@ -587,6 +592,7 @@ impl StormbirdLiftingLine {
                 let wing_indices = model.line_force_model.wing_indices.clone();
 
                 env.apply_inflow_corrections(
+                    apparent_wind_direction,
                     &mut freestream_velocity,
                     non_dimensional_span_distances,
                     wing_indices
