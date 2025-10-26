@@ -14,57 +14,57 @@ use crate::error::Error;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Parametric model of a foil profile that can compute lift and drag coefficients.
-/// 
+///
 /// The reason for using a parametric model, rather than a data based table look-up, is two fold:
-/// 
+///
 /// 1) It becomes easier to use this model as a building block for more complex foil models, where
-/// the behavior depends on some internal state, such as flap angle or suction rate, because the 
+/// the behavior depends on some internal state, such as flap angle or suction rate, because the
 /// parameters can be allowed to depend on the internal state through interpolation.
-/// 2) A parametric model ensures smoothness, which is important when using the model in 
-/// some form optimization, for instance to maximize thrust for a given wind direction. The 
-/// smoothness is in particular practical when the expected optimal point is close to the stall 
-/// angle 
-/// 
+/// 2) A parametric model ensures smoothness, which is important when using the model in
+/// some form optimization, for instance to maximize thrust for a given wind direction. The
+/// smoothness is in particular practical when the expected optimal point is close to the stall
+/// angle
+///
 /// The model is divided in two core sub-models
-/// 1) For angles of attack below stall, it is assumed that both lift and drag can be represented 
-/// accurately as simple polynomials. The lift is mostly linear, but can also have an optional 
-/// high-order term where both the factor and power of the term is adjustable. The drag is assumed 
+/// 1) For angles of attack below stall, it is assumed that both lift and drag can be represented
+/// accurately as simple polynomials. The lift is mostly linear, but can also have an optional
+/// high-order term where both the factor and power of the term is adjustable. The drag is assumed
 /// to be represented as a second order polynomial.
 /// 2) FOr angles of attack above stall, both the lift and drag are assumed to be harmonic functions
-/// which primarily is adjusted by setting the *max value* after stall. This is a rough model, which 
-/// is assumed to be appropriate as the pre-stall behavior is usually more important for a 
+/// which primarily is adjusted by setting the *max value* after stall. This is a rough model, which
+/// is assumed to be appropriate as the pre-stall behavior is usually more important for a
 /// wind power device.
-/// 
+///
 /// The transit between the two models is done using a sigmoid function, where both the transition
 /// point and the width of the transition can be adjusted.
-/// 
-/// In addition, there factors in the model to account for added mass and lift due to the time 
+///
+/// In addition, there factors in the model to account for added mass and lift due to the time
 /// derivative of the angle of attack. Both these effects are assumed to be linear for simplicity.
 pub struct Foil {
     #[serde(default)]
-    /// Lift coefficient at zero angle of attack. This is zero by default, but can be set to a 
+    /// Lift coefficient at zero angle of attack. This is zero by default, but can be set to a
     /// non-zero value to account for camber, flap angle or boundary layer suction/blowing.
     pub cl_zero_angle: Float,
     #[serde(default="Foil::default_cl_initial_slope")]
     /// How fast the lift coefficient increases with angle of attack, when the angle of attack is
-    /// small. The default value is 2 * pi, which is a typical value for a normal foil profile, 
-    /// but it can also be set to different value for instance to account for boundary layer 
+    /// small. The default value is 2 * pi, which is a typical value for a normal foil profile,
+    /// but it can also be set to different value for instance to account for boundary layer
     /// suction/blowing.
     pub cl_initial_slope: Float,
     #[serde(default)]
-    /// Optional proportionality factor for adding higher order terms to the lift. Is zero by 
+    /// Optional proportionality factor for adding higher order terms to the lift. Is zero by
     /// default, and therefore not used. Can be used to adjust the behavior of the lift curve close
     /// to stall.
     pub cl_high_order_factor: Float,
     #[serde(default)]
-    /// Option power for adding higher order terms to the lift. Is zero by default, and therefore 
+    /// Option power for adding higher order terms to the lift. Is zero by default, and therefore
     /// not used. Can be used to adjust the behavior of the lift curve close to stall.
     pub cl_high_order_power: Float,
     #[serde(default="Foil::default_one")]
-    /// The maximum lift coefficient after stall. 
+    /// The maximum lift coefficient after stall.
     pub cl_max_after_stall: Float,
     #[serde(default)]
-    /// Minimum drag coefficient angle of attack
+    /// Minimum drag coefficient when the angle of attack is equal to the `angle_cd_min`.
     pub cd_min: Float,
     #[serde(default)]
     /// The angle where the the minimum drag coefficient is reached
@@ -76,12 +76,12 @@ pub struct Foil {
     /// The maximum drag coefficient after stall.
     pub cd_max_after_stall: Float,
     #[serde(default="Foil::default_cd_power_after_stall")]
-    /// Power factor for the harmonic dependency of the drag coefficient after stall. Set to 1.6 by 
+    /// Power factor for the harmonic dependency of the drag coefficient after stall. Set to 1.6 by
     /// default.
     pub cd_power_after_stall: Float,
     #[serde(default)]
     /// factor that can be used to correct for numerical errors in the lift-induced drag. Set to a
-    /// a positive value to increase the drag, and a negative value to decrease the drag. The 
+    /// positive value to increase the drag, and a negative value to decrease the drag. The
     /// default is zero, which means no correction.
     pub cdi_correction_factor: Float,
     #[serde(default="Foil::default_mean_stall_angle")]
@@ -100,8 +100,8 @@ pub struct Foil {
     /// pre- and post-stall drag models.
     pub cd_bump_during_stall: Float,
     #[serde(default)]
-    /// Optional offset to the stall angle for the drag coefficient. This can be used to tune the 
-    /// drag curve to better fit experimental data. The default is zero, which means that stall 
+    /// Optional offset to the stall angle for the drag coefficient. This can be used to tune the
+    /// drag curve to better fit experimental data. The default is zero, which means that stall
     /// effects on the drag starts at the same angle of attack as for the lift. When the offset is
     /// set to any value, the "amount of stall" function is shifted by this value for the case of
     /// the drag coefficient only.
@@ -119,7 +119,7 @@ fn get_stall_angle(angle_of_attack: Float) -> Float {
         }
 
         effective *= angle_of_attack.signum();
-    
+
     effective
 }
 
@@ -139,9 +139,9 @@ impl Foil {
     pub fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
-    
+
     /// Calculates the lift coefficient for a given angle of attack.
-    /// 
+    ///
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
@@ -164,8 +164,8 @@ impl Foil {
         } else {
             0.0
         };
-        
-        self.lift_coefficient_linear(angle_of_attack) + 
+
+        self.lift_coefficient_linear(angle_of_attack) +
         self.cl_high_order_factor * angle_high_power
     }
 
@@ -195,7 +195,7 @@ impl Foil {
     }
 
     /// Calculates the drag coefficient for a given angle of attack.
-    /// 
+    ///
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
@@ -232,9 +232,9 @@ impl Foil {
     }
 
     /// Calculates the added mass force in the direction of the heave motion of the foil.
-    /// 
+    ///
     /// # Arguments
-    /// * `heave_acceleration` - Acceleration of the flow around the foil normal to the chord 
+    /// * `heave_acceleration` - Acceleration of the flow around the foil normal to the chord
     /// length. That is, the opposite of the acceleration of the foil itself.
     pub fn added_mass_coefficient(&self, heave_acceleration: Float) -> Float {
         self.added_mass_factor * heave_acceleration
@@ -252,8 +252,8 @@ impl Foil {
         };
 
         special_functions::sigmoid_zero_to_one(
-            effective_angle.abs(), 
-            mean_stall_angle, 
+            effective_angle.abs(),
+            mean_stall_angle,
             self.stall_range
         )
     }

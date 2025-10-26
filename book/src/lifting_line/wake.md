@@ -1,4 +1,4 @@
-# Lifting line Wake
+# Lifting line wake
 
 The vortex wakes from the wings are the most important part of a lifting line simulation. They are responsible for modeling how the velocity is affected by the wings themselves. How the velocity should be calculated depends on a several settings variables. Setting up a wake model is therefore done using "wake builders" which both contain settings used directly by the final wake structures and settings used for initializing the wake structures. An overview of the fields available in the wake builders are given in this section.
 
@@ -75,4 +75,4 @@ pub struct DynamicWakeBuilder {
 
 All values have default values which should make sense in most situations. The most common variable to adjust will be `nr_panels_per_line_element`, the `write_wake_data_to_file`, and the `wake_files_folder_path`. The first determines the number of panels in the streamwise direction. The two second variables are used if you want to export the wake panels to a files for visualizations. If `write_wake_data_to_file` is set to true, the wake panels will be exported as `.vtk` files to the folder defined by the `wake_files_folder_path` string.
 
-For the rest of the variables, see the explanation in the code documentation [LINK TO COME]
+For the rest of the variables, see the explanation in the [code documentation](https://docs.rs/stormbird/0.7.0/stormbird/)

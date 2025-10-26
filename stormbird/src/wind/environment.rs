@@ -22,7 +22,7 @@ use super::wind_condition::WindCondition;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Structure used to represent a wind environment. Can be used to query about the wind velocity at 
+/// Structure used to represent a wind environment. Can be used to query about the wind velocity at
 /// different locations
 pub struct WindEnvironment {
     #[serde(default)]
@@ -59,13 +59,13 @@ impl WindEnvironment {
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
-        
+
         Ok(serde_res)
     }
 
     pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
         let json_string = std::fs::read_to_string(file_path)?;
-        
+
         Self::from_json_string(&json_string)
     }
 
@@ -125,27 +125,53 @@ impl WindEnvironment {
             .collect()
     }
 
+    /// The main method to get the apparent wind velocity vectors at the input locations, given a
+    /// wind condition and a linear velocity of the body
     pub fn apparent_wind_velocity_vectors_at_locations(
         &self,
         condition: WindCondition,
         locations: &[SpatialVector],
-        linear_velocity: SpatialVector
+        linear_velocity: SpatialVector,
     ) -> Vec<SpatialVector> {
-        let mut true_wind = self.true_wind_velocity_vectors_at_locations(
-            condition, 
+        let mut wind = self.true_wind_velocity_vectors_at_locations(
+            condition,
             locations
         );
 
-        for i in 0..true_wind.len() {
-            true_wind[i] += linear_velocity;
+        for i in 0..wind.len() {
+            wind[i] += linear_velocity;
         }
 
-        true_wind
+        wind
+    }
+
+    pub fn apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
+        &self,
+        condition: WindCondition,
+        locations: &[SpatialVector],
+        linear_velocity: SpatialVector,
+        line_force_model: &LineForceModel
+    ) -> Vec<SpatialVector> {
+        let mut wind = self.apparent_wind_velocity_vectors_at_locations(
+            condition,
+            locations,
+            linear_velocity
+        );
+
+        self.apply_inflow_corrections(
+            condition.direction_coming_from,
+            &mut wind,
+            &line_force_model.ctrl_point_spanwise_distance_non_dimensional,
+            line_force_model.wing_indices.clone()
+        );
+
+        wind
     }
 
     /// Applies inflow corrections to the first points in the input freestream velocity
     pub fn apply_inflow_corrections(
         &self,
+        apparent_wind_directions: Float,
         freestream_velocity: &mut [SpatialVector],
         non_dimensional_span_distances: &[Float],
         wing_indices_vector: Vec<Range<usize>>,
@@ -156,9 +182,10 @@ impl WindEnvironment {
 
                 for i in wing_indices.start..wing_indices.end {
                     freestream_velocity[i] = corrections.correct_velocity(
-                        wing_index, 
-                        non_dimensional_span_distances[i], 
-                        freestream_velocity[i], 
+                        wing_index,
+                        apparent_wind_directions,
+                        non_dimensional_span_distances[i],
+                        freestream_velocity[i],
                         self.up_direction
                     )
                 }
@@ -166,32 +193,50 @@ impl WindEnvironment {
         }
     }
 
-    /// Measures the apparent wind direction based on the input velocity vectors, where the sign and 
+    pub fn apparent_wind_direction_from_condition_and_linear_velocity(
+        &self,
+        condition: WindCondition,
+        linear_velocity: SpatialVector
+    ) -> Float {
+        let true_wind_vector = condition.velocity * self.zero_direction_vector.rotate_around_axis(
+            condition.direction_coming_from,
+            self.wind_rotation_axis
+        );
+
+        let apparent_velocity_vector = true_wind_vector + linear_velocity;
+
+        self.zero_direction_vector.signed_angle_between(
+            apparent_velocity_vector,
+            self.wind_rotation_axis
+        )
+    }
+
+    /// Measures the apparent wind direction based on the input velocity vectors, where the sign and
     /// magnitude is defined by the zero_direction_vector and the wind_rotation_axis.
     pub fn apparent_wind_directions_from_velocity_based_on_rotation_axis(
-        &self, 
+        &self,
         velocity: &[SpatialVector]
     ) -> Vec<Float> {
         velocity.iter().map(|velocity| {
             self.zero_direction_vector.signed_angle_between(
-                *velocity, 
+                *velocity,
                 self.wind_rotation_axis
             )
         }).collect()
     }
 
     /// Measures the apparent wind direction based on the input velocity vectors, where the sign is
-    /// defined by the local, non-rotated, chord vector and rotation-axis of each wing in the line 
+    /// defined by the local, non-rotated, chord vector and rotation-axis of each wing in the line
     /// force model. This, then, gives the wind direction relative to the local coordinate system
     /// for each wing. A direction of zero means that the flow is aligned with the non-rotated chord
     pub fn apparent_wind_direction_from_velocity_and_line_force_model(
-        &self, 
+        &self,
         velocity: &[SpatialVector],
         line_force_model: &LineForceModel
     ) -> Vec<Float> {
 
         let nr_span_lines = line_force_model.nr_span_lines();
-        
+
         let mut out = Vec::with_capacity(nr_span_lines);
 
         for i in 0..nr_span_lines {
@@ -207,7 +252,7 @@ impl WindEnvironment {
 
             out.push(
                 chord_local_transformed.signed_angle_between(
-                    velocity[i], 
+                    velocity[i],
                     rotation_axis
                 )
             );
@@ -275,5 +320,3 @@ mod tests {
         dbg!(south_vector);
     }
 }
-
-    

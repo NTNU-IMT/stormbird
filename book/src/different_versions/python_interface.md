@@ -60,6 +60,44 @@ foil_model = VaryingFoil(input_string)
 ```
 The same example with the `stormbird_setup` library would look like this:
 
-```
-TO COME
+```python
+import numpy as np
+from pystormbird.section_models import VaryingFoil
+
+# General structures for storing the right variables in a class
+from stormbird_setup.direct_setup.section_models import Foil
+
+# Change the name of the VaryingFoil class from stormbird_setup to avoid name clash
+from stormbird_setup.direct_setup.section_models import VaryingFoil as VaryingFoilSetup
+
+
+# Parameters for the model, representing the foil forces at different lap angles
+flap_angles = np.radians([0, 5, 10, 15])
+
+cl_zero_angle = np.array([0.0, 0.3454, 0.7450, 1.0352])
+mean_stall_angle = np.radians([20.0, 19.0 , 17.8, 16.5])
+
+cd_zero_angle = np.array([0.0101, 0.0154, 0.0328, 0.0542])
+cd_second_order_factor = np.array([0.6, 0.9, 1.2, 1.5])
+
+# Loop over the parameters to create individual foil models
+foils_data = []
+for i_flap in range(len(flap_angles)):
+    foils_data.append(
+        Foil(
+            cl_zero_angle: cl_zero_angle[i_flap],
+            cd_zero_angl: cd_zero_angle[i_flap],
+            cd_second_order_factor: cd_second_order_factor[i_flap],
+            mean_stall_angle: mean_stall_angle[i_flap]
+        )
+    )
+
+# Collect the foil models into a "varying foil" model
+varying_foil_setup = VaryingFoilSetup(
+    internal_state_data = flap_angles.tolist(),
+    foils_data = foils_data
+)
+
+# Pass it to the Stormbird library
+foil_model = VaryingFoil(varying_foil_setup.to_json_string())
 ```

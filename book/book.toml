@@ -7,3 +7,4 @@ title = "Stormbird"
 
 [output.html]
 mathjax-support = true
+additional-css = ["custom.css"]

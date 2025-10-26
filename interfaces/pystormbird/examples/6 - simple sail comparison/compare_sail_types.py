@@ -61,11 +61,6 @@ if __name__ == "__main__":
             wind_environment=wind_environment,
         )
 
-        model_builder.lifting_line_simulation.simulation_settings.solver = SimpleIterative(
-            max_iterations_per_time_step = 1000,
-            damping_factor = 0.02
-        )
-
         model = CompleteSailModel(model_builder.to_json_string())
 
         thrust = np.zeros_like(wind_directions_deg)
@@ -100,7 +95,7 @@ if __name__ == "__main__":
 
         ax_power.plot(
             wind_directions_deg,
-            power_net / 1000.0,
+            power_net / area,
             label=f"{sail_type.value} effective",
             color=default_colors[sail_index]
         )
@@ -108,7 +103,7 @@ if __name__ == "__main__":
         if sail.sail_type.consumes_power():
             ax_power.plot(
                 wind_directions_deg,
-                propulsive_power / 1000.0,
+                propulsive_power / area,
                 linestyle='--',
                 label=f"{sail_type.value} propulsive",
                 color=default_colors[sail_index]
@@ -124,7 +119,7 @@ if __name__ == "__main__":
     ax_power.set_xlabel("Wind direction (deg)")
     ax_control.set_xlabel("Wind direction (deg)")
 
-    ax_power.set_ylabel("Power (kW)")
+    ax_power.set_ylabel("Power per area (W/m^2)")
     ax_control.set_ylabel("Control Surface Setting (rad or spin ratio)")
 
     ax_power.legend()

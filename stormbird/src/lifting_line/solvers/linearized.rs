@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use serde::{Deserialize, Serialize};
+use stormath::type_aliases::Float;
 
 use crate::lifting_line::prelude::SolverResult;
 use crate::line_force_model::LineForceModel;
@@ -54,16 +55,16 @@ impl Linearized {
         &self,
         line_force_model: &LineForceModel,
         felt_ctrl_points_freestream: &[SpatialVector],
-        frozen_wake: &mut FrozenWake    
+        frozen_wake: &mut FrozenWake
     ) -> SolverResult {
-        
+
         let nr_unknowns = line_force_model.nr_span_lines();
 
         let mut ctrl_points_velocity = felt_ctrl_points_freestream.to_vec();
 
         // Check if there is any lift to solve for at all
         let pre_solver_res = self.check_for_zero_linear_lift(
-            line_force_model, 
+            line_force_model,
             &ctrl_points_velocity
         );
 
@@ -93,12 +94,12 @@ impl Linearized {
 
         // Compute lift coefficients
         let angles_of_attack = line_force_model.angles_of_attack(
-            &ctrl_points_velocity, 
+            &ctrl_points_velocity,
             CoordinateSystem::Global
         );
-        
+
         let cl_linear = line_force_model.lift_coefficients_linear(
-            &angles_of_attack, 
+            &angles_of_attack,
             &ctrl_points_velocity
         );
 
@@ -121,7 +122,7 @@ impl Linearized {
 
                 if i_row == i_col {
                     // Lift due to circulation
-                    equation_matrix[[i_row, i_col]] += 2.0 / 
+                    equation_matrix[[i_row, i_col]] += 2.0 /
                         ( line_force_model.chord_lengths[i_row] * u_t);
                 }
             }
@@ -132,10 +133,10 @@ impl Linearized {
         // Solve for the circulation strength
         let mut circulation_strength = equation_matrix.solve_gaussian_elimination(&rhs).unwrap();
 
-        frozen_wake.update_induced_velocities_at_control_points(&circulation_strength); 
+        frozen_wake.update_induced_velocities_at_control_points(&circulation_strength);
 
         let corrected_velocity = self.velocity_corrections.corrected_velocity(
-            felt_ctrl_points_freestream, 
+            felt_ctrl_points_freestream,
             &frozen_wake.induced_velocities_at_control_points
         );
 
@@ -143,8 +144,8 @@ impl Linearized {
             ctrl_points_velocity = velocity
         } else {
             for i in 0..nr_unknowns {
-                ctrl_points_velocity[i] = 
-                    felt_ctrl_points_freestream[i] + 
+                ctrl_points_velocity[i] =
+                    felt_ctrl_points_freestream[i] +
                     frozen_wake.induced_velocities_at_control_points[i];
             }
         }
@@ -152,12 +153,12 @@ impl Linearized {
         // Calculate corrections on the circulation due to viscous effects
         if !self.disable_viscous_corrections {
             let angles_of_attack = line_force_model.angles_of_attack(
-                &ctrl_points_velocity, 
+                &ctrl_points_velocity,
                 CoordinateSystem::Global
             );
 
             let cl_linear = line_force_model.lift_coefficients_linear(
-                &angles_of_attack, 
+                &angles_of_attack,
                 &ctrl_points_velocity
             );
 
@@ -167,7 +168,9 @@ impl Linearized {
             );
 
             for i in 0..circulation_strength.len() {
-                circulation_strength[i] *= cl_full[i] / cl_linear[i]
+                if cl_linear[i].abs() > Float::MIN_POSITIVE {
+                    circulation_strength[i] *= cl_full[i] / cl_linear[i]
+                }
             }
 
             match &self.induced_velocity_correction_method {
@@ -176,9 +179,9 @@ impl Linearized {
                     frozen_wake.update_induced_velocities_at_control_points(&circulation_strength);
                 }
             }
-            
+
             let corrected_velocity = self.velocity_corrections.corrected_velocity(
-                felt_ctrl_points_freestream, 
+                felt_ctrl_points_freestream,
                 &frozen_wake.induced_velocities_at_control_points
             );
 
@@ -186,20 +189,20 @@ impl Linearized {
                 ctrl_points_velocity = velocity
             } else {
                 for i in 0..nr_unknowns {
-                    ctrl_points_velocity[i] = 
-                        felt_ctrl_points_freestream[i] + 
+                    ctrl_points_velocity[i] =
+                        felt_ctrl_points_freestream[i] +
                         frozen_wake.induced_velocities_at_control_points[i];
                 }
             }
         }
 
         let angles_of_attack = line_force_model.angles_of_attack(
-            &ctrl_points_velocity, 
+            &ctrl_points_velocity,
             CoordinateSystem::Global
         );
 
         let residual = line_force_model.average_residual_absolute(
-            &circulation_strength, 
+            &circulation_strength,
             &angles_of_attack,
             &ctrl_points_velocity
         );
@@ -256,4 +259,3 @@ impl Linearized {
         }
     }
 }
- 
