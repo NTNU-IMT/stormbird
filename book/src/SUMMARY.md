@@ -12,6 +12,7 @@
     - [Circulation strength](./line_model/circulation_strength.md)
     - [Move and modify a line model](./line_model/move_line_models.md)
     - [Force calculations](./line_model/force_calculations.md)
+    - [Input power](./line_model/input_power.md)
 - [Sectional models](./sectional_models/sectional_models_intro.md)
     - [Foil model](./sectional_models/foil_model.md)
     - [Varying foil model](./sectional_models/varying_foil_model.md)

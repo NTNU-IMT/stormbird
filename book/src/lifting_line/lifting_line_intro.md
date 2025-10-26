@@ -4,7 +4,7 @@ The basics of the lifting line simulations in Stormbird have a lot in common wit
 However, the Stormbird implementation also differs from the classical lifting line approach in at least three broad-stroke ways, explained further in the subsections below
 
 ## Non-linear solver
-In the classical lifting line method, the circulation is found by solving a *simplfied linearized equation system*. The system is based on the assumptions that the lift-induced velocities are small and that there is a linear relationship between the lift and vertical induced velocities on the wing. As a consequence, only a single equations system must be solved for each free stream condition, which makes the solution fast and simple.
+In the classical lifting line method, the circulation is found by solving a *simplified linearized equation system*. The system is based on the assumptions that the lift-induced velocities are small and that there is a linear relationship between the lift and vertical induced velocities on the wing. As a consequence, only a single equations system must be solved for each free stream condition, which makes the solution fast and simple.
 
 The big problem with this type of solver in the context of wind propulsion devices is that the final solution does not include viscous effects on the lift. Viscous effects are, for instance, important when wing sails or suction sails are operated close to stall. In addition, the assumption about small lift-induced velocities may not be correct for high-lift wind propulsion types, such as rotor- and suction sails.
 
@@ -23,9 +23,9 @@ The exact formulation for the induced velocity as a function of line geometry an
 
 ## Unsteady simulations and dynamic wakes
 
-The final extension from the classical lifting line approach is the inclusion of dynamic wakes and unsteady modelling. This means that the wings can move during a simulation, and the velocity input can change as a function of time.
+The final extension from the classical lifting line approach is the inclusion of dynamic wakes and unsteady modeling. This means that the wings can move during a simulation, and the velocity input can change as a function of time.
 
-Unsteady simulations comes in two flavours: 1) **quasi-steady** and 2) **dynamic**. In the quasi-steady case, the wake is as it is in a conventional lifting line simulation: It consist of *horseshoe* vortices that extend far downstream from the span lines of each wing for every time step. However, unsteady behavior is still modeled by changes in the *felt velocity* at the line elements due to the motion of the wings or changes in the freestream input.
+Unsteady simulations comes in two flavors: 1) **quasi-steady** and 2) **dynamic**. In the quasi-steady case, the wake is as it is in a conventional lifting line simulation: It consist of *horseshoe* vortices that extend far downstream from the span lines of each wing for every time step. However, unsteady behavior is still modeled by changes in the *felt velocity* at the line elements due to the motion of the wings or changes in the freestream input.
 
 In the dynamic case, the wake modeled is extended to consist of many doublet panels, similar to how it would be in an unsteady panel- or vortex lattice method. Both the strength and the shape of the wake panels will vary as a function of time, which allows for proper dynamic modeling of the lift. That is, the lift-induced velocities depend not only on the current *state* of the line model, but also the history of previous states.
 

@@ -1,3 +1,5 @@
+
+
 var dx = 0.001;
 var x_min = -0.5;
 var x_max = 0.5;
@@ -27,12 +29,19 @@ for (var i_exp = 0; i_exp < exp_factors.length; i_exp++) {
     x: x,
     y: y,
     mode: 'lines',
-    name: 'Beta = ' + exp_factor.toString(),
+    name: '\u03B2 = ' + exp_factor.toString(),
   };
 
   traces.push(trace);
 }
 
-var layout = {};
+var layout = {
+  xaxis: {
+    title: 'Non-dimensional span distance along the wing',
+  },
+  yaxis: {
+    title: 'Correction factor',
+  },
+};
 
 Plotly.newPlot('circulation-correction-plot', traces, layout);
