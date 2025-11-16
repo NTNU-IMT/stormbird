@@ -17,11 +17,11 @@ struct MotionRecord {
 }
 
 #[derive(Fmu, Debug, Clone, Default)]
-#[fmi_version = 2]
+#[fmu_from_struct(fmi_version = 2)]
 pub struct TabulatedMotion {
-    #[parameter]
+    #[fmu_from_struct(parameter)]
     pub motion_file_path: String,
-    #[output]
+    #[fmu_from_struct(output)]
     pub x_position: f64,
     pub y_position: f64,
     pub z_position: f64,

@@ -1,11 +1,11 @@
 pub use fmu_from_struct::prelude::*;
 
 #[derive(Fmu, Debug, Clone, Default)]
-#[fmi_version = 2]
+#[fmu_from_struct(fmi_version = 2)]
 pub struct ForwardMotion {
-    #[parameter]
+    #[fmu_from_struct(parameter)]
     pub velocity: f64,
-    #[output]
+    #[fmu_from_struct(output)]
     pub x_position: f64,
 }
 

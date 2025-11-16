@@ -9,13 +9,13 @@ use fmu_from_struct::prelude::*;
 use std::f64::consts::PI;
 
 #[derive(Fmu, Debug, Clone, Default)]
-#[fmi_version = 2]
+#[fmu_from_struct(fmi_version = 2)]
 pub struct HarmonicSignal {
-    #[parameter]
+    #[fmu_from_struct(parameter)]
     pub amplitude: f64,
     pub period: f64,
     pub phase_shift_in_deg: f64,
-    #[output]
+    #[fmu_from_struct(output)]
     pub signal: f64,
 
     frequency: f64,

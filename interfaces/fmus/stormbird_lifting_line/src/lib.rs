@@ -40,15 +40,15 @@ use parameters::FmuParameters;
 use model_scaling::ModelScaling;
 
 #[derive(Debug, Default, Clone, Fmu)]
-#[fmi_version = 2]
+#[fmu_from_struct(fmi_version = 2)]
 /// FMU for a lifting line model using the Stormbird library.
 pub struct StormbirdLiftingLine {
-    #[parameter]
+    #[fmu_from_struct(parameter)]
     /// Path to the parameters file. If empty, the parameters file is expected to be in the resource
     /// directory of the FMU.
     pub parameters_path: String,
     pub time_model_scale: f64,
-    #[input]
+    #[fmu_from_struct(input)]
     /// Variables specifying the wind conditions.
     pub wind_velocity: f64,
     pub wind_direction_coming_from: f64,
@@ -97,7 +97,7 @@ pub struct StormbirdLiftingLine {
     pub section_models_internal_state_10: f64,
     /// Optional variable to control the amount of thrust from controller
     pub controller_loading: f64,
-    #[output]
+    #[fmu_from_struct(output)]
     /// Global forces and moments acting on the lifting line model.
     pub force_x: f64,
     pub force_y: f64,
