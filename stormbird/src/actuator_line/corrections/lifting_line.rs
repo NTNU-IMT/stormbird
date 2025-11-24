@@ -60,7 +60,7 @@ pub struct LiftingLineCorrection {
 }
 
 impl LiftingLineCorrection {
-    /// Computes a difference in the induced velocities between two lifting line simualtions; one
+    /// Computes a difference in the induced velocities between two lifting line simulations; one
     /// with a viscous core length equal to the force projection width, and one with a small viscous
     /// core length. The difference is then returned as a vector of induced velocities at the control
     /// points of the line force model
@@ -106,7 +106,7 @@ impl LiftingLineCorrection {
             let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
-                self.viscous_core_length / 10.0,
+                self.viscous_core_length / 100.0,
                 self.symmetry_condition
             );
 
