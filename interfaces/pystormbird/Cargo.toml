@@ -17,4 +17,4 @@ crate-type = ["cdylib"]
 pyo3 = "0.21.0"
 
 stormbird = { path = "../../stormbird", features = ["parallel"] }
-stormath = { version = "0.1.1" }
+stormath = { path = "../../stormath" }

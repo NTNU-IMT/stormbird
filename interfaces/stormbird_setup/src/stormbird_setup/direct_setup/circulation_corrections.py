@@ -13,7 +13,6 @@ class WindowSize(Enum):
 
 class GaussianSmoothingBuilder(StormbirdSetupBaseModel):
     smoothing_length_factor: float = 0.1
-    number_of_end_points_to_interpolate: int = 0
 
 class CubicPolynomialSmoothingBuilder(StormbirdSetupBaseModel):
     window_size: WindowSize = WindowSize.Five
@@ -52,8 +51,7 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
         return cls(
             correction = CirculationSmoothingBuilder(
                 smoothing_type = GaussianSmoothingBuilder(
-                    smoothing_length_factor = smoothing_length_factor,
-                    number_of_end_points_to_interpolate = number_of_end_points_to_interpolate
+                    smoothing_length_factor = smoothing_length_factor
                 )
             )
         )

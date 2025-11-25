@@ -43,7 +43,7 @@ if __name__ == "__main__":
                 cl_zero_angle=1.3,
                 mean_positive_stall_angle=np.radians(14.0),
                 stall_range = np.radians(10.0),
-                cl_max_after_stall = 1.0
+                cl_max_after_stall = 0.75
             )
         )
     )
@@ -52,24 +52,24 @@ if __name__ == "__main__":
         nr_sections = nr_sections, 
         density = density,
         circulation_correction = CirculationCorrectionBuilder.new_gaussian_smoothing(
-            smoothing_length_factor = 0.07
+            smoothing_length_factor = 0.05
         )
     )
     
     line_force_model.add_wing_builder(wing_builder)
     
-    wake = QuasiSteadyWakeSettings(
+    wake = DynamicWakeBuilder(
         symmetry_condition=SymmetryCondition.Z,
     )
     
     solver = SimpleIterative(
-        max_iterations_per_time_step=500,
+        max_iterations_per_time_step=200,
         damping_factor = 0.02
     )
     
     simulation_builder = SimulationBuilder(
         line_force_model = line_force_model,
-        simulation_settings = QuasiSteadySettings(
+        simulation_settings = DynamicSettings(
             wake = wake,
             solver = solver
         ),

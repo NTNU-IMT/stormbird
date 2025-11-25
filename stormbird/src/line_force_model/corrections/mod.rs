@@ -101,16 +101,28 @@ impl LineForceModel {
         let mut smoothed_values: Vec<Float> = Vec::with_capacity(noisy_values.len());
         
         let span_distance = &self.ctrl_point_spanwise_distance;
+        let span_distance_non_dim = &self.ctrl_point_spanwise_distance_non_dimensional;
 
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
             let settings = &smoothing_settings[wing_index];
             
             let local_span_distance = span_distance[wing_indices.clone()].to_vec();
+            let local_span_distance_non_dim = span_distance_non_dim[wing_indices.clone()].to_vec();
+            
             let local_noisy_values = noisy_values[wing_indices.clone()].to_vec();
+            
+            let mut smoothing_weight: Vec<Float> = Vec::with_capacity(local_span_distance_non_dim.len());
+            
+            for i in 0..local_span_distance_non_dim.len() {
+                smoothing_weight.push(
+                     1.0 - 2.0 * local_span_distance_non_dim[i].abs().powi(2)
+                );
+            }
 
-            let wing_smoothed_values = settings.apply_smoothing(
+            let wing_smoothed_values = settings.apply_smoothing_with_varying_smoothing_weight(
                 &local_span_distance, 
-                &local_noisy_values, 
+                &local_noisy_values,
+                &smoothing_weight
             );
             
             for index in 0..wing_smoothed_values.len() {
