@@ -15,7 +15,7 @@ def get_section_model(solver: SolverType):
     The reason for using different section solvers for different solvers is due to a somewhat 
     different behavior around stall. In general, the linearized solver will stall at a later stage
     than the iterative solver. Principally speaking, the linearized solver is less accurate around 
-    stall, due to the binarization, but practically speaking it seems to give good results as long
+    stall, due to the linearization, but practically speaking it seems to give good results as long
     as the section model is adjusted. As a general principle, tuning the exact stall behavior is 
     seen as acceptable, while tuning the lift slope should be based on the actual 2D data
 
