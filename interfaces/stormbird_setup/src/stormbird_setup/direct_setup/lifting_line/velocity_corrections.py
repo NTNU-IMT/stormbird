@@ -19,6 +19,20 @@ class VelocityCorrectionType(Enum):
 class VelocityCorrections(StormbirdSetupBaseModel):
     type: VelocityCorrectionType = VelocityCorrectionType.NoCorrection
     value: float | None = None
+    
+    @classmethod
+    def new_max_induced_velocity_magnitude(cls, max_magnitude_ratio: float = 1.0):
+        return cls(
+            type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
+            value = max_magnitude_ratio
+        )
+        
+    @classmethod
+    def new_fixed_magnitude_equal_to_freestream(cls):
+        return cls(
+            type = VelocityCorrectionType.FixedMagnitudeEqualToFreestream,
+            value = None
+        )
 
     @model_serializer
     def ser_model(self):

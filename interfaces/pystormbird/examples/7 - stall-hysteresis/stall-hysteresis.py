@@ -12,6 +12,7 @@ from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder,
 from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
 from stormbird_setup.direct_setup.lifting_line.solver import SimpleIterative
 from stormbird_setup.direct_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
+from stormbird_setup.direct_setup.lifting_line.velocity_corrections import VelocityCorrections
 
 from stormbird_setup.direct_setup.circulation_corrections import CirculationCorrectionBuilder
 
@@ -58,18 +59,19 @@ if __name__ == "__main__":
     
     line_force_model.add_wing_builder(wing_builder)
     
-    wake = DynamicWakeBuilder(
+    wake = QuasiSteadyWakeSettings(
         symmetry_condition=SymmetryCondition.Z,
     )
     
     solver = SimpleIterative(
         max_iterations_per_time_step=200,
-        damping_factor = 0.02
+        damping_factor = 0.02,
+        velocity_corrections=VelocityCorrections.new_max_induced_velocity_magnitude()
     )
     
     simulation_builder = SimulationBuilder(
         line_force_model = line_force_model,
-        simulation_settings = DynamicSettings(
+        simulation_settings = QuasiSteadySettings(
             wake = wake,
             solver = solver
         ),

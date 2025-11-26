@@ -115,7 +115,7 @@ impl LineForceModel {
             
             for i in 0..local_span_distance_non_dim.len() {
                 smoothing_weight.push(
-                     1.0 - 2.0 * local_span_distance_non_dim[i].abs().powi(2)
+                     1.0 - 2.0 * local_span_distance_non_dim[i].abs().powi(4)
                 );
             }
 
