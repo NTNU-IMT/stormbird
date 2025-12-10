@@ -103,6 +103,43 @@ impl CompleteSailModel {
             data: result_rs
         }
     }
+    
+    #[pyo3(signature=(
+        *,
+        wind_velocity,
+        wind_direction,
+        ship_velocity,
+        nr_loadings_to_test = 10,
+        time_step = 1.0,
+        nr_time_steps = 1
+    ))]
+    pub fn simulate_condition_optimal_controller_loading(
+        &mut self,
+        wind_velocity: f64,
+        wind_direction: f64,
+        ship_velocity: f64,
+        nr_loadings_to_test: usize,
+        time_step: f64,
+        nr_time_steps: usize
+    ) -> SimulationResult {
+
+        let wind_condition = WindCondition{
+            velocity: wind_velocity,
+            direction_coming_from: wind_direction
+        };
+
+        let result_rs = self.data.simulate_condition_optimal_controller_loading(
+            wind_condition,
+            ship_velocity,
+            nr_loadings_to_test,
+            time_step,
+            nr_time_steps
+        );
+
+        SimulationResult {
+            data: result_rs
+        }
+    }
 
     pub fn section_models_internal_state(&self) -> Vec<f64> {
         self.data.lifting_line_simulation.line_force_model.section_models_internal_state()

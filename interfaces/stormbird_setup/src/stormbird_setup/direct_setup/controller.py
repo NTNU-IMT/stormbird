@@ -74,8 +74,8 @@ class ControllerBuilder(StormbirdSetupBaseModel):
         Helper function to quickly set up a suitable controller for a rotor sail. Assumed to be
         fairly general
         '''
-        apparent_wind_directions_data = np.radians([-180, -50, -30, 30, 50, 180])
-        section_model_internal_state_set_points_data = [6.0, 3.0, 0.0, 0.0, -3.0, -6.0]
+        apparent_wind_directions_data = np.radians([-180, -40, -15, 15, 40, 180])
+        section_model_internal_state_set_points_data = [3.0, 3.0, 0.0, 0.0, -3.0, -3.0]
 
         internal_state_type = InternalStateType.SpinRatio
         internal_state_conversion = SpinRatioConversion(

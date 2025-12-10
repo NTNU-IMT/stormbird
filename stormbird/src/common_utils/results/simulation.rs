@@ -67,6 +67,16 @@ impl SimulationResult {
         
         sum
     }
+    
+    pub fn input_power_sum(&self) -> Float {
+        let mut sum = 0.0;
+        
+        for i in 0..self.input_power.len() {
+            sum += self.input_power[i];
+        }
+        
+        sum
+    }
 
     pub fn write_to_file(&self, file_path: &str) -> std::io::Result<()> {
         let file = std::fs::File::create(file_path)?;

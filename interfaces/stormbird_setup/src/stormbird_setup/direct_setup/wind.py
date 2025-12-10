@@ -21,6 +21,24 @@ class LogarithmicHeightVariation(StormbirdSetupBaseModel):
 
 class HeightVariationModel(StormbirdSetupBaseModel):
     model: PowerHeightVariation | LogarithmicHeightVariation = PowerHeightVariation()
+    
+    @classmethod
+    def new_logarithmic(cls, reference_height: float = 10.0, surface_roughness: float = 0.0002):
+        return cls(
+            model = LogarithmicHeightVariation(
+                reference_height=reference_height, 
+                surface_roughness=surface_roughness
+            )
+        )
+        
+    @classmethod
+    def new_power(cls, reference_height: float = 10.0, power_factor: float = 1.0/9.0):
+        cls(
+            model = PowerHeightVariation(
+                reference_height = reference_height,
+                power_factor = power_factor
+            )
+        )
 
     @model_serializer
     def ser_model(self):
@@ -50,7 +68,3 @@ class WindEnvironment(StormbirdSetupBaseModel):
         default_factory=lambda: SpatialVector(x=1.0, y=0.0, z=0.0)
     )
     water_plane_height: float = 0.0
-    
-    
-
-

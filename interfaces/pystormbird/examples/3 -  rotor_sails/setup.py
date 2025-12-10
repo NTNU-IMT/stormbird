@@ -1,5 +1,6 @@
 
 
+from typing_extensions import Dict
 import numpy as np
 
 from stormbird_setup.direct_setup.spatial_vector import SpatialVector
@@ -7,7 +8,7 @@ from stormbird_setup.direct_setup.section_models import SectionModel, RotatingCy
 from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings
 from stormbird_setup.direct_setup.lifting_line.solver import Linearized, SimpleIterative
-from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition
+from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition, ViscousCoreLength, ViscousCoreLengthType
 
 from stormbird_setup.direct_setup.lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
 
@@ -121,7 +122,7 @@ def simulate_single_case(
             solver = Linearized()
             
     wake = QuasiSteadyWakeSettings(
-        symmetry_condition=SymmetryCondition.Z,
+        symmetry_condition=SymmetryCondition.Z
     )
     
     simulation_builder = SimulationBuilder(

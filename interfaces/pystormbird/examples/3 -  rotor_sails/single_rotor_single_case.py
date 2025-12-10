@@ -48,6 +48,8 @@ if __name__ == "__main__":
 
     ax_circulation.set_xlabel('Line model segment')
     ax_circulation.set_ylabel('Circulation strength')
+    
+    ax_circulation.set_ylim(0, None)
 
     ax_angle.set_xlabel('Line model segment')
     ax_angle.set_ylabel('Effective angle of attack [deg]')
