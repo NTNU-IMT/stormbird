@@ -6,10 +6,7 @@
 
 use pyo3::prelude::*;
 
-use pyo3::{
-    wrap_pymodule,
-    types::PyDict
-};
+use pyo3::wrap_pymodule;
 
 mod section_models;
 mod result_structs;
@@ -18,7 +15,7 @@ mod lifting_line;
 mod smoothing;
 
 #[pymodule]
-fn pystormbird(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<result_structs::SimulationResult>()?;
     m.add_class::<result_structs::SectionalForcesInput>()?;
     
@@ -27,19 +24,5 @@ fn pystormbird(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_wrapped(wrap_pymodule!(lifting_line::lifting_line))?;
     m.add_wrapped(wrap_pymodule!(smoothing::smoothing))?;
     
-    // Trick to make the module visible to Python. Taken from:
-    // <https://medium.com/@kudryavtsev_ia/how-i-design-and-develop-real-world-python-extensions-in-rust-2abfe2377182>
-    Python::with_gil(|py| {
-        let sys = PyModule::import_bound(py, "sys")?;
-        let sys_modules: &PyDict = sys
-            .getattr("modules")?
-            .extract()?;
-
-        sys_modules.set_item("pystormbird.section_models",   m.getattr("section_models")?)?;
-        sys_modules.set_item("pystormbird.line_force_model", m.getattr("line_force_model")?)?;
-        sys_modules.set_item("pystormbird.lifting_line",     m.getattr("lifting_line")?)?;
-        sys_modules.set_item("pystormbird.smoothing",        m.getattr("smoothing")?)?;
-
-        Ok(())
-    })
+    Ok(())
 }

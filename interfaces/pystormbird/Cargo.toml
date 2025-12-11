@@ -14,7 +14,8 @@ name = "pystormbird"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.0"
+pyo3 = { version = "0.27.2"}
 
 stormbird = { path = "../../stormbird", features = ["parallel"] }
 stormath = { path = "../../stormath" }
+pythonize = "0.27.0"

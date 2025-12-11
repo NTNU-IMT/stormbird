@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pythonize::pythonize;
 
 pub mod foil;
 pub mod rotating_cylinder;
@@ -28,19 +29,11 @@ impl SectionModel {
     pub fn __str__(&self) -> String {
         self.data.to_string()
     }
-
+    
     #[getter]
     /// Uses the built in json module to convert the string to a dictionary
-    pub fn __dict__(&self) -> PyResult<PyObject> {
-        let json_string = self.__str__();
-        
-        Python::with_gil(|py| {
-            let json_module = PyModule::import_bound(py, "json")?;
-
-            let dict = json_module.call_method1("loads", (json_string,))?;
-
-            Ok(dict.into())
-        })
+    pub fn __dict__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(pythonize(py, &self.data)?)
     }
 }
 
