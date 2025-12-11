@@ -52,8 +52,8 @@ class InputPowerModel(StormbirdSetupBaseModel):
         input_power_coefficient_data = factor * (section_models_internal_state_data**power)
 
         return cls(
-            input_power_type=InputPowerDataType.FromInternalStateAlone,
-            input_power_data=InputPowerData(
+            input_power_type = InputPowerDataType.FromInternalStateAlone,
+            input_power_data = InputPowerData(
                 section_models_internal_state_data = section_models_internal_state_data.tolist(),
                 input_power_coefficient_data = input_power_coefficient_data.tolist()
             )
