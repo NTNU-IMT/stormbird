@@ -38,9 +38,12 @@ class RotatingCylinder(StormbirdSetupBaseModel):
     cl_data: list[float]| None = None
     cd_data: list[float] | None = None
     added_mass_factor: float | None = None
+    
+class EffectiveWindSensor(StormbirdSetupBaseModel):
+    pass
 
 class SectionModel(StormbirdSetupBaseModel):
-    model: Foil | VaryingFoil | RotatingCylinder = Foil()
+    model: Foil | VaryingFoil | RotatingCylinder | EffectiveWindSensor
 
     @model_serializer
     def ser_model(self):
@@ -58,5 +61,7 @@ class SectionModel(StormbirdSetupBaseModel):
             return {
                 "RotatingCylinder": model_dict
             }
+        elif isinstance(self.model, EffectiveWindSensor):
+            return "EffectiveWindSensor"
         else:
             raise ValueError("Unsupported section model:", type(self.model))
