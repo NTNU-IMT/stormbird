@@ -23,7 +23,7 @@ class StormbirdSetupBaseModel(BaseModel):
         populate_by_name = True,
         use_enum_values = False,
         validate_default = True,
-        ser_json_exclude_none=True
+        ser_json_exclude_none=True,
     )
 
     @classmethod
