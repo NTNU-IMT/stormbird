@@ -6,6 +6,8 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from ..base_model import StormbirdSetupBaseModel
 
+import math
+
 class SpatialVector(StormbirdSetupBaseModel):
     '''
     Class for defining a spatial vector
@@ -13,6 +15,13 @@ class SpatialVector(StormbirdSetupBaseModel):
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
+    
+    @classmethod
+    def from_dict(cls, dict_in) -> "SpatialVector":
+        return cls(x = dict_in["x"], y = dict_in["y"], z = dict_in["z"])
+        
+    def length(self) -> float:
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
     def as_tuple(self) -> tuple[float, float, float]:
         return (self.x, self.y, self.z)
