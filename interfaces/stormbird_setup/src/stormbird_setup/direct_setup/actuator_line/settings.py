@@ -13,6 +13,7 @@ class Gaussian(StormbirdSetupBaseModel):
 class ProjectionSettings(StormbirdSetupBaseModel):
     projection_function: Gaussian = Gaussian()
     project_normal_to_velocity: bool = False
+    project_viscous_lift: bool = False
     project_sectional_drag: bool = False
 
 class SamplingSettings(StormbirdSetupBaseModel):

@@ -357,7 +357,11 @@ impl ActuatorLine {
         velocity: SpatialVector
     ) -> SpatialVector {
         if let Some(simulation_result) = &self.simulation_result {
-            let raw_lift_force = simulation_result.sectional_forces.circulatory[line_index];
+            let mut raw_lift_force = simulation_result.sectional_forces.circulatory[line_index];
+            
+            if self.projection_settings.project_viscous_lift {
+                raw_lift_force += simulation_result.sectional_forces.viscous_lift[line_index];
+            }
 
             let raw_drag_force = if self.projection_settings.project_sectional_drag {
                 simulation_result.sectional_forces.sectional_drag[line_index]
