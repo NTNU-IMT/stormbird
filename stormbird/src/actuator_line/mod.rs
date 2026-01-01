@@ -132,7 +132,7 @@ impl ActuatorLine {
     /// current estimate of the control point velocities.
     pub fn do_step(&mut self, time: Float, time_step: Float){
         if self.current_iteration >= self.start_iteration {
-            let solver_result = self.solve(time_step);
+            let solver_result = self.solve(time, time_step);
 
             let ctrl_point_acceleration = vec![
                 SpatialVector::default();
@@ -193,7 +193,7 @@ impl ActuatorLine {
 
     /// Computes a corrected velocity at the control points, based on the sampling settings, and,
     /// if present, the lifting line correction.
-    pub fn corrected_ctrl_points_velocity(&self) -> Vec<SpatialVector> {
+    pub fn corrected_ctrl_points_velocity(&self, time: Float) -> Vec<SpatialVector> {
         let mut corrected_velocity = if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
                 &self.ctrl_points_velocity,
@@ -214,6 +214,7 @@ impl ActuatorLine {
                 &self.line_force_model,
                 &self.ctrl_points_velocity,
                 &last_circulation_strength,
+                time
             );
 
             for i in 0..corrected_velocity.len() {
@@ -256,8 +257,8 @@ impl ActuatorLine {
 
     /// Takes the estimated velocity on at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn solve(&mut self, _time_step: Float) -> SolverResult {
-        let corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity();
+    pub fn solve(&mut self, time: Float, _time_step: Float) -> SolverResult {
+        let corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
 
         let angles_of_attack = self.line_force_model.angles_of_attack(
             &corrected_ctrl_points_velocity,
