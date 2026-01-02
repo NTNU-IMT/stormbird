@@ -110,17 +110,26 @@ impl WindEnvironment {
 
         velocity * direction_vector
     }
+    
+    pub fn apparent_wind_velocity_vector_at_location(
+        &self,
+        condition: WindCondition,
+        location: SpatialVector,
+        linear_velocity: SpatialVector
+    ) -> SpatialVector {
+        let true_wind = self.true_wind_velocity_vector_at_location(condition, location);
+        
+        true_wind + linear_velocity
+    }
 
     pub fn true_wind_velocity_vectors_at_locations(
         &self,
         condition: WindCondition,
         locations: &[SpatialVector]
     ) -> Vec<SpatialVector> {
-        locations.iter()
-            .map(
-                |&location| self.true_wind_velocity_vector_at_location(condition, location)
-            )
-            .collect()
+        locations.iter().map(
+            |&location| self.true_wind_velocity_vector_at_location(condition, location)
+        ).collect()
     }
 
     /// The main method to get the apparent wind velocity vectors at the input locations, given a
@@ -131,16 +140,13 @@ impl WindEnvironment {
         locations: &[SpatialVector],
         linear_velocity: SpatialVector,
     ) -> Vec<SpatialVector> {
-        let mut wind = self.true_wind_velocity_vectors_at_locations(
-            condition,
-            locations
-        );
-
-        for i in 0..wind.len() {
-            wind[i] += linear_velocity;
-        }
-
-        wind
+        locations.iter().map(
+            |&location| self.apparent_wind_velocity_vector_at_location(
+                condition, 
+                location, 
+                linear_velocity
+            )
+        ).collect()
     }
 
     pub fn apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
@@ -160,8 +166,6 @@ impl WindEnvironment {
             condition, linear_velocity
         );
         
-        
-
         self.apply_inflow_corrections(
             apparent_wind_direction,
             &mut wind_velocity,

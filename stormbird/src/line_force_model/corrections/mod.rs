@@ -113,6 +113,7 @@ impl LineForceModel {
             
             let mut smoothing_weight: Vec<Float> = Vec::with_capacity(local_span_distance_non_dim.len());
             
+            // TODO: make the power of the local span distance a variable
             for i in 0..local_span_distance_non_dim.len() {
                 smoothing_weight.push(
                      1.0 - 2.0 * local_span_distance_non_dim[i].abs().powi(4)

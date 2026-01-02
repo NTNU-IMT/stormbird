@@ -60,6 +60,8 @@ pub struct ActuatorLine {
     pub ctrl_points_velocity: Vec<SpatialVector>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
+    /// Results that are projected
+    pub simulation_result_to_project: Option<SimulationResult>,
     /// Corrections based on the lifting line model
     pub lifting_line_correction: Option<LiftingLineCorrection>,
     /// Empirical correction for the circulation strength, also known as a tip loss factor
@@ -144,10 +146,27 @@ impl ActuatorLine {
                 &ctrl_point_acceleration,
                 time,
             );
-
+            
             //self.line_force_model.update_flow_derivatives(&result);
 
             self.simulation_result = Some(simulation_result);
+            
+            if self.projection_settings.use_uncorrected_velocity_for_projection_forces {
+                let mut solver_result_for_projection = solver_result.clone();
+                
+                solver_result_for_projection.output_ctrl_points_velocity = 
+                    solver_result.input_ctrl_points_velocity.clone();
+                
+                let simulation_result_to_project = self.line_force_model.calculate_simulation_result(
+                    &solver_result,
+                    &ctrl_point_acceleration,
+                    time,
+                );
+                
+                self.simulation_result_to_project = Some(simulation_result_to_project);
+            } else {
+                self.simulation_result_to_project = self.simulation_result.clone();
+            }
         }
 
         self.current_iteration += 1;
@@ -356,7 +375,7 @@ impl ActuatorLine {
         line_index: usize,
         velocity: SpatialVector
     ) -> SpatialVector {
-        if let Some(simulation_result) = &self.simulation_result {
+        if let Some(simulation_result) = &self.simulation_result_to_project {
             let mut raw_lift_force = simulation_result.sectional_forces.circulatory[line_index];
             
             if self.projection_settings.project_viscous_lift {

@@ -15,6 +15,7 @@ class ProjectionSettings(StormbirdSetupBaseModel):
     project_normal_to_velocity: bool = False
     project_viscous_lift: bool = False
     project_sectional_drag: bool = False
+    use_uncorrected_velocity_for_projection_forces: bool = False
 
 class SamplingSettings(StormbirdSetupBaseModel):
     use_point_sampling: bool = False

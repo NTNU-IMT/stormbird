@@ -45,8 +45,7 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
     @classmethod
     def new_gaussian_smoothing(
         cls, 
-        smoothing_length_factor: float = 0.1, 
-        number_of_end_points_to_interpolate: int = 0
+        smoothing_length_factor: float = 0.1,
     ):
         return cls(
             correction = CirculationSmoothingBuilder(

@@ -25,6 +25,8 @@ pub struct ProjectionSettings {
     pub project_viscous_lift: bool,
     #[serde(default)]
     pub project_sectional_drag: bool,
+    #[serde(default)]
+    pub use_uncorrected_velocity_for_projection_forces: bool
 }
 
 impl Default for ProjectionSettings {
@@ -35,6 +37,7 @@ impl Default for ProjectionSettings {
             weight_limit: Self::default_weight_limit(),
             project_viscous_lift: true,
             project_sectional_drag: false,
+            use_uncorrected_velocity_for_projection_forces: false
         }
     }
 }
