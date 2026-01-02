@@ -60,8 +60,10 @@ pub struct ActuatorLine {
     pub ctrl_points_velocity: Vec<SpatialVector>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
-    /// Results that are projected
-    pub simulation_result_to_project: Option<SimulationResult>,
+    /// Lift forces that are projected back to the CFD domain
+    pub sectional_lift_forces_to_project: Vec<SpatialVector>,
+    /// Drag forces that are projected back to the CFD domain
+    pub sectional_drag_forces_to_project: Vec<SpatialVector>,
     /// Corrections based on the lifting line model
     pub lifting_line_correction: Option<LiftingLineCorrection>,
     /// Empirical correction for the circulation strength, also known as a tip loss factor
@@ -107,7 +109,8 @@ impl ActuatorLine {
             let span_projection = if self.sampling_settings.neglect_span_projection {
                 1.0
             } else {
-                let span_smoothing_length = self.sampling_settings.span_projection_factor * span_line.length();
+                let span_smoothing_length = self.sampling_settings.span_projection_factor * 
+                    span_line.length();
 
                 gaussian_kernel(
                     line_coordinates.span,
@@ -151,22 +154,7 @@ impl ActuatorLine {
 
             self.simulation_result = Some(simulation_result);
             
-            if self.projection_settings.use_uncorrected_velocity_for_projection_forces {
-                let mut solver_result_for_projection = solver_result.clone();
-                
-                solver_result_for_projection.output_ctrl_points_velocity = 
-                    solver_result.input_ctrl_points_velocity.clone();
-                
-                let simulation_result_to_project = self.line_force_model.calculate_simulation_result(
-                    &solver_result,
-                    &ctrl_point_acceleration,
-                    time,
-                );
-                
-                self.simulation_result_to_project = Some(simulation_result_to_project);
-            } else {
-                self.simulation_result_to_project = self.simulation_result.clone();
-            }
+            self.update_sectional_forces_to_project();
         }
 
         self.current_iteration += 1;
@@ -363,6 +351,49 @@ impl ActuatorLine {
             }
         }
     }
+    
+    /// Function 
+    pub fn update_sectional_forces_to_project(&mut self) {
+        let nr_span_lines = self.line_force_model.nr_span_lines();
+        
+        if let Some(simulation_result) = &self.simulation_result {
+            for line_index in 0..nr_span_lines {
+                let mut lift_force = simulation_result.sectional_forces.circulatory[line_index];
+                let mut drag_force = SpatialVector::default();
+                
+                if self.projection_settings.project_viscous_lift {
+                    lift_force += simulation_result.sectional_forces.viscous_lift[line_index];
+                }
+                
+                if self.projection_settings.project_sectional_drag {
+                    drag_force = simulation_result.sectional_forces.sectional_drag[line_index];
+                }
+                
+                if self.projection_settings.use_uncorrected_velocity_for_projection_forces {
+                    let line = self.line_force_model.span_lines_global[line_index];
+                    let velocity = self.ctrl_points_velocity[line_index];
+    
+                    let lift_direction = line
+                        .relative_vector()
+                        .cross(velocity)
+                        .normalize();
+                    
+                    let drag_direction = velocity.normalize();
+                    
+                    lift_force = lift_force.length() * lift_direction;
+                    drag_force = drag_force.length() * drag_direction;
+                }
+                
+                self.sectional_lift_forces_to_project[line_index] = lift_force;
+                self.sectional_drag_forces_to_project[line_index] = drag_force;
+                
+            }
+        } else {
+            self.sectional_lift_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
+            self.sectional_drag_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
+        }
+        
+    }
 
     /// Returns the force to be projected, based on the line index
     ///
@@ -370,40 +401,27 @@ impl ActuatorLine {
     /// * `line_index` - The index of the line segment for which the force is to be projected.
     /// * `velocity` - The velocity vector at the control point of the cell where the force is to be
     /// projected.
-    pub fn force_to_project(
+    pub fn force_to_project_at_cell(
         &self,
         line_index: usize,
         velocity: SpatialVector
     ) -> SpatialVector {
-        if let Some(simulation_result) = &self.simulation_result_to_project {
-            let mut raw_lift_force = simulation_result.sectional_forces.circulatory[line_index];
-            
-            if self.projection_settings.project_viscous_lift {
-                raw_lift_force += simulation_result.sectional_forces.viscous_lift[line_index];
-            }
+        let lift_force = self.sectional_lift_forces_to_project[line_index];
+        let drag_force = self.sectional_drag_forces_to_project[line_index];
 
-            let raw_drag_force = if self.projection_settings.project_sectional_drag {
-                simulation_result.sectional_forces.sectional_drag[line_index]
-            } else {
-                SpatialVector::default()
-            };
+        if self.projection_settings.project_normal_to_velocity {
+            let line = self.line_force_model.span_lines_global[line_index];
 
-            if self.projection_settings.project_normal_to_velocity {
-                let line = self.line_force_model.span_lines_global[line_index];
+            let lift_direction = line
+                .relative_vector()
+                .cross(velocity)
+                .normalize();
 
-                let lift_direction = line
-                    .relative_vector()
-                    .cross(velocity)
-                    .normalize();
+            let drag_direction = velocity.normalize();
 
-                let drag_direction = velocity.normalize();
-
-                raw_lift_force.length() * lift_direction + raw_drag_force.length() * drag_direction
-            } else {
-                raw_lift_force + raw_drag_force
-            }
+            lift_force.length() * lift_direction + drag_force.length() * drag_direction
         } else {
-            SpatialVector::default()
+            lift_force + drag_force
         }
     }
 

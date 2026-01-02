@@ -97,7 +97,8 @@ impl ActuatorLineBuilder {
             write_iterations_full_result: self.write_iterations_full_result,
             ctrl_points_velocity: vec![SpatialVector::default(); nr_span_lines],
             simulation_result: None,
-            simulation_result_to_project: None,
+            sectional_lift_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
+            sectional_drag_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             lifting_line_correction,
             empirical_circulation_correction: self.empirical_circulation_correction.clone(),
         }
