@@ -6,7 +6,7 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from ..base_model import StormbirdSetupBaseModel
 
-from pydantic import model_serializer
+from pydantic import model_serializer, model_validator
 
 class Foil(StormbirdSetupBaseModel):
     cl_zero_angle: float | None = None
@@ -44,6 +44,30 @@ class EffectiveWindSensor(StormbirdSetupBaseModel):
 
 class SectionModel(StormbirdSetupBaseModel):
     model: Foil | VaryingFoil | RotatingCylinder | EffectiveWindSensor
+    
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_from_rust_enum(cls, data):
+        # Handle the "EffectiveWindSensor" string case (unit variant)
+        if data == "EffectiveWindSensor":
+            return {'model': EffectiveWindSensor()}
+        
+        if not isinstance(data, dict):
+            return data
+        
+        # Already in Python/Pydantic form
+        if 'model' in data:
+            return data
+        
+        # Rust externally-tagged enum format
+        if 'Foil' in data:
+            return {'model': Foil(**data['Foil'])}
+        elif 'VaryingFoil' in data:
+            return {'model': VaryingFoil(**data['VaryingFoil'])}
+        elif 'RotatingCylinder' in data:
+            return {'model': RotatingCylinder(**data['RotatingCylinder'])}
+        else:
+            raise ValueError(f"Unknown section model variant: {list(data.keys())}")
 
     @model_serializer
     def ser_model(self):

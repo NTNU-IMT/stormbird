@@ -50,8 +50,8 @@ pub struct ActuatorLine {
     pub sampling_settings: SamplingSettings,
     /// Dynamic optimizer that can be optionally used to optimize the settings in the model
     pub controller: Option<Controller>,
-    /// The iteration to start solving
-    pub start_iteration: usize,
+    /// The time to start solving
+    pub start_time: Float,
     /// The current iteration of the simulation
     pub current_iteration: usize,
     /// The number of iterations between each time a full simulation result is written to file
@@ -136,7 +136,7 @@ impl ActuatorLine {
     /// It solves for the circulation strength and computes the simulation result based on the
     /// current estimate of the control point velocities.
     pub fn do_step(&mut self, time: Float, time_step: Float){
-        if self.current_iteration >= self.start_iteration {
+        if time >= self.start_time {
             let solver_result = self.solve(time, time_step);
 
             let ctrl_point_acceleration = vec![
@@ -162,7 +162,7 @@ impl ActuatorLine {
 
     /// Function to update the controller in the model, if the controller is present.
     pub fn update_controller(&mut self, time: Float, time_step: Float) -> bool {
-        if self.current_iteration >= self.start_iteration {
+        if time >= self.start_time {
             let controller_output = if let Some(controller) = &mut self.controller {
                 let simulation_result = self.simulation_result.as_ref().unwrap();
 
@@ -221,7 +221,7 @@ impl ActuatorLine {
                 &self.line_force_model,
                 &self.ctrl_points_velocity,
                 &last_circulation_strength,
-                time
+                time - self.start_time
             );
 
             for i in 0..corrected_velocity.len() {

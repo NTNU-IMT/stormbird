@@ -2,7 +2,7 @@
 
 from ..base_model import StormbirdSetupBaseModel
 
-from pydantic import model_serializer
+from pydantic import model_serializer, model_validator
 
 from enum import Enum
 
@@ -30,6 +30,26 @@ class CirculationSmoothingBuilder(StormbirdSetupBaseModel):
             }
         else:
             raise NotImplementedError("Only Gaussian smoothing is implemented")
+            
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_from_rust_enum(cls, data):
+        if not isinstance(data, dict):
+            return data
+        
+        if not data:
+            return data
+        
+        # Check if smoothing_type needs to be unwrapped from Rust enum format
+        if 'smoothing_type' in data:
+            st = data['smoothing_type']
+            if isinstance(st, dict):
+                if 'Gaussian' in st:
+                    return {'smoothing_type': GaussianSmoothingBuilder(**st['Gaussian'])}
+                elif 'CubicPolynomial' in st:
+                    return {'smoothing_type': CubicPolynomialSmoothingBuilder(**st['CubicPolynomial'])}
+        
+        return data
             
 class PrescribedCirculationShape(StormbirdSetupBaseModel):
     inner_power: float = 2.0
@@ -71,7 +91,33 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
                 curve_fit_shape_parameters = curve_fit_shape_parameters
             )
         )
-
+        
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_from_rust_enum(cls, data):
+        # Handle the "None" string case
+        if data == "None":
+            return {'correction': None}
+        
+        if not isinstance(data, dict):
+            return data
+        
+        if not data:
+            return data
+        
+        # Already in Python/Pydantic form
+        if 'correction' in data:
+            return data
+        
+        # Rust externally-tagged enum format
+        if 'Prescribed' in data:
+            return {'correction': PrescribedCirculation(**data['Prescribed'])}
+        elif 'Smoothing' in data:
+            # Use model_validate so it goes through CirculationSmoothingBuilder's validator
+            return {'correction': CirculationSmoothingBuilder.model_validate(data['Smoothing'])}
+        else:
+            raise ValueError(f"Unknown circulation correction variant: {list(data.keys())}")
+        
     @model_serializer
     def ser_model(self):
         if self.correction is None:

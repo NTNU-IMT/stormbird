@@ -23,14 +23,13 @@ pub struct ProjectionSettings {
     pub realign_to_local_velocity_at_each_cell: bool,
     #[serde(default="ProjectionSettings::default_weight_limit")]
     pub weight_limit: Float,
-    #[serde(default)]
+    #[serde(default="ProjectionSettings::default_true")]
     pub project_viscous_lift: bool,
     #[serde(default)]
     pub project_sectional_drag: bool,
 }
 
 impl Default for ProjectionSettings {
-    
     
     fn default() -> Self {
         Self {

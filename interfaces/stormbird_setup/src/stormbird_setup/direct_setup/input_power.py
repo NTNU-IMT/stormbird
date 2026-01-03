@@ -8,7 +8,7 @@ from ..base_model import StormbirdSetupBaseModel
 
 from enum import Enum
 
-from pydantic import model_serializer
+from pydantic import model_serializer, model_validator
 
 import numpy as np
 
@@ -58,6 +58,41 @@ class InputPowerModel(StormbirdSetupBaseModel):
                 input_power_coefficient_data = input_power_coefficient_data.tolist()
             )
         )
+        
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_from_rust_enum(cls, data):
+        # Handle the "NoPower" string case (unit variant)
+        if data == "NoPower":
+            return {
+                'input_power_type': InputPowerDataType.NoPower,
+                'input_power_data': None
+            }
+        
+        if not isinstance(data, dict):
+            return data
+        
+        # Empty dict means use defaults
+        if not data:
+            return data
+        
+        # Already in Python/Pydantic form
+        if 'input_power_type' in data or 'input_power_data' in data:
+            return data
+        
+        # Rust externally-tagged enum format
+        if 'FromInternalStateAlone' in data:
+            return {
+                'input_power_type': InputPowerDataType.FromInternalStateAlone,
+                'input_power_data': InputPowerData(**data['FromInternalStateAlone'])
+            }
+        elif 'FromInternalStateAndVelocity' in data:
+            return {
+                'input_power_type': InputPowerDataType.FromInternalStateAndVelocity,
+                'input_power_data': InputPowerData(**data['FromInternalStateAndVelocity'])
+            }
+        else:
+            raise ValueError(f"Unknown input power model variant: {list(data.keys())}")
 
     @model_serializer
     def ser_model(self) -> dict[str, object] | str:
