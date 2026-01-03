@@ -24,3 +24,11 @@ class WindEnvironment:
         location: list[float],
         linear_velocity: list[float]
     ) -> list[float]: ...
+    
+    def apparent_wind_direction_from_condition_and_linear_velocity(
+        self,
+        *,
+        wind_velocity: float,
+        wind_direction_coming_from: float,
+        linear_velocity: float
+    ) -> float: ...

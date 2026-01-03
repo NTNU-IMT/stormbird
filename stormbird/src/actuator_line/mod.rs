@@ -369,7 +369,7 @@ impl ActuatorLine {
                     drag_force = simulation_result.sectional_forces.sectional_drag[line_index];
                 }
                 
-                if self.projection_settings.use_uncorrected_velocity_for_projection_forces {
+                if self.projection_settings.realign_sectional_forces {
                     let line = self.line_force_model.span_lines_global[line_index];
                     let velocity = self.ctrl_points_velocity[line_index];
     
@@ -409,7 +409,7 @@ impl ActuatorLine {
         let lift_force = self.sectional_lift_forces_to_project[line_index];
         let drag_force = self.sectional_drag_forces_to_project[line_index];
 
-        if self.projection_settings.project_normal_to_velocity {
+        if self.projection_settings.realign_to_local_velocity_at_each_cell {
             let line = self.line_force_model.span_lines_global[line_index];
 
             let lift_direction = line

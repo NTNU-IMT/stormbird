@@ -14,7 +14,7 @@ class InflowCorrectionsSingleDirection(StormbirdSetupBaseModel):
     wing_indices: list[Range]
     
     @classmethod
-    def from_simulation_results_aligne_with_freestream(
+    def from_simulation_results_aligned_with_freestream(
         cls, 
         stormbird_result: dict[str, Any],
         freestream_velocity: SpatialVector,
@@ -75,4 +75,4 @@ class InflowCorrectionsSingleDirection(StormbirdSetupBaseModel):
     
 class InflowCorrections(StormbirdSetupBaseModel):
     apparent_wind_directions: list[float]
-    individual_corrections: list[InflowCorrectionsSingleDirection]
+    corrections: list[InflowCorrectionsSingleDirection]

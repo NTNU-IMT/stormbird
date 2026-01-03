@@ -100,4 +100,29 @@ impl WindEnvironment {
             linear_velocity_internal
         ).0
     }
+    
+    #[pyo3(signature=(
+        *,
+        wind_velocity,
+        wind_direction_coming_from,
+        linear_velocity
+    ))]
+    pub fn apparent_wind_direction_from_condition_and_linear_velocity(
+        &self,
+        wind_velocity: f64, 
+        wind_direction_coming_from: f64,
+        linear_velocity: [f64; 3]
+    ) -> f64 {
+        let wind_condition = WindCondition{
+            velocity: wind_velocity,
+            direction_coming_from: wind_direction_coming_from
+        };
+        
+        let linear_velocity_internal = SpatialVector::from(linear_velocity);
+        
+        self.data.apparent_wind_direction_from_condition_and_linear_velocity(
+            wind_condition,
+            linear_velocity_internal
+        )
+    }
 }
