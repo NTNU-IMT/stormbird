@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+use std::ops::Range;
+
 /// Functionality to represent the a wind environment
 
 use stormath::{
@@ -149,16 +151,16 @@ impl WindEnvironment {
         ).collect()
     }
 
-    pub fn apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
+    pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
         &self,
         condition: WindCondition,
-        locations: &[SpatialVector],
+        ctrl_points: &[SpatialVector],
         linear_velocity: SpatialVector,
-        line_force_model: &LineForceModel
+        wing_indices: &[Range<usize>]
     ) -> Vec<SpatialVector> {
         let mut wind_velocity = self.apparent_wind_velocity_vectors_at_locations(
             condition,
-            locations,
+            ctrl_points,
             linear_velocity
         );
         
@@ -169,7 +171,8 @@ impl WindEnvironment {
         self.apply_inflow_corrections(
             apparent_wind_direction,
             &mut wind_velocity,
-            &line_force_model,
+            ctrl_points,
+            wing_indices,
         );
 
         wind_velocity
@@ -180,27 +183,29 @@ impl WindEnvironment {
         &self,
         apparent_wind_direction: Float,
         freestream_velocity: &mut [SpatialVector],
-        line_force_model: &LineForceModel,
+        ctrl_points: &[SpatialVector],
+        wing_indices: &[Range<usize>]
     ) {
         if let Some(corrections) = &self.inflow_corrections {
-            let mut ctrl_point_height_values: Vec<Float> = Vec::with_capacity(
-                line_force_model.nr_span_lines()
+            let nr_ctrl_points = ctrl_points.len();
+            let nr_wings = wing_indices.len();
+            
+            let mut height_values: Vec<Float> = Vec::with_capacity(
+                nr_ctrl_points
             );
             
-            for i in 0..ctrl_point_height_values.len() {
-                ctrl_point_height_values.push(
-                    line_force_model.ctrl_points_global[i].dot(self.up_direction)
+            for i in 0..nr_ctrl_points {
+                height_values.push(
+                    ctrl_points[i].dot(self.up_direction)
                 );
             }
             
-            for wing_index in 0..line_force_model.nr_wings() {
-                let wing_indices = line_force_model.wing_indices[wing_index].clone();
-
-                for i in wing_indices.start..wing_indices.end {
+            for wing_index in 0..nr_wings {
+                for i in wing_indices[wing_index].start..wing_indices[wing_index].end {
                     freestream_velocity[i] = corrections.correct_velocity_single_sail(
                         wing_index,
                         apparent_wind_direction,
-                        ctrl_point_height_values[i],
+                        height_values[i],
                         freestream_velocity[i],
                         self.up_direction
                     )

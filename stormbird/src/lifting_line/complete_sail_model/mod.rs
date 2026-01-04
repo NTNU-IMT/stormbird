@@ -164,14 +164,25 @@ impl CompleteSailModel {
             .get_freestream_velocity_points();
 
         let linear_velocity = ship_velocity * self.wind_environment.zero_direction_vector;
-
-        let freestream_velocity = self.wind_environment
-            .apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
+        
+        let mut freestream_velocity = self.wind_environment.apparent_wind_velocity_vectors_at_locations(
+            wind_condition, 
+            &freestream_velocity_points, 
+            linear_velocity
+        );
+        
+        let apparent_wind_direction = self.wind_environment
+            .apparent_wind_direction_from_condition_and_linear_velocity(
                 wind_condition,
-                &freestream_velocity_points,
-                linear_velocity,
-                &self.lifting_line_simulation.line_force_model,
+                linear_velocity
             );
+        
+        self.wind_environment.apply_inflow_corrections(
+            apparent_wind_direction,
+            &mut freestream_velocity,
+            &self.lifting_line_simulation.line_force_model.ctrl_points_global,
+            &self.lifting_line_simulation.line_force_model.wing_indices
+        );
 
         freestream_velocity
     }

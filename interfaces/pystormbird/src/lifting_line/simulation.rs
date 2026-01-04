@@ -11,6 +11,8 @@ use stormath::spatial_vector::SpatialVector;
 
 use crate::result_structs::SimulationResult;
 
+use crate::line_force_model::LineForceModel;
+
 #[pyclass]
 pub struct Simulation {
     data: SimulationRust
@@ -27,6 +29,11 @@ impl Simulation {
                 &setup_string
             ).unwrap()
         }
+    }
+    
+    #[getter]
+    pub fn line_force_model(&self) -> LineForceModel {
+        LineForceModel { data: self.data.line_force_model.clone() }
     }
 
     pub fn set_translation_and_rotation_with_finite_difference_for_the_velocity(

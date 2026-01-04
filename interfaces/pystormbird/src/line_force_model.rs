@@ -43,6 +43,11 @@ impl LineForceModel {
     pub fn ctrl_points(&self) -> Vec<[f64; 3]> {
         self.data.ctrl_points_global.iter().map(|v| v.0).collect()
     }
+    
+    #[getter]
+    pub fn wing_indices(&self) -> Vec<[usize; 2]> {
+        self.data.wing_indices.iter().map(|v| [v.start, v.end]).collect()
+    }
 
     #[getter]
     pub fn ctrl_point_spanwise_distance_non_dimensional(&self) -> Vec<f64> {
