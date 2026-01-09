@@ -116,6 +116,7 @@ impl FrozenWake {
 
                 let u_i_corrected = if let Some(p_m) = point_mirrored {
                     let u_i_mirrored = vortex.induced_velocity_with_unit_strength(p_m);
+                    
                     wake_settings.symmetry_condition.corrected_velocity(u_i, u_i_mirrored)
                 } else {
                     u_i

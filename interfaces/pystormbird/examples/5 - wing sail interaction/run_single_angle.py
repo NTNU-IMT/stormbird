@@ -10,8 +10,6 @@ if __name__ == '__main__':
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument("--angle-of-attack", type=float, default = 10.0, help="Angle of attack in degrees")
     argument_parser.add_argument("--wind-angle", type=float, default = 45.0, help="Wind angle in degrees")
-    argument_parser.add_argument("--dynamic", action='store_true')
-    argument_parser.add_argument("--write-wake-files", action='store_true')
 
     args = argument_parser.parse_args()
 
@@ -22,9 +20,7 @@ if __name__ == '__main__':
 
     simulation = SimulationCase(
         angle_of_attack_deg = args.angle_of_attack,
-        wind_angle_deg=args.wind_angle,
-        dynamic = args.dynamic,
-        write_wake_files=args.write_wake_files,
+        wind_angle_deg = args.wind_angle
     )
 
     result = simulation.run()
@@ -32,11 +28,11 @@ if __name__ == '__main__':
     force_wing_1 = result.integrated_forces[0].total
     force_wing_2 = result.integrated_forces[1].total
 
-    cl1 = force_wing_1.y / simulation.force_factor
-    cl2 = force_wing_2.y / simulation.force_factor
+    cl1 = force_wing_1[1] / simulation.force_factor
+    cl2 = force_wing_2[1] / simulation.force_factor
 
-    cd1 = force_wing_1.x / simulation.force_factor
-    cd2 = force_wing_2.x / simulation.force_factor
+    cd1 = force_wing_1[0] / simulation.force_factor
+    cd2 = force_wing_2[0] / simulation.force_factor
 
     print(f'Cl1: {cl1}')
     print(f'Cl2: {cl2}')

@@ -25,8 +25,7 @@ if __name__ == '__main__':
     for angle in angles_of_attack:
         simulation = SimulationCase(
             angle_of_attack_deg = angle,
-            wind_angle_deg=45.0,
-            dynamic = args.dynamic
+            wind_angle_deg = 45.0
         )
 
         result = simulation.run()
@@ -34,11 +33,11 @@ if __name__ == '__main__':
         force_wing_1 = result.integrated_forces[0].total
         force_wing_2 = result.integrated_forces[1].total
 
-        drag_1.append(force_wing_1.x / simulation.force_factor)
-        drag_2.append(force_wing_2.x / simulation.force_factor)
+        drag_1.append(force_wing_1[0] / simulation.force_factor)
+        drag_2.append(force_wing_2[0] / simulation.force_factor)
         
-        lift_1.append(force_wing_1.y / simulation.force_factor)
-        lift_2.append(force_wing_2.y / simulation.force_factor)
+        lift_1.append(force_wing_1[1] / simulation.force_factor)
+        lift_2.append(force_wing_2[1] / simulation.force_factor)
                       
     w_plot = 12
     fig = plt.figure(figsize=(w_plot, w_plot/1.85))
