@@ -121,6 +121,13 @@ pub struct SimulationResult {
 #[pymethods]
 impl SimulationResult {
     #[classmethod]
+    pub fn from_json(_cls: &Bound<'_, PyType>, file_path: String) -> SimulationResult {
+        let data = SimulationResultRust::from_json(&file_path).unwrap();
+        
+        SimulationResult { data }
+    }
+    
+    #[classmethod]
     pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> Vec<SimulationResult> {
         let rust_vector = SimulationResultRust::result_history_from_file(&file_path).unwrap();
 
@@ -165,6 +172,19 @@ impl SimulationResult {
     #[getter]
     pub fn residual(&self) -> f64 {
         self.data.residual
+    }
+    
+    #[getter]
+    pub fn wing_indices(&self) -> Vec<[usize; 2]> {
+        let mut out = Vec::with_capacity(self.data.nr_of_wings());
+        
+        for i in 0..self.data.nr_of_wings() {
+            out.push(
+                [self.data.wing_indices[i].start, self.data.wing_indices[i].end]
+            )
+        }
+        
+        out
     }
 
     fn __str__(&self) -> String {

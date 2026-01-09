@@ -17,20 +17,27 @@ use gaussian::Gaussian;
 pub struct ProjectionSettings {
     #[serde(default)]
     pub projection_function: Gaussian,
+    #[serde(default="ProjectionSettings::default_true")]
+    pub realign_sectional_forces: bool,
     #[serde(default)]
-    pub project_normal_to_velocity: bool,
+    pub realign_to_local_velocity_at_each_cell: bool,
     #[serde(default="ProjectionSettings::default_weight_limit")]
     pub weight_limit: Float,
+    #[serde(default="ProjectionSettings::default_true")]
+    pub project_viscous_lift: bool,
     #[serde(default)]
     pub project_sectional_drag: bool,
 }
 
 impl Default for ProjectionSettings {
+    
     fn default() -> Self {
         Self {
             projection_function: Gaussian::default(),
-            project_normal_to_velocity: false,
+            realign_sectional_forces: true,
+            realign_to_local_velocity_at_each_cell: false,
             weight_limit: Self::default_weight_limit(),
+            project_viscous_lift: true,
             project_sectional_drag: false,
         }
     }
@@ -38,6 +45,7 @@ impl Default for ProjectionSettings {
 
 
 impl ProjectionSettings {
+    fn default_true() -> bool {true}
     fn default_weight_limit() -> Float {0.001}
 
     pub fn projection_value_at_point(

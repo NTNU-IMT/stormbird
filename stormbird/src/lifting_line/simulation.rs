@@ -162,7 +162,7 @@ impl Simulation {
                 &self.line_force_model,
                 &felt_ctrl_points_freestream,
                 &mut self.frozen_wake,
-            &self.previous_circulation_strength
+                &self.previous_circulation_strength
             ),
             Solver::Linearized(solver) => {
                 solver.solve(

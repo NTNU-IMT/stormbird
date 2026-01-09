@@ -42,8 +42,6 @@ pub struct CirculationSmoothing {
 #[serde(deny_unknown_fields)]
 pub struct GaussianSmoothingBuilder {
     pub smoothing_length_factor: Float,
-    #[serde(default)]
-    pub number_of_end_points_to_interpolate: usize
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +111,6 @@ impl CirculationSmoothingBuilder {
                             end_conditions: end_conditions[wing_index],
                             number_of_end_insertions: None,
                             delta_x_factor_end_insertions: 0.5,
-                            number_of_end_points_to_interpolate: settings_builder.number_of_end_points_to_interpolate
                         }
                     );
 

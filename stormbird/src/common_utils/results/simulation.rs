@@ -47,6 +47,14 @@ impl SimulationResult {
 
         Ok(serde_res)
     }
+    
+    pub fn from_json(file_path: &str) -> Result<SimulationResult, Error> {
+        let string = std::fs::read_to_string(file_path)?;
+        
+        let serde_res = serde_json::from_str(&string)?;
+        
+        Ok(serde_res)
+    }
 
     pub fn integrated_forces_sum(&self) -> SpatialVector {
         let mut sum = SpatialVector::default();
@@ -63,6 +71,16 @@ impl SimulationResult {
 
         for i in 0..self.integrated_moments.len() {
             sum += self.integrated_moments[i].total;
+        }
+        
+        sum
+    }
+    
+    pub fn input_power_sum(&self) -> Float {
+        let mut sum = 0.0;
+        
+        for i in 0..self.input_power.len() {
+            sum += self.input_power[i];
         }
         
         sum

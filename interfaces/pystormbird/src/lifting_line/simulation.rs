@@ -11,6 +11,8 @@ use stormath::spatial_vector::SpatialVector;
 
 use crate::result_structs::SimulationResult;
 
+use crate::line_force_model::LineForceModel;
+
 #[pyclass]
 pub struct Simulation {
     data: SimulationRust
@@ -27,6 +29,11 @@ impl Simulation {
                 &setup_string
             ).unwrap()
         }
+    }
+    
+    #[getter]
+    pub fn line_force_model(&self) -> LineForceModel {
+        LineForceModel { data: self.data.line_force_model.clone() }
     }
 
     pub fn set_translation_and_rotation_with_finite_difference_for_the_velocity(
@@ -84,6 +91,12 @@ impl Simulation {
 
     pub fn set_velocity_angular(&mut self, angular_velocity: [f64; 3]) {
         self.data.line_force_model.rigid_body_motion.velocity_angular = SpatialVector::from(angular_velocity);
+    }
+    
+    pub fn reset_previous_circulation_strength(&mut self) {
+        let nr_sections = self.data.line_force_model.nr_span_lines();
+        
+        self.data.previous_circulation_strength = vec![0.0; nr_sections];
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {

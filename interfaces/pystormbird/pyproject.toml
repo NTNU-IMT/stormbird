@@ -12,4 +12,6 @@ classifiers = [
 ]
 
 [tool.maturin]
+module-name = "pystormbird._native"
+python-source = "." 
 features = ["pyo3/extension-module"]

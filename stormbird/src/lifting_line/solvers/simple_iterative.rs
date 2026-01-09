@@ -31,11 +31,14 @@ pub struct QuasiSteadySimpleIterativeBuilder {
     pub velocity_corrections: VelocityCorrections,
     #[serde(default)]
     pub start_with_linearized_solution: bool,
+    #[serde(default="QuasiSteadySimpleIterativeBuilder::default_one")]
+    pub correction_factor_initial_solution: Float
 }
 
 impl QuasiSteadySimpleIterativeBuilder {
     pub fn default_max_iterations_per_time_step() -> usize {1000}
     pub fn default_damping_factor() -> Float {0.04}
+    pub fn default_one() -> Float {1.0}
 
     pub fn build(&self) -> SimpleIterative {
         SimpleIterative {
@@ -46,6 +49,7 @@ impl QuasiSteadySimpleIterativeBuilder {
             velocity_corrections: self.velocity_corrections.clone(),
             use_raw_circulation_during_iterations: false,
             start_with_linearized_solution: self.start_with_linearized_solution,
+            correction_factor_initial_solution: self.correction_factor_initial_solution
         }
     }
 }
@@ -67,6 +71,8 @@ pub struct SimpleIterative {
     pub use_raw_circulation_during_iterations: bool,
     #[serde(default)]
     pub start_with_linearized_solution: bool,
+    #[serde(default="SimpleIterative::default_one")]
+    pub correction_factor_initial_solution: Float
 }
 
 impl SimpleIterative {
@@ -75,6 +81,7 @@ impl SimpleIterative {
     pub fn default_damping_factor() -> Float {0.05}
     pub fn default_residual_tolerance_absolute() -> Float {1e-4}
     pub fn default_strength_difference_tolerance() -> Float {1e-6}
+    pub fn default_one() -> Float {1.0}
 
     pub fn solve(
         &self,
@@ -86,6 +93,12 @@ impl SimpleIterative {
         let ctrl_points = &line_force_model.ctrl_points_global;
 
         let mut circulation_strength: Vec<Float> = initial_solution.to_vec();
+        
+        if (self.correction_factor_initial_solution - 1.0).abs() > Float::MIN_POSITIVE {
+            for i in 0..circulation_strength.len() {
+                circulation_strength[i] *= self.correction_factor_initial_solution;
+            }
+        }
 
         if self.start_with_linearized_solution {
             let linearized_solver = Linearized::default();
@@ -209,6 +222,7 @@ impl Default for SimpleIterative {
             velocity_corrections: VelocityCorrections::default(),
             use_raw_circulation_during_iterations: SimpleIterative::default_use_raw_circulation_during_iterations(),
             start_with_linearized_solution: false,
+            correction_factor_initial_solution: SimpleIterative::default_one()
         }
     }
 }
@@ -222,6 +236,7 @@ impl Default for QuasiSteadySimpleIterativeBuilder {
             strength_difference_tolerance: SimpleIterative::default_strength_difference_tolerance(),
             velocity_corrections: VelocityCorrections::default(),
             start_with_linearized_solution: false,
+            correction_factor_initial_solution: QuasiSteadySimpleIterativeBuilder::default_one()
         }
     }
 }

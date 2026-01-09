@@ -1,6 +1,6 @@
 [package]
 name = "pystormbird"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "Python interface to the Stormbird library."
 homepage = "https://github.com/NTNU-IMT/stormbird"
@@ -14,7 +14,8 @@ name = "pystormbird"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.0"
+pyo3 = { version = "0.27.2"}
 
 stormbird = { path = "../../stormbird", features = ["parallel"] }
-stormath = { version = "0.1.1" }
+stormath = { path = "../../stormath" }
+pythonize = "0.27.0"

@@ -2,9 +2,9 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-/// Functionality to represent the a wind environment
-
 use std::ops::Range;
+
+/// Functionality to represent the a wind environment
 
 use stormath::{
     type_aliases::Float,
@@ -112,17 +112,26 @@ impl WindEnvironment {
 
         velocity * direction_vector
     }
+    
+    pub fn apparent_wind_velocity_vector_at_location(
+        &self,
+        condition: WindCondition,
+        location: SpatialVector,
+        linear_velocity: SpatialVector
+    ) -> SpatialVector {
+        let true_wind = self.true_wind_velocity_vector_at_location(condition, location);
+        
+        true_wind + linear_velocity
+    }
 
     pub fn true_wind_velocity_vectors_at_locations(
         &self,
         condition: WindCondition,
         locations: &[SpatialVector]
     ) -> Vec<SpatialVector> {
-        locations.iter()
-            .map(
-                |&location| self.true_wind_velocity_vector_at_location(condition, location)
-            )
-            .collect()
+        locations.iter().map(
+            |&location| self.true_wind_velocity_vector_at_location(condition, location)
+        ).collect()
     }
 
     /// The main method to get the apparent wind velocity vectors at the input locations, given a
@@ -133,58 +142,70 @@ impl WindEnvironment {
         locations: &[SpatialVector],
         linear_velocity: SpatialVector,
     ) -> Vec<SpatialVector> {
-        let mut wind = self.true_wind_velocity_vectors_at_locations(
-            condition,
-            locations
-        );
-
-        for i in 0..wind.len() {
-            wind[i] += linear_velocity;
-        }
-
-        wind
+        locations.iter().map(
+            |&location| self.apparent_wind_velocity_vector_at_location(
+                condition, 
+                location, 
+                linear_velocity
+            )
+        ).collect()
     }
 
-    pub fn apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
+    pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
         &self,
         condition: WindCondition,
-        locations: &[SpatialVector],
+        ctrl_points: &[SpatialVector],
         linear_velocity: SpatialVector,
-        line_force_model: &LineForceModel
+        wing_indices: &[Range<usize>]
     ) -> Vec<SpatialVector> {
-        let mut wind = self.apparent_wind_velocity_vectors_at_locations(
+        let mut wind_velocity = self.apparent_wind_velocity_vectors_at_locations(
             condition,
-            locations,
+            ctrl_points,
             linear_velocity
         );
-
+        
+        let apparent_wind_direction = self.apparent_wind_direction_from_condition_and_linear_velocity(
+            condition, linear_velocity
+        );
+        
         self.apply_inflow_corrections(
-            condition.direction_coming_from,
-            &mut wind,
-            &line_force_model.ctrl_point_spanwise_distance_non_dimensional,
-            line_force_model.wing_indices.clone()
+            apparent_wind_direction,
+            &mut wind_velocity,
+            ctrl_points,
+            wing_indices,
         );
 
-        wind
+        wind_velocity
     }
 
     /// Applies inflow corrections to the first points in the input freestream velocity
     pub fn apply_inflow_corrections(
         &self,
-        apparent_wind_directions: Float,
+        apparent_wind_direction: Float,
         freestream_velocity: &mut [SpatialVector],
-        non_dimensional_span_distances: &[Float],
-        wing_indices_vector: Vec<Range<usize>>,
+        ctrl_points: &[SpatialVector],
+        wing_indices: &[Range<usize>]
     ) {
         if let Some(corrections) = &self.inflow_corrections {
-            for wing_index in 0..wing_indices_vector.len() {
-                let wing_indices = wing_indices_vector[wing_index].clone();
-
-                for i in wing_indices.start..wing_indices.end {
-                    freestream_velocity[i] = corrections.correct_velocity(
+            let nr_ctrl_points = ctrl_points.len();
+            let nr_wings = wing_indices.len();
+            
+            let mut height_values: Vec<Float> = Vec::with_capacity(
+                nr_ctrl_points
+            );
+            
+            for i in 0..nr_ctrl_points {
+                height_values.push(
+                    ctrl_points[i].dot(self.up_direction)
+                );
+            }
+            
+            for wing_index in 0..nr_wings {
+                for i in wing_indices[wing_index].start..wing_indices[wing_index].end {
+                    freestream_velocity[i] = corrections.correct_velocity_single_sail(
                         wing_index,
-                        apparent_wind_directions,
-                        non_dimensional_span_distances[i],
+                        apparent_wind_direction,
+                        height_values[i],
                         freestream_velocity[i],
                         self.up_direction
                     )

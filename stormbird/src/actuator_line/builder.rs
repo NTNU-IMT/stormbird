@@ -9,6 +9,7 @@ use crate::controller::ControllerBuilder;
 use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use super::projection::ProjectionSettings;
 use super::sampling::SamplingSettings;
@@ -35,7 +36,7 @@ pub struct ActuatorLineBuilder {
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
     pub write_iterations_full_result: usize,
     #[serde(default)]
-    pub start_iteration: usize,
+    pub start_time: Float,
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
     #[serde(default)]
@@ -55,7 +56,7 @@ impl ActuatorLineBuilder {
             sampling_settings: SamplingSettings::default(),
             controller: None,
             write_iterations_full_result: Self::default_write_iterations_full_result(),
-            start_iteration: 0,
+            start_time: 0.0,
             lifting_line_correction: None,
             empirical_circulation_correction: None,
         }
@@ -92,11 +93,13 @@ impl ActuatorLineBuilder {
             solver_settings: self.solver_settings.clone(),
             sampling_settings: self.sampling_settings.clone(),
             controller,
-            start_iteration: self.start_iteration,
+            start_time: self.start_time,
             current_iteration: 0,
             write_iterations_full_result: self.write_iterations_full_result,
             ctrl_points_velocity: vec![SpatialVector::default(); nr_span_lines],
             simulation_result: None,
+            sectional_lift_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
+            sectional_drag_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             lifting_line_correction,
             empirical_circulation_correction: self.empirical_circulation_correction.clone(),
         }

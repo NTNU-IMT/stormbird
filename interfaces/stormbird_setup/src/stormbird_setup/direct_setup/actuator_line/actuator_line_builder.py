@@ -18,7 +18,7 @@ class ActuatorLineBuilder(StormbirdSetupBaseModel):
     solver_settings: SolverSettings = SolverSettings()
     sampling_settings: SamplingSettings = SamplingSettings()
     write_iterations_full_result: int = 100
-    start_iteration: int = 0
+    start_time: float = 0
     controller: ControllerBuilder | None = None
     lifting_line_correction: LiftingLineCorrectionBuilder | None = None
     empirical_circulation_correction: EmpiricalCirculationCorrection | None = None

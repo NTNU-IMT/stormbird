@@ -3,6 +3,8 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
+from typing import Any
+
 from stormbird_setup.simplified_setup.single_wing_simulation import SingleWingSimulation, SolverType
 from stormbird_setup.direct_setup.section_models import SectionModel, Foil
 
@@ -15,7 +17,7 @@ def get_section_model(solver: SolverType):
     The reason for using different section solvers for different solvers is due to a somewhat 
     different behavior around stall. In general, the linearized solver will stall at a later stage
     than the iterative solver. Principally speaking, the linearized solver is less accurate around 
-    stall, due to the binarization, but practically speaking it seems to give good results as long
+    stall, due to the linearization, but practically speaking it seems to give good results as long
     as the section model is adjusted. As a general principle, tuning the exact stall behavior is 
     seen as acceptable, while tuning the lift slope should be based on the actual 2D data
 
@@ -61,7 +63,7 @@ def simulate_single_case(
     dynamic: bool = False,
     solver_type: SolverType = SolverType.Linearized,
     smoothing_length: float = 0.0,
-) -> dict:
+) -> dict[str, Any]:
 
     chord_length = 1.0
     height = 4.5
@@ -88,8 +90,6 @@ def simulate_single_case(
     )
 
     freestream_velocity_points = simulation.get_freestream_velocity_points()
-
-    nr_points = len(freestream_velocity_points)
 
     freestream_velocity_list = []
     for _ in freestream_velocity_points:

@@ -144,7 +144,7 @@ impl CppActuatorLine {
         line_index: usize,
         velocity: &[f64; 3]
     ) -> [f64; 3] {
-        let body_force = self.model.force_to_project(
+        let body_force = self.model.force_to_project_at_cell(
             line_index,
             SpatialVector::from(*velocity)
         );

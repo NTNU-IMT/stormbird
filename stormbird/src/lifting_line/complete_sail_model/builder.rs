@@ -36,14 +36,10 @@ impl CompleteSailModelBuilder {
     }
 
     pub fn build(&self) -> CompleteSailModel {
-        let lifting_line_simulation = self.lifting_line_simulation.build();
-
-        let controller = self.controller.build();
-
         CompleteSailModel {
-            lifting_line_simulation,
+            lifting_line_simulation: self.lifting_line_simulation.build(),
             wind_environment: self.wind_environment.clone(),
-            controller
+            controller: self.controller.build()
         }
     }
 }

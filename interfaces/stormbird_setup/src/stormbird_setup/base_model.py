@@ -23,7 +23,7 @@ class StormbirdSetupBaseModel(BaseModel):
         populate_by_name = True,
         use_enum_values = False,
         validate_default = True,
-        ser_json_exclude_none=True
+        ser_json_exclude_none=True,
     )
 
     @classmethod
@@ -35,7 +35,7 @@ class StormbirdSetupBaseModel(BaseModel):
         return cls.model_validate_json(file_path.read_text())
 
     def to_json_string(self) -> str:
-        return self.model_dump_json(exclude_none=True)
+        return self.model_dump_json(exclude_none=True, indent=4)
 
     def to_json_file(self, file_path: Path | str) -> None:
 

@@ -333,7 +333,10 @@ impl LineForceModel {
      /// Calculates the forces on each line element.
      pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
         let mut sectional_forces = SectionalForces {
-            circulatory: self.sectional_circulatory_forces(&input.circulation_strength, &input.velocity),
+            circulatory: self.sectional_circulatory_forces(
+                &input.circulation_strength, 
+                &input.velocity
+            ),
             viscous_lift: self.viscous_lift_forces(&input.angles_of_attack, &input.velocity),
             sectional_drag: self.sectional_drag_forces(&input.angles_of_attack, &input.velocity),
             added_mass: self.sectional_added_mass_force(&input.acceleration),
@@ -359,7 +362,9 @@ impl LineForceModel {
                 if velocity[index].length() == 0.0 {
                     SpatialVector::default()
                 } else {
-                    strength[index] * velocity[index].cross(span_lines[index].relative_vector()) * self.density
+                    strength[index] * 
+                    velocity[index].cross(span_lines[index].relative_vector()) * 
+                    self.density
                 }
             }
         ).collect()

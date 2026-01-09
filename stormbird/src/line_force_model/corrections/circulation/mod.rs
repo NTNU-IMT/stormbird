@@ -66,4 +66,3 @@ impl Default for CirculationCorrection {
         CirculationCorrection::None
     }
 }
-

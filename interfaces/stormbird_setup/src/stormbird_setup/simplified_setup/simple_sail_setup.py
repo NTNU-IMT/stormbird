@@ -10,7 +10,7 @@ from ..base_model import StormbirdSetupBaseModel
 from ..direct_setup.spatial_vector import SpatialVector
 from ..direct_setup.line_force_model import WingBuilder
 from ..direct_setup.section_models import SectionModel, Foil, VaryingFoil, RotatingCylinder
-from ..direct_setup.controller import ControllerBuilder, ControllerLogic, InternalStateType, SpinRatioConversion
+from ..direct_setup.controller import ControllerBuilder, ControllerLogic
 from ..direct_setup.input_power import InputPowerModel
 
 import numpy as np
@@ -139,7 +139,10 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                     logic = logic
                 )
             case SailType.RotorSail:
-                return ControllerBuilder.new_default_rotor_sail(diameter=self.chord_length, max_rps = 180.0/60.0)
+                return ControllerBuilder.new_default_rotor_sail(
+                    diameter = self.chord_length, 
+                    max_rps = 180.0 / 60.0
+                )
             case SailType.SuctionSail:
                 raise NotImplementedError("Suction sail not implemented yet")
             case _:

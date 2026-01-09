@@ -24,6 +24,20 @@ class ViscousCoreLengthType(Enum):
 class ViscousCoreLength(StormbirdSetupBaseModel):
     value_type: ViscousCoreLengthType = ViscousCoreLengthType.Relative
     value: float = 0.1
+    
+    @classmethod
+    def new_relative(cls, relative_value: float) -> "ViscousCoreLength":
+        return cls(
+            value_type = ViscousCoreLengthType.Relative,
+            value = relative_value
+        )
+    
+    @classmethod
+    def new_absolute(cls, absolute_value: float) -> "ViscousCoreLength":
+        return cls(
+            value_type = ViscousCoreLengthType.Absolute,
+            value = absolute_value
+        )
 
     @model_serializer
     def ser_model(self):

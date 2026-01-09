@@ -9,6 +9,7 @@ use crate::line_force_model::LineForceModel;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
+use stormath::special_functions::cosine_transition_zero_to_one;
 
 use serde::{Serialize, Deserialize};
 
@@ -20,7 +21,9 @@ pub struct LiftingLineCorrectionBuilder {
     #[serde(default = "LiftingLineCorrectionBuilder::default_wake_length_factor")]
     pub wake_length_factor: Float,
     #[serde(default)]
-    pub symmetry_condition: SymmetryCondition
+    pub symmetry_condition: SymmetryCondition,
+    #[serde(default)]
+    pub initialization_time: Option<Float>
 }
 
 impl LiftingLineCorrectionBuilder {
@@ -40,7 +43,8 @@ impl LiftingLineCorrectionBuilder {
         LiftingLineCorrection {
             viscous_core_length,
             wake_length_factor: self.wake_length_factor,
-            symmetry_condition: self.symmetry_condition
+            symmetry_condition: self.symmetry_condition,
+            initialization_time: self.initialization_time,
         }
     }
 }
@@ -56,11 +60,12 @@ impl LiftingLineCorrectionBuilder {
 pub struct LiftingLineCorrection {
     pub viscous_core_length: Float,
     pub wake_length_factor: Float,
-    pub symmetry_condition: SymmetryCondition
+    pub symmetry_condition: SymmetryCondition,
+    pub initialization_time: Option<Float>,
 }
 
 impl LiftingLineCorrection {
-    /// Computes a difference in the induced velocities between two lifting line simualtions; one
+    /// Computes a difference in the induced velocities between two lifting line simulations; one
     /// with a viscous core length equal to the force projection width, and one with a small viscous
     /// core length. The difference is then returned as a vector of induced velocities at the control
     /// points of the line force model
@@ -69,6 +74,7 @@ impl LiftingLineCorrection {
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
         circulation_strength: &[Float],
+        time: Float,
     ) -> Vec<SpatialVector> {
         let span_lines = &line_force_model.span_lines_global;
 
@@ -106,7 +112,7 @@ impl LiftingLineCorrection {
             let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
-                self.viscous_core_length / 10.0,
+                self.viscous_core_length / 100.0,
                 self.symmetry_condition
             );
 
@@ -123,6 +129,14 @@ impl LiftingLineCorrection {
                     frozen_wake_default.induced_velocities_at_control_points[i] -
                     frozen_wake_viscous.induced_velocities_at_control_points[i]
                 );
+            }
+        }
+        
+        if let Some(initialization_time) = self.initialization_time {
+            let correction_factor = cosine_transition_zero_to_one(time, 0.0, initialization_time);
+            
+            for i in 0..u_i_correction.len() {
+                u_i_correction[i] *= correction_factor;
             }
         }
 

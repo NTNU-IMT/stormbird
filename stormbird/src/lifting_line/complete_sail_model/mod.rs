@@ -20,21 +20,19 @@ use crate::controller::{
     input::ControllerInput,
 };
 
-//use crate::empirical_models::input_power::InputPower;
-
 use crate::common_utils::results::simulation::SimulationResult;
 
 use builder::CompleteSailModelBuilder;
 
-use stormath::spatial_vector::SpatialVector;
-
-use stormath::type_aliases::Float;
-
+use stormath::{
+    type_aliases::Float,
+    spatial_vector::SpatialVector,
+    array_generation,
+};
 use crate::error::Error;
 
-
 #[derive(Debug, Clone)]
-/// Collection of the necessary functionality to simulate a *complete* sail system using the lifting
+/// Collection of the necessary functionality to simulate a *complete sail system* using the lifting
 /// line model. This means combining a lifting line model of the sails with a model of the wind
 /// conditions and a control system that adjust the control parameters of the sails based on the
 /// wind conditions.
@@ -45,12 +43,63 @@ pub struct CompleteSailModel {
 }
 
 impl CompleteSailModel {
+    /// Generate a model from an input json string
     pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
         let builder = CompleteSailModelBuilder::new_from_string(setup_string)?;
 
         Ok(builder.build())
     }
-
+    
+    /// Runs multiple `simulate_condition` calls with different loadings, and chooses the best one
+    /// based on the maximum delivered power
+    pub fn simulate_condition_optimal_controller_loading(
+        &mut self,
+        wind_condition: WindCondition,
+        ship_velocity: Float,
+        nr_loadings_to_test: usize,
+        time_step: Float,
+        nr_time_steps: usize,
+    ) -> SimulationResult {
+        
+        let loadings_to_test = array_generation::linspace(0.1, 1.0, nr_loadings_to_test);
+        
+        let mut results: Vec<SimulationResult> = Vec::with_capacity(nr_loadings_to_test);
+        let mut effective_power: Vec<f64> = Vec::with_capacity(nr_loadings_to_test);
+        
+        let mut max_effective_power = Float::NEG_INFINITY;
+        let mut best_index = 0;
+        
+        for i in 0..nr_loadings_to_test {
+            let result = self.simulate_condition(
+                wind_condition, 
+                ship_velocity, 
+                loadings_to_test[i], 
+                time_step, 
+                nr_time_steps
+            );
+            
+            // TODO: must find a way to define what the thrust direction is!
+            let thrust = -result.integrated_forces_sum()[0];
+            let delivered_power = thrust * ship_velocity;
+            let input_power = result.input_power_sum();
+            
+            effective_power.push(delivered_power - input_power);
+            
+            if effective_power[i] > max_effective_power {
+                max_effective_power = effective_power[i];
+                best_index = i;
+            }
+            
+            results.push(
+              result  
+            );
+        }
+        
+        results[best_index].clone()
+    }
+    
+    /// Simulate a condition for the sail, specified by a wind condition, ship velocity, 
+    /// and controller loading
     pub fn simulate_condition(
         &mut self,
         wind_condition: WindCondition,
@@ -78,7 +127,7 @@ impl CompleteSailModel {
         result
     }
 
-    /// Returns the forces on the sails
+    /// Returns the forces on the sails for a single time step
     pub fn do_step(
         &mut self,
         current_time: Float,
@@ -105,7 +154,7 @@ impl CompleteSailModel {
             &freestream_velocity
         )
     }
-
+    
     pub fn freestream_velocity(
         &self,
         wind_condition: WindCondition,
@@ -115,14 +164,25 @@ impl CompleteSailModel {
             .get_freestream_velocity_points();
 
         let linear_velocity = ship_velocity * self.wind_environment.zero_direction_vector;
-
-        let freestream_velocity = self.wind_environment
-            .apparent_wind_velocity_vectors_at_locations_with_corrections_applied(
+        
+        let mut freestream_velocity = self.wind_environment.apparent_wind_velocity_vectors_at_locations(
+            wind_condition, 
+            &freestream_velocity_points, 
+            linear_velocity
+        );
+        
+        let apparent_wind_direction = self.wind_environment
+            .apparent_wind_direction_from_condition_and_linear_velocity(
                 wind_condition,
-                &freestream_velocity_points,
-                linear_velocity,
-                &self.lifting_line_simulation.line_force_model,
+                linear_velocity
             );
+        
+        self.wind_environment.apply_inflow_corrections(
+            apparent_wind_direction,
+            &mut freestream_velocity,
+            &self.lifting_line_simulation.line_force_model.ctrl_points_global,
+            &self.lifting_line_simulation.line_force_model.wing_indices
+        );
 
         freestream_velocity
     }

@@ -14,14 +14,14 @@ pub fn gaussian_kernel(x: Float, x0: Float, smoothing_length: Float) -> Float {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GaussianSmoothing<T: SmoothingOps> {
+    /// The length to use in the Gaussian kernel
     pub smoothing_length: Float,
+    /// How to treat the ends
     pub end_conditions: [EndCondition<T>; 2],
     #[serde(default)]
     pub number_of_end_insertions: Option<usize>,
     #[serde(default = "default_delta_x_factor_end_insertions")]
     pub delta_x_factor_end_insertions: Float,
-    #[serde(default)]
-    pub number_of_end_points_to_interpolate: usize
 }
 
 fn default_delta_x_factor_end_insertions() -> Float {1.0}
@@ -47,50 +47,17 @@ impl<T: SmoothingOps> GaussianSmoothing<T> {
     pub fn apply_smoothing(&self, x: &[Float], y: &[T]) -> Vec<T> {   
         let number_of_end_insertions = self.number_of_end_insertions(x);
 
-        let x_modified_end_insertions = EndCondition::<Float>::add_end_values_to_x_data(
+        let x_modified = EndCondition::<Float>::add_end_values_to_x_data(
             x, 
             number_of_end_insertions,
             self.delta_x_factor_end_insertions
         );
 
-        let y_modified_end_insertions = EndCondition::add_end_values_to_y_data(
+        let y_modified = EndCondition::add_end_values_to_y_data(
             y, 
             number_of_end_insertions, 
             self.end_conditions
         );
-
-        let n_mod_end_insertions = x_modified_end_insertions.len();
-
-        let mut x_modified = Vec::with_capacity(n_mod_end_insertions);
-        let mut y_modified: Vec<T> = Vec::with_capacity(n_mod_end_insertions);
-
-        if self.number_of_end_points_to_interpolate > 0 {
-            for i in 0..number_of_end_insertions {
-                x_modified.push(x_modified_end_insertions[i]);
-                y_modified.push(y_modified_end_insertions[i]);
-            }
-
-            let interior_start_index = number_of_end_insertions + self.number_of_end_points_to_interpolate;
-            let interior_end_index = x_modified_end_insertions.len() - number_of_end_insertions - self.number_of_end_points_to_interpolate;
-
-            for i in interior_start_index..interior_end_index {
-                x_modified.push(x_modified_end_insertions[i]);
-                y_modified.push(y_modified_end_insertions[i]);
-            }
-
-            let end_start_index = x_modified_end_insertions.len() - number_of_end_insertions;
-            let end_end_index = x_modified_end_insertions.len();
-            for i in end_start_index..end_end_index {
-                x_modified.push(x_modified_end_insertions[i]);
-                y_modified.push(y_modified_end_insertions[i]);
-            }
-
-        } else {
-            for i in 0..n_mod_end_insertions {
-                x_modified.push(x_modified_end_insertions[i]);
-                y_modified.push(y_modified_end_insertions[i]);
-            }
-        }
 
         let n = y.len();
         let n_mod = y_modified.len();
@@ -110,6 +77,56 @@ impl<T: SmoothingOps> GaussianSmoothing<T> {
             }
 
             y_smooth.push(kernel_func_product_sum / kernel_sum);
+        }
+
+        y_smooth
+    }
+    
+    /// Apply smoothing, but with weighted smoothing length
+    pub fn apply_smoothing_with_varying_smoothing_weight(
+        &self,
+        x: &[Float],
+        y: &[T],
+        smoothing_weight: &[Float]
+    ) -> Vec<T> {
+        let number_of_end_insertions = self.number_of_end_insertions(x);
+
+        let x_modified = EndCondition::<Float>::add_end_values_to_x_data(
+            x, 
+            number_of_end_insertions,
+            self.delta_x_factor_end_insertions
+        );
+
+        let y_modified = EndCondition::add_end_values_to_y_data(
+            y, 
+            number_of_end_insertions, 
+            self.end_conditions
+        );
+
+        let n = y.len();
+        let n_mod = y_modified.len();
+
+        let mut y_smooth: Vec<T> = Vec::with_capacity(n);
+
+        // i_0 represents the index of the point to be smoothed
+        for i_0 in 0..n {
+            let mut kernel_sum = 0.0;
+            let mut kernel_func_product_sum: T = Default::default();
+            
+            let smoothing_length = self.smoothing_length * smoothing_weight[i_0];
+            
+            if smoothing_length.abs() < f64::MIN_POSITIVE {
+                y_smooth.push(y[i_0])
+            } else {
+                for i in 0..n_mod {
+                    let kernel_value = gaussian_kernel(x_modified[i], x[i_0], smoothing_length);
+    
+                    kernel_sum += kernel_value;
+                    kernel_func_product_sum = kernel_func_product_sum + y_modified[i] * kernel_value;
+                }
+    
+                y_smooth.push(kernel_func_product_sum / kernel_sum);
+            }
         }
 
         y_smooth

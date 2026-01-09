@@ -1,6 +1,6 @@
 [package]
 name = "stormath"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "A selction of math utility functionality"
 homepage = "https://github.com/NTNU-IMT/stormbird"

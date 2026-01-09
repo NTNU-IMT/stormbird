@@ -12,7 +12,9 @@ class Gaussian(StormbirdSetupBaseModel):
 
 class ProjectionSettings(StormbirdSetupBaseModel):
     projection_function: Gaussian = Gaussian()
-    project_normal_to_velocity: bool = False
+    realign_sectional_forces: bool = True
+    realign_to_local_velocity_at_each_cell: bool = False
+    project_viscous_lift: bool = False
     project_sectional_drag: bool = False
 
 class SamplingSettings(StormbirdSetupBaseModel):
