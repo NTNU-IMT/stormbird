@@ -1,6 +1,6 @@
 [package]
 name = "pystormbird"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "Python interface to the Stormbird library."
 homepage = "https://github.com/NTNU-IMT/stormbird"
