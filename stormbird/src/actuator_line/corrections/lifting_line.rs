@@ -102,14 +102,14 @@ impl LiftingLineCorrection {
 
             let wake_vector = averaged_ctrl_points_velocity.normalize() * self.wake_length_factor;
 
-            let mut frozen_wake_viscous = FrozenWake::steady_wake_from_span_lines_and_direction(
+            let mut frozen_wake_viscous = FrozenWake::steady_wake_for_single_wing_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length,
                 self.symmetry_condition
             );
 
-            let mut frozen_wake_default = FrozenWake::steady_wake_from_span_lines_and_direction(
+            let mut frozen_wake_default = FrozenWake::steady_wake_for_single_wing_from_span_lines_and_direction(
                 wing_span_lines,
                 wake_vector,
                 self.viscous_core_length / 100.0,

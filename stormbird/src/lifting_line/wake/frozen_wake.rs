@@ -81,8 +81,9 @@ impl FrozenWake {
         let wake_length = wake_settings.wake_length_factor * average_chord_length;
 
         // Pre-calculate normalized wake vectors to avoid repeated normalization
-        let mut wake_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines + 1);
-        for i in 0..=nr_span_lines {
+        let nr_wake_vectors = span_point_velocities.len();
+        let mut wake_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_wake_vectors);
+        for i in 0..span_point_velocities.len() {
             wake_vectors.push(span_point_velocities[i].normalize() * wake_length);
         }
 
@@ -98,8 +99,8 @@ impl FrozenWake {
             ViscousCoreLength::NoViscousCore => 0.0,
         };
 
-        let horseshoe_vortices = HorseshoeVortex::vortices_from_span_lines_and_wake_vectors(
-            &span_lines,
+        let horseshoe_vortices = HorseshoeVortex::vortices_from_line_force_model_and_wake_vectors(
+            line_force_model,
             &wake_vectors,
             viscous_core_length
         );
@@ -129,7 +130,7 @@ impl FrozenWake {
 
     /// Function to create a steady frozen wake from a set of span lines, a wake direction and a
     /// wake length.
-    pub fn steady_wake_from_span_lines_and_direction(
+    pub fn steady_wake_for_single_wing_from_span_lines_and_direction(
         span_lines: &[SpanLine],
         wake_vector: SpatialVector,
         viscous_core_length: Float,
@@ -148,7 +149,7 @@ impl FrozenWake {
 
         let wake_vectors = vec![wake_vector; nr_span_lines + 1];
 
-        let horseshoe_vortices = HorseshoeVortex::vortices_from_span_lines_and_wake_vectors(
+        let horseshoe_vortices = HorseshoeVortex::vortices_for_single_wing_from_span_lines_and_wake_vectors(
             &span_lines,
             &wake_vectors,
             viscous_core_length
