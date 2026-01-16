@@ -11,7 +11,8 @@ from pydantic import model_serializer, model_validator
 class Foil(StormbirdSetupBaseModel):
     cl_zero_angle: float | None = None
     cl_initial_slope: float | None = None
-    cl_high_order_factor: float | None = None
+    cl_high_order_factor_positive: float | None = None
+    cl_high_order_factor_negative: float | None = None
     cl_high_order_power: float | None = None
     cl_max_after_stall: float | None = None
     cd_min: float | None = None

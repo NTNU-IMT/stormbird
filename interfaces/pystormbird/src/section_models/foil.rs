@@ -60,13 +60,23 @@ impl Foil {
     }
 
     #[getter]
-    pub fn get_cl_high_order_factor(&self) -> f64 {
-        self.data.cl_high_order_factor
+    pub fn get_cl_high_order_factor_positive(&self) -> f64 {
+        self.data.cl_high_order_factor_positive
     }
 
     #[setter]
-    pub fn set_cl_high_order_factor(&mut self, value: f64) {
-        self.data.cl_high_order_factor = value;
+    pub fn set_cl_high_order_factor_positive(&mut self, value: f64) {
+        self.data.cl_high_order_factor_positive= value;
+    }
+    
+    #[getter]
+    pub fn get_cl_high_order_factor_negative(&self) -> f64 {
+        self.data.cl_high_order_factor_negative
+    }
+
+    #[setter]
+    pub fn set_cl_high_order_factor_negative(&mut self, value: f64) {
+        self.data.cl_high_order_factor_negative = value;
     }
 
     #[getter]

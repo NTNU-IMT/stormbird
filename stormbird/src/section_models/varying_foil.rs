@@ -34,7 +34,8 @@ impl VaryingFoil {
     pub fn get_foil(&self) -> Foil {
         let cl_zero_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
         let cl_initial_slope_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
-        let cl_high_order_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor).collect();
+        let cl_high_order_factor_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor_positive).collect();
+        let cl_high_order_factor_negative_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor_negative).collect();
         let cl_high_order_power_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_power).collect();
         let cl_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
 
@@ -59,7 +60,8 @@ impl VaryingFoil {
         Foil {
             cl_zero_angle:             linear_interpolation(x, x_data, &cl_zero_angle_data),
             cl_initial_slope:          linear_interpolation(x, x_data, &cl_initial_slope_data),
-            cl_high_order_factor:      linear_interpolation(x, x_data, &cl_high_order_factor_data),
+            cl_high_order_factor_positive: linear_interpolation(x, x_data, &cl_high_order_factor_positive_data),
+            cl_high_order_factor_negative: linear_interpolation(x, x_data, &cl_high_order_factor_negative_data),
             cl_high_order_power:       linear_interpolation(x, x_data, &cl_high_order_power_data),
             cl_max_after_stall:        linear_interpolation(x, x_data, &cl_max_after_stall_data),
             cd_min:                    linear_interpolation(x, x_data, &cd_min_data),

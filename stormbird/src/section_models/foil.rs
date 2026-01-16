@@ -55,7 +55,12 @@ pub struct Foil {
     /// Optional proportionality factor for adding higher order terms to the lift. Is zero by
     /// default, and therefore not used. Can be used to adjust the behavior of the lift curve close
     /// to stall.
-    pub cl_high_order_factor: Float,
+    pub cl_high_order_factor_positive: Float,
+    #[serde(default)]
+    /// Optional proportionality factor for adding higher order terms to the lift. Is zero by
+    /// default, and therefore not used. Can be used to adjust the behavior of the lift curve close
+    /// to stall.
+    pub cl_high_order_factor_negative: Float,
     #[serde(default)]
     /// Option power for adding higher order terms to the lift. Is zero by default, and therefore
     /// not used. Can be used to adjust the behavior of the lift curve close to stall.
@@ -164,9 +169,15 @@ impl Foil {
         } else {
             0.0
         };
+        
+        let high_order_factor = if angle_of_attack >= 0.0 {
+            self.cl_high_order_factor_positive
+        } else {
+            self.cl_high_order_factor_negative
+        };
 
-        self.lift_coefficient_linear(angle_of_attack) +
-        self.cl_high_order_factor * angle_high_power
+        self.lift_coefficient_linear(angle_of_attack) + 
+            high_order_factor * angle_high_power
     }
 
     #[inline(always)]
@@ -270,7 +281,8 @@ impl Default for Foil {
         Self {
             cl_zero_angle:          0.0,
             cl_initial_slope:       Self::default_cl_initial_slope(),
-            cl_high_order_factor:   0.0,
+            cl_high_order_factor_positive: 0.0,
+            cl_high_order_factor_negative: 0.0,
             cl_high_order_power:    0.0,
             cl_max_after_stall:     Self::default_one(),
             cd_min:                 0.0,
