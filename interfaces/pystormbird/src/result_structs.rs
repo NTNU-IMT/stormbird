@@ -121,7 +121,7 @@ pub struct SimulationResult {
 #[pymethods]
 impl SimulationResult {
     #[classmethod]
-    pub fn from_json(_cls: &Bound<'_, PyType>, file_path: String) -> SimulationResult {
+    pub fn from_json_file(_cls: &Bound<'_, PyType>, file_path: String) -> SimulationResult {
         let data = SimulationResultRust::from_json(&file_path).unwrap();
         
         SimulationResult { data }

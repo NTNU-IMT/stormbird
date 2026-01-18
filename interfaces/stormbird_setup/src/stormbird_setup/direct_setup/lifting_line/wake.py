@@ -4,11 +4,12 @@ Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 '''
 
-from ...base_model import StormbirdSetupBaseModel
-
+from typing import Any
 from enum import Enum
 
-from pydantic import model_serializer
+from ...base_model import StormbirdSetupBaseModel
+
+from pydantic import model_serializer, model_validator
 
 class SymmetryCondition(Enum):
     NoSymmetry = "NoSymmetry"
@@ -38,6 +39,35 @@ class ViscousCoreLength(StormbirdSetupBaseModel):
             value_type = ViscousCoreLengthType.Absolute,
             value = absolute_value
         )
+        
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_viscous_core_length(cls, data: Any) -> Any:
+        # If already in correct format, return as-is
+        if isinstance(data, dict) and 'value_type' in data:
+            return data
+        
+        # Handle string format for NoViscousCore
+        if isinstance(data, str) and data == "NoViscousCore":
+            return {
+                "value_type": ViscousCoreLengthType.NoViscousCore,
+                "value": 0.0  # Default value, won't be used
+            }
+        
+        # Handle dict formats with Relative or Absolute
+        if isinstance(data, dict):
+            if "Relative" in data:
+                return {
+                    "value_type": ViscousCoreLengthType.Relative,
+                    "value": data["Relative"]
+                }
+            elif "Absolute" in data:
+                return {
+                    "value_type": ViscousCoreLengthType.Absolute,
+                    "value": data["Absolute"]
+                }
+        
+        return data
 
     @model_serializer
     def ser_model(self):

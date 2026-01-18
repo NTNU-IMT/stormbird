@@ -46,6 +46,42 @@ class SpatialVector(StormbirdSetupBaseModel):
         
         return SpatialVector(x = x, y = y, z = z)
         
+    def __imul__(self, scalar: float) -> "SpatialVector":
+        if isinstance(scalar, float):
+            self.x *= scalar
+            self.y *= scalar
+            self.z *= scalar
+            
+            return self
+        else:
+            return NotImplemented
+            
+    def __mul__(self, scalar: float) -> "SpatialVector":
+            if isinstance(scalar, float):
+                return SpatialVector(
+                    x = self.x * scalar,
+                    y = self.y * scalar,
+                    z = self.z * scalar
+                )
+            else:
+                return NotImplemented
+                
+    def __add__(self, other: "SpatialVector") -> "SpatialVector":
+        return SpatialVector(
+            x = self.x + other.x,
+            y = self.y + other.y,
+            z = self.z + other.z
+        )
+            
+    def normalize(self) -> "SpatialVector":
+        length = self.length()
+        
+        return SpatialVector(
+            x = self.x / length,
+            y = self.y / length,
+            z = self.z / length
+        )
+        
     def absolute_angle_between(self, rhs: "SpatialVector") -> float:
         self_len_sq = self.length_squared()
         rhs_len_sq = rhs.length_squared()
@@ -68,6 +104,18 @@ class SpatialVector(StormbirdSetupBaseModel):
             return absolute_angle
         else:
             return -absolute_angle
+            
+    def rotate_around_axis(self, angle: float, axis: "SpatialVector") -> "SpatialVector":
+        axis_normalized = axis.normalize()
+
+        cos_angle = math.cos(angle)
+        sin_angle = math.sin(angle)
+
+        term1 = self * cos_angle
+        term2 = axis_normalized.cross(self) * sin_angle
+        term3 = axis_normalized * axis_normalized.dot(self) * (1.0 - cos_angle)
+
+        return term1 + term2 + term3
 
     
     
