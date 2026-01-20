@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 stormbird = { path = "../../stormbird"}
+
+[build-dependencies]
+cbindgen = "0.29"
