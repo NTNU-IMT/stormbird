@@ -5,8 +5,6 @@ use std::os::raw::c_char;
 use crate::wind::WindCondition;
 use crate::results::{
     SingleSailResult,
-    SailResults,
-    MAX_NUMBER_OF_SAILS
 };
 
 use stormbird::{
@@ -58,14 +56,17 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition(
     sail_model: *mut CompleteSailModel,
     wind_condition: WindCondition,
     ship_velocity: f64,
-    controller_loading: f64
-) -> SailResults {
+    controller_loading: f64,
+    results_out: *mut SingleSailResult,
+    results_out_length: usize,
+) -> i32 {
     // Check for null pointer
-    if sail_model.is_null() {
-        return SailResults {
-            data: [SingleSailResult::default(); MAX_NUMBER_OF_SAILS],
-            length: 0,
-        };
+    if sail_model.is_null() || results_out.is_null() {
+        return -1;
+    }
+    
+    if results_out_length == 0 {
+        return -2;
     }
     
     let rust_model = unsafe {
@@ -74,11 +75,21 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition(
     
     let wind_condition_rust = WindConditionImpl::from(wind_condition);
     
-    let rust_result = rust_model.simulate_steady_state_condition_simple_output(
+    let rust_results = rust_model.simulate_steady_state_condition_simple_output(
         wind_condition_rust, 
         ship_velocity, 
         controller_loading
     );
     
-    SailResults::from_rust_array(rust_result)
+    let actual_count = rust_results.len().min(results_out_length);
+    
+    let output_slice = unsafe { 
+        std::slice::from_raw_parts_mut(results_out, actual_count) 
+    };
+    
+    for (i, rust_result) in rust_results.iter().take(actual_count).enumerate() {
+        output_slice[i] = SingleSailResult::from(rust_result.clone());
+    }
+    
+    actual_count as i32
 }
