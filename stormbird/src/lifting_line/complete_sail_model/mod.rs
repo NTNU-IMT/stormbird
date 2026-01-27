@@ -53,6 +53,11 @@ impl CompleteSailModel {
         Ok(builder.build())
     }
     
+    /// Query the model for the number of sails
+    pub fn get_number_of_sails(&self) -> usize {
+        self.lifting_line_simulation.line_force_model.nr_wings()
+    }
+    
     /// Runs multiple `simulate_condition` calls with different loadings, and chooses the best one
     /// based on the maximum delivered power
     pub fn simulate_condition_optimal_controller_loading(

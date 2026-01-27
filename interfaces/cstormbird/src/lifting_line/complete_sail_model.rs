@@ -42,6 +42,20 @@ pub extern "C" fn complete_sail_model_new(setup_string: *const c_char) -> *mut C
     }
 }
 
+/// Query the model for the number of sails
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_get_number_of_sails(sail_model: *mut CompleteSailModel) -> i32 {
+    if sail_model.is_null() {
+        return -1;
+    }
+    
+    let rust_model = unsafe {
+        &mut *(sail_model as *mut CompleteSailModelImpl)
+    };
+    
+    rust_model.get_number_of_sails() as i32
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn complete_sail_model_drop(sail_model: *mut CompleteSailModel) {
     if !sail_model.is_null() {
