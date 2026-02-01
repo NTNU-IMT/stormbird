@@ -67,6 +67,36 @@ class ControllerBuilder(StormbirdSetupBaseModel):
     max_internal_section_state_change_rate: float | None = None
     moving_average_window_size: int | None = None
     use_input_velocity_for_apparent_wind_direction: bool = False
+    
+    @classmethod
+    def new_default_wing_sail_single_element(cls):
+        apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180])
+        angle_of_attack_set_points_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15, 15])
+
+        logic = ControllerLogic(
+            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
+            angle_of_attack_set_points_data = angle_of_attack_set_points_data.tolist()
+        )
+
+        return cls(
+            logic = logic
+        )
+    
+    @classmethod
+    def new_default_wing_sail_two_element(cls):
+        apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180])
+        angle_of_attack_set_points_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
+        section_model_internal_state_set_points_data = np.radians([-30.0, -30.0, 0.0, 0.0, 30.0, 30.0])
+
+        logic = ControllerLogic(
+            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
+            angle_of_attack_set_points_data = angle_of_attack_set_points_data.tolist(),
+            section_model_internal_state_set_points_data = section_model_internal_state_set_points_data.tolist()
+        )
+
+        return cls(
+            logic = logic
+        )
 
     @classmethod
     def new_default_rotor_sail(cls, *, diameter: float, max_rps: float):
@@ -90,6 +120,31 @@ class ControllerBuilder(StormbirdSetupBaseModel):
             internal_state_conversion = internal_state_conversion
         )
 
-        return ControllerBuilder(
+        return cls(
+            logic = logic
+        )
+        
+    @classmethod
+    def new_default_suction_sail(cls):
+        max_aoa_deg = 40
+        max_ca = 0.3
+        
+        apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180]).tolist()
+        angle_of_attack_set_points_data = np.radians([
+            -max_aoa_deg, -max_aoa_deg, 0.0, 
+            0.0, max_aoa_deg, max_aoa_deg
+        ]).tolist()
+        section_model_internal_state_set_points_data = [
+            -max_ca, -max_ca, 0.0, 
+            0.0, max_ca, max_ca
+        ]
+
+        logic = ControllerLogic(
+            apparent_wind_directions_data = apparent_wind_directions_data,
+            angle_of_attack_set_points_data = angle_of_attack_set_points_data,
+            section_model_internal_state_set_points_data = section_model_internal_state_set_points_data
+        )
+        
+        return cls(
             logic = logic
         )

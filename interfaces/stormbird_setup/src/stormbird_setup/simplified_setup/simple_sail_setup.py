@@ -9,7 +9,7 @@ from enum import Enum
 from ..base_model import StormbirdSetupBaseModel
 from ..direct_setup.spatial_vector import SpatialVector
 from ..direct_setup.line_force_model import WingBuilder
-from ..direct_setup.section_models import SectionModel, Foil, VaryingFoil, RotatingCylinder
+from ..direct_setup.section_models import SectionModel
 from ..direct_setup.controller import ControllerBuilder, ControllerLogic
 from ..direct_setup.input_power import InputPowerModel
 
@@ -17,7 +17,7 @@ import numpy as np
 
 class SailType(Enum):
     WingSailSingleElement = "WingSailSingleElement"
-    WingSailFlapped = "WingSailFlapped"
+    WingSailTwoElement = "WingSailTwoElement"
     RotorSail = "RotorSail"
     SuctionSail = "SuctionSail"
 
@@ -25,7 +25,7 @@ class SailType(Enum):
         match self:
             case SailType.RotorSail | SailType.SuctionSail:
                 return True
-            case SailType.WingSailSingleElement | SailType.WingSailFlapped:
+            case SailType.WingSailSingleElement | SailType.WingSailTwoElement:
                 return False
             case _:
                 raise ValueError("Unsupported sail type:", self)
@@ -57,26 +57,13 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
 
         match self.sail_type:
             case SailType.WingSailSingleElement:
-                section_model = SectionModel(model=Foil(
-                    cd_min = 0.01,
-                ))
-            case SailType.WingSailFlapped:
-                internal_state_data = np.radians([-15.0, 0.0, 15.0]).tolist()
-
-                foils_data = [
-                    Foil(cl_zero_angle = -1.75, cd_min = 0.01),
-                    Foil(cl_zero_angle = 0.0, cd_min = 0.01),
-                    Foil(cl_zero_angle = 1.75, cd_min = 0.01)
-                ]
-
-                section_model = SectionModel(model=VaryingFoil(
-                    internal_state_data = internal_state_data,
-                    foils_data=foils_data
-                ))
+                section_model = SectionModel.default_wing_sail_single_element()
+            case SailType.WingSailTwoElement:
+                section_model = SectionModel.default_wing_sail_two_element()
             case SailType.RotorSail:
-                section_model = SectionModel(model=RotatingCylinder())
+                section_model = SectionModel.default_rotor_sail()
             case SailType.SuctionSail:
-                raise NotImplementedError("Suction sail not implemented yet")
+                section_model = SectionModel.default_suction_sail()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
 
@@ -104,7 +91,9 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
 
                 wing_builder.input_power_model = input_power_model
             case SailType.SuctionSail:
-                raise NotImplementedError("Suction sail not implemented yet")
+                input_power_model = InputPowerModel.new_from_internal_state_as_power_coefficient()
+                
+                wing_builder.input_power_model = input_power_model
             case _:
                 pass
 
@@ -113,37 +102,18 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
     def controller_builder(self) -> ControllerBuilder:
         match self.sail_type:
             case SailType.WingSailSingleElement:
-                apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180])
-                angle_of_attack_set_points_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15, 15])
-
-                logic = ControllerLogic(
-                    apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
-                    angle_of_attack_set_points_data = angle_of_attack_set_points_data.tolist()
-                )
-
-                return ControllerBuilder(
-                    logic = logic
-                )
-            case SailType.WingSailFlapped:
-                apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180])
-                angle_of_attack_set_points_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
-                section_model_internal_state_set_points_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15.0, 15.0])
-
-                logic = ControllerLogic(
-                    apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
-                    angle_of_attack_set_points_data = angle_of_attack_set_points_data.tolist(),
-                    section_model_internal_state_set_points_data = section_model_internal_state_set_points_data.tolist()
-                )
-
-                return ControllerBuilder(
-                    logic = logic
-                )
+                return ControllerBuilder.new_default_wing_sail_single_element()
+            case SailType.WingSailTwoElement:
+                return ControllerBuilder.new_default_wing_sail_two_element()
             case SailType.RotorSail:
+                diameter_data = np.array([4.0, 5.0])
+                max_rps_data = np.array([255.0, 180.0]) / 60.0
+                
                 return ControllerBuilder.new_default_rotor_sail(
                     diameter = self.chord_length, 
-                    max_rps = 180.0 / 60.0
+                    max_rps = np.interp(self.chord_length, diameter_data, max_rps_data)
                 )
             case SailType.SuctionSail:
-                raise NotImplementedError("Suction sail not implemented yet")
+                return ControllerBuilder.new_default_suction_sail()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
