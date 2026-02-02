@@ -20,7 +20,10 @@ use crate::controller::{
     input::ControllerInput,
 };
 
-use crate::common_utils::results::simulation::SimulationResult;
+use crate::common_utils::results::{
+    simulation::SimulationResult,
+    simplfied::SingleSailResult,
+};
 
 use builder::CompleteSailModelBuilder;
 
@@ -48,6 +51,11 @@ impl CompleteSailModel {
         let builder = CompleteSailModelBuilder::new_from_string(setup_string)?;
 
         Ok(builder.build())
+    }
+    
+    /// Query the model for the number of sails
+    pub fn get_number_of_sails(&self) -> usize {
+        self.lifting_line_simulation.line_force_model.nr_wings()
     }
     
     /// Runs multiple `simulate_condition` calls with different loadings, and chooses the best one
@@ -96,6 +104,36 @@ impl CompleteSailModel {
         }
         
         results[best_index].clone()
+    }
+    
+    pub fn simulate_steady_state_condition(
+        &mut self,
+        wind_condition: WindCondition,
+        ship_velocity: Float,
+        controller_loading: Float
+    ) -> SimulationResult {
+        self.simulate_condition(
+            wind_condition, 
+            ship_velocity, 
+            controller_loading, 
+            1.0, 
+            1
+        )
+    }
+    
+    pub fn simulate_steady_state_condition_simple_output(
+        &mut self,
+        wind_condition: WindCondition,
+        ship_velocity: Float,
+        controller_loading: Float
+    ) -> Vec<SingleSailResult> {
+        let full_results = self.simulate_steady_state_condition(
+            wind_condition, 
+            ship_velocity, 
+            controller_loading
+        );
+        
+        full_results.as_simplified()
     }
     
     /// Simulate a condition for the sail, specified by a wind condition, ship velocity, 

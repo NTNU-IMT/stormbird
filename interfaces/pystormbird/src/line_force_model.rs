@@ -28,13 +28,24 @@ impl LineForceModel {
         }
     }
 
-    pub fn circulation_strength(&self, angles_of_attack: Vec<f64>, velocity: Vec<[f64; 3]>) -> Vec<f64> {
-        let rust_velocity: Vec<SpatialVector> = velocity.iter().map(|v| SpatialVector::from(*v)).collect();
+    pub fn circulation_strength(
+        &self, 
+        angles_of_attack: Vec<f64>, 
+        velocity: Vec<[f64; 3]>
+    ) -> Vec<f64> {
+        let rust_velocity: Vec<SpatialVector> = velocity
+            .iter()
+            .map(|v| SpatialVector::from(*v))
+            .collect();
+        
         self.data.circulation_strength(&angles_of_attack, &rust_velocity)
     }
 
     pub fn angles_of_attack(&self, velocity: Vec<[f64; 3]>) -> Vec<f64> {
-        let rust_velocity: Vec<SpatialVector> = velocity.iter().map(|v| SpatialVector::from(*v)).collect();
+        let rust_velocity: Vec<SpatialVector> = velocity
+            .iter()
+            .map(|v| SpatialVector::from(*v))
+            .collect();
         
         self.data.angles_of_attack(&rust_velocity, CoordinateSystem::Global)
     }

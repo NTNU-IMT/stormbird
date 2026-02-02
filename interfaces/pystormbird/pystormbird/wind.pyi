@@ -30,7 +30,7 @@ class WindEnvironment:
         *,
         wind_velocity: float,
         wind_direction_coming_from: float,
-        linear_velocity: float
+        linear_velocity: list[float]
     ) -> float: ...
     
     def apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(

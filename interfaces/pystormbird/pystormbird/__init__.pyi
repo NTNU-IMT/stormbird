@@ -41,6 +41,9 @@ class IntegratedValues:
 
 class SimulationResult:
     @classmethod
+    def from_json_file(cls, file_path: str) -> "SimulationResult": ...
+    
+    @classmethod
     def result_history_from_file(cls, file_path: str) -> list["SimulationResult"]: ...
 
     @property

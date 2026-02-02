@@ -20,6 +20,8 @@ use crate::common_utils::forces_and_moments::{
     SectionalForcesInput
 };
 
+use crate::common_utils::results::simplfied::SingleSailResult;
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Structures used to return results from simulations. 
 pub struct SimulationResult {
@@ -142,6 +144,24 @@ impl SimulationResult {
             )
         }
 
+        out
+    }
+    
+    pub fn as_simplified(&self) -> Vec<SingleSailResult> {
+        let nr_wings = self.nr_of_wings();
+        
+        let mut out: Vec<SingleSailResult> = Vec::with_capacity(nr_wings);
+        
+        for i in 0..nr_wings {
+            out.push(
+                SingleSailResult {
+                    force: self.integrated_forces[i].total,
+                    moment: self.integrated_moments[i].total,
+                    input_power: self.input_power[i]
+                }
+            )
+        }
+        
         out
     }
 

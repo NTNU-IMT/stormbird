@@ -1,5 +1,6 @@
 
 from pystormbird import SimulationResult
+from .line_force_model import LineForceModel
 
 class Simulation:
     def __init__(self, input_string: str) -> None: ...
@@ -52,3 +53,6 @@ class CompleteSailModel:
     
     def set_translation_only(self, rotation: list[float]): ...
     def set_rotation_only(self, rotation: list[float]): ...
+    
+    @property
+    def line_force_model(self) -> LineForceModel: ...

@@ -605,6 +605,7 @@ impl LineForceModel {
                 internal_states[wing_index],
                 self.span_lines_local[i],
                 self.chord_lengths[i],
+                self.density,
                 velocity[i]
             );
         }

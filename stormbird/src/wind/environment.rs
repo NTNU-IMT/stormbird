@@ -164,8 +164,16 @@ impl WindEnvironment {
             linear_velocity
         );
         
-        let apparent_wind_direction = self.apparent_wind_direction_from_condition_and_linear_velocity(
-            condition, linear_velocity
+        let mut average_height = 0.0;
+        
+        for i in 0..ctrl_points.len() {
+            average_height += ctrl_points[i].dot(self.up_direction);
+        }
+        
+        average_height /= ctrl_points.len() as Float;
+        
+        let apparent_wind_direction = self.apparent_wind_direction_from_condition_and_linear_velocity_and_height(
+            condition, linear_velocity, average_height
         );
         
         self.apply_inflow_corrections(
@@ -220,6 +228,27 @@ impl WindEnvironment {
         linear_velocity: SpatialVector
     ) -> Float {
         let true_wind_vector = condition.velocity * self.zero_direction_vector.rotate_around_axis(
+            condition.direction_coming_from,
+            self.wind_rotation_axis
+        );
+
+        let apparent_velocity_vector = true_wind_vector + linear_velocity;
+
+        self.zero_direction_vector.signed_angle_between(
+            apparent_velocity_vector,
+            self.wind_rotation_axis
+        )
+    }
+    
+    pub fn apparent_wind_direction_from_condition_and_linear_velocity_and_height(
+        &self,
+        condition: WindCondition,
+        linear_velocity: SpatialVector,
+        height: Float
+    ) -> Float {
+        let true_wind_velocity = self.true_wind_velocity_at_height(condition, height);
+        
+        let true_wind_vector = true_wind_velocity * self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
             self.wind_rotation_axis
         );

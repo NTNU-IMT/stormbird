@@ -7,3 +7,4 @@
 
 pub mod solver;
 pub mod simulation;
+pub mod simplfied;

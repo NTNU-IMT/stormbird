@@ -81,6 +81,9 @@ impl LineForceModel {
 
     /// Maps the values at the control points to the values at the span points using linear
     /// interpolation.
+    /// 
+    /// The returning vector has length equal to the number of span lines in the line force model, 
+    /// plus one additional entry for each wing. 
     pub fn span_point_values_from_ctrl_point_values<T>(
         &self,
         ctrl_point_values: &[T],
@@ -99,7 +102,7 @@ impl LineForceModel {
             Vec::with_capacity(nr_span_lines + nr_wings);
 
         for wing_index in 0..nr_wings {
-            let first_index =self.wing_indices[wing_index].start;
+            let first_index = self.wing_indices[wing_index].start;
 
             // First point is extrapolated
             if extrapolate_ends {
