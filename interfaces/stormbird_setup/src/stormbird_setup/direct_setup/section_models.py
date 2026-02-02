@@ -98,17 +98,17 @@ class SectionModel(StormbirdSetupBaseModel):
         """
         
         # The power coefficient values used to represent the intenral state
-        ca_values = [0.1187, 0.2161, 0.3389]
+        ca_values = [0.0, 0.1187, 0.2161, 0.3389]
         
-        cl_zero_angle = [2.6, 3.4, 3.8]
-        cl_initial_slope = [2*np.pi * 1.4, 2*np.pi * 1.4, 2*np.pi * 1.4]
-        stall_angles = np.radians([23, 27, 29.0]).tolist()
+        cl_zero_angle = [0.0, 2.6, 3.4, 3.8]
+        cl_initial_slope = [2 * np.pi, 2*np.pi * 1.4, 2*np.pi * 1.4, 2*np.pi * 1.4]
+        stall_angles = np.radians([20.0, 23, 27, 29.0]).tolist()
         
         # Make the model valid for both positive and negative Ca values
-        ca_values_full = [-x for x in ca_values[::-1]] + ca_values
-        cl_zero_angle_full = [-x for x in cl_zero_angle[::-1]] + cl_zero_angle
-        cl_initial_slope_full = [x for x in cl_initial_slope[::-1]] + cl_initial_slope
-        stall_angles_full = [x for x in stall_angles[::-1]] + stall_angles
+        ca_values_full = [-x for x in ca_values[1::-1]] + ca_values
+        cl_zero_angle_full = [-x for x in cl_zero_angle[1::-1]] + cl_zero_angle
+        cl_initial_slope_full = [x for x in cl_initial_slope[1::-1]] + cl_initial_slope
+        stall_angles_full = [x for x in stall_angles[1::-1]] + stall_angles
         
         # Create foil models from the input arrays
         foils_data = []

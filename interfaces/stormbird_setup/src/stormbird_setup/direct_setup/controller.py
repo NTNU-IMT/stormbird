@@ -70,7 +70,7 @@ class ControllerBuilder(StormbirdSetupBaseModel):
     
     @classmethod
     def new_default_wing_sail_single_element(cls):
-        apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180])
+        apparent_wind_directions_data = np.radians([-180, -20, -10, 20, 30, 180])
         angle_of_attack_set_points_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15, 15])
 
         logic = ControllerLogic(
@@ -84,7 +84,7 @@ class ControllerBuilder(StormbirdSetupBaseModel):
     
     @classmethod
     def new_default_wing_sail_two_element(cls):
-        apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180])
+        apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180])
         angle_of_attack_set_points_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
         section_model_internal_state_set_points_data = np.radians([-30.0, -30.0, 0.0, 0.0, 30.0, 30.0])
 
@@ -126,10 +126,10 @@ class ControllerBuilder(StormbirdSetupBaseModel):
         
     @classmethod
     def new_default_suction_sail(cls):
-        max_aoa_deg = 40
+        max_aoa_deg = 45
         max_ca = 0.3
         
-        apparent_wind_directions_data = np.radians([-180, -30, -10, 10, 30, 180]).tolist()
+        apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180]).tolist()
         angle_of_attack_set_points_data = np.radians([
             -max_aoa_deg, -max_aoa_deg, 0.0, 
             0.0, max_aoa_deg, max_aoa_deg

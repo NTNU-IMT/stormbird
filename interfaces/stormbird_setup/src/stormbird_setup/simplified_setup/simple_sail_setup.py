@@ -10,7 +10,7 @@ from ..base_model import StormbirdSetupBaseModel
 from ..direct_setup.spatial_vector import SpatialVector
 from ..direct_setup.line_force_model import WingBuilder
 from ..direct_setup.section_models import SectionModel
-from ..direct_setup.controller import ControllerBuilder, ControllerLogic
+from ..direct_setup.controller import ControllerBuilder
 from ..direct_setup.input_power import InputPowerModel
 
 import numpy as np
