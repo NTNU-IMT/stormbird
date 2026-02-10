@@ -209,10 +209,13 @@ impl CompleteSailModel {
             linear_velocity
         );
         
+        let reference_height = 10.0;
+        
         let apparent_wind_direction = self.wind_environment
             .apparent_wind_direction_from_condition_and_linear_velocity(
                 wind_condition,
-                linear_velocity
+                linear_velocity,
+                reference_height
             );
         
         self.wind_environment.apply_inflow_corrections(

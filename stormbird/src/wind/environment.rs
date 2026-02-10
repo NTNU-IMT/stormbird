@@ -225,9 +225,12 @@ impl WindEnvironment {
     pub fn apparent_wind_direction_from_condition_and_linear_velocity(
         &self,
         condition: WindCondition,
-        linear_velocity: SpatialVector
+        linear_velocity: SpatialVector,
+        height: Float
     ) -> Float {
-        let true_wind_vector = condition.velocity * self.zero_direction_vector.rotate_around_axis(
+        let true_wind_velocity = self.true_wind_velocity_at_height(condition, height);
+        
+        let true_wind_vector = true_wind_velocity * self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
             self.wind_rotation_axis
         );

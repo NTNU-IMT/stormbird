@@ -107,13 +107,15 @@ impl WindEnvironment {
         *,
         wind_velocity,
         wind_direction_coming_from,
-        linear_velocity
+        linear_velocity,
+        height = 10.0
     ))]
     pub fn apparent_wind_direction_from_condition_and_linear_velocity(
         &self,
         wind_velocity: f64, 
         wind_direction_coming_from: f64,
-        linear_velocity: [f64; 3]
+        linear_velocity: [f64; 3],
+        height: f64
     ) -> f64 {
         let wind_condition = WindCondition{
             velocity: wind_velocity,
@@ -124,7 +126,8 @@ impl WindEnvironment {
         
         self.data.apparent_wind_direction_from_condition_and_linear_velocity(
             wind_condition,
-            linear_velocity_internal
+            linear_velocity_internal,
+            height
         )
     }
     
