@@ -7,7 +7,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::lifting_line::simulation_builder::SimulationBuilder;
 use crate::wind::environment::WindEnvironment;
-use crate::controller::ControllerBuilder;
+use crate::controller::builder::ControllerBuilder;
 //use crate::empirical_models::input_power::InputPower;
 
 use super::CompleteSailModel;

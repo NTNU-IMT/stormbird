@@ -4,7 +4,7 @@
 
 
 use crate::line_force_model::builder::LineForceModelBuilder;
-use crate::controller::ControllerBuilder;
+use crate::controller::builder::ControllerBuilder;
 
 use serde::{Serialize, Deserialize};
 

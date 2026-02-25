@@ -5,7 +5,7 @@
 
 pub use super::{
     Controller,
-    ControllerBuilder,
+    builder::ControllerBuilder,
     logic::ControllerLogic,
     input::ControllerInput,
     output::ControllerOutput,

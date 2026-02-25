@@ -44,7 +44,7 @@ pub struct ControllerInput {
 impl ControllerInput {
     /// Method that creates input to a controller based on a simulation results structure. This will
     /// then contain information about the lift-induced velocities in the measurements, which might 
-    /// be critical for certain controller logics (e.g., effective angle of attack controller). 
+    /// be critical for certain controller logic (e.g., effective angle of attack controller). 
     pub fn new_from_simulation_result(
         loading: Float,
         line_force_model: &LineForceModel,
