@@ -12,8 +12,8 @@ The content of the folders in this repository can be described as follows:
 
 ## Documentation
 - A more comprehensive documentation of the library can be found [here](https://jarlekramer.github.io/stormbird_book_pages/).
-- Automatic code documentation for core library [here](https://docs.rs/stormbird/0.6.0/stormbird/)
-- Automatic code documentation for the math utilities [here](https://docs.rs/stormath/0.1.1/stormath/)
+- Automatic code documentation for core library [here](https://docs.rs/stormbird/0.8.0/stormbird/)
+- Automatic code documentation for the math utilities [here](https://docs.rs/stormath/0.2.0/stormath/)
 
 ## License
 The software is licensed under the GPL3. See [LICENSE](LICENSE) for more.
