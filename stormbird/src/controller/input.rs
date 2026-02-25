@@ -30,15 +30,15 @@ pub struct ControllerInput {
     /// How much of the max value that should be used
     pub loading: Float,
     /// The current local wing angles, so that the controller know what to change from
-    pub current_local_wing_angles: Vec<Float>,
+    pub current_local_wing_angle: Float,
     /// Current internal state
-    pub current_section_models_internal_state: Vec<Float>,
+    pub current_section_model_internal_state: Float,
     /// Measured angles of attack according to the measurement settings
-    pub angles_of_attack: Vec<Float>,
+    pub angle_of_attack: Float,
     /// Measured velocity magnitude
-    pub velocity: Vec<Float>,
+    pub velocity: Float,
     /// Measured apparent wind direction
-    pub apparent_wind_directions: Vec<Float>,
+    pub apparent_wind_direction: Float,
 }
 
 impl ControllerInput {
@@ -52,27 +52,45 @@ impl ControllerInput {
         measurement_settings: &FlowMeasurementSettings,
         wind_environment: &WindEnvironment,
         use_input_velocity_for_apparent_wind_direction: bool,
-    ) -> Self {
-        Self {
-            loading: loading,
-            current_local_wing_angles: line_force_model.local_wing_angles.clone(),
-            current_section_models_internal_state: line_force_model.section_models_internal_state(),
-            angles_of_attack: measure_angles_of_attack(
-                simulation_result, 
-                &measurement_settings.angle_of_attack
-            ),
-            velocity: measure_wind_velocity_magnitude(
-                simulation_result, 
-                &measurement_settings.wind_velocity
-            ),
-            apparent_wind_directions: measure_apparent_wind_direction(
-                simulation_result, 
-                &measurement_settings.wind_direction, 
-                wind_environment, 
-                line_force_model,
-                use_input_velocity_for_apparent_wind_direction
-            ),
+    ) -> Vec<Self> {
+        let nr_wings = line_force_model.nr_wings();
+        
+        let section_models_internal_state = line_force_model.section_models_internal_state();
+        
+        let angles_of_attack = measure_angles_of_attack(
+            simulation_result, 
+            &measurement_settings.angle_of_attack
+        );
+        
+        let velocities = measure_wind_velocity_magnitude(
+            simulation_result, 
+            &measurement_settings.wind_velocity
+        );
+        
+        let apparent_wind_directions = measure_apparent_wind_direction(
+            simulation_result, 
+            &measurement_settings.wind_direction, 
+            wind_environment, 
+            line_force_model,
+            use_input_velocity_for_apparent_wind_direction
+        );
+        
+        let mut out: Vec<Self> = Vec::with_capacity(nr_wings);
+        
+        for i in 0..nr_wings {
+            out.push(
+                Self {
+                    loading: loading,
+                    current_local_wing_angle: line_force_model.local_wing_angles[i],
+                    current_section_model_internal_state: section_models_internal_state[i],
+                    angle_of_attack: angles_of_attack[i],
+                    velocity: velocities[i],
+                    apparent_wind_direction: apparent_wind_directions[i]
+                }
+            )
         }
+        
+        out
     }
 
     /// Method for creating controller input based on a supplied velocity vector. The intended use 
@@ -84,38 +102,56 @@ impl ControllerInput {
         velocity: &[SpatialVector],
         measurement_settings: &FlowMeasurementSettings,
         wind_environment: &WindEnvironment,
-    ) -> Self {
-        let velocity_magnitude: Vec<Float> = velocity.iter().map(|v| v.length()).collect();
-        let angles_of_attack = line_force_model.angles_of_attack(
+    ) -> Vec<Self> {
+        let nr_wings = line_force_model.nr_wings();
+        let wing_indices = line_force_model.wing_indices.clone();
+        
+        let velocities_all_sections: Vec<Float> = velocity.iter().map(|v| v.length()).collect();
+        let angles_of_attack_all_sections = line_force_model.angles_of_attack(
             velocity, CoordinateSystem::Global
+        );
+        
+        let angles_of_attack = measure_float_values(
+            &angles_of_attack_all_sections, 
+            wing_indices.clone(), 
+            &measurement_settings.angle_of_attack
+        );
+        
+        let velocities = measure_float_values(
+            &velocities_all_sections, 
+            wing_indices.clone(), 
+            &measurement_settings.wind_velocity
         );
         
         let wind_directions = wind_environment.apparent_wind_direction_from_velocity_and_line_force_model(
             velocity,
             line_force_model
         );
+        
+        let apparent_wind_directions = measure_float_values(
+            &wind_directions, 
+            wing_indices.clone(), 
+            &measurement_settings.wind_direction
+        );
+        
+        let section_models_internal_state = line_force_model.section_models_internal_state();
 
-        let wing_indices = line_force_model.wing_indices.clone();
 
-        Self {
-            loading,
-            current_local_wing_angles: line_force_model.local_wing_angles.clone(),
-            current_section_models_internal_state: line_force_model.section_models_internal_state(),
-            angles_of_attack: measure_float_values(
-                &angles_of_attack, 
-                wing_indices.clone(), 
-                &measurement_settings.angle_of_attack
-            ),
-            velocity: measure_float_values(
-                &velocity_magnitude, 
-                wing_indices.clone(), 
-                &measurement_settings.wind_velocity
-            ),
-            apparent_wind_directions: measure_float_values(
-                &wind_directions, 
-                wing_indices.clone(), 
-                &measurement_settings.wind_direction
+        let mut out: Vec<Self> = Vec::with_capacity(nr_wings);
+        
+        for i in 0..nr_wings {
+            out.push(
+                Self {
+                    loading: loading,
+                    current_local_wing_angle: line_force_model.local_wing_angles[i],
+                    current_section_model_internal_state: section_models_internal_state[i],
+                    angle_of_attack: angles_of_attack[i],
+                    velocity: velocities[i],
+                    apparent_wind_direction: apparent_wind_directions[i]
+                }
             )
         }
+        
+        out
     }
 }

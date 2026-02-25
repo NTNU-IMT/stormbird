@@ -189,7 +189,7 @@ impl ActuatorLine {
 
                 need_update = true;
 
-                controller_output.write_to_csv_file("controller_output.csv");
+                ControllerOutput::write_to_csv_file(&controller_output, "controller_output.csv");
             }
 
             need_update

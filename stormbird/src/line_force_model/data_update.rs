@@ -157,14 +157,15 @@ impl LineForceModel {
         }
     }
 
-    pub fn set_controller_output(&mut self, controller_output: &ControllerOutput) {
-        if let Some(local_wing_angles) = &controller_output.local_wing_angles {
-            self.set_local_wing_angles(local_wing_angles);
-        }
-
-        if let Some(section_models_internal_state) = &controller_output.section_models_internal_state {
-            self.set_section_models_internal_state(section_models_internal_state);
-        }
+    pub fn set_controller_output(&mut self, controller_output: &[ControllerOutput]) {
+        let local_wing_angles: Vec<Float> = controller_output.iter()
+            .map(|v| v.local_wing_angle).collect();
+        
+        let section_models_internal_state: Vec<Float> = controller_output.iter()
+            .map(|v| v.section_model_internal_state).collect();
+        
+        self.set_local_wing_angles(&local_wing_angles);
+        self.set_section_models_internal_state(&section_models_internal_state);
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {

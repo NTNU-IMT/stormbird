@@ -7,7 +7,7 @@ use crate::error::Error;
 use serde::{Deserialize, Serialize};
 
 use super::Controller;
-use super::logic::ControllerLogic;
+use super::set_points::ControllerSetPoints;
 use super::measurements::FlowMeasurementSettings;
 
 use stormath::type_aliases::Float;
@@ -15,17 +15,13 @@ use stormath::type_aliases::Float;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControllerBuilder {
-    pub logic: ControllerLogic,
+    pub set_points: Vec<ControllerSetPoints>,
     #[serde(default)]
     pub flow_measurement_settings: FlowMeasurementSettings,
     #[serde(default = "ControllerBuilder::default_time_steps_between_updates")]
     pub time_steps_between_updates: usize,
     #[serde(default)]
     pub start_time: Float,
-    #[serde(default)]
-    pub max_local_wing_angle_change_rate: Option<Float>,
-    #[serde(default)]
-    pub max_internal_section_state_change_rate: Option<Float>,
     #[serde(default)]
     pub moving_average_window_size: Option<usize>,
     #[serde(default)]
@@ -49,15 +45,12 @@ impl ControllerBuilder {
 
     pub fn build(&self) -> Controller {
         Controller {
-            logic: self.logic.clone(),
+            set_points: self.set_points.clone(),
             flow_measurement_settings: self.flow_measurement_settings.clone(),
             time_steps_between_updates: self.time_steps_between_updates,
             start_time: self.start_time,
-            max_local_wing_angle_change_rate: self.max_local_wing_angle_change_rate,
-            max_internal_section_state_change_rate: self.max_internal_section_state_change_rate,
             time_step_index: 0,
             use_input_velocity_for_apparent_wind_direction: self.use_input_velocity_for_apparent_wind_direction,
         }
     }
 }
-

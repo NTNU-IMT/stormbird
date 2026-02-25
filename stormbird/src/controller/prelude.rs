@@ -6,7 +6,7 @@
 pub use super::{
     Controller,
     builder::ControllerBuilder,
-    logic::ControllerLogic,
+    set_points::ControllerSetPoints,
     input::ControllerInput,
     output::ControllerOutput,
     measurements::{
