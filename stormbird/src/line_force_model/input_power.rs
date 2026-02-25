@@ -21,20 +21,24 @@ pub struct InputPowerData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// An empirical model to calculate the input power required for driving a wind propulsion device.
-///
-/// It comes with different modes. Each mode represents different ways of calculating the data.
+/// It comes with different modes that represents different ways of calculating the power.
 pub enum InputPowerModel {
-    /// Default value. Represent a case where a sail does not need power at all
+    /// Default value. Represent a case where a sail does not need power at all, e.g., wing sails
     NoPower,
-    /// Calculates the power using the internal state of the sectional model alone. This could, for
-    /// instance, be a power model where the power is calculated directly from the RPS of a rotor
-    /// sail
-    InterpolateFromInternalState(InputPowerData),
-    /// Calculates the power using the the internal state as an aerodynamic power power_coefficient.
-    /// 
-    /// This then represents a model where the internal state is a measure of the input power, made 
-    /// non-dimensional by the density, sail area, and the velocity to the third power.
-    FromInternalStateAsPowerCoefficient,
+    /// Calculates the power using the the internal state as an aerodynamic power power coefficient.
+    /// This then represents a model where the internal state is a measure of the input power 
+    /// directly, made non-dimensional by the density, sail area, and the velocity to the third 
+    /// power. A typical use case would be to model suction sails, where the power coefficient is a 
+    /// natural way to represent the internal state of the sail.
+    InternalStateAsPowerCoefficient,
+    /// Uses the internal state to interpolate an aerodynamic power coefficient from some input 
+    /// data. This can be used as an alternative to the `InternalStateAsPowerCoefficient`, to allow
+    /// for different values for the internal state and the power coefficient.
+    InterpolatePowerCoefficientFromInternalState(InputPowerData),
+    /// Calculates the power using the internal state of the sectional model, but not the input 
+    /// velocity. This could, for instance, be a power model where the power is calculated directly 
+    /// from the RPS of a rotor sail
+    InterpolateFromInternalStateOnly(InputPowerData),
 }
 
 impl Default for InputPowerModel {
@@ -47,16 +51,24 @@ impl InputPowerModel {
     pub fn input_power_coefficient(&self, section_model_internal_state: Float) -> Float {
         match self {
             InputPowerModel::NoPower => 0.0,
-            InputPowerModel::InterpolateFromInternalState(data) => {
+            InputPowerModel::InternalStateAsPowerCoefficient => {
+                section_model_internal_state.abs()
+            },
+            InputPowerModel::InterpolateFromInternalStateOnly(data) => {
                 linear_interpolation(
                     section_model_internal_state.abs(),
                     &data.section_models_internal_state_data,
                     &data.input_power_coefficient_data,
                 )
-                },
-            InputPowerModel::FromInternalStateAsPowerCoefficient => {
-                section_model_internal_state.abs()
             },
+            InputPowerModel::InterpolatePowerCoefficientFromInternalState(data) => {
+                linear_interpolation(
+                    section_model_internal_state.abs(),
+                    &data.section_models_internal_state_data,
+                    &data.input_power_coefficient_data,
+                )
+            },
+            
         }
     }
 
@@ -73,10 +85,11 @@ impl InputPowerModel {
 
         match self {
             InputPowerModel::NoPower => 0.0,
-            InputPowerModel::InterpolateFromInternalState(_) => {
+            InputPowerModel::InterpolateFromInternalStateOnly(_) => {
                 power_coefficient * chord_length * span_line.length()
             },
-            InputPowerModel::FromInternalStateAsPowerCoefficient => {                
+            InputPowerModel::InternalStateAsPowerCoefficient | 
+            InputPowerModel::InterpolatePowerCoefficientFromInternalState(_) => {                
                 let dynamic_pressure = 0.5 * density * velocity.length_squared();
                 
                 let strip_area = chord_length * span_line.length();
