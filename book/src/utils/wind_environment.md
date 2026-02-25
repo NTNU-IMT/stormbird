@@ -59,19 +59,16 @@ The correction factors themselves consist of two parts: A magnitude factor that 
 The data structures to set this up is shown below. In practice, these structures are just used to do linear interpolation on the correction factors as needed during the simulation.:
 
 ```rust
-pub struct InflowCorrectionSingleSailSingleDirection {
-    pub non_dimensional_span_distances: Vec<f64>,
-    pub wake_factors_magnitude: Vec<f64>,
-    pub angle_corrections: Vec<f64>,
-}
-
-pub struct InflowCorrectionSingleSail {
-    pub apparent_wind_directions: Vec<f64>,
-    pub corrections: Vec<InflowCorrectionSingleSailSingleDirection>,
+pub struct InflowCorrectionsSingleDirection {
+    pub height_values: Vec<Float>,
+    pub magnitude_corrections: Vec<Float>,
+    pub angle_corrections: Vec<Float>, 
+    pub wing_indices: Vec<Range<usize>>,
 }
 
 pub struct InflowCorrections {
-    pub individual_corrections: Vec<InflowCorrectionSingleSail>,
+    pub apparent_wind_directions: Vec<Float>,
+    pub corrections: Vec<InflowCorrectionsSingleDirection>,
 }
 ```
 

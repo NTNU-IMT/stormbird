@@ -36,7 +36,8 @@ A view of the available fields in the `Foil` model is seen below, with further e
 pub struct Foil {
     pub cl_zero_angle: f64,
     pub cl_initial_slope: f64,
-    pub cl_high_order_factor: f64,
+    pub cl_high_order_factor_positive: f64,
+    pub cl_high_order_factor_negative: f64,
     pub cl_high_order_power: f64,
     pub cl_max_after_stall: f64,
     pub cd_min: f64,
@@ -58,7 +59,7 @@ An explanation of the parameters are given below:
 
 - `cl_zero_angle`: Lift coefficient at zero angle of attack. This is zero by default, but can be set to a non-zero value to account for camber, flap angle or boundary layer suction/blowing.
 - `cl_initial_slope`: How fast the lift coefficient increases with angle of attack, when the angle of attack is small. The default value is \\( 2 \pi \\) , which should always be the values used for a normal foil profile - with or without camber and flap - but it can also be set to different value for instance to account for boundary layer suction/blowing.
-- `cl_high_order_factor`: Optional proportionality factor for adding higher order terms to the lift. Is zero by default, and therefore not used. Can be used to adjust the behavior of the lift curve close to stall.
+- `cl_high_order_factor_positive/negative`: Optional proportionality factor for adding higher order terms to the lift when the angle of attack is either positive or negative. Is zero by default, and therefore not used. Can be used to adjust the behavior of the lift curve close to stall.
 - `cl_high_order_power`: Option power for adding higher order terms to the lift. Is zero by default, and therefore not used. Can be used to adjust the behavior of the lift curve close to stall.
 - `cl_max_after_stall`: The maximum lift coefficient after stall.
 - `cd_min`: Minimum drag coefficient when the angle of attack is equal to the `angle_cd_min`.

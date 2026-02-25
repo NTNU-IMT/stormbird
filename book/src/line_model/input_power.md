@@ -12,7 +12,8 @@ pub struct InputPowerData {
 
 pub enum InputPowerModel {
     NoPower,
-    FromInternalStateAlone(InputPowerData),
-    FromInternalStateAndVelocity(InputPowerData),
+    InternalStateAsPowerCoefficient,
+    InterpolatePowerCoefficientFromInternalState(InputPowerData),
+    InterpolateFromInternalStateOnly(InputPowerData),
 }
 ```

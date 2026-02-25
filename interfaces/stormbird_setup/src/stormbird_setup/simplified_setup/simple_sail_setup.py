@@ -10,7 +10,7 @@ from ..base_model import StormbirdSetupBaseModel
 from ..direct_setup.spatial_vector import SpatialVector
 from ..direct_setup.line_force_model import WingBuilder
 from ..direct_setup.section_models import SectionModel
-from ..direct_setup.controller import ControllerBuilder
+from ..direct_setup.controller import ControllerSetPoints
 from ..direct_setup.input_power import InputPowerModel
 
 import numpy as np
@@ -99,21 +99,21 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
 
         return wing_builder
 
-    def controller_builder(self) -> ControllerBuilder:
+    def controller_set_points(self) -> ControllerSetPoints:
         match self.sail_type:
             case SailType.WingSailSingleElement:
-                return ControllerBuilder.new_default_wing_sail_single_element()
+                return ControllerSetPoints.new_default_wing_sail_single_element()
             case SailType.WingSailTwoElement:
-                return ControllerBuilder.new_default_wing_sail_two_element()
+                return ControllerSetPoints.new_default_wing_sail_two_element()
             case SailType.RotorSail:
                 diameter_data = np.array([4.0, 5.0])
                 max_rps_data = np.array([255.0, 180.0]) / 60.0
                 
-                return ControllerBuilder.new_default_rotor_sail(
+                return ControllerSetPoints.new_default_rotor_sail(
                     diameter = self.chord_length, 
                     max_rps = np.interp(self.chord_length, diameter_data, max_rps_data)
                 )
             case SailType.SuctionSail:
-                return ControllerBuilder.new_default_suction_sail()
+                return ControllerSetPoints.new_default_suction_sail()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)

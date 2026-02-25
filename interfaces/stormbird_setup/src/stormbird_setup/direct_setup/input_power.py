@@ -18,8 +18,9 @@ class InputPowerData(StormbirdSetupBaseModel):
 
 class InputPowerDataType(Enum):
     NoPower = "NoPower"
-    InterpolateFromInternalState = "InterpolateFromInternalState"
-    FromInternalStateAsPowerCoefficient = "FromInternalStateAsPowerCoefficient"
+    InternalStateAsPowerCoefficient = "InternalStateAsPowerCoefficient"
+    InterpolatePowerCoefficientFromInternalState = "InterpolatePowerCoefficientFromInternalState"
+    InterpolateFromInternalStateOnly = "InterpolateFromInternalStateOnly"
 
 class InputPowerModel(StormbirdSetupBaseModel):
     '''
@@ -31,7 +32,7 @@ class InputPowerModel(StormbirdSetupBaseModel):
     @classmethod
     def new_from_internal_state_as_power_coefficient(cls) -> "InputPowerModel":
         return cls(
-            input_power_type = InputPowerDataType.FromInternalStateAsPowerCoefficient
+            input_power_type = InputPowerDataType.InternalStateAsPowerCoefficient
         )
 
     @classmethod
@@ -58,7 +59,7 @@ class InputPowerModel(StormbirdSetupBaseModel):
         input_power_coefficient_data = factor * (section_models_internal_state_data**power)
 
         return cls(
-            input_power_type = InputPowerDataType.InterpolateFromInternalState,
+            input_power_type = InputPowerDataType.InterpolateFromInternalStateOnly,
             input_power_data = InputPowerData(
                 section_models_internal_state_data = section_models_internal_state_data.tolist(),
                 input_power_coefficient_data = input_power_coefficient_data.tolist()
@@ -87,15 +88,20 @@ class InputPowerModel(StormbirdSetupBaseModel):
             return data
         
         # Rust externally-tagged enum format
-        if 'FromInternalStateAlone' in data:
+        if 'InterpolateFromInternalStateOnly' in data:
             return {
-                'input_power_type': InputPowerDataType.InterpolateFromInternalState,
-                'input_power_data': InputPowerData(**data['InterpolateFromInternalState'])
+                'input_power_type': InputPowerDataType.InterpolateFromInternalStateOnly,
+                'input_power_data': InputPowerData(**data['InterpolateFromInternalStateOnly'])
             }
-        elif 'FromInternalStateAndVelocity' in data:
+        elif 'InternalStateAsPowerCoefficient' in data:
             return {
-                'input_power_type': InputPowerDataType.FromInternalStateAsPowerCoefficient,
+                'input_power_type': InputPowerDataType.InternalStateAsPowerCoefficient,
                 'input_power_data': None
+            }
+        elif 'InterpolatePowerCoefficientFromInternalState' in data:
+            return {
+                'input_power_type': InputPowerDataType.InterpolatePowerCoefficientFromInternalState,
+                'input_power_data': InputPowerData(**data['InterpolatePowerCoefficientFromInternalState'])
             }
         else:
             raise ValueError(f"Unknown input power model variant: {list(data.keys())}")
@@ -103,14 +109,21 @@ class InputPowerModel(StormbirdSetupBaseModel):
     @model_serializer
     def ser_model(self) -> dict[str, object] | str:
         match self.input_power_type:
-            case InputPowerDataType.NoPower | InputPowerDataType.FromInternalStateAsPowerCoefficient:
+            case InputPowerDataType.NoPower | InputPowerDataType.InternalStateAsPowerCoefficient:
                 return self.input_power_type.value
-            case InputPowerDataType.InterpolateFromInternalState:
+            case InputPowerDataType.InterpolateFromInternalStateOnly:
                 if self.input_power_data is None:
-                    raise ValueError("input_power_data must be set for InterpolateFromInternalState")
+                    raise ValueError("input_power_data must be set for InterpolateFromInternalStateOnly")
 
                 return {
-                    "InterpolateFromInternalState": self.input_power_data.model_dump()
+                    "InterpolateFromInternalStateOnly": self.input_power_data.model_dump()
+                }
+            case InputPowerDataType.InterpolatePowerCoefficientFromInternalState:
+                if self.input_power_data is None:
+                    raise ValueError("input_power_data must be set for InterpolatePowerCoefficientFromInternalState")
+                
+                return {
+                    "InterpolatePowerCoefficientFromInternalState": self.input_power_data.model_dump()
                 }
             case _:
-                raise ValueError("Uknown input power type", self.input_power_type)
+                raise ValueError("Unknown input power type", self.input_power_type)

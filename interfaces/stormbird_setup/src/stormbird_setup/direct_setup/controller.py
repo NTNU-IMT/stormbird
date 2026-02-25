@@ -20,13 +20,15 @@ class SpinRatioConversion(StormbirdSetupBaseModel):
     diameter: float
     max_rps: float
 
-class ControllerLogic(StormbirdSetupBaseModel):
+class ControllerSetPoints(StormbirdSetupBaseModel):
     apparent_wind_directions_data: list[float]
-    angle_of_attack_set_points_data: list[float] | None = None
-    section_model_internal_state_set_points_data: list[float] | None = None
+    angle_of_attack_data: list[float] | None = None
+    section_model_internal_state_data: list[float] | None = None
     internal_state_type: InternalStateType = InternalStateType.Generic
     internal_state_conversion: SpinRatioConversion | None = Field(default=None, exclude=True)
     use_effective_angle_of_attack: bool = False
+    max_local_wing_angle_change_rate: float | None = None
+    max_internal_section_state_change_rate: float | None = None
 
     @field_serializer('internal_state_type')
     def serialize_internal_state_type(self, value: InternalStateType):
@@ -41,6 +43,73 @@ class ControllerLogic(StormbirdSetupBaseModel):
                 }
             case _:
                 raise ValueError("Unsupported internal state type:", value)
+                
+    @classmethod
+    def new_default_wing_sail_single_element(cls):
+        apparent_wind_directions_data = np.radians([-180, -20, -10, 20, 30, 180])
+        angle_of_attack_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15, 15])
+
+        return ControllerSetPoints(
+            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
+            angle_of_attack_data = angle_of_attack_data.tolist()
+        )
+        
+    @classmethod
+    def new_default_wing_sail_two_element(cls):
+        apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180])
+        angle_of_attack_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
+        section_model_internal_state_data = np.radians([-30.0, -30.0, 0.0, 0.0, 30.0, 30.0])
+
+        return ControllerSetPoints(
+            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
+            angle_of_attack_data = angle_of_attack_data.tolist(),
+            section_model_internal_state_data = section_model_internal_state_data.tolist()
+        )
+        
+    @classmethod
+    def new_default_rotor_sail(cls, *, diameter: float, max_rps: float):
+        '''
+        Helper function to quickly set up a suitable controller for a rotor sail. Assumed to be
+        fairly general
+        '''
+        apparent_wind_directions_data = np.radians([-180, -40, -15, 15, 40, 180])
+        section_model_internal_state_data = [3.0, 3.0, 0.0, 0.0, -3.0, -3.0]
+
+        internal_state_type = InternalStateType.SpinRatio
+        internal_state_conversion = SpinRatioConversion(
+            diameter = diameter,
+            max_rps = max_rps
+        )
+
+        return ControllerSetPoints(
+            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
+            section_model_internal_state_data = section_model_internal_state_data,
+            internal_state_type = internal_state_type,
+            internal_state_conversion = internal_state_conversion
+        )
+        
+    @classmethod
+    def new_default_suction_sail(cls):
+        max_aoa_deg = 30
+        max_ca = 0.3
+        
+        apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180]).tolist()
+        
+        angle_of_attack_data = np.radians([
+            -max_aoa_deg, -max_aoa_deg, 0.0, 
+            0.0, max_aoa_deg, max_aoa_deg
+        ]).tolist()
+        
+        section_model_internal_state_data = [
+            -max_ca, -max_ca, 0.0, 
+            0.0, max_ca, max_ca
+        ]
+
+        return ControllerSetPoints(
+            apparent_wind_directions_data = apparent_wind_directions_data,
+            angle_of_attack_data = angle_of_attack_data,
+            section_model_internal_state_data = section_model_internal_state_data
+        )
 
 
 class MeasurementType(Enum):
@@ -59,92 +128,11 @@ class FlowMeasurementSettings(StormbirdSetupBaseModel):
     wind_velocity: MeasurementSettings = MeasurementSettings()
 
 class ControllerBuilder(StormbirdSetupBaseModel):
-    logic: ControllerLogic
+    set_points: list[ControllerSetPoints]
     flow_measurement_settings: FlowMeasurementSettings = FlowMeasurementSettings()
     time_steps_between_updates: int = 1
     start_time: float = 0.0
-    max_local_wing_angle_change_rate: float | None = None
-    max_internal_section_state_change_rate: float | None = None
     moving_average_window_size: int | None = None
     use_input_velocity_for_apparent_wind_direction: bool = False
+        
     
-    @classmethod
-    def new_default_wing_sail_single_element(cls):
-        apparent_wind_directions_data = np.radians([-180, -20, -10, 20, 30, 180])
-        angle_of_attack_set_points_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15, 15])
-
-        logic = ControllerLogic(
-            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
-            angle_of_attack_set_points_data = angle_of_attack_set_points_data.tolist()
-        )
-
-        return cls(
-            logic = logic
-        )
-    
-    @classmethod
-    def new_default_wing_sail_two_element(cls):
-        apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180])
-        angle_of_attack_set_points_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
-        section_model_internal_state_set_points_data = np.radians([-30.0, -30.0, 0.0, 0.0, 30.0, 30.0])
-
-        logic = ControllerLogic(
-            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
-            angle_of_attack_set_points_data = angle_of_attack_set_points_data.tolist(),
-            section_model_internal_state_set_points_data = section_model_internal_state_set_points_data.tolist()
-        )
-
-        return cls(
-            logic = logic
-        )
-
-    @classmethod
-    def new_default_rotor_sail(cls, *, diameter: float, max_rps: float):
-        '''
-        Helper function to quickly set up a suitable controller for a rotor sail. Assumed to be
-        fairly general
-        '''
-        apparent_wind_directions_data = np.radians([-180, -40, -15, 15, 40, 180])
-        section_model_internal_state_set_points_data = [3.0, 3.0, 0.0, 0.0, -3.0, -3.0]
-
-        internal_state_type = InternalStateType.SpinRatio
-        internal_state_conversion = SpinRatioConversion(
-            diameter = diameter,
-            max_rps = max_rps
-        )
-
-        logic = ControllerLogic(
-            apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
-            section_model_internal_state_set_points_data = section_model_internal_state_set_points_data,
-            internal_state_type = internal_state_type,
-            internal_state_conversion = internal_state_conversion
-        )
-
-        return cls(
-            logic = logic
-        )
-        
-    @classmethod
-    def new_default_suction_sail(cls):
-        max_aoa_deg = 45
-        max_ca = 0.3
-        
-        apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180]).tolist()
-        angle_of_attack_set_points_data = np.radians([
-            -max_aoa_deg, -max_aoa_deg, 0.0, 
-            0.0, max_aoa_deg, max_aoa_deg
-        ]).tolist()
-        section_model_internal_state_set_points_data = [
-            -max_ca, -max_ca, 0.0, 
-            0.0, max_ca, max_ca
-        ]
-
-        logic = ControllerLogic(
-            apparent_wind_directions_data = apparent_wind_directions_data,
-            angle_of_attack_set_points_data = angle_of_attack_set_points_data,
-            section_model_internal_state_set_points_data = section_model_internal_state_set_points_data
-        )
-        
-        return cls(
-            logic = logic
-        )

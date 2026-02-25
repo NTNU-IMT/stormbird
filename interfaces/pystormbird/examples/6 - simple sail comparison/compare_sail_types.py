@@ -1,7 +1,7 @@
 
 from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder
 from stormbird_setup.direct_setup.lifting_line.complete_sail_model import CompleteSailModelBuilder
-from stormbird_setup.direct_setup.lifting_line.solver import SimpleIterative
+from stormbird_setup.direct_setup.controller import ControllerBuilder
 
 from stormbird_setup.simplified_setup.simple_sail_setup import SimpleSailSetup, SailType
 from stormbird_setup.direct_setup.spatial_vector import SpatialVector
@@ -15,8 +15,9 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     sail_types_to_compare = [
         SailType.WingSailSingleElement,
-        SailType.WingSailFlapped,
-        SailType.RotorSail
+        SailType.WingSailTwoElement,
+        SailType.RotorSail,
+        SailType.SuctionSail
     ]
 
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -49,7 +50,7 @@ if __name__ == "__main__":
 
         simulation_builder.line_force_model.add_wing_builder(sail.wing_builder())
 
-        controller = sail.controller_builder()
+        controller_set_points = sail.controller_set_points()
 
         wind_environment = WindEnvironment(
             height_variation_model=None
@@ -57,7 +58,7 @@ if __name__ == "__main__":
 
         model_builder = CompleteSailModelBuilder(
             lifting_line_simulation=simulation_builder,
-            controller=controller,
+            controller=ControllerBuilder(set_points = [controller_set_points]),
             wind_environment=wind_environment,
         )
 
