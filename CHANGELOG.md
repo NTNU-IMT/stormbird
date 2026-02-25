@@ -61,3 +61,9 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 ## 0.7.0 - 2025-10-30
 ### Highlights
 - Cleanup and restructuring of the actuator line functionality. In particular with focus on finalizing the correction methods, and removing methods that were tested but not found useful.
+
+## 0.8.0 - 2026-02-25
+### Highlights
+- Refactoring of control system to handle different setup when using multiple sails
+- Fix of bug and refactoring of the input power model
+- Small updates to the foil model
