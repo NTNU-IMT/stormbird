@@ -313,6 +313,17 @@ impl WindEnvironment {
 
         out
     }
+    
+    pub fn stability_correction(&self, height: Float) -> Float {
+        if let Some(overall_model) = &self.height_variation_model {
+            match overall_model {
+                HeightVariationModel::LogarithmicModel(model) => model.businger_dyer_correction(height),
+                HeightVariationModel::PowerModel(_) => 0.0
+            }
+        } else {
+            0.0
+        }
+    }
 }
 
 #[cfg(test)]

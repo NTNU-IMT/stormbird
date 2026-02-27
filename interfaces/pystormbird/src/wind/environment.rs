@@ -188,4 +188,8 @@ impl WindEnvironment {
         
         velocity_out
     }
+    
+    pub fn stability_correction(&self, height: f64) -> f64 {
+        self.data.stability_correction(height)
+    }
 }
