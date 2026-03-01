@@ -3,12 +3,14 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 pub mod environment;
+pub mod wind_condition;
 
 use pyo3::prelude::*;
 
 #[pymodule]
 pub fn wind(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<environment::WindEnvironment>()?;
+    m.add_class::<wind_condition::WindCondition>()?;
     
     Ok(())
 }

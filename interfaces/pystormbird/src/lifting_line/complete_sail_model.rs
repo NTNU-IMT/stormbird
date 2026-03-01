@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 
 use stormbird::lifting_line::complete_sail_model::CompleteSailModel as CompleteSailModelRust;
 
-use stormbird::wind::wind_condition::WindCondition;
+use crate::wind::wind_condition::WindCondition;
 
 use crate::result_structs::SimulationResult;
 
@@ -34,8 +34,7 @@ impl CompleteSailModel {
         *,
         time,
         time_step,
-        wind_velocity,
-        wind_direction,
+        wind_condition,
         ship_velocity,
         controller_loading
     ))]
@@ -43,21 +42,15 @@ impl CompleteSailModel {
         &mut self,
         time: f64,
         time_step: f64,
-        wind_velocity: f64,
-        wind_direction: f64,
+        wind_condition: WindCondition,
         ship_velocity: f64,
         controller_loading: f64
     ) -> SimulationResult {
 
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction
-        };
-
         let result_rs = self.data.do_step(
             time,
             time_step,
-            wind_condition,
+            &wind_condition.data,
             ship_velocity,
             controller_loading,
         );
@@ -69,8 +62,7 @@ impl CompleteSailModel {
 
     #[pyo3(signature=(
         *,
-        wind_velocity,
-        wind_direction,
+        wind_condition,
         ship_velocity,
         controller_loading = 1.0,
         time_step = 1.0,
@@ -78,21 +70,15 @@ impl CompleteSailModel {
     ))]
     pub fn simulate_condition(
         &mut self,
-        wind_velocity: f64,
-        wind_direction: f64,
+        wind_condition: WindCondition,
         ship_velocity: f64,
         controller_loading: f64,
         time_step: f64,
         nr_time_steps: usize
     ) -> SimulationResult {
 
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction
-        };
-
         let result_rs = self.data.simulate_condition(
-            wind_condition,
+            &wind_condition.data,
             ship_velocity,
             controller_loading,
             time_step,
@@ -106,8 +92,7 @@ impl CompleteSailModel {
     
     #[pyo3(signature=(
         *,
-        wind_velocity,
-        wind_direction,
+        wind_condition,
         ship_velocity,
         nr_loadings_to_test = 10,
         time_step = 1.0,
@@ -115,21 +100,15 @@ impl CompleteSailModel {
     ))]
     pub fn simulate_condition_optimal_controller_loading(
         &mut self,
-        wind_velocity: f64,
-        wind_direction: f64,
+        wind_condition: WindCondition,
         ship_velocity: f64,
         nr_loadings_to_test: usize,
         time_step: f64,
         nr_time_steps: usize
     ) -> SimulationResult {
 
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction
-        };
-
         let result_rs = self.data.simulate_condition_optimal_controller_loading(
-            wind_condition,
+            &wind_condition.data,
             ship_velocity,
             nr_loadings_to_test,
             time_step,

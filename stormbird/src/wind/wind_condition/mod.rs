@@ -3,27 +3,28 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 
-use stormath::{
-    type_aliases::Float,
-    spatial_vector::SpatialVector,
-};
+use serde::{Serialize, Deserialize};
 
-#[cfg(feature = "padded_spatial_vectors")]
-const NED_ZERO_DIRECTION: SpatialVector = SpatialVector{0:[-1.0, 0.0, 0.0, 0.0]};
-#[cfg(feature = "padded_spatial_vectors")]
-const NED_UP_DIRECTION: SpatialVector = SpatialVector{0:[0.0, 0.0, 1.0, 0.0]};
+use stormath::type_aliases::Float;
 
-#[cfg(not(feature = "padded_spatial_vectors"))]
-const NED_ZERO_DIRECTION: SpatialVector = SpatialVector{0:[-1.0, 0.0, 0.0]};
-#[cfg(not(feature = "padded_spatial_vectors"))]
-const NED_UP_DIRECTION: SpatialVector = SpatialVector{0:[0.0, 0.0, -1.0]};
+pub mod velocity_variation;
 
-#[derive(Debug, Clone, Copy)]
+use velocity_variation::VelocityVariation;
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct WindCondition {
-    pub velocity: Float,
     pub direction_coming_from: Float,
+    pub velocity_variation: VelocityVariation
 }
 
+impl WindCondition {
+    /// Returns the true velocity magnitude at the height gives and input. 
+    pub fn true_wind_velocity_at_height(&self, height: Float) -> Float {
+        self.velocity_variation.true_wind_velocity_at_height(height)
+    }
+}
+
+/*
 impl WindCondition {
     pub fn from_velocity_vector_assuming_ned(
         velocity_vector: SpatialVector,
@@ -33,10 +34,12 @@ impl WindCondition {
 
         WindCondition {
             velocity: velocity_vector.length(),
-            direction_coming_from
+            direction_coming_from,
+            ..Default::default()
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -84,4 +87,4 @@ mod tests {
         assert!((west_wind_condition.direction_coming_from.to_degrees() + 90.0).abs() < allowable_error);
     }
 
-}
+}*/

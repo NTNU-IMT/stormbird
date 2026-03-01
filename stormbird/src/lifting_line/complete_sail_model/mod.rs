@@ -62,7 +62,7 @@ impl CompleteSailModel {
     /// based on the maximum delivered power
     pub fn simulate_condition_optimal_controller_loading(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         nr_loadings_to_test: usize,
         time_step: Float,
@@ -108,7 +108,7 @@ impl CompleteSailModel {
     
     pub fn simulate_steady_state_condition(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
@@ -123,7 +123,7 @@ impl CompleteSailModel {
     
     pub fn simulate_steady_state_condition_simple_output(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> Vec<SingleSailResult> {
@@ -140,7 +140,7 @@ impl CompleteSailModel {
     /// and controller loading
     pub fn simulate_condition(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float,
         time_step: Float,
@@ -170,7 +170,7 @@ impl CompleteSailModel {
         &mut self,
         current_time: Float,
         time_step: Float,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float,
     ) -> SimulationResult {
@@ -195,7 +195,7 @@ impl CompleteSailModel {
     
     pub fn freestream_velocity(
         &self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float
     ) -> Vec<SpatialVector> {
         let freestream_velocity_points = self.lifting_line_simulation

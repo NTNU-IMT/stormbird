@@ -3,8 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use stormbird::wind::{
-    environment::WindEnvironment as WindEnvironmentRust, 
-    wind_condition::WindCondition
+    environment::WindEnvironment as WindEnvironmentRust,
 };
 
 use stormath::spatial_vector::SpatialVector;
@@ -12,6 +11,8 @@ use stormath::spatial_vector::SpatialVector;
 use pyo3::prelude::*;
 
 use std::ops::Range;
+
+use super::wind_condition::WindCondition;
 
 #[pyclass]
 #[derive(Clone)]
@@ -32,72 +33,43 @@ impl WindEnvironment {
         }
     }
     
-    #[pyo3(signature=(
-        *,
-        wind_velocity,
-        wind_direction_coming_from,
-        height
-    ))]
-    pub fn true_wind_velocity_at_height(
+    pub fn true_wind_velocity_at_location(
         &self, 
-        wind_velocity: f64, 
-        wind_direction_coming_from: f64,
-        height: f64
-    ) -> f64 {
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction_coming_from
-        };
-        
-        self.data.true_wind_velocity_at_height(wind_condition, height)
-    }
-    
-    #[pyo3(signature=(
-        *,
-        wind_velocity,
-        wind_direction_coming_from,
-        location
-    ))]
-    pub fn true_wind_velocity_vector_at_location(
-        &self, 
-        wind_velocity: f64, 
-        wind_direction_coming_from: f64,
+        condition: WindCondition,
         location: [f64; 3]
-    ) -> [f64; 3] {
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction_coming_from
-        };
-        
+    ) -> f64 {
         let location_internal = SpatialVector::from(location);
         
-        self.data.true_wind_velocity_vector_at_location(wind_condition, location_internal).0
+        self.data.true_wind_velocity_at_location(&condition.data, location_internal)
+    }
+    
+    pub fn true_wind_velocity_vector_at_location(
+        &self, 
+        condition: WindCondition,
+        location: [f64; 3]
+    ) -> [f64; 3] {
+        let location_internal = SpatialVector::from(location);
+        
+        self.data.true_wind_velocity_vector_at_location(&condition.data, location_internal).0
     }
     
     #[pyo3(signature=(
         *,
-        wind_velocity,
-        wind_direction_coming_from,
+        condition,
         location,
         linear_velocity
     ))]
     pub fn apparent_wind_velocity_vector_at_location(
         &self, 
-        wind_velocity: f64, 
-        wind_direction_coming_from: f64,
+        condition: WindCondition,
         location: [f64; 3],
         linear_velocity: [f64; 3]
-    ) -> [f64; 3] {
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction_coming_from
-        };
-        
+    ) -> [f64; 3] {        
         let location_internal = SpatialVector::from(location);
         let linear_velocity_internal = SpatialVector::from(linear_velocity);
         
         self.data.apparent_wind_velocity_vector_at_location(
-            wind_condition, 
+            &condition.data, 
             location_internal,
             linear_velocity_internal
         ).0
@@ -105,27 +77,21 @@ impl WindEnvironment {
     
     #[pyo3(signature=(
         *,
-        wind_velocity,
-        wind_direction_coming_from,
+        condition,
         linear_velocity,
         height = 10.0
     ))]
     pub fn apparent_wind_direction_from_condition_and_linear_velocity(
         &self,
-        wind_velocity: f64, 
-        wind_direction_coming_from: f64,
+        condition: WindCondition,
         linear_velocity: [f64; 3],
         height: f64
     ) -> f64 {
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction_coming_from
-        };
         
         let linear_velocity_internal = SpatialVector::from(linear_velocity);
         
         self.data.apparent_wind_direction_from_condition_and_linear_velocity(
-            wind_condition,
+            &condition.data,
             linear_velocity_internal,
             height
         )
@@ -133,25 +99,18 @@ impl WindEnvironment {
     
     #[pyo3(signature=(
         *,
-        wind_velocity,
-        wind_direction_coming_from,
+        condition,
         ctrl_points,
         linear_velocity,
         wing_indices
     ))]
     pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
         &self,
-        wind_velocity: f64, 
-        wind_direction_coming_from: f64,
+        condition: WindCondition,
         ctrl_points: Vec<[f64; 3]>,
         linear_velocity: [f64; 3],
         wing_indices: Vec<[usize; 2]>
-    ) -> Vec<[f64; 3]> {
-        let wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: wind_direction_coming_from
-        };
-        
+    ) -> Vec<[f64; 3]> {        
         let linear_velocity_internal = SpatialVector::from(linear_velocity);
         
         let mut wing_indices_internal: Vec<Range<usize>> = Vec::new();
@@ -172,7 +131,7 @@ impl WindEnvironment {
         }
         
         let velocity_internal = self.data.apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
-            wind_condition, 
+            &condition.data, 
             &ctrl_points_internal, 
             linear_velocity_internal, 
             &wing_indices_internal
@@ -187,9 +146,5 @@ impl WindEnvironment {
         }
         
         velocity_out
-    }
-    
-    pub fn stability_correction(&self, height: f64) -> f64 {
-        self.data.stability_correction(height)
     }
 }

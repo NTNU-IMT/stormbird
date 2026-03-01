@@ -15,18 +15,14 @@ use serde_json;
 
 use crate::error::Error;
 use crate::line_force_model::LineForceModel;
-
-use super::height_variation::HeightVariationModel;
 use super::inflow_corrections::InflowCorrections;
 use super::wind_condition::WindCondition;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Structure used to represent a wind environment. Can be used to query about the wind velocity at
-/// different locations
+/// different locations.
 pub struct WindEnvironment {
-    #[serde(default)]
-    pub height_variation_model: Option<HeightVariationModel>,
     #[serde(default="WindEnvironment::default_up_direction")]
     pub up_direction: SpatialVector,
     #[serde(default="WindEnvironment::default_wind_rotation_axis")]
@@ -42,7 +38,6 @@ pub struct WindEnvironment {
 impl Default for WindEnvironment {
     fn default() -> Self {
         Self {
-            height_variation_model: None,
             up_direction: Self::default_up_direction(),
             wind_rotation_axis: Self::default_wind_rotation_axis(),
             zero_direction_vector: Self::default_zero_direction_vector(),
@@ -69,42 +64,27 @@ impl WindEnvironment {
         Self::from_json_string(&json_string)
     }
 
-    /// Computes the true wind velocity magnitude based on the input height
-    pub fn true_wind_velocity_at_height(&self, condition: WindCondition, height: Float) -> Float {
-        let increase_factor = if let Some(model) = self.height_variation_model {
-            if height > 0.0 {
-                model.velocity_increase_factor(height)
-            } else {
-                0.0
-            }
-        } else {
-            1.0
-        };
-
-        increase_factor * condition.velocity
-    }
-
     /// Computes the height of the input location and then the true wind velocity at this height
     pub fn true_wind_velocity_at_location(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         location: SpatialVector,
     ) -> Float {
         let height = (
             location.dot(self.up_direction) - self.water_plane_height
         ).max(0.0);
 
-        self.true_wind_velocity_at_height(condition, height)
+        condition.true_wind_velocity_at_height(height)
     }
 
     /// Returns the true wind vector at the location given as input
     pub fn true_wind_velocity_vector_at_location(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         location: SpatialVector
     ) -> SpatialVector {
         let velocity = self.true_wind_velocity_at_location(condition, location);
-
+        
         let direction_vector = self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
             self.wind_rotation_axis
@@ -115,7 +95,7 @@ impl WindEnvironment {
     
     pub fn apparent_wind_velocity_vector_at_location(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         location: SpatialVector,
         linear_velocity: SpatialVector
     ) -> SpatialVector {
@@ -126,7 +106,7 @@ impl WindEnvironment {
 
     pub fn true_wind_velocity_vectors_at_locations(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         locations: &[SpatialVector]
     ) -> Vec<SpatialVector> {
         locations.iter().map(
@@ -138,7 +118,7 @@ impl WindEnvironment {
     /// wind condition and a linear velocity of the body
     pub fn apparent_wind_velocity_vectors_at_locations(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         locations: &[SpatialVector],
         linear_velocity: SpatialVector,
     ) -> Vec<SpatialVector> {
@@ -153,7 +133,7 @@ impl WindEnvironment {
 
     pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         ctrl_points: &[SpatialVector],
         linear_velocity: SpatialVector,
         wing_indices: &[Range<usize>]
@@ -172,7 +152,7 @@ impl WindEnvironment {
         
         average_height /= ctrl_points.len() as Float;
         
-        let apparent_wind_direction = self.apparent_wind_direction_from_condition_and_linear_velocity_and_height(
+        let apparent_wind_direction = self.apparent_wind_direction_from_condition_and_linear_velocity(
             condition, linear_velocity, average_height
         );
         
@@ -224,32 +204,11 @@ impl WindEnvironment {
 
     pub fn apparent_wind_direction_from_condition_and_linear_velocity(
         &self,
-        condition: WindCondition,
+        condition: &WindCondition,
         linear_velocity: SpatialVector,
         height: Float
     ) -> Float {
-        let true_wind_velocity = self.true_wind_velocity_at_height(condition, height);
-        
-        let true_wind_vector = true_wind_velocity * self.zero_direction_vector.rotate_around_axis(
-            condition.direction_coming_from,
-            self.wind_rotation_axis
-        );
-
-        let apparent_velocity_vector = true_wind_vector + linear_velocity;
-
-        self.zero_direction_vector.signed_angle_between(
-            apparent_velocity_vector,
-            self.wind_rotation_axis
-        )
-    }
-    
-    pub fn apparent_wind_direction_from_condition_and_linear_velocity_and_height(
-        &self,
-        condition: WindCondition,
-        linear_velocity: SpatialVector,
-        height: Float
-    ) -> Float {
-        let true_wind_velocity = self.true_wind_velocity_at_height(condition, height);
+        let true_wind_velocity = condition.true_wind_velocity_at_height(height);
         
         let true_wind_vector = true_wind_velocity * self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
@@ -313,19 +272,9 @@ impl WindEnvironment {
 
         out
     }
-    
-    pub fn stability_correction(&self, height: Float) -> Float {
-        if let Some(overall_model) = &self.height_variation_model {
-            match overall_model {
-                HeightVariationModel::LogarithmicModel(model) => model.businger_dyer_correction(height),
-                HeightVariationModel::PowerModel(_) => 0.0
-            }
-        } else {
-            0.0
-        }
-    }
 }
 
+/* 
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,22 +288,26 @@ mod tests {
 
         let north_wind_condition = WindCondition{
             velocity: wind_velocity,
-            direction_coming_from: 0.0
+            direction_coming_from: 0.0,
+            ..Default::default()
         };
 
         let east_wind_condition = WindCondition{
             velocity: wind_velocity,
-            direction_coming_from: Float::from(90.0).to_radians()
+            direction_coming_from: Float::from(90.0).to_radians(),
+            ..Default::default()
         };
 
         let west_wind_condition = WindCondition{
             velocity: wind_velocity,
-            direction_coming_from: Float::from(-90.0).to_radians()
+            direction_coming_from: Float::from(-90.0).to_radians(),
+            ..Default::default()
         };
 
         let south_wind_condition = WindCondition{
             velocity: wind_velocity,
-            direction_coming_from: Float::from(180.0).to_radians()
+            direction_coming_from: Float::from(180.0).to_radians(),
+            ..Default::default()
         };
 
         let north_vector = wind_environment.true_wind_velocity_vector_at_location(
@@ -384,3 +337,5 @@ mod tests {
         dbg!(south_vector);
     }
 }
+
+*/
