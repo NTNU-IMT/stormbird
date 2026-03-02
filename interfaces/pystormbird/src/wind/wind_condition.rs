@@ -7,9 +7,7 @@ use stormbird::wind::wind_condition::WindCondition as WindConditionRust;
 use stormbird::wind::wind_condition::velocity_variation::{
     VelocityVariation,
     power_model::PowerModel,
-    logarithmic_model::{
-        LogarithmicModel, AtmosphereState
-    }
+    logarithmic_model::LogarithmicModel,
 };
 
 use pyo3::prelude::*;
@@ -98,8 +96,7 @@ impl WindCondition {
                         friction_velocity,
                         surface_roughness,
                         von_karman_constant,
-                        obukhov_length: obukhov_length_rust,
-                        atmosphere_state: AtmosphereState::Neutral
+                        obukhov_length: obukhov_length_rust
                     }
                 )
             }
@@ -108,5 +105,82 @@ impl WindCondition {
     
     pub fn true_wind_velocity_at_height(&self, height: f64) -> f64 {
         self.data.true_wind_velocity_at_height(height)
+    }
+    
+    #[getter]
+    pub fn get_von_karman_constant(&self) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => model.von_karman_constant,
+            _ => 0.0
+        }
+    }
+    
+    #[getter]
+    pub fn get_friction_velocity(&self) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => model.friction_velocity,
+            _ => 0.0
+        }
+    }
+    
+    #[setter]
+    pub fn set_friction_velocity(&mut self, value: f64) {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(ref mut model) => {
+                model.friction_velocity = value
+            },
+            _ => {}
+        }
+    }
+    
+    #[getter]
+    pub fn get_surface_roughness(&self) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => model.surface_roughness,
+            _ => 0.0
+        }
+    }
+    
+    #[setter]
+    pub fn set_surface_roughness(&mut self, value: f64) {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(ref mut model) => {
+                model.surface_roughness = value
+            },
+            _ => {}
+        }
+    }
+    
+    #[getter]
+    pub fn get_obukhov_length(&self) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => {
+                if let Some(length) = model.obukhov_length {
+                    length
+                } else {
+                    0.0
+                }
+            },
+            _ => 0.0
+        }
+    }
+    
+    #[setter]
+    pub fn set_obukhov_length(&mut self, value: f64) {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(ref mut model) => {
+                model.obukhov_length = Some(value)
+            },
+            _ => {}
+        }
+    }
+    
+    pub fn businger_dyer_unscaled_correction(&self, height: f64) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => {
+                model.businger_dyer_unscaled_correction(height)
+            },
+            _ => 0.0
+        }
     }
 }
