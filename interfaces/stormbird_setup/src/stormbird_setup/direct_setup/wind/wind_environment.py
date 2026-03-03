@@ -4,11 +4,9 @@ from ...base_model import StormbirdSetupBaseModel
 
 from ..spatial_vector import SpatialVector
 
-from .height_variation import HeightVariationModel
 from .inflow_corrections import InflowCorrections
 
 class WindEnvironment(StormbirdSetupBaseModel):
-    height_variation_model: HeightVariationModel | None = HeightVariationModel()
     up_direction: SpatialVector = Field(
         default_factory=lambda: SpatialVector(x=0.0, y=0.0, z=1.0)
     )
