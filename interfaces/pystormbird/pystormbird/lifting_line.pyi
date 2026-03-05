@@ -1,6 +1,7 @@
 
 from pystormbird import SimulationResult
 from .line_force_model import LineForceModel
+from .wind import WindCondition
 
 class Simulation:
     def __init__(self, input_string: str) -> None: ...
@@ -21,8 +22,7 @@ class CompleteSailModel:
         *,
         time: float, 
         time_step: float, 
-        wind_velocity: float, 
-        wind_direction: float, 
+        wind_condition: WindCondition, 
         ship_velocity: float,
         controller_loading: float
     ) -> SimulationResult: ...
@@ -30,8 +30,7 @@ class CompleteSailModel:
     def simulate_condition(
         self,
         *,
-        wind_velocity: float,
-        wind_direction: float,
+        wind_condition: WindCondition,
         ship_velocity: float,
         controller_loading: float = 1.0,
         time_step: float = 1.0,
@@ -41,8 +40,7 @@ class CompleteSailModel:
     def simulate_condition_optimal_controller_loading(
         self,
         *,
-        wind_velocity: float,
-        wind_direction: float,
+        wind_condition: WindCondition,
         ship_velocity: float,
         nr_loadings_to_test: int = 10,
         time_step: float = 1.0,

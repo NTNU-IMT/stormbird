@@ -11,16 +11,30 @@ pub mod velocity_variation;
 
 use velocity_variation::VelocityVariation;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+use super::gust_spectrums::discretized_spectrum::DiscretizedSpectrum;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindCondition {
     pub direction_coming_from: Float,
-    pub velocity_variation: VelocityVariation
+    pub velocity_variation: VelocityVariation,
+    #[serde(default)]
+    pub parallel_gust: Option<DiscretizedSpectrum>
 }
 
 impl WindCondition {
     /// Returns the true velocity magnitude at the height gives and input. 
-    pub fn true_wind_velocity_at_height(&self, height: Float) -> Float {
+    pub fn true_wind_velocity_at_height_without_gusts(&self, height: Float) -> Float {
         self.velocity_variation.true_wind_velocity_at_height(height)
+    }
+    
+    pub fn true_wind_velocity_at_height_with_gusts(&self, height: Float, time: Float) -> Float {
+        let mut u = self.velocity_variation.true_wind_velocity_at_height(height);
+        
+        if let Some(spectrum) = &self.parallel_gust {
+            u += spectrum.value_at_time(time);
+        }
+        
+        u
     }
 }
 

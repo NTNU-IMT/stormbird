@@ -176,7 +176,8 @@ impl CompleteSailModel {
     ) -> SimulationResult {
         let freestream_velocity = self.freestream_velocity(
             wind_condition,
-            ship_velocity
+            ship_velocity,
+            current_time
         );
 
         self.apply_controller_based_on_freestream(
@@ -196,7 +197,8 @@ impl CompleteSailModel {
     pub fn freestream_velocity(
         &self,
         wind_condition: &WindCondition,
-        ship_velocity: Float
+        ship_velocity: Float,
+        time: Float
     ) -> Vec<SpatialVector> {
         let freestream_velocity_points = self.lifting_line_simulation
             .get_freestream_velocity_points();
@@ -206,7 +208,8 @@ impl CompleteSailModel {
         let mut freestream_velocity = self.wind_environment.apparent_wind_velocity_vectors_at_locations(
             wind_condition, 
             &freestream_velocity_points, 
-            linear_velocity
+            linear_velocity,
+            time
         );
         
         let reference_height = 10.0;

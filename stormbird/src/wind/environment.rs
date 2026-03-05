@@ -69,21 +69,23 @@ impl WindEnvironment {
         &self,
         condition: &WindCondition,
         location: SpatialVector,
+        time: Float
     ) -> Float {
         let height = (
             location.dot(self.up_direction) - self.water_plane_height
         ).max(0.0);
 
-        condition.true_wind_velocity_at_height(height)
+        condition.true_wind_velocity_at_height_with_gusts(height, time)
     }
 
     /// Returns the true wind vector at the location given as input
     pub fn true_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
-        location: SpatialVector
+        location: SpatialVector,
+        time: Float
     ) -> SpatialVector {
-        let velocity = self.true_wind_velocity_at_location(condition, location);
+        let velocity = self.true_wind_velocity_at_location(condition, location, time);
         
         let direction_vector = self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
@@ -97,9 +99,10 @@ impl WindEnvironment {
         &self,
         condition: &WindCondition,
         location: SpatialVector,
-        linear_velocity: SpatialVector
+        linear_velocity: SpatialVector,
+        time: Float
     ) -> SpatialVector {
-        let true_wind = self.true_wind_velocity_vector_at_location(condition, location);
+        let true_wind = self.true_wind_velocity_vector_at_location(condition, location, time);
         
         true_wind + linear_velocity
     }
@@ -107,10 +110,11 @@ impl WindEnvironment {
     pub fn true_wind_velocity_vectors_at_locations(
         &self,
         condition: &WindCondition,
-        locations: &[SpatialVector]
+        locations: &[SpatialVector],
+        time: Float
     ) -> Vec<SpatialVector> {
         locations.iter().map(
-            |&location| self.true_wind_velocity_vector_at_location(condition, location)
+            |&location| self.true_wind_velocity_vector_at_location(condition, location, time)
         ).collect()
     }
 
@@ -121,12 +125,14 @@ impl WindEnvironment {
         condition: &WindCondition,
         locations: &[SpatialVector],
         linear_velocity: SpatialVector,
+        time: Float
     ) -> Vec<SpatialVector> {
         locations.iter().map(
             |&location| self.apparent_wind_velocity_vector_at_location(
                 condition, 
                 location, 
-                linear_velocity
+                linear_velocity,
+                time
             )
         ).collect()
     }
@@ -136,12 +142,14 @@ impl WindEnvironment {
         condition: &WindCondition,
         ctrl_points: &[SpatialVector],
         linear_velocity: SpatialVector,
+        time: Float,
         wing_indices: &[Range<usize>]
     ) -> Vec<SpatialVector> {
         let mut wind_velocity = self.apparent_wind_velocity_vectors_at_locations(
             condition,
             ctrl_points,
-            linear_velocity
+            linear_velocity,
+            time
         );
         
         let mut average_height = 0.0;
@@ -208,7 +216,7 @@ impl WindEnvironment {
         linear_velocity: SpatialVector,
         height: Float
     ) -> Float {
-        let true_wind_velocity = condition.true_wind_velocity_at_height(height);
+        let true_wind_velocity = condition.true_wind_velocity_at_height_without_gusts(height);
         
         let true_wind_vector = true_wind_velocity * self.zero_direction_vector.rotate_around_axis(
             condition.direction_coming_from,
