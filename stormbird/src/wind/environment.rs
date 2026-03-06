@@ -82,7 +82,7 @@ impl WindEnvironment {
         )
     }
     
-    pub fn steady_true_wind_velocity_at_height(
+    pub fn steady_true_wind_velocity_at_location(
         &self,
         condition: &WindCondition,
         location: SpatialVector,
@@ -135,7 +135,7 @@ impl WindEnvironment {
         condition: &WindCondition,
         location: SpatialVector,
     ) -> SpatialVector {
-        let parallel_vel = self.steady_true_wind_velocity_at_height(condition, location);
+        let parallel_vel = self.steady_true_wind_velocity_at_location(condition, location);
         let parallel_dir = self.true_wind_direction_vector(condition.direction_coming_from);
 
         parallel_vel * parallel_dir
@@ -179,20 +179,26 @@ impl WindEnvironment {
         time: Float,
         wing_indices: &[Range<usize>]
     ) -> Vec<SpatialVector> {
-        let mut wind_velocity = self.apparent_wind_velocity_vectors_at_locations(
-            condition,
-            ctrl_points,
-            linear_velocity,
-            time
-        );
         
+        let nr_ctrl_points = ctrl_points.len();
+        
+        let mut wind_velocity = Vec::with_capacity(nr_ctrl_points);
         let mut average_height = 0.0;
         
-        for i in 0..ctrl_points.len() {
+        for i in 0..nr_ctrl_points {
+            wind_velocity.push(
+                self.unsteady_apparent_wind_velocity_vector_at_location(
+                    condition, 
+                    ctrl_points[i], 
+                    linear_velocity, 
+                    time
+                )
+            );
+            
             average_height += ctrl_points[i].dot(self.up_direction);
         }
         
-        average_height /= ctrl_points.len() as Float;
+        average_height /= nr_ctrl_points as Float;
         
         let apparent_wind_direction = self.apparent_wind_direction_from_condition_and_linear_velocity(
             condition, linear_velocity, average_height

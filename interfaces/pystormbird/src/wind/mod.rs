@@ -4,7 +4,6 @@
 
 pub mod environment;
 pub mod wind_condition;
-pub mod gust_spectrums;
 
 use pyo3::prelude::*;
 
@@ -12,7 +11,6 @@ use pyo3::prelude::*;
 pub fn wind(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<environment::WindEnvironment>()?;
     m.add_class::<wind_condition::WindCondition>()?;
-    m.add_class::<gust_spectrums::DiscretizedSpectrum>()?;
     
     Ok(())
 }

@@ -56,6 +56,24 @@ impl WindCondition {
             0.0
         }
     }
+    
+    pub fn set_parallel_gust_from_json_string(&mut self, gust_string: &str) {
+        let parallel_gust: DiscretizedSpectrum = serde_json::from_str(gust_string).unwrap();
+        
+        self.parallel_gust = Some(parallel_gust);
+    }
+    
+    pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: &str) {
+        let perpendicular_gust: DiscretizedSpectrum = serde_json::from_str(&gust_string).unwrap();
+        
+        self.perpendicular_gust = Some(perpendicular_gust);
+    }
+    
+    pub fn set_vertical_gust_from_json_string(&mut self, gust_string: &str) {
+        let vertical_gust: DiscretizedSpectrum = serde_json::from_str(gust_string).unwrap();
+        
+        self.vertical_gust = Some(vertical_gust);
+    }
 }
 
 /*

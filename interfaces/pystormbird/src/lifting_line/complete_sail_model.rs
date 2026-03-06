@@ -62,62 +62,41 @@ impl CompleteSailModel {
 
     #[pyo3(signature=(
         *,
+        end_time,
+        time_step,
         wind_condition,
         ship_velocity,
-        controller_loading = 1.0,
-        time_step = 1.0,
-        nr_time_steps = 1
+        controller_loading    
     ))]
-    pub fn simulate_condition(
+    pub fn do_multiple_steps(
         &mut self,
+        end_time: f64,
+        time_step: f64,
         wind_condition: WindCondition,
         ship_velocity: f64,
         controller_loading: f64,
-        time_step: f64,
-        nr_time_steps: usize
-    ) -> SimulationResult {
+        
+    ) -> Vec<SimulationResult> {
 
-        let result_rs = self.data.simulate_condition(
+        let results_rs = self.data.do_multiple_steps(
+            end_time,
+            time_step,
             &wind_condition.data,
             ship_velocity,
-            controller_loading,
-            time_step,
-            nr_time_steps
+            controller_loading
         );
-
-        SimulationResult {
-            data: result_rs
+        
+        let mut out = Vec::with_capacity(results_rs.len());
+        
+        for i in 0..results_rs.len() {
+            out.push(
+                SimulationResult {
+                    data: results_rs[i].clone()
+                }
+            )
         }
-    }
-    
-    #[pyo3(signature=(
-        *,
-        wind_condition,
-        ship_velocity,
-        nr_loadings_to_test = 10,
-        time_step = 1.0,
-        nr_time_steps = 1
-    ))]
-    pub fn simulate_condition_optimal_controller_loading(
-        &mut self,
-        wind_condition: WindCondition,
-        ship_velocity: f64,
-        nr_loadings_to_test: usize,
-        time_step: f64,
-        nr_time_steps: usize
-    ) -> SimulationResult {
-
-        let result_rs = self.data.simulate_condition_optimal_controller_loading(
-            &wind_condition.data,
-            ship_velocity,
-            nr_loadings_to_test,
-            time_step,
-            nr_time_steps
-        );
-
-        SimulationResult {
-            data: result_rs
-        }
+        
+        out
     }
 
     pub fn section_models_internal_state(&self) -> Vec<f64> {

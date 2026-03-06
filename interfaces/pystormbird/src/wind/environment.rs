@@ -33,24 +33,51 @@ impl WindEnvironment {
         }
     }
     
-    pub fn true_wind_velocity_at_location(
+    #[pyo3(signature=(
+        *,
+        condition,
+        location,
+    ))]
+    pub fn steady_true_wind_velocity_at_location(
         &self, 
         condition: WindCondition,
         location: [f64; 3]
     ) -> f64 {
         let location_internal = SpatialVector::from(location);
         
-        self.data.true_wind_velocity_at_location(&condition.data, location_internal)
+        self.data.steady_true_wind_velocity_at_location(&condition.data, location_internal)
     }
     
-    pub fn true_wind_velocity_vector_at_location(
+    #[pyo3(signature=(
+        *,
+        condition,
+        location,
+    ))]
+    pub fn steady_true_wind_velocity_vector_at_location(
         &self, 
         condition: WindCondition,
         location: [f64; 3]
     ) -> [f64; 3] {
         let location_internal = SpatialVector::from(location);
         
-        self.data.true_wind_velocity_vector_at_location(&condition.data, location_internal).0
+        self.data.steady_true_wind_velocity_vector_at_location(&condition.data, location_internal).0
+    }
+    
+    #[pyo3(signature=(
+        *,
+        condition,
+        location,
+        time
+    ))]
+    pub fn unsteady_true_wind_velocity_vector_at_location(
+        &self, 
+        condition: WindCondition,
+        location: [f64; 3],
+        time: f64
+    ) -> [f64; 3] {
+        let location_internal = SpatialVector::from(location);
+        
+        self.data.unsteady_true_wind_velocity_vector_at_location(&condition.data, location_internal, time).0
     }
     
     #[pyo3(signature=(
@@ -59,7 +86,7 @@ impl WindEnvironment {
         location,
         linear_velocity
     ))]
-    pub fn apparent_wind_velocity_vector_at_location(
+    pub fn steady_apparent_wind_velocity_vector_at_location(
         &self, 
         condition: WindCondition,
         location: [f64; 3],
@@ -68,10 +95,35 @@ impl WindEnvironment {
         let location_internal = SpatialVector::from(location);
         let linear_velocity_internal = SpatialVector::from(linear_velocity);
         
-        self.data.apparent_wind_velocity_vector_at_location(
+        self.data.steady_apparent_wind_velocity_vector_at_location(
             &condition.data, 
             location_internal,
             linear_velocity_internal
+        ).0
+    }
+    
+    #[pyo3(signature=(
+        *,
+        condition,
+        location,
+        linear_velocity,
+        time
+    ))]
+    pub fn unsteady_apparent_wind_velocity_vector_at_location(
+        &self, 
+        condition: WindCondition,
+        location: [f64; 3],
+        linear_velocity: [f64; 3],
+        time: f64
+    ) -> [f64; 3] {        
+        let location_internal = SpatialVector::from(location);
+        let linear_velocity_internal = SpatialVector::from(linear_velocity);
+        
+        self.data.unsteady_apparent_wind_velocity_vector_at_location(
+            &condition.data, 
+            location_internal,
+            linear_velocity_internal,
+            time
         ).0
     }
     
@@ -102,6 +154,7 @@ impl WindEnvironment {
         condition,
         ctrl_points,
         linear_velocity,
+        time,
         wing_indices
     ))]
     pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
@@ -109,6 +162,7 @@ impl WindEnvironment {
         condition: WindCondition,
         ctrl_points: Vec<[f64; 3]>,
         linear_velocity: [f64; 3],
+        time: f64,
         wing_indices: Vec<[usize; 2]>
     ) -> Vec<[f64; 3]> {        
         let linear_velocity_internal = SpatialVector::from(linear_velocity);
@@ -133,7 +187,8 @@ impl WindEnvironment {
         let velocity_internal = self.data.apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
             &condition.data, 
             &ctrl_points_internal, 
-            linear_velocity_internal, 
+            linear_velocity_internal,
+            time,
             &wing_indices_internal
         );
         

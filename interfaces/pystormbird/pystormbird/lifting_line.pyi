@@ -27,25 +27,15 @@ class CompleteSailModel:
         controller_loading: float
     ) -> SimulationResult: ...
     
-    def simulate_condition(
+    def do_multiple_steps(
         self,
         *,
+        end_time: float,
+        time_step: float,
         wind_condition: WindCondition,
         ship_velocity: float,
-        controller_loading: float = 1.0,
-        time_step: float = 1.0,
-        nr_time_steps: int = 1
-    ) -> SimulationResult: ...
-    
-    def simulate_condition_optimal_controller_loading(
-        self,
-        *,
-        wind_condition: WindCondition,
-        ship_velocity: float,
-        nr_loadings_to_test: int = 10,
-        time_step: float = 1.0,
-        nr_time_steps: int = 1
-    ) -> SimulationResult: ...
+        controller_loading: float,
+    ) -> list[SimulationResult]: ...
     
     def section_models_internal_state(self) -> list[float]: ...
     

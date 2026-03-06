@@ -31,9 +31,24 @@ impl WindCondition {
         WindCondition{
             data: WindConditionRust{
                 direction_coming_from: direction_coming_from,
-                velocity_variation: VelocityVariation::Constant(velocity)
+                velocity_variation: VelocityVariation::Constant(velocity),
+                parallel_gust: None,
+                perpendicular_gust: None,
+                vertical_gust: None
             }
         }
+    }
+    
+    pub fn set_parallel_gust_from_json_string(&mut self, gust_string: String) {
+        self.data.set_parallel_gust_from_json_string(&gust_string);
+    }
+    
+    pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: String) {
+        self.data.set_perpendicular_gust_from_json_string(&gust_string);
+    }
+    
+    pub fn set_vertical_gust_from_json_string(&mut self, gust_string: String) {
+        self.data.set_vertical_gust_from_json_string(&gust_string);
     }
     
     #[classmethod]
@@ -60,7 +75,10 @@ impl WindCondition {
                         reference_height, 
                         power_factor 
                     }
-                )
+                ),
+                parallel_gust: None,
+                perpendicular_gust: None,
+                vertical_gust: None
             }
         }
     }
@@ -98,13 +116,28 @@ impl WindCondition {
                         von_karman_constant,
                         obukhov_length: obukhov_length_rust
                     }
-                )
+                ),
+                parallel_gust: None,
+                perpendicular_gust: None,
+                vertical_gust: None
             }
         }
     }
     
-    pub fn true_wind_velocity_at_height(&self, height: f64) -> f64 {
-        self.data.true_wind_velocity_at_height(height)
+    pub fn steady_true_wind_velocity_at_height(&self, height: f64) -> f64 {
+        self.data.steady_true_wind_velocity_at_height(height)
+    }
+    
+    pub fn unsteady_parallel_true_wind_velocity_at_height(&self, height: f64, time: f64) -> f64 {
+        self.data.unsteady_parallel_true_wind_velocity_at_height(height, time)
+    }
+    
+    pub fn unsteady_perpendicular_true_wind_velocity(&self, time: f64) -> f64 {
+        self.data.unsteady_perpendicular_true_wind_velocity(time)
+    }
+    
+    pub fn unsteady_vertical_true_wind_velocity(&self, time: f64) -> f64 {
+        self.data.unsteady_vertical_true_wind_velocity(time)
     }
     
     #[getter]
