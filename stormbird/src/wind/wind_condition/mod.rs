@@ -8,26 +8,30 @@ use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
 
 pub mod velocity_variation;
+pub mod discretized_spectrum;
 
 use velocity_variation::VelocityVariation;
-
-use super::gust_spectrums::discretized_spectrum::DiscretizedSpectrum;
+use discretized_spectrum::DiscretizedSpectrum;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindCondition {
     pub direction_coming_from: Float,
     pub velocity_variation: VelocityVariation,
     #[serde(default)]
-    pub parallel_gust: Option<DiscretizedSpectrum>
+    pub parallel_gust: Option<DiscretizedSpectrum>,
+    #[serde(default)]
+    pub perpendicular_gust: Option<DiscretizedSpectrum>,
+    #[serde(default)]
+    pub vertical_gust: Option<DiscretizedSpectrum>
 }
 
 impl WindCondition {
     /// Returns the true velocity magnitude at the height gives and input. 
-    pub fn true_wind_velocity_at_height_without_gusts(&self, height: Float) -> Float {
+    pub fn steady_true_wind_velocity_at_height(&self, height: Float) -> Float {
         self.velocity_variation.true_wind_velocity_at_height(height)
     }
     
-    pub fn true_wind_velocity_at_height_with_gusts(&self, height: Float, time: Float) -> Float {
+    pub fn unsteady_parallel_true_wind_velocity_at_height(&self, height: Float, time: Float) -> Float {
         let mut u = self.velocity_variation.true_wind_velocity_at_height(height);
         
         if let Some(spectrum) = &self.parallel_gust {
@@ -35,6 +39,22 @@ impl WindCondition {
         }
         
         u
+    }
+    
+    pub fn unsteady_perpendicular_true_wind_velocity(&self, time: Float) -> Float {
+        if let Some(spectrum) = &self.perpendicular_gust {
+            spectrum.value_at_time(time)
+        } else {
+            0.0
+        }
+    }
+    
+    pub fn unsteady_vertical_true_wind_velocity(&self, time: Float) -> Float {
+        if let Some(spectrum) = &self.vertical_gust {
+            spectrum.value_at_time(time)
+        } else {
+            0.0
+        }
     }
 }
 

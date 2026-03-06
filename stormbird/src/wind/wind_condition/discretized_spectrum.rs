@@ -9,6 +9,7 @@ use stormath::type_aliases::Float;
 use stormath::consts::TAU;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// Structure used to represent a spectrum as discrete harmonic signals
 pub struct DiscretizedSpectrum {
     pub frequencies: Vec<Float>,
     pub amplitudes: Vec<Float>,

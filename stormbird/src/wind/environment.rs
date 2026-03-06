@@ -63,78 +63,112 @@ impl WindEnvironment {
 
         Self::from_json_string(&json_string)
     }
+    
+    #[inline(always)]
+    /// Returns the height from a given vector, based on the definitions on the up-direction and 
+    /// water plane height given in the structure.
+    pub fn height_from_location(&self, location: SpatialVector) -> Float {
+        (
+            location.dot(self.up_direction) - self.water_plane_height
+        ).max(0.0)
+    }
+    
+    #[inline(always)]
+    /// Returns the true wind direction as a vector
+    pub fn true_wind_direction_vector(&self, direction_coming_from: Float) -> SpatialVector {
+        self.zero_direction_vector.rotate_around_axis(
+            direction_coming_from,
+            self.wind_rotation_axis
+        )
+    }
+    
+    pub fn steady_true_wind_velocity_at_height(
+        &self,
+        condition: &WindCondition,
+        location: SpatialVector,
+    ) -> Float {
+        let height = self.height_from_location(location);
+
+        condition.steady_true_wind_velocity_at_height(height)
+    }
 
     /// Computes the height of the input location and then the true wind velocity at this height
-    pub fn true_wind_velocity_at_location(
+    pub fn unsteady_parallel_true_wind_velocity_at_location(
         &self,
         condition: &WindCondition,
         location: SpatialVector,
         time: Float
     ) -> Float {
-        let height = (
-            location.dot(self.up_direction) - self.water_plane_height
-        ).max(0.0);
+        let height = self.height_from_location(location);
 
-        condition.true_wind_velocity_at_height_with_gusts(height, time)
+        condition.unsteady_parallel_true_wind_velocity_at_height(height, time)
     }
 
     /// Returns the true wind vector at the location given as input
-    pub fn true_wind_velocity_vector_at_location(
+    pub fn unsteady_true_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
         location: SpatialVector,
         time: Float
     ) -> SpatialVector {
-        let velocity = self.true_wind_velocity_at_location(condition, location, time);
-        
-        let direction_vector = self.zero_direction_vector.rotate_around_axis(
-            condition.direction_coming_from,
-            self.wind_rotation_axis
+        let parallel_vel = self.unsteady_parallel_true_wind_velocity_at_location(
+            condition, 
+            location, 
+            time
         );
+        let parallel_dir = self.true_wind_direction_vector(condition.direction_coming_from);
+        
+        let perpendicular_vel = condition.unsteady_perpendicular_true_wind_velocity(time);
+        let perpendicular_dir = self.up_direction.cross(parallel_dir);
+        
+        let vertical_dir = self.up_direction;
+        let vertical_vel = condition.unsteady_vertical_true_wind_velocity(time);
 
-        velocity * direction_vector
+        parallel_vel * parallel_dir + 
+        perpendicular_vel * perpendicular_dir + 
+        vertical_vel * vertical_dir
     }
     
-    pub fn apparent_wind_velocity_vector_at_location(
+    /// Returns the true wind vector at the location given as input
+    pub fn steady_true_wind_velocity_vector_at_location(
+        &self,
+        condition: &WindCondition,
+        location: SpatialVector,
+    ) -> SpatialVector {
+        let parallel_vel = self.steady_true_wind_velocity_at_height(condition, location);
+        let parallel_dir = self.true_wind_direction_vector(condition.direction_coming_from);
+
+        parallel_vel * parallel_dir
+    }
+    
+    pub fn steady_apparent_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
         location: SpatialVector,
         linear_velocity: SpatialVector,
-        time: Float
     ) -> SpatialVector {
-        let true_wind = self.true_wind_velocity_vector_at_location(condition, location, time);
+        let true_wind = self.steady_true_wind_velocity_vector_at_location(
+            condition, 
+            location
+        );
         
         true_wind + linear_velocity
     }
-
-    pub fn true_wind_velocity_vectors_at_locations(
+    
+    pub fn unsteady_apparent_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
-        locations: &[SpatialVector],
-        time: Float
-    ) -> Vec<SpatialVector> {
-        locations.iter().map(
-            |&location| self.true_wind_velocity_vector_at_location(condition, location, time)
-        ).collect()
-    }
-
-    /// The main method to get the apparent wind velocity vectors at the input locations, given a
-    /// wind condition and a linear velocity of the body
-    pub fn apparent_wind_velocity_vectors_at_locations(
-        &self,
-        condition: &WindCondition,
-        locations: &[SpatialVector],
+        location: SpatialVector,
         linear_velocity: SpatialVector,
         time: Float
-    ) -> Vec<SpatialVector> {
-        locations.iter().map(
-            |&location| self.apparent_wind_velocity_vector_at_location(
-                condition, 
-                location, 
-                linear_velocity,
-                time
-            )
-        ).collect()
+    ) -> SpatialVector {
+        let true_wind = self.unsteady_true_wind_velocity_vector_at_location(
+            condition, 
+            location, 
+            time
+        );
+        
+        true_wind + linear_velocity
     }
 
     pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
@@ -216,13 +250,13 @@ impl WindEnvironment {
         linear_velocity: SpatialVector,
         height: Float
     ) -> Float {
-        let true_wind_velocity = condition.true_wind_velocity_at_height_without_gusts(height);
+        let location = height * self.up_direction;
         
-        let true_wind_vector = true_wind_velocity * self.zero_direction_vector.rotate_around_axis(
-            condition.direction_coming_from,
-            self.wind_rotation_axis
+        let true_wind_vector = self.steady_true_wind_velocity_vector_at_location(
+            condition,
+            location
         );
-
+        
         let apparent_velocity_vector = true_wind_vector + linear_velocity;
 
         self.zero_direction_vector.signed_angle_between(
@@ -233,16 +267,14 @@ impl WindEnvironment {
 
     /// Measures the apparent wind direction based on the input velocity vectors, where the sign and
     /// magnitude is defined by the zero_direction_vector and the wind_rotation_axis.
-    pub fn apparent_wind_directions_from_velocity_based_on_rotation_axis(
+    pub fn apparent_wind_direction_from_velocity_based_on_rotation_axis(
         &self,
-        velocity: &[SpatialVector]
-    ) -> Vec<Float> {
-        velocity.iter().map(|velocity| {
-            self.zero_direction_vector.signed_angle_between(
-                *velocity,
-                self.wind_rotation_axis
-            )
-        }).collect()
+        velocity: SpatialVector
+    ) -> Float {
+        self.zero_direction_vector.signed_angle_between(
+            velocity,
+            self.wind_rotation_axis
+        )
     }
 
     /// Measures the apparent wind direction based on the input velocity vectors, where the sign is
