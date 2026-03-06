@@ -246,10 +246,14 @@ impl CompleteSailModel {
         loading: Float,
         freestream_velocity: &[SpatialVector]
     ) {
+        let nr_ctrl_points = self.lifting_line_simulation.line_force_model.nr_span_lines();
+        
+        let ctrl_points_velocity = &freestream_velocity[0..nr_ctrl_points];
+        
         let controller_input = ControllerInput::new_from_velocity(
             loading,
             &self.lifting_line_simulation.line_force_model,
-            freestream_velocity,
+            ctrl_points_velocity,
             &self.controller.flow_measurement_settings,
             &self.wind_environment,
         );
