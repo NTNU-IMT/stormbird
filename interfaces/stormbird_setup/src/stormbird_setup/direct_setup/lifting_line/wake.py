@@ -100,3 +100,17 @@ class DynamicWakeBuilder(StormbirdSetupBaseModel):
     use_chord_direction: bool = False
     write_wake_data_to_file: bool = False
     wake_files_folder_path: str = ""
+    
+    @classmethod
+    def new_default(
+        cls, 
+        *, 
+        time_step: float, 
+        chord_length: float, 
+        velocity: float
+    ) -> "DynamicWakeBuilder":
+        first_panel_relative_length = time_step * velocity / chord_length
+        
+        return DynamicWakeBuilder(
+            first_panel_relative_length = first_panel_relative_length
+        )
