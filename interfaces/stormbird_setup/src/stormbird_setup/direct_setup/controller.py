@@ -90,7 +90,7 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         
     @classmethod
     def new_default_suction_sail(cls):
-        max_aoa_deg = 30
+        max_aoa_deg = 45
         max_ca = 0.3
         
         apparent_wind_directions_data = np.radians([-180, -20, -10, 10, 20, 180]).tolist()
