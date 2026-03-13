@@ -107,10 +107,12 @@ class DynamicWakeBuilder(StormbirdSetupBaseModel):
         *, 
         time_step: float, 
         chord_length: float, 
-        velocity: float
+        velocity: float,
+        nr_panels_per_line_element: int = 100
     ) -> "DynamicWakeBuilder":
         first_panel_relative_length = time_step * velocity / chord_length
         
         return DynamicWakeBuilder(
+            nr_panels_per_line_element = nr_panels_per_line_element,
             first_panel_relative_length = first_panel_relative_length
         )

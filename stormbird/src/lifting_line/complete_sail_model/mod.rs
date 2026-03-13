@@ -108,12 +108,19 @@ impl CompleteSailModel {
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
+        self.apply_controller(
+            0.0, 
+            1.0, 
+            wind_condition, 
+            ship_velocity, 
+            controller_loading
+        );
+        
         self.do_step(
             0.0,
             1.0,
             wind_condition, 
-            ship_velocity, 
-            controller_loading, 
+            ship_velocity
         )
     }
     
@@ -140,7 +147,6 @@ impl CompleteSailModel {
         time_step: Float,
         wind_condition: &WindCondition,
         ship_velocity: Float,
-        controller_loading: Float,
     ) -> Vec<SimulationResult> {
         let mut results = Vec::new();
 
@@ -155,7 +161,6 @@ impl CompleteSailModel {
                     time_step,
                     wind_condition,
                     ship_velocity,
-                    controller_loading
                 )
             );
             
@@ -171,9 +176,29 @@ impl CompleteSailModel {
         current_time: Float,
         time_step: Float,
         wind_condition: &WindCondition,
+        ship_velocity: Float
+    ) -> SimulationResult {
+        let freestream_velocity = self.freestream_velocity(
+            wind_condition,
+            ship_velocity,
+            current_time
+        );
+
+        self.lifting_line_simulation.do_step(
+            current_time,
+            time_step,
+            &freestream_velocity
+        )
+    }
+    
+    pub fn apply_controller(
+        &mut self,
+        current_time: Float,
+        time_step: Float,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float,
-    ) -> SimulationResult {
+    ) {
         let freestream_velocity = self.freestream_velocity(
             wind_condition,
             ship_velocity,
@@ -186,12 +211,6 @@ impl CompleteSailModel {
             controller_loading,
             &freestream_velocity
         );
-
-        self.lifting_line_simulation.do_step(
-            current_time,
-            time_step,
-            &freestream_velocity
-        )
     }
     
     pub fn freestream_velocity(

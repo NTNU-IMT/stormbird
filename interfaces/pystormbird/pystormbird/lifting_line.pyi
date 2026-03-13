@@ -17,7 +17,8 @@ class Simulation:
     
 class CompleteSailModel:
     def __init__(self, input_string: str) -> None: ...
-    def do_step(
+    
+    def apply_controller(
         self,
         *,
         time: float, 
@@ -25,6 +26,15 @@ class CompleteSailModel:
         wind_condition: WindCondition, 
         ship_velocity: float,
         controller_loading: float
+    ) -> None: ...
+    
+    def do_step(
+        self,
+        *,
+        time: float, 
+        time_step: float, 
+        wind_condition: WindCondition, 
+        ship_velocity: float
     ) -> SimulationResult: ...
     
     def do_multiple_steps(
@@ -33,8 +43,7 @@ class CompleteSailModel:
         end_time: float,
         time_step: float,
         wind_condition: WindCondition,
-        ship_velocity: float,
-        controller_loading: float,
+        ship_velocity: float
     ) -> list[SimulationResult]: ...
     
     def section_models_internal_state(self) -> list[float]: ...

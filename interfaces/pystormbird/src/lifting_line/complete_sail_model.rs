@@ -29,7 +29,7 @@ impl CompleteSailModel {
             ).unwrap()
         }
     }
-
+    
     #[pyo3(signature=(
         *,
         time,
@@ -38,21 +38,43 @@ impl CompleteSailModel {
         ship_velocity,
         controller_loading
     ))]
-    pub fn do_step(
+    pub fn apply_controller(
         &mut self,
         time: f64,
         time_step: f64,
         wind_condition: WindCondition,
         ship_velocity: f64,
         controller_loading: f64
+    ) {
+        self.data.apply_controller(
+            time,
+            time_step,
+            &wind_condition.data,
+            ship_velocity,
+            controller_loading
+        );
+    }
+
+    #[pyo3(signature=(
+        *,
+        time,
+        time_step,
+        wind_condition,
+        ship_velocity
+    ))]
+    pub fn do_step(
+        &mut self,
+        time: f64,
+        time_step: f64,
+        wind_condition: WindCondition,
+        ship_velocity: f64
     ) -> SimulationResult {
 
         let result_rs = self.data.do_step(
             time,
             time_step,
             &wind_condition.data,
-            ship_velocity,
-            controller_loading,
+            ship_velocity
         );
 
         SimulationResult {
@@ -65,25 +87,21 @@ impl CompleteSailModel {
         end_time,
         time_step,
         wind_condition,
-        ship_velocity,
-        controller_loading    
+        ship_velocity
     ))]
     pub fn do_multiple_steps(
         &mut self,
         end_time: f64,
         time_step: f64,
         wind_condition: WindCondition,
-        ship_velocity: f64,
-        controller_loading: f64,
-        
+        ship_velocity: f64
     ) -> Vec<SimulationResult> {
 
         let results_rs = self.data.do_multiple_steps(
             end_time,
             time_step,
             &wind_condition.data,
-            ship_velocity,
-            controller_loading
+            ship_velocity
         );
         
         let mut out = Vec::with_capacity(results_rs.len());
