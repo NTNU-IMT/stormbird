@@ -289,4 +289,16 @@ impl CompleteSailModel {
             );
         }
     }
+    
+    pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {
+        self.lifting_line_simulation
+            .line_force_model
+            .set_local_wing_angles(local_wing_angles);
+    }
+    
+    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
+        self.lifting_line_simulation
+            .line_force_model
+            .set_section_models_internal_state(internal_state);
+    }
 }

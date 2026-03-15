@@ -1,9 +1,14 @@
 
-from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder
-from stormbird_setup.direct_setup.lifting_line.complete_sail_model import CompleteSailModelBuilder
-from stormbird_setup.direct_setup.controller import ControllerBuilder
+from stormbird_setup.direct_setup.lifting_line import (
+    SimulationBuilder, 
+    QuasiSteadySettings, 
+    QuasiSteadyWakeSettings, 
+    SymmetryCondition, 
+    CompleteSailModelBuilder
+)
 
 from stormbird_setup.simplified_setup.simple_sail_setup import SimpleSailSetup, SailType
+from stormbird_setup.direct_setup.controller import ControllerBuilder
 from stormbird_setup.direct_setup.spatial_vector import SpatialVector
 from stormbird_setup.direct_setup.wind import WindEnvironment
 
@@ -14,6 +19,22 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+def revolutions_per_second_from_spin_ratio(
+    *,
+    spin_ratio: float,
+    diameter: float,
+    velocity: float
+):
+    '''
+    Helper function to convert spin ratio to revolutions per second
+    '''
+    circumference = np.pi * diameter
+    tangential_velocity = velocity * spin_ratio
+            
+    revolutions_per_second = -tangential_velocity / circumference 
+
+    return revolutions_per_second
+
 if __name__ == "__main__":
     sail_types_to_compare = [
         SailType.WingSailSingleElement,
@@ -22,7 +43,6 @@ if __name__ == "__main__":
         SailType.SuctionSail
     ]
 
-    # Plotly default color sequence
     default_colors = [
         '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
@@ -31,19 +51,23 @@ if __name__ == "__main__":
     chord_length = 5.0
     height = 35.0
     area = chord_length * height
-    deck_height = 10.0
+    deck_height = 0.0
 
     ship_velocity = 12.0 * 0.5144444
     wind_velocity = 8.0
     density = 1.225
     wind_directions_deg = np.arange(-180.0, 181, 2)
 
-    fig = make_subplots(
-        rows=1, cols=2,
-    )
+    fig = make_subplots(rows=2, cols=2)
 
     for sail_index, sail_type in enumerate(sail_types_to_compare):
-        simulation_builder = SimulationBuilder()
+        simulation_builder = SimulationBuilder(
+            simulation_settings = QuasiSteadySettings(
+                wake = QuasiSteadyWakeSettings(
+                    symmetry_condition=SymmetryCondition.Z
+                )
+            )
+        )
 
         sail = SimpleSailSetup(
             position = SpatialVector(x=0.0, y=0.0, z=deck_height),
@@ -53,17 +77,126 @@ if __name__ == "__main__":
         )
 
         simulation_builder.line_force_model.add_wing_builder(sail.wing_builder())
+        
+        sail_type.add_default_corrections(simulation_builder)
 
         controller_set_points = sail.controller_set_points()
+        
+        max_internal_state = np.max(controller_set_points.section_model_internal_state_data)
+        max_angle_of_attack = np.max(controller_set_points.angle_of_attack_data)
 
         model_builder = CompleteSailModelBuilder(
-            lifting_line_simulation=simulation_builder,
-            controller=ControllerBuilder(set_points = [controller_set_points]),
+            lifting_line_simulation = simulation_builder,
+            controller = ControllerBuilder(set_points = [controller_set_points]),
             wind_environment=WindEnvironment(),
         )
 
         model = CompleteSailModel(model_builder.to_json_string())
-
+        
+        # --------------- Lift and drag  --------------------------------------------------
+        n_test = 20
+        
+        match sail_type:
+            case SailType.WingSailSingleElement:
+                alpha_test = np.radians(np.linspace(0, 30, n_test))
+            case SailType.WingSailTwoElement:
+                model.set_section_models_internal_state([max_internal_state])
+                alpha_test = np.radians(np.linspace(0, 30, n_test))
+            case SailType.RotorSail:
+                alpha_test = np.linspace(0, 5.0, n_test)
+            case SailType.SuctionSail:
+                model.set_section_models_internal_state([max_internal_state])
+                alpha_test = np.radians(np.linspace(0, 35, n_test))
+            case _:
+                raise ValueError("Undefined sail type", sail_type)
+        
+        cl = np.zeros(n_test)
+        cd = np.zeros(n_test)
+        
+        for i_alpha in range(n_test):
+            if sail_type == SailType.RotorSail:
+                rps = revolutions_per_second_from_spin_ratio(
+                    spin_ratio = alpha_test[i_alpha],
+                    diameter = chord_length,
+                    velocity = wind_velocity
+                )
+                
+                model.set_section_models_internal_state([rps])
+            else:
+                model.set_local_wing_angles([-alpha_test[i_alpha]])
+            
+            wind_condition = WindCondition.new_constant(
+                direction_coming_from = 0.0,
+                velocity = wind_velocity
+            )
+            
+            result = model.do_step(
+                time = 0, 
+                time_step = 1,
+                wind_condition = wind_condition,
+                ship_velocity = 0.0
+            )
+            
+            forces = result.integrated_forces_sum()
+            
+            cd[i_alpha] = forces[0] / (0.5 * density * area * wind_velocity**2)
+            cl[i_alpha] = forces[1] / (0.5 * density * area * wind_velocity**2)
+            
+        if sail_type == SailType.RotorSail:
+            fig.add_trace(
+                go.Scatter(
+                    x = alpha_test,
+                    y = cl,
+                    line=dict(color=default_colors[sail_index]),
+                    showlegend=False,
+                    xaxis = 'x5',
+                    yaxis = 'y'
+                )
+            )
+            
+            fig.add_trace(
+                go.Scatter(
+                    x = [max_internal_state],
+                    y = [np.interp(max_internal_state, alpha_test, cl)],
+                    line = dict(color=default_colors[sail_index], dash="dot"),
+                    showlegend=False,
+                    xaxis = 'x5',
+                    yaxis = 'y'
+                )
+            )
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x = np.degrees(alpha_test),
+                    y = cl,
+                    line=dict(color=default_colors[sail_index]),
+                    showlegend=False,
+                ),
+                row=1, col=1
+            )
+            
+            fig.add_trace(
+                go.Scatter(
+                    x = np.degrees([max_angle_of_attack]),
+                    y = [np.interp(max_angle_of_attack, alpha_test, cl)],
+                    line=dict(color=default_colors[sail_index], dash="dot"),
+                    showlegend=False,
+                ),
+                row=1, col=1
+            )
+        
+        fig.add_trace(
+            go.Scatter(
+                x = cl,
+                y = cd,
+                line=dict(color=default_colors[sail_index]),
+                showlegend=False
+            ),
+            row=1, col=2
+        )
+            
+        
+        # --------------- Compute thrust and net power ------------------------------------
         thrust = np.zeros_like(wind_directions_deg)
         thrust_coefficient = np.zeros_like(wind_directions_deg)
         propulsive_power = np.zeros_like(wind_directions_deg)
@@ -93,12 +226,19 @@ if __name__ == "__main__":
             previous_power_net = -np.inf
             
             while optimizing and loading > 0.0:
-                result = model.do_step(
+                model.apply_controller(
                     time = 0, 
                     time_step = 1,
                     wind_condition=wind_condition,
                     ship_velocity = ship_velocity,
                     controller_loading = loading
+                )
+                
+                result = model.do_step(
+                    time = 0, 
+                    time_step = 1,
+                    wind_condition=wind_condition,
+                    ship_velocity = ship_velocity
                 )
                 
                 local_thrust = -result.integrated_forces_sum()[0]
@@ -137,7 +277,7 @@ if __name__ == "__main__":
                 showlegend=True,
                 legendgroup=f"group{sail_index}"
             ),
-            row=1, col=1
+            row=2, col=1
         )
 
         # Add power net trace
@@ -151,7 +291,7 @@ if __name__ == "__main__":
                 showlegend=False,
                 legendgroup=f"group{sail_index}"
             ),
-            row=1, col=2
+            row=2, col=2
         )
 
         if sail.sail_type.consumes_power():
@@ -166,29 +306,49 @@ if __name__ == "__main__":
                     showlegend=True,
                     legendgroup=f"group{sail_index}"
                 ),
-                row=1, col=2
+                row=2, col=2
             )
+            
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            line=dict(color="grey", dash="dot"),
+            name="Max controller set point",
+            showlegend=True
+        )
+    )
 
     # Update layout
-    fig.update_xaxes(title_text="Apparent wind direction (deg)", row=1, col=1, range=[0, 180])
-    fig.update_xaxes(title_text="Apparent wind direction (deg)", row=1, col=2, range=[0, 180])
+    fig.update_xaxes(title_text="Angle of attack [deg]", row=1, col=1)
+    fig.update_xaxes(title_text="Lift coefficient", row=1, col=2)
     
-    fig.update_yaxes(title_text="Thrust / (0.5 density * area * velocity^2)", row=1, col=1)
-    fig.update_yaxes(title_text="Power per area (W/m^2)", row=1, col=2)
+    fig.update_xaxes(title_text="Apparent wind direction (deg)", row=2, col=1, range=[0, 180])
+    fig.update_xaxes(title_text="Apparent wind direction (deg)", row=2, col=2, range=[0, 180])
+    
+    fig.update_yaxes(title_text="Lift coefficient", row=1, col=1)
+    fig.update_yaxes(title_text="Drag coefficient", row=1, col=2)
+    
+    fig.update_yaxes(title_text="Thrust coefficient", row=2, col=1)
+    fig.update_yaxes(title_text="Power per area (W/m^2)", row=2, col=2)
+    
+    fig.update_layout(
+        xaxis5=dict(
+            title="Spin ratio",
+            overlaying='x',
+            side='top',
+            anchor='y'
+        )
+    )
 
     fig.update_layout(
-        title=dict(
-            text=f"Ship velocity: {ship_velocity/0.5144444:.1f} kn, Wind velocity: {wind_velocity:.1f} m/s",
-            x=0.5,
-            xanchor='center'
-        ),
-        height=600,
+        height=960,
         width=960,
-        hovermode='x unified',
+        margin=dict(t=20),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.3,
+            y=-0.2,
             xanchor="center",
             x=0.5
         )

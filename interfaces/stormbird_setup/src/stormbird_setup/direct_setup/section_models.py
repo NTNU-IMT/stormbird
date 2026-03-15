@@ -55,7 +55,10 @@ class SectionModel(StormbirdSetupBaseModel):
         model
         """
         return cls(
-            model = RotatingCylinder()
+            model = RotatingCylinder(
+                spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
+                cl_data = [0.0, 1.22, 2.56, 5.93, 8.87, 9.56, 10.22, 12.0, 13.00]
+            )
         )
     
     @classmethod
@@ -74,11 +77,13 @@ class SectionModel(StormbirdSetupBaseModel):
         Default values for a two-element wing sail.
         """
         internal_state_data = np.radians([-30.0, 0.0, 30.0]).tolist()
+        
+        stall_angle = np.radians(15)
 
         foils_data = [
-            Foil(cl_zero_angle = -2.0, cd_min = 0.01),
+            Foil(cl_zero_angle = -2.0, cd_min = 0.01, mean_negative_stall_angle = stall_angle),
             Foil(cl_zero_angle = 0.0,  cd_min = 0.01),
-            Foil(cl_zero_angle = 2.0,  cd_min = 0.01)
+            Foil(cl_zero_angle = 2.0,  cd_min = 0.01, mean_positive_stall_angle = stall_angle)
         ]
 
         return cls(

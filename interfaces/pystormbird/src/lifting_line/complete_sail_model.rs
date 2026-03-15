@@ -120,4 +120,12 @@ impl CompleteSailModel {
     pub fn section_models_internal_state(&self) -> Vec<f64> {
         self.data.lifting_line_simulation.line_force_model.section_models_internal_state()
     }
+    
+    pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {
+        self.data.set_local_wing_angles(&local_wing_angles);
+    }
+    
+    pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
+        self.data.set_section_models_internal_state(&internal_state);
+    }
 }

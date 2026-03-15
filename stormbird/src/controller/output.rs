@@ -15,8 +15,6 @@ pub struct ControllerOutput {
     pub section_model_internal_state: Float,
 }
 
-
-
 impl ControllerOutput {
     pub fn as_csv_string(output_to_write: &[Self]) -> (String, String) {
         let mut header = String::new();

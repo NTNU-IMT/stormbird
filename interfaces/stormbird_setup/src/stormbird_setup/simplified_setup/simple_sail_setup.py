@@ -13,6 +13,9 @@ from ..direct_setup.section_models import SectionModel
 from ..direct_setup.controller import ControllerSetPoints
 from ..direct_setup.input_power import InputPowerModel
 
+from ..direct_setup.lifting_line import SimulationBuilder
+from ..direct_setup.lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
+
 import numpy as np
 
 class SailType(Enum):
@@ -29,6 +32,13 @@ class SailType(Enum):
                 return False
             case _:
                 raise ValueError("Unsupported sail type:", self)
+                
+    def add_default_corrections(self, simulation_builder: SimulationBuilder):
+        if self == SailType.RotorSail:
+            simulation_builder.simulation_settings.solver.velocity_corrections = VelocityCorrections(
+                type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
+                value = 2.0
+            )
 
 class SimpleSailSetup(StormbirdSetupBaseModel):
     '''
@@ -117,3 +127,5 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                 return ControllerSetPoints.new_default_suction_sail()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
+                
+

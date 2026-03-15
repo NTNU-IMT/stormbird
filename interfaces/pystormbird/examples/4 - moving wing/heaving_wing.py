@@ -48,7 +48,7 @@ def simulate_heaving_wing(
     sim_mode: SimMode,
     density: float = 1.225,
     nr_sections: int = 32
-) -> tuple[list[float], list[float], list[float]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Function that simulates a harmonically heaving wing, where the frequency is set based on the 
     supplied reduced frequency
@@ -64,7 +64,7 @@ def simulate_heaving_wing(
 
     force_factor = 0.5 * chord_length * span * density * velocity**2
 
-    dt = 0.25 * chord_length / velocity
+    dt = 0.1 * chord_length / velocity
     final_time = 5.0 * period
 
     wing_builder = WingBuilder(
@@ -138,10 +138,10 @@ def simulate_heaving_wing(
 
         t += dt
         
-    return time, lift, drag
+    return np.array(time), np.array(lift), np.array(drag)
 
 if __name__ == "__main__":
-    reduced_frequencies = [0.2, 0.4, 0.8]
+    reduced_frequencies = [0.2, 0.4]
     modes = [SimMode.QuasiStatic, SimMode.Dynamic]
     
     amplitude_factor = 0.1
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     
     colors = plotly.colors.qualitative.Plotly
     
-    fig = make_subplots(rows=3, cols=1)
+    fig = go.Figure()
     
     for freq_index, reduced_frequency in enumerate(reduced_frequencies):
         for mode_index, mode in enumerate(modes):
@@ -169,18 +169,59 @@ if __name__ == "__main__":
             
             if mode == SimMode.QuasiStatic:
                 dash = "dash"
-                name = "Quasi-steady"
+                showlegend=False
             else:
                 dash = "solid"
-                name = "Dynamic"
+                showlegend=True
             
             fig.add_trace(
                 go.Scatter(
-                    x = time,
+                    x = time / time[-1],
                     y = cl,
-                    line=dict(color=colors[0], dash=dash)
-                ),
-                row = freq_index+1, col=1
+                    line=dict(color=colors[freq_index], dash=dash),
+                    name = f"reduced frequency {reduced_frequency}",
+                    showlegend=showlegend
+                )
             )
+            
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            line=dict(color="grey", dash="solid"),
+            mode="lines",
+            name="Dynamic"
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            line=dict(color="grey", dash="dash"),
+            mode="lines",
+            name="Quasi-static"
+        )
+    )
+    
+    fig.update_xaxes(title="Time / end time")
+    fig.update_yaxes(title="Lift coefficient")
+    
+    fig.update_layout(
+        width = 960,
+        height = 480,
+        margin=dict(t=20),
+        legend = dict(
+            orientation = "h",
+            yanchor = "top",
+            y = -0.15,
+            xanchor = "center",
+            x = 0.5
+        )
+    )
+    
+    fig.write_image("heaving_wing.pdf")
+    fig.write_image("heaving_wing.svg")
+    fig.write_image("heaving_wing.png", scale=2)
             
     fig.show()
