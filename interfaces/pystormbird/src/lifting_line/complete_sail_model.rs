@@ -121,6 +121,10 @@ impl CompleteSailModel {
         self.data.lifting_line_simulation.line_force_model.section_models_internal_state()
     }
     
+    pub fn local_wing_angles(&self) -> Vec<f64> {
+        self.data.lifting_line_simulation.line_force_model.local_wing_angles.clone()
+    }
+    
     pub fn set_local_wing_angles(&mut self, local_wing_angles: Vec<f64>) {
         self.data.set_local_wing_angles(&local_wing_angles);
     }

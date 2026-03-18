@@ -56,7 +56,7 @@ if __name__ == "__main__":
     ship_velocity = 12.0 * 0.5144444
     wind_velocity = 8.0
     density = 1.225
-    wind_directions_deg = np.arange(-180.0, 181, 2)
+    wind_directions_deg = np.arange(-180.0, 181, 4)
 
     fig = make_subplots(rows=2, cols=2)
 
@@ -219,11 +219,38 @@ if __name__ == "__main__":
                 direction_coming_from = wind_dir_rad,
                 velocity = wind_velocity
             )
-            optimizing = True
+            
+            optimizing = False
             loading = 1.0
             delta_loading = 0.05
             
             previous_power_net = -np.inf
+            
+            model.apply_controller(
+                time = 0, 
+                time_step = 1,
+                wind_condition = wind_condition,
+                ship_velocity = ship_velocity,
+                controller_loading = loading
+            )
+            
+            result = model.do_step(
+                time = 0, 
+                time_step = 1,
+                wind_condition = wind_condition,
+                ship_velocity = ship_velocity
+            )
+            
+            local_thrust = -result.integrated_forces_sum()[0]
+            local_propulsive_power = local_thrust * ship_velocity
+            local_power_net = local_propulsive_power - result.input_power_sum()
+            
+            thrust[index] = local_thrust
+            
+            thrust_coefficient[index] = thrust[index] / (0.5 * density * area * u_inf**2)
+
+            propulsive_power[index] = local_propulsive_power
+            power_net[index] = local_power_net
             
             while optimizing and loading > 0.0:
                 model.apply_controller(
@@ -260,6 +287,11 @@ if __name__ == "__main__":
                 previous_power_net = local_power_net
 
             section_model_internal_state[index] = model.section_models_internal_state()[0]
+            
+            local_wing_angle = model.local_wing_angles()[0]
+            angle_of_attack = -apparent_wind_direction[index] - local_wing_angle
+            
+            print(np.degrees(apparent_wind_direction[index]), np.degrees(angle_of_attack))
             
         if sail.sail_type.consumes_power():
             name = f"{sail_type.value} effective"

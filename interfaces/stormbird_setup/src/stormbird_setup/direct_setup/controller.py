@@ -134,5 +134,3 @@ class ControllerBuilder(StormbirdSetupBaseModel):
     start_time: float = 0.0
     moving_average_window_size: int | None = None
     use_input_velocity_for_apparent_wind_direction: bool = False
-        
-    

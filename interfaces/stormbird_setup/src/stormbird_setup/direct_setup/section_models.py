@@ -102,7 +102,7 @@ class SectionModel(StormbirdSetupBaseModel):
         https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf
         """
         
-        # The power coefficient values used to represent the intenral state
+        # The power coefficient values used to represent the internal state
         ca_values = [0.0, 0.1187, 0.2161, 0.3389]
         
         cl_zero_angle = [0.0, 2.6, 3.4, 3.8]
@@ -123,16 +123,16 @@ class SectionModel(StormbirdSetupBaseModel):
                     cl_zero_angle = cl_zero_angle_full[foil_index],
                     cl_initial_slope = cl_initial_slope_full[foil_index],
                     cd_min = 0.01,
-                    mean_positive_stall_angle = stall_angles_full[foil_index],
-                    mean_negative_stall_angle = 2.0 * stall_angles_full[foil_index]
+                    mean_positive_stall_angle = 4.0 * stall_angles_full[foil_index],
+                    mean_negative_stall_angle = 4.0*stall_angles_full[foil_index]
                 )
             else:
                 foil = Foil(
                     cl_zero_angle = cl_zero_angle_full[foil_index],
                     cl_initial_slope = cl_initial_slope_full[foil_index],
                     cd_min = 0.01,
-                    mean_positive_stall_angle = 2.0 * stall_angles_full[foil_index],
-                    mean_negative_stall_angle = stall_angles_full[foil_index]
+                    mean_positive_stall_angle = 4.0*stall_angles_full[foil_index],
+                    mean_negative_stall_angle = 4.0*stall_angles_full[foil_index]
                 )
                 
             foils_data.append(foil)
