@@ -49,6 +49,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
     chord_length: float
     height: float
     sail_type: SailType
+    iterative_solver: bool = False
 
     def wing_builder(self) -> WingBuilder:
         section_points = [
@@ -68,12 +69,17 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
         match self.sail_type:
             case SailType.WingSailSingleElement:
                 section_model = SectionModel.default_wing_sail_single_element()
+                
+                if self.iterative_solver:
+                    section_model.model.mean_positive_stall_angle += np.radians(1.5)
+                    section_model.model.mean_negative_stall_angle += np.radians(1.5)
+                
             case SailType.WingSailTwoElement:
                 section_model = SectionModel.default_wing_sail_two_element()
             case SailType.RotorSail:
                 section_model = SectionModel.default_rotor_sail()
             case SailType.SuctionSail:
-                section_model = SectionModel.default_suction_sail()
+                section_model = SectionModel.default_suction_sail_turbosail(scale_factor = 1.1)
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
 
@@ -124,7 +130,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                     max_rps = np.interp(self.chord_length, diameter_data, max_rps_data)
                 )
             case SailType.SuctionSail:
-                return ControllerSetPoints.new_default_suction_sail()
+                return ControllerSetPoints.new_default_suction_sail(max_aoa_deg=32)
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
                 

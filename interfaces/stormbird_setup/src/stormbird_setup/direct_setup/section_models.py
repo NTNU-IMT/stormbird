@@ -67,8 +67,13 @@ class SectionModel(StormbirdSetupBaseModel):
         Default model for a single element wing sail, which also equals the default model for the 
         Foil model
         """
+        stall_angle = np.radians(20.0)
+        
         return cls(
-            model = Foil()
+            model = Foil(
+                mean_positive_stall_angle = stall_angle,
+                mean_negative_stall_angle = stall_angle
+            )
         )
         
     @classmethod
@@ -95,25 +100,36 @@ class SectionModel(StormbirdSetupBaseModel):
         )
     
     @classmethod
-    def default_suction_sail(cls) -> "SectionModel":
+    def default_suction_sail_turbosail(cls, scale_factor: float = 1.0) -> "SectionModel":
         """
         Default values from a suction sail, manually tuned so that they roughly represent the 
-        results presented in:
+        results of the originally suction sail, named TurboSail.
+        
+        The paper that presents TurboSail curves:
         https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf
+        
+        The default values can also be scaled in a simplified way, through the input 
+        "scale_factor". This is intended to quickly be able to model "modern suction" sails, which
+        are generally thought to be a bit better, but where detailed lift drag curves for varying
+        power coefficients are generally not available. One example is the results in the link below,
+        which indicate that max lift as a function of power coefficient is about 18% higher with 
+        Bound4Blue's suction sail in 2024, compared to the original Turbosail. 
+        
+        Bound4Blue's paper: https://bound4blue.com/aerodynamic-optimization-of-the-esail/
         """
         
         # The power coefficient values used to represent the internal state
         ca_values = [0.0, 0.1187, 0.2161, 0.3389]
         
-        cl_zero_angle = [0.0, 2.6, 3.4, 3.8]
+        cl_zero_angle = (np.array([0.0, 2.6, 3.4, 3.8]) * scale_factor).tolist()
         cl_initial_slope = [2 * np.pi, 2*np.pi * 1.4, 2*np.pi * 1.4, 2*np.pi * 1.4]
-        stall_angles = np.radians([20.0, 23, 27, 29.0]).tolist()
+        stall_angles = (np.radians([20.0, 23, 27, 29.0]) * scale_factor).tolist()
         
         # Make the model valid for both positive and negative Ca values
-        ca_values_full = [-x for x in ca_values[1::-1]] + ca_values
-        cl_zero_angle_full = [-x for x in cl_zero_angle[1::-1]] + cl_zero_angle
-        cl_initial_slope_full = [x for x in cl_initial_slope[1::-1]] + cl_initial_slope
-        stall_angles_full = [x for x in stall_angles[1::-1]] + stall_angles
+        ca_values_full = [-x for x in ca_values[:0:-1]] + ca_values
+        cl_zero_angle_full = [-x for x in cl_zero_angle[:0:-1]] + cl_zero_angle
+        cl_initial_slope_full = [x for x in cl_initial_slope[:0:-1]] + cl_initial_slope
+        stall_angles_full = [x for x in stall_angles[:0:-1]] + stall_angles
         
         # Create foil models from the input arrays
         foils_data = []
@@ -123,16 +139,16 @@ class SectionModel(StormbirdSetupBaseModel):
                     cl_zero_angle = cl_zero_angle_full[foil_index],
                     cl_initial_slope = cl_initial_slope_full[foil_index],
                     cd_min = 0.01,
-                    mean_positive_stall_angle = 4.0 * stall_angles_full[foil_index],
-                    mean_negative_stall_angle = 4.0*stall_angles_full[foil_index]
+                    mean_positive_stall_angle = stall_angles_full[foil_index],
+                    mean_negative_stall_angle = 2.0 * stall_angles_full[foil_index]
                 )
             else:
                 foil = Foil(
                     cl_zero_angle = cl_zero_angle_full[foil_index],
                     cl_initial_slope = cl_initial_slope_full[foil_index],
                     cd_min = 0.01,
-                    mean_positive_stall_angle = 4.0*stall_angles_full[foil_index],
-                    mean_negative_stall_angle = 4.0*stall_angles_full[foil_index]
+                    mean_positive_stall_angle = 2.0 * stall_angles_full[foil_index],
+                    mean_negative_stall_angle = stall_angles_full[foil_index]
                 )
                 
             foils_data.append(foil)

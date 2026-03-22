@@ -1,3 +1,15 @@
+"""
+This example is intended to show how to set up "generic sail models", using the Stormbird library.
+That is, the library comes with standard settings for modeling different sail types, such as 
+different types of wing sails, rotor sails, and suction sails. Note, the point of the generic models
+are not necessarily to be very accurate compared to any specific supplier, as all sail types have 
+large variations in performance parameters. However, the settings are intended to be rough values, 
+useful if one wants to make a quick comparison, for whatever reason. 
+
+This example essentially demonstrates how to load the generic settings, and how to combine force
+models with control systems in a complete sail model.
+"""
+
 
 from stormbird_setup.direct_setup.lifting_line import (
     SimulationBuilder, 
@@ -92,6 +104,8 @@ if __name__ == "__main__":
         )
 
         model = CompleteSailModel(model_builder.to_json_string())
+        
+        wind_environment = model.get_wind_environment()
         
         # --------------- Lift and drag  --------------------------------------------------
         n_test = 20
@@ -212,51 +226,30 @@ if __name__ == "__main__":
             v_wind_apparent = -wind_velocity * np.sin(wind_dir_rad)
 
             u_inf = np.sqrt(u_wind_apparent**2 + v_wind_apparent**2)
-
-            apparent_wind_direction[index] = np.arctan2(-v_wind_apparent, u_wind_apparent)
             
             wind_condition = WindCondition.new_constant(
                 direction_coming_from = wind_dir_rad,
                 velocity = wind_velocity
             )
+
+            apparent_wind_direction[index] = wind_environment.apparent_wind_direction_from_condition_and_linear_velocity(
+                condition = wind_condition,
+                linear_velocity = [ship_velocity, 0.0, 0.0]
+            )
             
-            optimizing = False
+            optimizing = True
             loading = 1.0
             delta_loading = 0.05
+            min_loading = 0.05
             
             previous_power_net = -np.inf
             
-            model.apply_controller(
-                time = 0, 
-                time_step = 1,
-                wind_condition = wind_condition,
-                ship_velocity = ship_velocity,
-                controller_loading = loading
-            )
             
-            result = model.do_step(
-                time = 0, 
-                time_step = 1,
-                wind_condition = wind_condition,
-                ship_velocity = ship_velocity
-            )
-            
-            local_thrust = -result.integrated_forces_sum()[0]
-            local_propulsive_power = local_thrust * ship_velocity
-            local_power_net = local_propulsive_power - result.input_power_sum()
-            
-            thrust[index] = local_thrust
-            
-            thrust_coefficient[index] = thrust[index] / (0.5 * density * area * u_inf**2)
-
-            propulsive_power[index] = local_propulsive_power
-            power_net[index] = local_power_net
-            
-            while optimizing and loading > 0.0:
+            while optimizing and loading > min_loading:
                 model.apply_controller(
                     time = 0, 
                     time_step = 1,
-                    wind_condition=wind_condition,
+                    wind_condition = wind_condition,
                     ship_velocity = ship_velocity,
                     controller_loading = loading
                 )
@@ -264,7 +257,7 @@ if __name__ == "__main__":
                 result = model.do_step(
                     time = 0, 
                     time_step = 1,
-                    wind_condition=wind_condition,
+                    wind_condition = wind_condition,
                     ship_velocity = ship_velocity
                 )
                 
@@ -285,13 +278,6 @@ if __name__ == "__main__":
                     optimizing = False
                     
                 previous_power_net = local_power_net
-
-            section_model_internal_state[index] = model.section_models_internal_state()[0]
-            
-            local_wing_angle = model.local_wing_angles()[0]
-            angle_of_attack = -apparent_wind_direction[index] - local_wing_angle
-            
-            print(np.degrees(apparent_wind_direction[index]), np.degrees(angle_of_attack))
             
         if sail.sail_type.consumes_power():
             name = f"{sail_type.value} effective"
@@ -363,6 +349,19 @@ if __name__ == "__main__":
     
     fig.update_yaxes(title_text="Thrust coefficient", row=2, col=1)
     fig.update_yaxes(title_text="Power per area (W/m^2)", row=2, col=2)
+
+    ship_velocity_knots = ship_velocity / 0.5144444
+    fig.add_annotation(
+        text=f"V<sub>wind</sub> = {wind_velocity:.1f} m/s, V<sub>ship</sub> = {ship_velocity_knots:.0f} kn",
+        xref="x4 domain",
+        yref="y4 domain",
+        x=0.5,
+        y=1.02,
+        showarrow=False,
+        font=dict(size=12),
+        xanchor="center",
+        yanchor="bottom"
+    )
     
     fig.update_layout(
         xaxis5=dict(

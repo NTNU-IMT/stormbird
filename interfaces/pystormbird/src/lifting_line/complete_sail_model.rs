@@ -12,6 +12,8 @@ use crate::wind::wind_condition::WindCondition;
 
 use crate::result_structs::SimulationResult;
 
+use crate::wind::environment::WindEnvironment;
+
 #[pyclass]
 pub struct CompleteSailModel {
     data: CompleteSailModelRust
@@ -131,5 +133,11 @@ impl CompleteSailModel {
     
     pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
         self.data.set_section_models_internal_state(&internal_state);
+    }
+    
+    pub fn get_wind_environment(&self) -> WindEnvironment {
+        WindEnvironment{
+            data: self.data.wind_environment.clone()
+        }
     }
 }
