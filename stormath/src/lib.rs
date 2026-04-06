@@ -20,6 +20,7 @@ pub mod spatial_vector;
 pub mod special_functions;
 pub mod solvers;
 pub mod matrix;
+pub mod sparse_matrix;
 pub mod optimize;
 pub mod rigid_body_motion;
 pub mod error;

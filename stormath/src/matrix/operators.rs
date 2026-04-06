@@ -15,10 +15,8 @@ use std::ops::{Index, IndexMut, Add, Sub, Mul};
 
 use super::*;
 
-impl<T> Index<[usize; 2]> for Matrix<T>
-where T: Default + Clone + Copy + Debug,
-{
-    type Output = T;
+impl Index<[usize; 2]> for Matrix {
+    type Output = Float;
 
     fn index(&self, indices: [usize; 2]) -> &Self::Output {
         let flat_index = self.flat_index(indices);
@@ -26,9 +24,7 @@ where T: Default + Clone + Copy + Debug,
     }
 }
 
-impl<T> IndexMut<[usize; 2]> for Matrix<T>
-where T: Default + Clone + Copy + Debug,
-{
+impl IndexMut<[usize; 2]> for Matrix {
     fn index_mut(&mut self, indices: [usize; 2]) -> &mut Self::Output {
         let flat_index = self.flat_index(indices);
 
@@ -36,9 +32,7 @@ where T: Default + Clone + Copy + Debug,
     }
 }
 
-impl<T> Add for Matrix<T>
-where T: Default + Clone + Copy + Debug + Add<Output = T>,
-{
+impl Add for Matrix {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -54,9 +48,7 @@ where T: Default + Clone + Copy + Debug + Add<Output = T>,
     }
 }
 
-impl<T> Sub for Matrix<T>
-where T: Default + Clone + Copy + Debug + Sub<Output = T>,
-{
+impl Sub for Matrix {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
@@ -72,9 +64,7 @@ where T: Default + Clone + Copy + Debug + Sub<Output = T>,
     }
 }
 
-impl<T> Mul<Float> for Matrix<T>
-where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
-{
+impl Mul<Float> for Matrix {
     type Output = Self;
 
     fn mul(self, scalar: Float) -> Self {
@@ -88,12 +78,10 @@ where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
     }
 }
 
-impl<T> Mul<Matrix<T>> for Float
-where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
-{
-    type Output = Matrix<T>;
+impl Mul<Matrix> for Float {
+    type Output = Matrix;
 
-    fn mul(self, matrix: Matrix<T>) -> Matrix<T> {
+    fn mul(self, matrix: Matrix) -> Matrix {
         let mut result = matrix.clone();
 
         for i in 0..matrix.data.len() {
@@ -105,21 +93,16 @@ where T: Default + Clone + Copy + Debug + Mul<Float, Output = T>,
 }
 
 
-impl<T> Matrix<T>
-where T: Default + Clone + Copy + Debug +
-    Mul<Output = T> +
-    Add<Output = T>,
-
-{
-    /// Performs a matrix multiplciation with the supplied matrix
-    pub fn matrix_multiply(&self, other: &Matrix<T>) -> Matrix<T> {
+impl Matrix {
+    /// Performs a matrix multiplication with the supplied matrix
+    pub fn matrix_multiply(&self, other: &Matrix) -> Matrix {
         assert_eq!(self.shape[1], other.shape[0], "Matrix shapes do not match for multiplication");
 
         let mut result = Matrix::new_default([self.shape[0], other.shape[1]]);
 
         for i in 0..self.shape[0] {
             for j in 0..other.shape[1] {
-                let mut sum = T::default();
+                let mut sum = 0.0;
                 for k in 0..self.shape[1] {
                     sum = sum + self[[i, k]] * other[[k, j]];
                 }
@@ -130,14 +113,18 @@ where T: Default + Clone + Copy + Debug +
         result
     }
 
-    /// Performs a multiplcaiton with the supplied vector
-    pub fn vector_multiply(&self, vector: &[T]) -> Vec<T> {
-        assert_eq!(self.shape[1], vector.len(), "Matrix and vector shapes do not match for multiplication");
+    /// Performs a multiplication with the supplied vector
+    pub fn vector_multiply(&self, vector: &[Float]) -> Vec<Float> {
+        assert_eq!(
+            self.shape[1], 
+            vector.len(), 
+            "Matrix and vector shapes do not match for multiplication"
+        );
 
-        let mut result = vec![T::default(); self.shape[0]];
+        let mut result = vec![0.0; self.shape[0]];
 
         for i in 0..self.shape[0] {
-            let mut sum = T::default();
+            let mut sum = 0.0;
             for j in 0..self.shape[1] {
                 sum = sum + self[[i, j]] * vector[j];
             }

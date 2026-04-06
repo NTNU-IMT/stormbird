@@ -12,7 +12,36 @@ use super::*;
 
 use crate::error::Error;
 
-impl Matrix<Float> {
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IterativeSolverSettings {
+    #[serde(default="IterativeSolverSettings::default_min_number_of_iterations")]
+    pub min_number_of_iterations: usize,
+    #[serde(default="IterativeSolverSettings::default_max_number_of_iterations")]
+    pub max_number_of_iterations: usize,
+    #[serde(default="IterativeSolverSettings::default_relative_residual_limit")]
+    pub relative_residual_limit: Float
+}
+
+impl IterativeSolverSettings {
+    fn default_min_number_of_iterations() -> usize {1}
+    fn default_max_number_of_iterations() -> usize {1000}
+    fn default_relative_residual_limit() -> Float {0.00001}
+}
+
+impl Default for IterativeSolverSettings {
+    fn default() -> Self {
+        Self {
+            min_number_of_iterations: Self::default_min_number_of_iterations(),
+            max_number_of_iterations: Self::default_max_number_of_iterations(),
+            relative_residual_limit: Self::default_relative_residual_limit()
+        }
+    }
+}
+
+impl Matrix{
     pub fn check_dimensions_for_solvability(&self, rhs: &[Float]) {
         let n = self.nr_rows();
         let m = self.nr_cols();
@@ -21,6 +50,18 @@ impl Matrix<Float> {
         assert_eq!(n, m, "Matrix must be square to be solvable");
         assert_eq!(rhs.len(), n, "Right-hand side vector length must match matrix size");
 
+    }
+    
+    pub fn linear_residual(&self, rhs: &[Float], x: &[Float]) -> Vec<Float> {    
+        let ax = self.vector_multiply(x);
+        
+        ax.iter().zip(rhs.iter()).map(|(a, b)| b - a).collect()
+    }
+    
+    pub fn linear_residual_absolute_sum(&self, rhs: &[Float], x: &[Float]) -> Float {
+        let r = self.linear_residual(rhs, x);
+        
+        r.iter().map(|r| r.abs()).sum::<Float>() / (r.len() as Float)
     }
 
     /// Solves the equation system Ax = b using Gaussian elimination.
@@ -90,34 +131,56 @@ impl Matrix<Float> {
 
         Ok(x)
     }
+    
     /// Solves the equation system Ax = b using Gauss-Seidel method.
     ///
     /// Source: <https://en.wikipedia.org/wiki/Gauss%E2%80%93Seidel_method>
-    pub fn solve_gauss_seidel(&self, rhs: &[Float], nr_iterations: usize) -> Result<Vec<Float>, Error> {
+    pub fn solve_gauss_seidel(
+        &self, 
+        rhs: &[Float], 
+        initial_guess: &[Float], 
+        settings: &IterativeSolverSettings
+    ) -> Result<Vec<Float>, Error> {
         self.check_dimensions_for_solvability(rhs);
 
         let n = self.nr_rows();
 
-        let mut estimated_solution = vec![0.0; n];
-
-        for _ in 0..nr_iterations {
-            for i in 0..n {
-                if self[[i, i]].abs() < 1e-12 {
-                    return Err(
-                        Error::NoSolution(format!("Matrix is singular or nearly singular at row {}", i))
-                    );
-                }
-
-                let mut sigma = 0.0;
-
-                for j in 0..n {
-                    if i != j {
-                        sigma += self[[i, j]] * estimated_solution[j];
-                    }
-                }
-
-                estimated_solution[i] = (rhs[i] - sigma) / self[[i, i]]
+        let mut estimated_solution = initial_guess.to_vec();
+        
+        let initial_residual = self.linear_residual_absolute_sum(rhs, &estimated_solution);
+        
+        for i in 0..n {
+            if self[[i, i]].abs() < 1e-12 {
+                return Err(
+                    Error::NoSolution(format!("Matrix is singular or nearly singular at row {}", i))
+                );
             }
+        }
+        
+        let diag_inv: Vec<Float> = (0..n).map(|i| 1.0 / self[[i, i]]).collect();
+
+        for iteration in 0..settings.max_number_of_iterations {
+            for i in 0..n {
+                let row = self.row_slice(i);
+                
+                let sigma =
+                    row[..i].iter().zip(&estimated_solution[..i])
+                        .map(|(a, x)| a * x).sum::<Float>()
+                  + row[i+1..].iter().zip(&estimated_solution[i+1..])
+                        .map(|(a, x)| a * x).sum::<Float>();
+                
+                estimated_solution[i] = (rhs[i] - sigma) * diag_inv[i];
+            }
+            
+            
+            if iteration > settings.min_number_of_iterations {
+                let new_residual = self.linear_residual_absolute_sum(rhs, &estimated_solution);
+                
+                if new_residual / initial_residual < settings.relative_residual_limit {
+                    break
+                }
+            }
+            
         }
 
         Ok(estimated_solution)
@@ -130,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_matrix_solver() {
-        let allowable_error = 1e-6;
+        let allowable_error = 1e-4;
 
         let a = Matrix{
             data: vec![3.0, 2.0, 0.0,
@@ -142,7 +205,14 @@ mod tests {
         let b = vec![1.0, 2.0, 3.0];
 
         let x_solved_elimination = a.solve_gaussian_elimination(&b).unwrap();
-        let x_solved_iterative = a.solve_gauss_seidel(&b, 100).unwrap();
+        
+        let initial_guess = vec![0.0; 3];
+        
+        let x_solved_iterative = a.solve_gauss_seidel(
+            &b, 
+            &initial_guess, 
+            &IterativeSolverSettings::default()
+        ).unwrap();
 
         let x_numpy = vec![0.6, -0.4,  2.0]; // Manually extracted from NumPy
 

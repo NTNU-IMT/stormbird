@@ -76,7 +76,7 @@ impl CurveFit {
         &self,
         x_data: &[Float], 
         unbounded_params: &[Float]
-    ) -> Matrix<Float> {
+    ) -> Matrix {
         let nr_data_points = x_data.len();
         let nr_params = unbounded_params.len();
         

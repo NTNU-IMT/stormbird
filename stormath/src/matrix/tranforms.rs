@@ -9,9 +9,7 @@
 
 use super::*;
 
-impl<T> Matrix<T>
-where T: Default + Clone + Copy + Debug,
-{
+impl Matrix {
     /// Transposes the matrix, swapping rows and columns.
     pub fn transpose(&self) -> Self {
         let mut result = Matrix::new_default([self.shape[1], self.shape[0]]);

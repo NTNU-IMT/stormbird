@@ -14,21 +14,20 @@ pub mod operators;
 use crate::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// A 2D matrix structure that can store data of any type `T`.
-pub struct Matrix<T> {
+/// A 2D matrix structure for storing Float.
+pub struct Matrix {
     /// The data stored in the matrix, represented as a flat vector. The data is stored in
     /// row-major order.
-    pub data: Vec<T>,
+    pub data: Vec<Float>,
     /// The shape of the matrix, represented as a tuple of two usize values (rows, columns).
     pub shape: [usize; 2],
 }
 
-impl<T> Matrix<T>
-where T: Default + Clone + Copy + Debug,
+impl Matrix
 {
     /// Creates a new matrix with the specified shape where all values are equal to the supplied
     /// element value
-    pub fn from_elem(shape: [usize; 2], elem: T) -> Self {
+    pub fn from_elem(shape: [usize; 2], elem: Float) -> Self {
         let data = vec![elem; shape[0] * shape[1]];
 
         Self {
@@ -40,7 +39,7 @@ where T: Default + Clone + Copy + Debug,
     /// New with default values. The value of the default depends on type. Zero would be the
     /// case for the Float type.
     pub fn new_default(shape: [usize; 2]) -> Self {
-        Self::from_elem(shape, T::default())
+        Self::from_elem(shape, 0.0)
     }
 
     #[inline(always)]
@@ -64,9 +63,12 @@ where T: Default + Clone + Copy + Debug,
     pub fn nr_cols(&self) -> usize {
         self.shape[1]
     }
-}
-
-impl Matrix<Float> {
+    
+    pub fn row_slice(&self, row: usize) -> &[Float] {
+        let start = row * self.shape[1];
+        &self.data[start .. start + self.shape[1]]
+    }
+    
     /// Creates a matrix with values of 1.0 along the diagonal
     pub fn identity(size: usize) -> Self {
         let mut out = Self::new_default([size, size]);
