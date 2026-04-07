@@ -1,0 +1,16 @@
+{
+  "domain_start_point": [-1.0, -0.5, 0.0],
+  "domain_end_point": [1.0, 0.5, 0.5],
+  "initial_velocity": [1.0, 0.0, 0.0],
+  "boundary_conditions": [
+    [{"Inlet": [1.0, 0.0, 0.0]}, "Outlet"],
+    [{"Inlet": [1.0, 0.0, 0.0]}, {"Inlet": [1.0, 0.0, 0.0]}],
+    ["NoSlip", {"Inlet": [1.0, 0.0, 0.0]}]
+  ],
+  "nr_interior_cells": [128, 64, 128],
+  "viscosity": 0.1,
+  "solver_settings": {
+    "min_number_of_iterations": 1,
+    "max_number_of_iterations": 200
+  }
+}

@@ -8,12 +8,11 @@ pub const INTERIOR_OFFSET: usize = 1;
 /// Structure for storing indices around a cell/face
 pub struct LocalFlatIndices {
     pub current: usize,
-    pub x_neg: [usize; 1],
-    pub x_pos: [usize; 1],
-    pub y_neg: [usize; 1],
-    pub y_pos: [usize; 1],
-    pub z_neg: [usize; 1],
-    pub z_pos: [usize; 1]
+    pub pos: [usize; 3],
+    pub neg: [usize; 3],
+    /// Edge indices: pos_neg[i][j] is the index shifted +1 in direction i and -1 in direction j.
+    /// For i == j, these values are undefined (set to current as a placeholder, but should not be used).
+    pub pos_neg: [[usize; 3]; 3],
 }
 
 #[derive(Debug, Clone)]
@@ -67,28 +66,74 @@ impl Grid {
     }
     
     pub fn local_flat_indices_on_extended_grid(&self, indices: [usize; 3]) -> LocalFlatIndices {
+        let [i, j, k] = indices;
+        
         LocalFlatIndices {
             current: self.flat_index_on_extended_grid(indices),
-            x_neg: [self.flat_index_on_extended_grid([indices[0]-1, indices[1], indices[2]])],
-            x_pos: [self.flat_index_on_extended_grid([indices[0]+1, indices[1], indices[2]])],
-            y_neg: [self.flat_index_on_extended_grid([indices[0], indices[1]-1, indices[2]])],
-            y_pos: [self.flat_index_on_extended_grid([indices[0], indices[1]+1, indices[2]])],
-            z_neg: [self.flat_index_on_extended_grid([indices[0], indices[1], indices[2]-1])],
-            z_pos: [self.flat_index_on_extended_grid([indices[0], indices[1], indices[2]+1])],
+            pos: [
+                self.flat_index_on_extended_grid([i+1, j, k]),
+                self.flat_index_on_extended_grid([i, j+1, k]),
+                self.flat_index_on_extended_grid([i, j, k+1])
+            ],
+            neg: [
+                self.flat_index_on_extended_grid([i-1, j, k]),
+                self.flat_index_on_extended_grid([i, j-1, k]),
+                self.flat_index_on_extended_grid([i, j, k-1])
+            ],
+            pos_neg: [
+                [   // a = 0: +1 in x-direction
+                    self.flat_index_on_extended_grid([i, j, k]),     // d=0: placeholder (a==d)
+                    self.flat_index_on_extended_grid([i+1, j-1, k]), // d=1: +x, -y
+                    self.flat_index_on_extended_grid([i+1, j, k-1]), // d=2: +x, -z
+                ],
+                [   // a = 1: +1 in y-direction
+                    self.flat_index_on_extended_grid([i-1, j+1, k]), // d=0: +y, -x
+                    self.flat_index_on_extended_grid([i, j, k]),     // d=1: placeholder (a==d)
+                    self.flat_index_on_extended_grid([i, j+1, k-1]), // d=2: +y, -z
+                ],
+                [   // a = 2: +1 in z-direction
+                    self.flat_index_on_extended_grid([i-1, j, k+1]), // d=0: +z, -x
+                    self.flat_index_on_extended_grid([i, j-1, k+1]), // d=1: +z, -y
+                    self.flat_index_on_extended_grid([i, j, k]),     // d=2: placeholder (a==d)
+                ],
+            ],
         }
     }
     
     pub fn local_flat_indices_on_interior_grid(&self, indices: [usize; 3]) -> LocalFlatIndices {
         let [nx, ny, nz] = self.nr_interior_cells();
         
+        let [i, j, k] = indices;
+        
         LocalFlatIndices {
             current: self.flat_index_on_interior_grid(indices),
-            x_neg: [self.flat_index_on_interior_grid([indices[0].saturating_sub(1), indices[1], indices[2]])],
-            x_pos: [self.flat_index_on_interior_grid([indices[0].saturating_add(1).min(nx-1), indices[1], indices[2]])],
-            y_neg: [self.flat_index_on_interior_grid([indices[0], indices[1].saturating_sub(1), indices[2]])],
-            y_pos: [self.flat_index_on_interior_grid([indices[0], indices[1].saturating_add(1).min(ny-1), indices[2]])],
-            z_neg: [self.flat_index_on_interior_grid([indices[0], indices[1], indices[2].saturating_sub(1)])],
-            z_pos: [self.flat_index_on_interior_grid([indices[0], indices[1], indices[2].saturating_add(1).min(nz-1)])],
+            pos: [
+                self.flat_index_on_interior_grid([i.saturating_add(1).min(nx-1), j, k]),
+                self.flat_index_on_interior_grid([i, j.saturating_add(1).min(ny-1), k]),
+                self.flat_index_on_interior_grid([i, j, k.saturating_add(1).min(nz-1)])
+            ],
+            neg: [
+                self.flat_index_on_interior_grid([i.saturating_sub(1), j, k]),
+                self.flat_index_on_interior_grid([i, j.saturating_sub(1), k]),
+                self.flat_index_on_interior_grid([i, j, k.saturating_sub(1)])
+            ],
+            pos_neg: [
+                [   // a = 0: +1 in x-direction
+                    self.flat_index_on_extended_grid([i, j, k]),     // d=0: placeholder (a==d)
+                    self.flat_index_on_extended_grid([i+1, j.saturating_sub(1), k]), // d=1: +x, -y
+                    self.flat_index_on_extended_grid([i+1, j, k.saturating_sub(1)]), // d=2: +x, -z
+                ],
+                [   // a = 1: +1 in y-direction
+                    self.flat_index_on_extended_grid([i.saturating_sub(1), j+1, k]), // d=0: +y, -x
+                    self.flat_index_on_extended_grid([i, j, k]),     // d=1: placeholder (a==d)
+                    self.flat_index_on_extended_grid([i, j+1, k.saturating_sub(1)]), // d=2: +y, -z
+                ],
+                [   // a = 2: +1 in z-direction
+                    self.flat_index_on_extended_grid([i.saturating_sub(1), j, k+1]), // d=0: +z, -x
+                    self.flat_index_on_extended_grid([i, j.saturating_sub(1), k+1]), // d=1: +z, -y
+                    self.flat_index_on_extended_grid([i, j, k]),     // d=2: placeholder (a==d)
+                ],
+            ],
         }
     }
     

@@ -41,6 +41,10 @@ impl Simulation {
     }
 
     pub fn do_step(&mut self, time: Float, time_step: Float) {
+        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        
+        let nr_interior_cells = nx * ny * nz;
+        
         println!("Setting velocity ghost cells");
         self.boundary_conditions.set_velocity_ghost_cells(
             &self.grid,
@@ -64,15 +68,26 @@ impl Simulation {
         println!("Computing pressure right hand side");
         let pressure_rhs = self.pressure_projection_rhs(time_step, &u_star, &v_star, &w_star);
         
-        let initial_guess = self.grid.interior_values_from_extended_values(&self.pressure);
+        //let initial_guess = self.grid.interior_values_from_extended_values(&self.pressure);
+        
+        let initial_guess = vec![0.0; nr_interior_cells];
         
         println!("Solving the pressure");
-        let pressure_interior = self.pressure_matrix.solve_jacobi(
+        let pressure_delta_interior = self.pressure_matrix.solve_jacobi(
             &pressure_rhs, &initial_guess, &self.solver_settings
         ).unwrap();
         
         println!("Transferring interior values to the extended grid");
-        self.grid.transfer_interior_values_to_extended_grid(&pressure_interior, &mut self.pressure);
+        
+        for i_flat_i in 0..nr_interior_cells {
+            let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_i);
+            let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
+            let i_flat_e = self.grid.flat_index_on_extended_grid(extended_indices);
+            
+            self.pressure[i_flat_e] += pressure_delta_interior[i_flat_i];
+        }
+        
+        //self.grid.transfer_interior_values_to_extended_grid(&pressure_interior, &mut self.pressure);
         
         self.boundary_conditions.set_pressure_ghost_cells(&self.grid, &mut self.pressure);
         
@@ -102,9 +117,9 @@ impl Simulation {
         
         let local_indices = self.grid.local_flat_indices_on_extended_grid(extended_indices);
         
-        let u = 0.5 * (self.velocity_x[local_indices.current] + self.velocity_x[local_indices.x_neg[0]]);
-        let v = 0.5 * (self.velocity_y[local_indices.current] + self.velocity_y[local_indices.y_neg[0]]);
-        let w = 0.5 * (self.velocity_z[local_indices.current] + self.velocity_z[local_indices.z_neg[0]]);
+        let u = 0.5 * (self.velocity_x[local_indices.current] + self.velocity_x[local_indices.neg[0]]);
+        let v = 0.5 * (self.velocity_y[local_indices.current] + self.velocity_y[local_indices.neg[1]]);
+        let w = 0.5 * (self.velocity_z[local_indices.current] + self.velocity_z[local_indices.neg[2]]);
         
         SpatialVector([u, v, w])
     }
@@ -253,7 +268,7 @@ impl Simulation {
                                 // Principle: p_{i-1} = p_i
                                 // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{-p_i + p_{i+1}}{dx^2}
                                 matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.x_pos[0]]] += 1.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
                             },
                             BoundaryCondition::Value(value) => {
                                 // Principle: p_face = value
@@ -261,7 +276,7 @@ impl Simulation {
                                 // p_{i-1} = 2 * value - p_i
                                 // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{2 * value - p_i - 2 p_i + p_{i+1}}{dx^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.x_pos[0]]] += 1.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
                                 
                                 rhs[i_l.current] += -2.0 * value / dx.powi(2);
                             }
@@ -272,7 +287,7 @@ impl Simulation {
                                 // Principle: p_{i+1} = p_i
                                 // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{-p_i + p_{i-1}}{dx^2}
                                 matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.x_neg[0]]] += 1.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
                             },
                             BoundaryCondition::Value(value) => {
                                 // Principle: p_face = value
@@ -280,15 +295,15 @@ impl Simulation {
                                 // p_{i+1} = 2 * value - p_i
                                 // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{p_{i-1} - 2 p_i + 2 * value - p_i}{dx^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.x_neg[0]]] += 1.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
                                 
                                 rhs[i_l.current] += -2.0 * value / dx.powi(2);
                             }
                         }
                     } else {
-                        matrix[[i_l.current, i_l.x_neg[0]]] += 1.0 / dx.powi(2);
+                        matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
                         matrix[[i_l.current, i_l.current]] += -2.0 / dx.powi(2);
-                        matrix[[i_l.current, i_l.x_pos[0]]] += 1.0 / dx.powi(2);
+                        matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
                     }
 
                     // Y direction
@@ -298,7 +313,7 @@ impl Simulation {
                                 // Principle: p_{j-1} = p_j
                                 // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{-p_j + p_{j+1}}{dy^2}
                                 matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.y_pos[0]]] += 1.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
                             },
                             BoundaryCondition::Value(value) => {
                                 // Principle: p_face = value
@@ -306,7 +321,7 @@ impl Simulation {
                                 // p_{j-1} = 2 * value - p_j
                                 // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{2 * value - p_j - 2 p_j + p_{j+1}}{dy^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.y_pos[0]]] += 1.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
 
                                 rhs[i_l.current] += -2.0 * value / dy.powi(2);
                             }
@@ -317,7 +332,7 @@ impl Simulation {
                                 // Principle: p_{j+1} = p_j
                                 // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{-p_j + p_{j-1}}{dy^2}
                                 matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.y_neg[0]]] += 1.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
                             },
                             BoundaryCondition::Value(value) => {
                                 // Principle: p_face = value
@@ -325,15 +340,15 @@ impl Simulation {
                                 // p_{j+1} = 2 * value - p_j
                                 // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{p_{j-1} - 2 p_j + 2 * value - p_j}{dy^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.y_neg[0]]] += 1.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
 
                                 rhs[i_l.current] += -2.0 * value / dy.powi(2);
                             }
                         }
                     } else {
-                        matrix[[i_l.current, i_l.y_neg[0]]] += 1.0 / dy.powi(2);
+                        matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
                         matrix[[i_l.current, i_l.current]] += -2.0 / dy.powi(2);
-                        matrix[[i_l.current, i_l.y_pos[0]]] += 1.0 / dy.powi(2);
+                        matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
                     }
 
                     // Z direction
@@ -343,7 +358,7 @@ impl Simulation {
                                 // Principle: p_{k-1} = p_k
                                 // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{-p_k + p_{k+1}}{dz^2}
                                 matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.z_pos[0]]] += 1.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
                             },
                             BoundaryCondition::Value(value) => {
                                 // Principle: p_face = value
@@ -351,7 +366,7 @@ impl Simulation {
                                 // p_{k-1} = 2 * value - p_k
                                 // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{2 * value - p_k - 2 p_k + p_{k+1}}{dz^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.z_pos[0]]] += 1.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
 
                                 rhs[i_l.current] += -2.0 * value / dz.powi(2);
                             }
@@ -362,7 +377,7 @@ impl Simulation {
                                 // Principle: p_{k+1} = p_k
                                 // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{-p_k + p_{k-1}}{dz^2}
                                 matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.z_neg[0]]] += 1.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
                             },
                             BoundaryCondition::Value(value) => {
                                 // Principle: p_face = value
@@ -370,15 +385,15 @@ impl Simulation {
                                 // p_{k+1} = 2 * value - p_k
                                 // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{p_{k-1} - 2 p_k + 2 * value - p_k}{dz^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.z_neg[0]]] += 1.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
 
                                 rhs[i_l.current] += -2.0 * value / dz.powi(2);
                             }
                         }
                     } else {
-                        matrix[[i_l.current, i_l.z_neg[0]]] += 1.0 / dz.powi(2);
+                        matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
                         matrix[[i_l.current, i_l.current]] += -2.0 / dz.powi(2);
-                        matrix[[i_l.current, i_l.z_pos[0]]] += 1.0 / dz.powi(2);
+                        matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
                     }
                 }
             }
@@ -413,12 +428,14 @@ impl Simulation {
                     
                     let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
                     
-                    let du_dx = (u_star[i_l.current] - u_star[i_l.x_neg[0]]) / dx;
-                    let dv_dy = (v_star[i_l.current] - v_star[i_l.y_neg[0]]) / dy;
-                    let dw_dz = (w_star[i_l.current] - w_star[i_l.z_neg[0]]) / dz;
+                    let du_dx = (u_star[i_l.current] - u_star[i_l.neg[0]]) / dx;
+                    let dv_dy = (v_star[i_l.current] - v_star[i_l.neg[1]]) / dy;
+                    let dw_dz = (w_star[i_l.current] - w_star[i_l.neg[2]]) / dz;
                     
-                    out[i_0_int] = self.pressure_rhs_fixed[i_0_int] + 
-                        self.density * (du_dx + dv_dy + dw_dz) / time_step;
+                    //out[i_0_int] = self.pressure_rhs_fixed[i_0_int] + 
+                    //    self.density * (du_dx + dv_dy + dw_dz) / time_step;
+                    
+                    out[i_0_int] = self.density * (du_dx + dv_dy + dw_dz) / time_step;
                 }
             }
         }
@@ -435,9 +452,9 @@ impl Simulation {
         
         let nr_cells = nx * ny * nz;
         
-        let [dx, dy, dz] = self.grid.cell_length.0;
-        
         let mut phi_star = phi.to_vec();
+        
+        let velocities = [&self.velocity_x, &self.velocity_y, &self.velocity_z];
         
         for i_flat in 0..nr_cells {
             let interior_indices = self.grid.interior_indices_from_flat_index(i_flat);
@@ -446,60 +463,45 @@ impl Simulation {
             let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
             
             let mut convective_term = 0.0;
+            let mut viscous_term = 0.0;
             
-            let phi_x_neg = 0.5 * (phi[i_l.current] + phi[i_l.x_neg[0]]);
-            let phi_x_pos = 0.5 * (phi[i_l.current] + phi[i_l.x_pos[0]]);                    
-            let u_x_neg = 0.5 * (self.velocity_x[i_l.current] + self.velocity_x[i_l.x_neg[0]]);
-            let u_x_pos = 0.5 * (self.velocity_x[i_l.current] + self.velocity_x[i_l.x_pos[0]]);
-            
-            convective_term -= (phi_x_pos * u_x_pos - phi_x_neg * u_x_neg)/dx;
-            
-            let phi_y_neg = 0.5 * (phi[i_l.current] + phi[i_l.y_neg[0]]);
-            let phi_y_pos = 0.5 * (phi[i_l.current] + phi[i_l.y_pos[0]]);
-            
-            let v_y_neg = 0.5 * (self.velocity_y[i_l.current] + self.velocity_y[i_l.y_neg[0]]);
-            let v_y_pos = 0.5 * (self.velocity_y[i_l.current] + self.velocity_y[i_l.y_pos[0]]);
-            
-            convective_term -= (phi_y_pos * v_y_pos - phi_y_neg * v_y_neg)/dy;
-            
-            let phi_z_neg = 0.5 * (phi[i_l.current] + phi[i_l.z_neg[0]]);
-            let phi_z_pos = 0.5 * (phi[i_l.current] + phi[i_l.z_pos[0]]);
-            
-            let w_z_neg = 0.5 * (self.velocity_z[i_l.current] + self.velocity_z[i_l.z_neg[0]]);
-            let w_z_pos = 0.5 * (self.velocity_z[i_l.current] + self.velocity_z[i_l.z_pos[0]]);
-            
-            convective_term -= (phi_z_pos * w_z_pos - phi_z_neg * w_z_neg)/dz;
-            
-            // viscous term
-            let d2phi_dx2 = (
-                phi[i_l.x_pos[0]] - 
-                2.0 * phi[i_l.current] + 
-                phi[i_l.x_neg[0]]
-            ) / dx.powi(2);
-            
-            let d2phi_dy2 = (
-                phi[i_l.y_pos[0]] - 
-                2.0 * phi[i_l.current] + 
-                phi[i_l.y_neg[0]]
-            ) / dy.powi(2);
-            
-            let d2phi_dz2 = (
-                phi[i_l.z_pos[0]] - 
-                2.0 * phi[i_l.current] + 
-                phi[i_l.z_neg[0]]
-            ) / dz.powi(2);
-            
-            let viscous_term = self.viscosity * (d2phi_dx2 + d2phi_dy2 + d2phi_dz2);
+            for i_a in 0..3 {
+                let phi_neg = 0.5 * (phi[i_l.current] + phi[i_l.neg[i_a]]);
+                let phi_pos = 0.5 * (phi[i_l.current] + phi[i_l.pos[i_a]]);                    
+                
+                let (u_neg, u_pos) = if i_a == axis_index {
+                    // Advecting velocity is staggered in the same direction as phi
+                    // Simple average in that direction
+                    let u_neg = 0.5 * (velocities[i_a][i_l.current] + velocities[i_a][i_l.neg[i_a]]);
+                    let u_pos = 0.5 * (velocities[i_a][i_l.current] + velocities[i_a][i_l.pos[i_a]]);
+                    (u_neg, u_pos)
+                } else {
+                    // Advecting velocity is staggered in a different direction
+                    // Need 4-point average (2 in axis_index direction × 2 in i_a direction)
+                    // but here using the edge interpolation to the correct face location
+                    let u_neg = 0.5 * (velocities[i_a][i_l.neg[i_a]] + velocities[i_a][i_l.pos_neg[axis_index][i_a]]);
+                    let u_pos = 0.5 * (velocities[i_a][i_l.current] + velocities[i_a][i_l.pos[axis_index]]);
+                    (u_neg, u_pos)
+                };
+                
+                convective_term -= (phi_pos * u_pos - phi_neg * u_neg)/self.grid.cell_length[i_a];
+                
+                viscous_term += self.viscosity * (
+                    phi[i_l.pos[i_a]] - 
+                    2.0 * phi[i_l.current] + 
+                    phi[i_l.neg[i_a]]
+                ) / self.grid.cell_length[i_a].powi(2);
+            }
             
             // Body force
-            let body_force = match axis_index {
-                0 => 0.5 * (self.body_force[i_l.current][0] + self.body_force[i_l.x_neg[0]][0]) / self.density,
-                1 => 0.5 * (self.body_force[i_l.current][1] + self.body_force[i_l.y_neg[0]][1]) / self.density,
-                2 => 0.5 * (self.body_force[i_l.current][2] + self.body_force[i_l.z_neg[0]][2]) / self.density,
-                _ => panic!("Axis index larger than 2, which does not make sense")
-            };
+            let body_force = 0.5 * (
+                self.body_force[i_l.current][axis_index] + self.body_force[i_l.neg[axis_index]][axis_index]
+            ) / self.density;
             
-            let du_dt = convective_term + viscous_term - body_force; // TODO: decide more on the sign...
+            let pressure_gradient = (self.pressure[i_l.pos[axis_index]] - self.pressure[i_l.current]) / 
+                (self.density * self.grid.cell_length[axis_index]);
+            
+            let du_dt = convective_term + viscous_term - body_force - pressure_gradient; // TODO: decide more on the sign...
             
             phi_star[i_l.current] = phi[i_l.current] + du_dt * time_step;
         }
@@ -520,9 +522,9 @@ impl Simulation {
             
             let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
             
-            let dp_dx = (self.pressure[i_l.x_pos[0]] - self.pressure[i_l.current]) / dx;
-            let dp_dy = (self.pressure[i_l.y_pos[0]] - self.pressure[i_l.current]) / dy;
-            let dp_dz = (self.pressure[i_l.z_pos[0]] - self.pressure[i_l.current]) / dz;
+            let dp_dx = (self.pressure[i_l.pos[0]] - self.pressure[i_l.current]) / dx;
+            let dp_dy = (self.pressure[i_l.pos[1]] - self.pressure[i_l.current]) / dy;
+            let dp_dz = (self.pressure[i_l.pos[2]] - self.pressure[i_l.current]) / dz;
             
             self.velocity_x[i_l.current] = u_star[i_l.current]  - (time_step / self.density) * dp_dx;
             self.velocity_y[i_l.current] = v_star[i_l.current]  - (time_step / self.density) * dp_dy;
