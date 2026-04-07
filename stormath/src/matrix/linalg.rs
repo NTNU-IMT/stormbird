@@ -41,7 +41,7 @@ impl Default for IterativeSolverSettings {
     }
 }
 
-impl Matrix{
+impl Matrix<Float>{
     pub fn check_dimensions_for_solvability(&self, rhs: &[Float]) {
         let n = self.nr_rows();
         let m = self.nr_cols();
@@ -73,7 +73,7 @@ impl Matrix{
         let n = self.nr_rows();
 
         // Create augmented matrix [A|b]
-        let mut aug = Matrix::new_default([n, n + 1]);
+        let mut aug: Matrix<Float> = Matrix::new_default([n, n + 1]);
 
         // Copy matrix A and vector b into augmented matrix
         for i in 0..n {

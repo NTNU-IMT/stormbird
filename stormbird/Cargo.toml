@@ -2,7 +2,7 @@
 name = "stormbird"
 version = "0.8.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
-description = "A library for modelling modern wind propulsion devices"
+description = "A library for modeling modern wind propulsion devices"
 homepage = "https://github.com/NTNU-IMT/stormbird"
 readme = "README.md"
 repository = "https://github.com/NTNU-IMT/stormbird"
@@ -10,7 +10,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [dependencies]
-stormath = { version = "0.2.0" }
+stormath = { path = "../stormath"}
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.107"
 rand = "0.9.1"

@@ -70,7 +70,7 @@ impl CompleteSailModel {
         let loadings_to_test = array_generation::linspace(0.1, 1.0, nr_loadings_to_test);
         
         let mut results: Vec<SimulationResult> = Vec::with_capacity(nr_loadings_to_test);
-        let mut effective_power: Vec<f64> = Vec::with_capacity(nr_loadings_to_test);
+        let mut effective_power: Vec<Float> = Vec::with_capacity(nr_loadings_to_test);
         
         let mut max_effective_power = Float::NEG_INFINITY;
         let mut best_index = 0;

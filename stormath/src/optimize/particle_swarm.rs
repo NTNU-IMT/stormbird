@@ -16,9 +16,9 @@ pub struct SwarmState {
     /// The current iteration of the swarm
     pub iteration: usize,
     /// The current position of the particles in the swarm
-    pub position: Matrix,
+    pub position: Matrix<Float>,
     /// The velocity that brought the particles to their current position
-    pub velocity: Matrix,
+    pub velocity: Matrix<Float>,
 }
 
 impl SwarmState {
@@ -36,7 +36,7 @@ pub struct SwarmResult {
     /// The function values of the particles in the swarm
     pub function_values: Vec<Float>,
     /// The historical best position of each particle in the swarm
-    pub local_best_positions: Matrix,
+    pub local_best_positions: Matrix<Float>,
     /// The historical best function value of each particle in the swarm
     pub local_best_function_values: Vec<Float>,
     /// The historical best position of all the particles in the swarm
@@ -177,7 +177,7 @@ impl ParticleSwarm {
 
     /// Computes a new velocities for the particles in the swarm, to be used to move them in the 
     /// next generation
-    pub fn compute_velocity(&self, state: &SwarmState, result: &SwarmResult) -> Matrix {
+    pub fn compute_velocity(&self, state: &SwarmState, result: &SwarmResult) -> Matrix<Float> {
         if state.nr_particles() != self.nr_particles {
             panic!(
                 "Particle swarm size mismatch: expected {}, got {}", 
