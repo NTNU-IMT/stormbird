@@ -8,7 +8,7 @@ pub mod builder;
 
 use crate::grid::Grid;
 
-use crate::boundary_conditions::{BoundaryConditions};
+use crate::boundary_conditions::{BoundaryConditions, BoundaryCondition};
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
 
@@ -23,6 +23,7 @@ pub struct Simulation {
     pub body_force: Vec<SpatialVector>,
     pub boundary_conditions: BoundaryConditions,
     pub pressure_matrix: SparseMatrix<MATRIX_ROW_LENGTH>,
+    pub pressure_rhs_fixed: Vec<Float>,
     pub grid: Grid,
     pub viscosity: Float,
     pub density: Float,
@@ -38,90 +39,34 @@ impl Simulation {
         println!();
     }
 
-    pub fn do_step(&mut self, time: Float, time_step: Float) {
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
-        
-        let nr_interior_cells = nx * ny * nz;
-        let nr_extended_cells = self.grid.nr_extended_cells[0] * 
-            self.grid.nr_extended_cells[1] * 
-            self.grid.nr_extended_cells[2];
-        
-        println!("Setting velocity ghost cells");
+    pub fn do_step(&mut self, time: Float, time_step: Float) {      
+        println!("First prediction");
         self.boundary_conditions.set_velocity_ghost_cells(
             &self.grid,
             &mut self.velocity
         );
         
-        println!("Computing velocity star");
-        let convective_term = self.convective_term();
-        let viscous_term = self.viscous_term();
-        let pressure_gradient_term = self.pressure_gradient_term();
-        let body_force_term = self.body_force_term();
+        let mut velocity_star = self.convect_and_diffuse(time_step, &self.velocity);
+        let mut pressure = self.project_pressure(time_step, &velocity_star);
         
-        let mut velocity_star = StaggeredSpatialVectors::new_default(nr_extended_cells);
-        
-        for a_i in 0..3 {
-            for i in 0..nr_extended_cells {
-                
-                velocity_star.data[a_i][i] = self.velocity.data[a_i][i] + (
-                    convective_term.data[a_i][i] + 
-                    viscous_term.data[a_i][i] - 
-                    pressure_gradient_term.data[a_i][i] - 
-                    body_force_term.data[a_i][i]
-                ) * time_step;
-            }
-        }
-        
-         self.boundary_conditions.set_velocity_ghost_cells(
-            &self.grid, 
-            &mut velocity_star
-        );
-        
-        println!("Computing pressure right hand side");
-        let pressure_rhs = self.pressure_projection_rhs(
+        let mut velocity_predicted = self.new_velocity(
             time_step, 
-            &velocity_star.data[0], 
-            &velocity_star.data[1], 
-            &velocity_star.data[2]
+            &pressure,
+            &velocity_star
         );
         
-        //let initial_guess = self.grid.interior_values_from_extended_values(&self.pressure);
+        println!("Second prediction");
+        velocity_star = self.convect_and_diffuse(time_step, &velocity_predicted);
+        pressure = self.project_pressure(time_step, &velocity_star);
         
-        let initial_guess = vec![0.0; nr_interior_cells];
-        
-        println!("Solving the pressure");
-        let pressure_delta_interior = self.pressure_matrix.solve_jacobi(
-            &pressure_rhs, &initial_guess, &self.solver_settings
-        ).unwrap();
-        
-        println!("Transferring interior values to the extended grid");
-        
-        let mut pressure_delta_extended = vec![0.0; nr_extended_cells];
-        
-        for i_flat_i in 0..nr_interior_cells {
-            let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_i);
-            let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
-            let i_flat_e = self.grid.flat_index_on_extended_grid(extended_indices);
-            
-            self.pressure[i_flat_e] += pressure_delta_interior[i_flat_i];
-            pressure_delta_extended[i_flat_e] = pressure_delta_interior[i_flat_i];
-        }
-        
-        BoundaryConditions::set_pressure_ghost_cells_to_zero_gradient(&self.grid, &mut pressure_delta_extended);
-        
-        self.boundary_conditions.set_pressure_ghost_cells(&self.grid, &mut self.pressure);
-        
-        println!("Final velocity update");
-        self.update_velocity(
+        velocity_predicted = self.new_velocity(
             time_step, 
-            &velocity_star,
-            &pressure_delta_extended
+            &pressure,
+            &velocity_star
         );
         
-        self.boundary_conditions.set_velocity_ghost_cells(
-            &self.grid,
-            &mut self.velocity
-        );
+        self.velocity = velocity_predicted;
+        self.pressure = pressure;
         
         println!("Running actuator line model");
         self.run_actuator_line_model(time, time_step);
@@ -277,12 +222,13 @@ impl Simulation {
     
     pub fn set_fixed_pressure_system(&mut self) {
         let [dx, dy, dz] = self.grid.cell_length.0;
-       
+           
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         
         let nr_interior_cells = nx * ny * nz;
         
         let mut matrix: SparseMatrix<MATRIX_ROW_LENGTH> = SparseMatrix::new_default(nr_interior_cells);
+        let mut rhs: Vec<Float> = vec![0.0; nr_interior_cells];
         
         for i_x in 0..nx {
             for i_y in 0..ny {
@@ -290,11 +236,43 @@ impl Simulation {
                     let i_l = self.grid.local_flat_indices_on_interior_grid([i_x, i_y, i_z]);
                     
                     if i_x == 0 {
-                        matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
-                        matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
+                        match self.boundary_conditions.pressure[0][0] {
+                            BoundaryCondition::ZeroGradient => {
+                                // Principle: p_{i-1} = p_i
+                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{-p_i + p_{i+1}}{dx^2}
+                                matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
+                            },
+                            BoundaryCondition::Value(value) => {
+                                // Principle: p_face = value
+                                // 0.5 * (p_{i-1} + p_i) = value
+                                // p_{i-1} = 2 * value - p_i
+                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{2 * value - p_i - 2 p_i + p_{i+1}}{dx^2}
+                                matrix[[i_l.current, i_l.current]] += -3.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
+                                
+                                rhs[i_l.current] += -2.0 * value / dx.powi(2);
+                            }
+                        }
                     } else if i_x == nx - 1 {
-                        matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
-                        matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
+                        match self.boundary_conditions.pressure[0][1] {
+                            BoundaryCondition::ZeroGradient => {
+                                // Principle: p_{i+1} = p_i
+                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{-p_i + p_{i-1}}{dx^2}
+                                matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
+                            },
+                            BoundaryCondition::Value(value) => {
+                                // Principle: p_face = value
+                                // 0.5 * (p_{i+1} + p_i) = value
+                                // p_{i+1} = 2 * value - p_i
+                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{p_{i-1} - 2 p_i + 2 * value - p_i}{dx^2}
+                                matrix[[i_l.current, i_l.current]] += -3.0 / dx.powi(2);
+                                matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
+                                
+                                rhs[i_l.current] += -2.0 * value / dx.powi(2);
+                            }
+                        }
                     } else {
                         matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
                         matrix[[i_l.current, i_l.current]] += -2.0 / dx.powi(2);
@@ -303,11 +281,43 @@ impl Simulation {
 
                     // Y direction
                     if i_y == 0 {
-                        matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
-                        matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
+                        match self.boundary_conditions.pressure[1][0] {
+                            BoundaryCondition::ZeroGradient => {
+                                // Principle: p_{j-1} = p_j
+                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{-p_j + p_{j+1}}{dy^2}
+                                matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
+                            },
+                            BoundaryCondition::Value(value) => {
+                                // Principle: p_face = value
+                                // 0.5 * (p_{j-1} + p_j) = value
+                                // p_{j-1} = 2 * value - p_j
+                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{2 * value - p_j - 2 p_j + p_{j+1}}{dy^2}
+                                matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
+
+                                rhs[i_l.current] += -2.0 * value / dy.powi(2);
+                            }
+                        }
                     } else if i_y == ny - 1 {
-                        matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
-                        matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
+                        match self.boundary_conditions.pressure[1][1] {
+                            BoundaryCondition::ZeroGradient => {
+                                // Principle: p_{j+1} = p_j
+                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{-p_j + p_{j-1}}{dy^2}
+                                matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
+                            },
+                            BoundaryCondition::Value(value) => {
+                                // Principle: p_face = value
+                                // 0.5 * (p_{j+1} + p_j) = value
+                                // p_{j+1} = 2 * value - p_j
+                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{p_{j-1} - 2 p_j + 2 * value - p_j}{dy^2}
+                                matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
+                                matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
+
+                                rhs[i_l.current] += -2.0 * value / dy.powi(2);
+                            }
+                        }
                     } else {
                         matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
                         matrix[[i_l.current, i_l.current]] += -2.0 / dy.powi(2);
@@ -316,11 +326,43 @@ impl Simulation {
 
                     // Z direction
                     if i_z == 0 {
-                        matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
-                        matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
+                        match self.boundary_conditions.pressure[2][0] {
+                            BoundaryCondition::ZeroGradient => {
+                                // Principle: p_{k-1} = p_k
+                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{-p_k + p_{k+1}}{dz^2}
+                                matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
+                            },
+                            BoundaryCondition::Value(value) => {
+                                // Principle: p_face = value
+                                // 0.5 * (p_{k-1} + p_k) = value
+                                // p_{k-1} = 2 * value - p_k
+                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{2 * value - p_k - 2 p_k + p_{k+1}}{dz^2}
+                                matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
+
+                                rhs[i_l.current] += -2.0 * value / dz.powi(2);
+                            }
+                        }
                     } else if i_z == nz - 1 {
-                        matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
-                        matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
+                        match self.boundary_conditions.pressure[2][1] {
+                            BoundaryCondition::ZeroGradient => {
+                                // Principle: p_{k+1} = p_k
+                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{-p_k + p_{k-1}}{dz^2}
+                                matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
+                            },
+                            BoundaryCondition::Value(value) => {
+                                // Principle: p_face = value
+                                // 0.5 * (p_{k+1} + p_k) = value
+                                // p_{k+1} = 2 * value - p_k
+                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{p_{k-1} - 2 p_k + 2 * value - p_k}{dz^2}
+                                matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
+                                matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
+
+                                rhs[i_l.current] += -2.0 * value / dz.powi(2);
+                            }
+                        }
                     } else {
                         matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
                         matrix[[i_l.current, i_l.current]] += -2.0 / dz.powi(2);
@@ -331,15 +373,10 @@ impl Simulation {
         }
         
         self.pressure_matrix = matrix;
+        self.pressure_rhs_fixed = rhs;
     }
     
-    pub fn pressure_projection_rhs(
-        &self,
-        time_step: Float,
-        u_star: &[Float],
-        v_star: &[Float], 
-        w_star: &[Float]
-    ) -> Vec<Float> {
+    pub fn pressure_projection_rhs(&self, time_step: Float, velocity: &StaggeredSpatialVectors) -> Vec<Float> {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         let [dx, dy, dz] = self.grid.cell_length.0;
         
@@ -358,11 +395,12 @@ impl Simulation {
                     
                     let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
                     
-                    let du_dx = (u_star[i_l.current] - u_star[i_l.neg[0]]) / dx;
-                    let dv_dy = (v_star[i_l.current] - v_star[i_l.neg[1]]) / dy;
-                    let dw_dz = (w_star[i_l.current] - w_star[i_l.neg[2]]) / dz;
+                    let du_dx = (velocity.data[0][i_l.current] - velocity.data[0][i_l.neg[0]]) / dx;
+                    let dv_dy = (velocity.data[1][i_l.current] - velocity.data[1][i_l.neg[1]]) / dy;
+                    let dw_dz = (velocity.data[2][i_l.current] - velocity.data[2][i_l.neg[2]]) / dz;
                     
-                    out[i_0_int] = self.density * (du_dx + dv_dy + dw_dz) / time_step;
+                    out[i_0_int] = self.pressure_rhs_fixed[i_0_int] + 
+                        self.density * (du_dx + dv_dy + dw_dz) / time_step;
                 }
             }
         }
@@ -370,12 +408,11 @@ impl Simulation {
         out
     }
     
-    
-    /// Calculates the convective term of the Navier Stokes equation suing finite difference.
+    /// Calculates the convective term of the Navier-Stokes equation suing finite difference.
     /// 
     /// Convective term, index notation:
     /// - u_j du_i/dx_j
-    pub fn convective_term(&self) -> StaggeredSpatialVectors {
+    pub fn convective_term(&self, velocity: &StaggeredSpatialVectors) -> StaggeredSpatialVectors {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         let [nx_ext, ny_ext, nz_ext] = self.grid.nr_extended_cells.clone();
         
@@ -411,22 +448,22 @@ impl Simulation {
                 
                 for a_i_2 in 0..3 {
                     let u_j = if a_i_1 == a_i_2 {
-                        self.velocity[[a_i_2, i_0]]
+                        velocity[[a_i_2, i_0]]
                     } else {
                         let mut indices_pn_i = indices_p_i.clone();
                         indices_pn_i[a_i_2] -= 1;
                         let i_pn = self.grid.flat_index_on_extended_grid(indices_pn_i);
                         
                         0.25 * (
-                            self.velocity[[a_i_2, i_0]] + // Current cell
-                            self.velocity[[a_i_2, i_p_i]] + // Neighbor, in the u_i direction
-                            self.velocity[[a_i_2, i_n[a_i_2]]] + // Current cell, opposite face
-                            self.velocity[[a_i_2, i_pn]] // Neighbor, in the u_i direction, opposite face
+                            velocity[[a_i_2, i_0]] + // Current cell
+                            velocity[[a_i_2, i_p_i]] + // Neighbor, in the u_i direction
+                            velocity[[a_i_2, i_n[a_i_2]]] + // Current cell, opposite face
+                            velocity[[a_i_2, i_pn]] // Neighbor, in the u_i direction, opposite face
                         )
                     };
                     
-                    let u_i_p = self.velocity[[a_i_1, i_p[a_i_2]]];
-                    let u_i_n = self.velocity[[a_i_1, i_n[a_i_2]]];
+                    let u_i_p = velocity[[a_i_1, i_p[a_i_2]]];
+                    let u_i_n = velocity[[a_i_1, i_n[a_i_2]]];
                     
                     let dui_dxj = (u_i_p - u_i_n) / (2.0 * self.grid.cell_length[a_i_2]); 
                      
@@ -438,7 +475,7 @@ impl Simulation {
         out
     }
     
-    pub fn viscous_term(&self) -> StaggeredSpatialVectors {
+    pub fn viscous_term(&self, velocity: &StaggeredSpatialVectors) -> StaggeredSpatialVectors {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         let [nx_ext, ny_ext, nz_ext] = self.grid.nr_extended_cells.clone();
         
@@ -465,40 +502,11 @@ impl Simulation {
                     let i_n = self.grid.flat_index_on_extended_grid(indices_n);
                     
                     out[[vel_comp, i_0]] += self.viscosity * (
-                        self.velocity[[vel_comp, i_p]] - 
-                        2.0 * self.velocity[[vel_comp, i_0]] + 
-                        self.velocity[[vel_comp, i_n]]
+                        velocity[[vel_comp, i_p]] - 
+                        2.0 * velocity[[vel_comp, i_0]] + 
+                        velocity[[vel_comp, i_n]]
                     ) / self.grid.cell_length[deriv_dir].powi(2);
                 }
-            }
-        }
-        
-        out
-    }
-    
-    pub fn pressure_gradient_term(&self) -> StaggeredSpatialVectors {
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
-        let [nx_ext, ny_ext, nz_ext] = self.grid.nr_extended_cells.clone();
-        
-        let nr_cells_interior = nx * ny * nz;
-        let nr_cells_extended = nx_ext * ny_ext * nz_ext;
-        
-        let mut out = StaggeredSpatialVectors::new_default(nr_cells_extended);
-        
-        for i_flat_interior in 0..nr_cells_interior {
-            let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
-            
-            let [i, j, k] = self.grid.extended_indices_from_interior_indices(interior_indices);
-            
-            let i_0 = self.grid.flat_index_on_extended_grid([i, j, k]);
-            
-            for a_i in 0..3 {
-                let mut indices_p = [i, j, k];
-                indices_p[a_i] += 1;
-                let i_p = self.grid.flat_index_on_extended_grid(indices_p);
-                
-                out[[a_i, i_0]] += (self.pressure[i_p] - self.pressure[i_0]) / 
-                    (self.density * self.grid.cell_length[a_i]);
             }
         }
         
@@ -533,31 +541,93 @@ impl Simulation {
         out
     }
     
-    pub fn update_velocity(
-        &mut self, 
+    pub fn project_pressure(&self, time_step: Float, velocity_star: &StaggeredSpatialVectors) -> Vec<Float> {
+        println!("Projecting pressure");
+        let mut out = vec![0.0; velocity_star.data[0].len()];
+        
+        let pressure_rhs = self.pressure_projection_rhs(time_step, velocity_star);
+        
+        let initial_guess = self.grid.interior_values_from_extended_values(&self.pressure);
+        
+        let pressure_interior = self.pressure_matrix.solve_jacobi(
+            &pressure_rhs, &initial_guess, &self.solver_settings
+        ).unwrap();
+        
+        self.grid.transfer_interior_values_to_extended_grid(&pressure_interior, &mut out);
+        
+        self.boundary_conditions.set_pressure_ghost_cells(&self.grid, &mut out);
+        
+        out
+    }
+    
+    pub fn convect_and_diffuse(&self, time_step: Float, velocity: &StaggeredSpatialVectors) -> StaggeredSpatialVectors {
+        println!("Computing velocity star");
+        let nr_extended_cells = self.grid.nr_extended_cells[0] * 
+            self.grid.nr_extended_cells[1] * 
+            self.grid.nr_extended_cells[2];
+        
+        let convective_term = self.convective_term(velocity);
+        let viscous_term = self.viscous_term(velocity);
+        let body_force_term = self.body_force_term();
+        
+        let mut velocity_star = StaggeredSpatialVectors::new_default(nr_extended_cells);
+        
+        for a_i in 0..3 {
+            for i in 0..nr_extended_cells {
+                velocity_star.data[a_i][i] = self.velocity.data[a_i][i] + (
+                    convective_term.data[a_i][i] + 
+                    viscous_term.data[a_i][i] - 
+                    body_force_term.data[a_i][i]
+                ) * time_step;
+            }
+        }
+        
+        self.boundary_conditions.set_velocity_ghost_cells(
+            &self.grid, 
+            &mut velocity_star
+        );
+        
+        velocity_star
+    }
+    
+    pub fn new_velocity(
+        &self, 
         time_step: Float, 
-        velocity_star: &StaggeredSpatialVectors, 
-        delta_pressure: &[Float]
-    ) {
+        pressure: &[Float], 
+        velocity_star: &StaggeredSpatialVectors
+    ) -> StaggeredSpatialVectors {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         
-        let nr_cells = nx * ny * nz;
+        let nr_interior_cells = nx * ny * nz;
+        
+        let nr_extended_cells = self.grid.nr_extended_cells[0] *
+            self.grid.nr_extended_cells[1] * 
+            self.grid.nr_extended_cells[2];
         
         let [dx, dy, dz] = self.grid.cell_length.0;
         
-        for i_flat in 0..nr_cells {
+        let mut out = StaggeredSpatialVectors::new_default(nr_extended_cells);
+        
+        for i_flat in 0..nr_interior_cells {
             let interior_indices = self.grid.interior_indices_from_flat_index(i_flat);
             let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
             
             let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
             
-            let dp_dx = (delta_pressure[i_l.pos[0]] - delta_pressure[i_l.current]) / dx;
-            let dp_dy = (delta_pressure[i_l.pos[1]] - delta_pressure[i_l.current]) / dy;
-            let dp_dz = (delta_pressure[i_l.pos[2]] - delta_pressure[i_l.current]) / dz;
+            let dp_dx = (pressure[i_l.pos[0]] - pressure[i_l.current]) / dx;
+            let dp_dy = (pressure[i_l.pos[1]] - pressure[i_l.current]) / dy;
+            let dp_dz = (pressure[i_l.pos[2]] - pressure[i_l.current]) / dz;
             
-            self.velocity[[0, i_l.current]] = velocity_star.data[0][i_l.current]  - (time_step / self.density) * dp_dx;
-            self.velocity[[1, i_l.current]] = velocity_star.data[1][i_l.current]  - (time_step / self.density) * dp_dy;
-            self.velocity[[2, i_l.current]] = velocity_star.data[2][i_l.current]  - (time_step / self.density) * dp_dz;
+            out[[0, i_l.current]] = velocity_star.data[0][i_l.current]  - (time_step / self.density) * dp_dx;
+            out[[1, i_l.current]] = velocity_star.data[1][i_l.current]  - (time_step / self.density) * dp_dy;
+            out[[2, i_l.current]] = velocity_star.data[2][i_l.current]  - (time_step / self.density) * dp_dz;
         }
+        
+        self.boundary_conditions.set_velocity_ghost_cells(
+            &self.grid,
+            &mut out
+        );
+        
+        out
     }
 }

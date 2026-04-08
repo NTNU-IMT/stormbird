@@ -76,6 +76,7 @@ impl SimulationBuilder {
         let body_force = vec![SpatialVector::default(); total_nr_cells];
         
         let pressure_matrix = SparseMatrix::new_default(total_nr_cells);
+        let pressure_rhs_fixed = vec![0.0; total_nr_cells];
         
         let grid = Grid{
             start_point: self.domain_start_point,
@@ -134,6 +135,7 @@ impl SimulationBuilder {
             body_force,
             boundary_conditions,
             pressure_matrix,
+            pressure_rhs_fixed,
             grid,
             viscosity: self.viscosity,
             density: 1.0,

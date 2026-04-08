@@ -4,7 +4,7 @@ import json
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    file_path = "stormbird_full_results/full_results_1600.json"
+    file_path = "stormbird_full_results/full_results_1000.json"
     
     with open(file_path, "r") as f:
         data = json.load(f)
