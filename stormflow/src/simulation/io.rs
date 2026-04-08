@@ -115,9 +115,9 @@ impl Simulation {
                     let flat_y_bot  = self.grid.flat_index_on_extended_grid([ex,     ey - 1, ez    ]);
                     let flat_z_back = self.grid.flat_index_on_extended_grid([ex,     ey,     ez - 1]);
 
-                    let u: f64 = (0.5 * (self.velocity_x[flat_x_left] + self.velocity_x[flat_c])) as f64;
-                    let v: f64 = (0.5 * (self.velocity_y[flat_y_bot]  + self.velocity_y[flat_c])) as f64;
-                    let ww: f64 = (0.5 * (self.velocity_z[flat_z_back] + self.velocity_z[flat_c])) as f64;
+                    let u: f64 = (0.5 * (self.velocity.data[0][flat_x_left] + self.velocity.data[0][flat_c])) as f64;
+                    let v: f64 = (0.5 * (self.velocity.data[1][flat_y_bot]  + self.velocity.data[1][flat_c])) as f64;
+                    let ww: f64 = (0.5 * (self.velocity.data[2][flat_z_back] + self.velocity.data[2][flat_c])) as f64;
 
                     if binary {
                         w.write_all(&u.to_be_bytes()).unwrap();

@@ -17,6 +17,7 @@ use crate::grid::{Grid, INTERIOR_OFFSET};
 use crate::simulation::Simulation;
 
 use crate::error::Error;
+use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -64,14 +65,17 @@ impl SimulationBuilder {
         let total_nr_cells = nr_extended_cells[0] * nr_extended_cells[1] * nr_extended_cells[2];
         
         let pressure = vec![0.0; total_nr_cells];
-        let velocity_x = vec![self.initial_velocity[0]; total_nr_cells];
-        let velocity_y = vec![self.initial_velocity[1]; total_nr_cells];
-        let velocity_z = vec![self.initial_velocity[2]; total_nr_cells];
+        let velocity = StaggeredSpatialVectors{
+            data: [
+                vec![self.initial_velocity[0]; total_nr_cells],
+                vec![self.initial_velocity[1]; total_nr_cells],
+                vec![self.initial_velocity[2]; total_nr_cells],
+            ]
+        };
+        
         let body_force = vec![SpatialVector::default(); total_nr_cells];
         
         let pressure_matrix = SparseMatrix::new_default(total_nr_cells);
-        let pressure_rhs_fixed = vec![0.0; total_nr_cells];
-        
         
         let grid = Grid{
             start_point: self.domain_start_point,
@@ -126,13 +130,10 @@ impl SimulationBuilder {
         
         Simulation {
             pressure, 
-            velocity_x,
-            velocity_y,
-            velocity_z,
+            velocity,
             body_force,
             boundary_conditions,
             pressure_matrix,
-            pressure_rhs_fixed,
             grid,
             viscosity: self.viscosity,
             density: 1.0,
