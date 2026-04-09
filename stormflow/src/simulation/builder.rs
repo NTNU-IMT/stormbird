@@ -15,6 +15,7 @@ use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::boundary_conditions::{BoundaryConditionBuilder, BoundaryConditions, BoundaryCondition};
 use crate::grid::{Grid, INTERIOR_OFFSET};
 use crate::simulation::Simulation;
+use crate::geometry::Sphere;
 
 use crate::error::Error;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
@@ -31,7 +32,9 @@ pub struct SimulationBuilder {
     #[serde(default)]
     pub solver_settings: IterativeSolverSettings,
     #[serde(default)]
-    pub actuator_line: Option<ActuatorLineBuilder>
+    pub actuator_line: Option<ActuatorLineBuilder>,
+    #[serde(default)]
+    pub geometries: Vec<Sphere>
 }
 
 impl SimulationBuilder {
@@ -140,7 +143,8 @@ impl SimulationBuilder {
             viscosity: self.viscosity,
             density: 1.0,
             solver_settings: self.solver_settings.clone(),
-            actuator_line
+            actuator_line,
+            geometries: self.geometries.clone()
         }
     }
 }

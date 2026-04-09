@@ -1,0 +1,22 @@
+{
+  "domain_start_point": [-60.0, -30.0, 0.0],
+  "domain_end_point": [60.0, 30.0, 45.0],
+  "initial_velocity": [8.0, 0.0, 0.0],
+  "boundary_conditions": [
+    [{"Inlet": [8.0, 0.0, 0.0]}, "Outlet"],
+    ["Slip", "Slip"],
+    ["Slip", "Slip"]
+  ],
+  "nr_interior_cells": [128, 64, 48],
+  "viscosity": 0.001,
+  "solver_settings": {
+    "min_number_of_iterations": 1,
+    "max_number_of_iterations": 100
+  },
+  "geometries": [
+    {
+      "center": [0.0, 0.0, 10.0],
+      "radius": 5.0
+    }
+  ]
+}

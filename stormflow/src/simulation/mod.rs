@@ -11,6 +11,7 @@ use crate::grid::Grid;
 use crate::boundary_conditions::{BoundaryConditions, BoundaryCondition};
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
+use crate::geometry::Sphere;
 
 use rayon::prelude::*;
 
@@ -28,6 +29,7 @@ pub struct Simulation {
     pub viscosity: Float,
     pub density: Float,
     pub solver_settings: IterativeSolverSettings,
+    pub geometries: Vec<Sphere>,
     pub actuator_line: Option<ActuatorLineInterface>,
 }
 
@@ -47,6 +49,8 @@ impl Simulation {
         );
         
         let mut velocity_star = self.convect_and_diffuse(time_step, &self.velocity);
+        self.correct_velocities_for_geometry(&mut velocity_star);
+        
         let mut pressure = self.project_pressure(time_step, &velocity_star);
         
         let mut velocity_predicted = self.new_velocity(
@@ -57,6 +61,8 @@ impl Simulation {
         
         println!("Second prediction");
         velocity_star = self.convect_and_diffuse(time_step, &velocity_predicted);
+        self.correct_velocities_for_geometry(&mut velocity_star);
+        
         pressure = self.project_pressure(time_step, &velocity_star);
         
         velocity_predicted = self.new_velocity(
@@ -64,6 +70,8 @@ impl Simulation {
             &pressure,
             &velocity_star
         );
+        
+        self.correct_velocities_for_geometry(&mut velocity_predicted);
         
         self.velocity = velocity_predicted;
         self.pressure = pressure;
@@ -95,6 +103,45 @@ impl Simulation {
         let w = 0.5 * (self.velocity[[2, i_0]] + self.velocity[[2, i_n[2]]]);
         
         SpatialVector([u, v, w])
+    }
+    
+    /// Computes the union of the signed distance functions in geometries
+    pub fn signed_distance_function(&self, point: SpatialVector) -> Float {
+        let mut value = Float::MAX;
+        
+        for geometry in &self.geometries {
+            let local_value = geometry.signed_distance(point);
+            
+            if local_value < value {
+                value = local_value;
+            }
+        }
+        
+        value
+    }
+    
+    pub fn correct_velocities_for_geometry(&self, velocity: &mut StaggeredSpatialVectors) {
+        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        
+        let nr_cells_interior = nx * ny * nz;
+        
+        for i_flat_interior in 0..nr_cells_interior {
+            let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
+            
+            let cell_center = self.grid.cell_center(interior_indices);
+            
+            let sdf = self.signed_distance_function(cell_center);
+            
+            if sdf < 0.0 {
+                let [i, j, k] = self.grid.extended_indices_from_interior_indices(interior_indices);
+                
+                let i_0 = self.grid.flat_index_on_extended_grid([i, j, k]);
+                
+                velocity[[0, i_0]] = 0.0;
+                velocity[[1, i_0]] = 0.0;
+                velocity[[2, i_0]] = 0.0;
+            }
+        }
     }
     
     pub fn actuator_line_initialization(&mut self) {
