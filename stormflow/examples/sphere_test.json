@@ -8,14 +8,14 @@
     ["Slip", "Slip"]
   ],
   "nr_interior_cells": [128, 64, 48],
-  "viscosity": 0.001,
+  "viscosity": 0.01,
   "solver_settings": {
     "min_number_of_iterations": 1,
-    "max_number_of_iterations": 100
+    "max_number_of_iterations": 50
   },
   "geometries": [
     {
-      "center": [0.0, 0.0, 10.0],
+      "center": [0.0, 0.0, 22.5],
       "radius": 5.0
     }
   ]

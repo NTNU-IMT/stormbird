@@ -11,11 +11,16 @@ use crate::grid::Grid;
 use crate::boundary_conditions::{BoundaryConditions, BoundaryCondition};
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
-use crate::geometry::Sphere;
+use crate::geometry::{
+    Sphere,
+    blending_function
+};
 
 use rayon::prelude::*;
 
 const MATRIX_ROW_LENGTH: usize = 9;
+
+
 
 
 pub struct Simulation {
@@ -38,6 +43,12 @@ impl Simulation {
         println!("Initializing after build");
         self.set_fixed_pressure_system();
         self.actuator_line_initialization();
+        
+        let mut velocity = self.velocity.clone();
+        
+        self.correct_velocities_for_geometry(&mut velocity);
+        
+        self.velocity = velocity;
         println!();
     }
 
@@ -71,7 +82,7 @@ impl Simulation {
             &velocity_star
         );
         
-        self.correct_velocities_for_geometry(&mut velocity_predicted);
+        //self.correct_velocities_for_geometry(&mut velocity_predicted);
         
         self.velocity = velocity_predicted;
         self.pressure = pressure;
@@ -123,23 +134,36 @@ impl Simulation {
     pub fn correct_velocities_for_geometry(&self, velocity: &mut StaggeredSpatialVectors) {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         
+        let mut max_dx = self.grid.cell_length[0];
+        if self.grid.cell_length[1] > max_dx {
+            max_dx = self.grid.cell_length[1];
+        }
+        
+        if self.grid.cell_length[2] > max_dx {
+            max_dx = self.grid.cell_length[2];
+        }
+        
+        let epsilon = 2.0 * max_dx;
+        
         let nr_cells_interior = nx * ny * nz;
         
         for i_flat_interior in 0..nr_cells_interior {
             let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
+            let [i, j, k] = self.grid.extended_indices_from_interior_indices(interior_indices);
+            let i_0 = self.grid.flat_index_on_extended_grid([i, j, k]);
             
             let cell_center = self.grid.cell_center(interior_indices);
             
-            let sdf = self.signed_distance_function(cell_center);
-            
-            if sdf < 0.0 {
-                let [i, j, k] = self.grid.extended_indices_from_interior_indices(interior_indices);
+            for axis_index in 0..3 {
+                let mut face = cell_center;
+                face[axis_index] += 0.5 * self.grid.cell_length[axis_index];
                 
-                let i_0 = self.grid.flat_index_on_extended_grid([i, j, k]);
+                let sdf = self.signed_distance_function(face);
                 
-                velocity[[0, i_0]] = 0.0;
-                velocity[[1, i_0]] = 0.0;
-                velocity[[2, i_0]] = 0.0;
+                if sdf.abs() < epsilon {
+                    let mu = blending_function(sdf, epsilon);
+                    velocity[[axis_index, i_0]] = mu * velocity[[axis_index, i_0]] + (1.0 - mu);   
+                }
             }
         }
     }
