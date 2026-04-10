@@ -106,7 +106,8 @@ impl BoundaryConditions {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 0 {
                                     // Principle: velocity_x is defined on the boundary face directly
-                                    velocity.data[0][flat_index_current] = value
+                                    let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
+                                    velocity.data[0][face_flat] = value
                                 } else {
                                     // Principle: the x-component is half a cell length away from the boundary
                                     // face. u_face = 0.5 * (u_j + u_{j+1})
@@ -123,7 +124,8 @@ impl BoundaryConditions {
                         match self.velocity_y[axis_index][face_index] {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 1 {
-                                    velocity.data[1][flat_index_current] = value
+                                    let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
+                                    velocity.data[1][face_flat] = value
                                 } else {
                                     velocity.data[1][flat_index_current] = 2.0 * value - velocity.data[1][flat_index_neighbor]
                                 }
@@ -137,7 +139,8 @@ impl BoundaryConditions {
                         match self.velocity_z[axis_index][face_index] {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 2 {
-                                    velocity.data[2][flat_index_current] = value
+                                    let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
+                                    velocity.data[2][face_flat] = value
                                 } else {
                                     velocity.data[2][flat_index_current] = 2.0 * value - velocity.data[2][flat_index_neighbor]
                                 }

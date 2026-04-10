@@ -12,7 +12,7 @@ use crate::boundary_conditions::{BoundaryConditions, BoundaryCondition};
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
 use crate::geometry::{
-    Sphere,
+    Geometry,
     blending_function
 };
 
@@ -34,7 +34,7 @@ pub struct Simulation {
     pub viscosity: Float,
     pub density: Float,
     pub solver_settings: IterativeSolverSettings,
-    pub geometries: Vec<Sphere>,
+    pub geometries: Vec<Geometry>,
     pub actuator_line: Option<ActuatorLineInterface>,
 }
 
@@ -82,7 +82,7 @@ impl Simulation {
             &velocity_star
         );
         
-        //self.correct_velocities_for_geometry(&mut velocity_predicted);
+        self.correct_velocities_for_geometry(&mut velocity_predicted);
         
         self.velocity = velocity_predicted;
         self.pressure = pressure;
@@ -134,13 +134,11 @@ impl Simulation {
     pub fn correct_velocities_for_geometry(&self, velocity: &mut StaggeredSpatialVectors) {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         
-        let mut max_dx = self.grid.cell_length[0];
-        if self.grid.cell_length[1] > max_dx {
-            max_dx = self.grid.cell_length[1];
-        }
-        
-        if self.grid.cell_length[2] > max_dx {
-            max_dx = self.grid.cell_length[2];
+        let mut max_dx = 0.0;
+        for axis_index in 0..3 {
+            if self.grid.cell_length[axis_index] > max_dx {
+                max_dx = self.grid.cell_length[axis_index];
+            }
         }
         
         let epsilon = 2.0 * max_dx;
@@ -160,10 +158,8 @@ impl Simulation {
                 
                 let sdf = self.signed_distance_function(face);
                 
-                if sdf.abs() < epsilon {
-                    let mu = blending_function(sdf, epsilon);
-                    velocity[[axis_index, i_0]] = mu * velocity[[axis_index, i_0]] + (1.0 - mu);   
-                }
+                let mu = blending_function(sdf, epsilon);
+                velocity[[axis_index, i_0]] = mu * velocity[[axis_index, i_0]] + (1.0 - mu) * 1e-6;   
             }
         }
     }
@@ -511,34 +507,41 @@ impl Simulation {
                 self.grid.flat_index_on_extended_grid([i, j, k-1])
             ];
             
-            for a_i_1 in 0..3 {
+            for vel_component in 0..3 {
                 let mut indices_p_i = [i, j, k];
-                indices_p_i[a_i_1] += 1; // Indices to neighbor cell relative to u_i
+                indices_p_i[vel_component] += 1; // Indices to neighbor cell relative to u_i
                 
                 let i_p_i = self.grid.flat_index_on_extended_grid(indices_p_i);
                 
-                for a_i_2 in 0..3 {
-                    let u_j = if a_i_1 == a_i_2 {
-                        velocity[[a_i_2, i_0]]
+                for der_dir in 0..3 {
+                    let u_j = if vel_component == der_dir {
+                        velocity[[der_dir, i_0]]
                     } else {
                         let mut indices_pn_i = indices_p_i.clone();
-                        indices_pn_i[a_i_2] -= 1;
+                        indices_pn_i[der_dir] -= 1;
                         let i_pn = self.grid.flat_index_on_extended_grid(indices_pn_i);
                         
                         0.25 * (
-                            velocity[[a_i_2, i_0]] + // Current cell
-                            velocity[[a_i_2, i_p_i]] + // Neighbor, in the u_i direction
-                            velocity[[a_i_2, i_n[a_i_2]]] + // Current cell, opposite face
-                            velocity[[a_i_2, i_pn]] // Neighbor, in the u_i direction, opposite face
+                            velocity[[der_dir, i_0]] + // Current cell
+                            velocity[[der_dir, i_p_i]] + // Neighbor, in the u_i direction
+                            velocity[[der_dir, i_n[der_dir]]] + // Current cell, opposite face
+                            velocity[[der_dir, i_pn]] // Neighbor, in the u_i direction, opposite face
                         )
                     };
                     
-                    let u_i_p = velocity[[a_i_1, i_p[a_i_2]]];
-                    let u_i_n = velocity[[a_i_1, i_n[a_i_2]]];
+                    let u_i = velocity[[vel_component, i_0]];
                     
-                    let dui_dxj = (u_i_p - u_i_n) / (2.0 * self.grid.cell_length[a_i_2]); 
+                    let dui_dxj = if u_j > 0.0 {
+                        let u_i_n = velocity[[vel_component, i_n[der_dir]]];
+                        
+                        (u_i - u_i_n) / self.grid.cell_length[der_dir]
+                    } else {
+                        let u_i_p = velocity[[vel_component, i_p[der_dir]]];
+                        
+                        (u_i_p - u_i) / self.grid.cell_length[der_dir]
+                    };
                      
-                    out[[a_i_1, i_0]] -= u_j * dui_dxj; 
+                    out[[vel_component, i_0]] -= u_j * dui_dxj; 
                  }
             }
         }

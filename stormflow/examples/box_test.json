@@ -15,8 +15,10 @@
   },
   "geometries": [
     {
-      "center": [0.0, 0.0, 22.5],
-      "radius": 5.0
+      "Box3D": {
+        "center": [0.0, 0.0, 22.5],
+        "half_extents": [5.0, 10.0, 5.0]
+      }
     }
   ]
 }
