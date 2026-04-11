@@ -1,6 +1,4 @@
 use stormath::type_aliases::Float;
-use stormath::sparse_matrix::SparseMatrix;
-use stormath::matrix::linalg::IterativeSolverSettings;
 use stormath::spatial_vector::SpatialVector;
 
 pub mod io;
@@ -8,7 +6,7 @@ pub mod builder;
 
 use crate::grid::Grid;
 
-use crate::boundary_conditions::{BoundaryConditions, BoundaryCondition};
+use crate::boundary_conditions::BoundaryConditions;
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
 use crate::geometry::{
@@ -16,24 +14,19 @@ use crate::geometry::{
     blending_function
 };
 
+use crate::pressure_solver::PressureSolver;
+
 use rayon::prelude::*;
-
-const MATRIX_ROW_LENGTH: usize = 9;
-
-
-
 
 pub struct Simulation {
     pub pressure: Vec<Float>,
     pub velocity: StaggeredSpatialVectors,
     pub body_force: Vec<SpatialVector>,
     pub boundary_conditions: BoundaryConditions,
-    pub pressure_matrix: SparseMatrix<MATRIX_ROW_LENGTH>,
-    pub pressure_rhs_fixed: Vec<Float>,
+    pub pressure_solver: PressureSolver,
     pub grid: Grid,
     pub viscosity: Float,
     pub density: Float,
-    pub solver_settings: IterativeSolverSettings,
     pub geometries: Vec<Geometry>,
     pub actuator_line: Option<ActuatorLineInterface>,
 }
@@ -41,7 +34,6 @@ pub struct Simulation {
 impl Simulation {
     pub fn initialize_after_build(&mut self) {
         println!("Initializing after build");
-        self.set_fixed_pressure_system();
         self.actuator_line_initialization();
         
         let mut velocity = self.velocity.clone();
@@ -287,162 +279,6 @@ impl Simulation {
         }
     }
     
-    pub fn set_fixed_pressure_system(&mut self) {
-        let [dx, dy, dz] = self.grid.cell_length.0;
-           
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
-        
-        let nr_interior_cells = nx * ny * nz;
-        
-        let mut matrix: SparseMatrix<MATRIX_ROW_LENGTH> = SparseMatrix::new_default(nr_interior_cells);
-        let mut rhs: Vec<Float> = vec![0.0; nr_interior_cells];
-        
-        for i_x in 0..nx {
-            for i_y in 0..ny {
-                for i_z in 0..nz {
-                    let i_l = self.grid.local_flat_indices_on_interior_grid([i_x, i_y, i_z]);
-                    
-                    if i_x == 0 {
-                        match self.boundary_conditions.pressure[0][0] {
-                            BoundaryCondition::ZeroGradient => {
-                                // Principle: p_{i-1} = p_i
-                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{-p_i + p_{i+1}}{dx^2}
-                                matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
-                            },
-                            BoundaryCondition::Value(value) => {
-                                // Principle: p_face = value
-                                // 0.5 * (p_{i-1} + p_i) = value
-                                // p_{i-1} = 2 * value - p_i
-                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{2 * value - p_i - 2 p_i + p_{i+1}}{dx^2}
-                                matrix[[i_l.current, i_l.current]] += -3.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
-                                
-                                rhs[i_l.current] += -2.0 * value / dx.powi(2);
-                            }
-                        }
-                    } else if i_x == nx - 1 {
-                        match self.boundary_conditions.pressure[0][1] {
-                            BoundaryCondition::ZeroGradient => {
-                                // Principle: p_{i+1} = p_i
-                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{-p_i + p_{i-1}}{dx^2}
-                                matrix[[i_l.current, i_l.current]] += -1.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
-                            },
-                            BoundaryCondition::Value(value) => {
-                                // Principle: p_face = value
-                                // 0.5 * (p_{i+1} + p_i) = value
-                                // p_{i+1} = 2 * value - p_i
-                                // \frac{p_{i-1} - 2 p_i + p_{i+1}}{dx^2} = \frac{p_{i-1} - 2 p_i + 2 * value - p_i}{dx^2}
-                                matrix[[i_l.current, i_l.current]] += -3.0 / dx.powi(2);
-                                matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
-                                
-                                rhs[i_l.current] += -2.0 * value / dx.powi(2);
-                            }
-                        }
-                    } else {
-                        matrix[[i_l.current, i_l.neg[0]]] += 1.0 / dx.powi(2);
-                        matrix[[i_l.current, i_l.current]] += -2.0 / dx.powi(2);
-                        matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
-                    }
-
-                    // Y direction
-                    if i_y == 0 {
-                        match self.boundary_conditions.pressure[1][0] {
-                            BoundaryCondition::ZeroGradient => {
-                                // Principle: p_{j-1} = p_j
-                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{-p_j + p_{j+1}}{dy^2}
-                                matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
-                            },
-                            BoundaryCondition::Value(value) => {
-                                // Principle: p_face = value
-                                // 0.5 * (p_{j-1} + p_j) = value
-                                // p_{j-1} = 2 * value - p_j
-                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{2 * value - p_j - 2 p_j + p_{j+1}}{dy^2}
-                                matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
-
-                                rhs[i_l.current] += -2.0 * value / dy.powi(2);
-                            }
-                        }
-                    } else if i_y == ny - 1 {
-                        match self.boundary_conditions.pressure[1][1] {
-                            BoundaryCondition::ZeroGradient => {
-                                // Principle: p_{j+1} = p_j
-                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{-p_j + p_{j-1}}{dy^2}
-                                matrix[[i_l.current, i_l.current]] += -1.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
-                            },
-                            BoundaryCondition::Value(value) => {
-                                // Principle: p_face = value
-                                // 0.5 * (p_{j+1} + p_j) = value
-                                // p_{j+1} = 2 * value - p_j
-                                // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{p_{j-1} - 2 p_j + 2 * value - p_j}{dy^2}
-                                matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
-                                matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
-
-                                rhs[i_l.current] += -2.0 * value / dy.powi(2);
-                            }
-                        }
-                    } else {
-                        matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
-                        matrix[[i_l.current, i_l.current]] += -2.0 / dy.powi(2);
-                        matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
-                    }
-
-                    // Z direction
-                    if i_z == 0 {
-                        match self.boundary_conditions.pressure[2][0] {
-                            BoundaryCondition::ZeroGradient => {
-                                // Principle: p_{k-1} = p_k
-                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{-p_k + p_{k+1}}{dz^2}
-                                matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
-                            },
-                            BoundaryCondition::Value(value) => {
-                                // Principle: p_face = value
-                                // 0.5 * (p_{k-1} + p_k) = value
-                                // p_{k-1} = 2 * value - p_k
-                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{2 * value - p_k - 2 p_k + p_{k+1}}{dz^2}
-                                matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
-
-                                rhs[i_l.current] += -2.0 * value / dz.powi(2);
-                            }
-                        }
-                    } else if i_z == nz - 1 {
-                        match self.boundary_conditions.pressure[2][1] {
-                            BoundaryCondition::ZeroGradient => {
-                                // Principle: p_{k+1} = p_k
-                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{-p_k + p_{k-1}}{dz^2}
-                                matrix[[i_l.current, i_l.current]] += -1.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
-                            },
-                            BoundaryCondition::Value(value) => {
-                                // Principle: p_face = value
-                                // 0.5 * (p_{k+1} + p_k) = value
-                                // p_{k+1} = 2 * value - p_k
-                                // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{p_{k-1} - 2 p_k + 2 * value - p_k}{dz^2}
-                                matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
-                                matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
-
-                                rhs[i_l.current] += -2.0 * value / dz.powi(2);
-                            }
-                        }
-                    } else {
-                        matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
-                        matrix[[i_l.current, i_l.current]] += -2.0 / dz.powi(2);
-                        matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
-                    }
-                }
-            }
-        }
-        
-        self.pressure_matrix = matrix;
-        self.pressure_rhs_fixed = rhs;
-    }
-    
     pub fn pressure_projection_rhs(&self, time_step: Float, velocity: &StaggeredSpatialVectors) -> Vec<Float> {
         let [nx, ny, nz] = self.grid.nr_interior_cells();
         let [dx, dy, dz] = self.grid.cell_length.0;
@@ -466,7 +302,7 @@ impl Simulation {
                     let dv_dy = (velocity.data[1][i_l.current] - velocity.data[1][i_l.neg[1]]) / dy;
                     let dw_dz = (velocity.data[2][i_l.current] - velocity.data[2][i_l.neg[2]]) / dz;
                     
-                    out[i_0_int] = self.pressure_rhs_fixed[i_0_int] + 
+                    out[i_0_int] = self.pressure_solver.fixed_rhs[i_0_int] + 
                         self.density * (du_dx + dv_dy + dw_dz) / time_step;
                 }
             }
@@ -619,13 +455,11 @@ impl Simulation {
         println!("Projecting pressure");
         let mut out = vec![0.0; velocity_star.data[0].len()];
         
-        let pressure_rhs = self.pressure_projection_rhs(time_step, velocity_star);
+        let rhs = self.pressure_projection_rhs(time_step, velocity_star);
         
         let initial_guess = self.grid.interior_values_from_extended_values(&self.pressure);
         
-        let pressure_interior = self.pressure_matrix.solve_jacobi(
-            &pressure_rhs, &initial_guess, &self.solver_settings
-        ).unwrap();
+        let pressure_interior = self.pressure_solver.solve(&initial_guess, &rhs);
         
         self.grid.transfer_interior_values_to_extended_grid(&pressure_interior, &mut out);
         

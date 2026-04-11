@@ -5,7 +5,6 @@ use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
-use stormath::sparse_matrix::SparseMatrix;
 use stormath::matrix::linalg::IterativeSolverSettings;
 
 use stormbird::actuator_line::builder::ActuatorLineBuilder;
@@ -16,6 +15,7 @@ use crate::boundary_conditions::{BoundaryConditionBuilder, BoundaryConditions, B
 use crate::grid::{Grid, INTERIOR_OFFSET};
 use crate::simulation::Simulation;
 use crate::geometry::Geometry;
+use crate::pressure_solver::PressureSolver;
 
 use crate::error::Error;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
@@ -78,9 +78,6 @@ impl SimulationBuilder {
         
         let body_force = vec![SpatialVector::default(); total_nr_cells];
         
-        let pressure_matrix = SparseMatrix::new_default(total_nr_cells);
-        let pressure_rhs_fixed = vec![0.0; total_nr_cells];
-        
         let grid = Grid{
             start_point: self.domain_start_point,
             cell_length,
@@ -120,6 +117,14 @@ impl SimulationBuilder {
             }
         }
         
+        let (matrix, fixed_rhs) = PressureSolver::poisson_matrix_and_rhs(&grid, &boundary_conditions);
+        
+        let pressure_solver = PressureSolver{
+            matrix,
+            fixed_rhs,
+            solver_settings: self.solver_settings.clone()
+        };
+        
         let actuator_line = if let Some(builder) = &self.actuator_line {
             Some(
                 ActuatorLineInterface{
@@ -137,12 +142,10 @@ impl SimulationBuilder {
             velocity,
             body_force,
             boundary_conditions,
-            pressure_matrix,
-            pressure_rhs_fixed,
+            pressure_solver,
             grid,
             viscosity: self.viscosity,
             density: 1.0,
-            solver_settings: self.solver_settings.clone(),
             actuator_line,
             geometries: self.geometries.clone()
         }
