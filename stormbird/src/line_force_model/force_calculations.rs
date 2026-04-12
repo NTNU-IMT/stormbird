@@ -33,7 +33,16 @@
 
 use super::*;
 
+use serde::{Serialize, Deserialize};
+
 use stormath::consts::MIN_POSITIVE;
+
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct ForceCalculationSettings {
+    #[serde(default)]
+    pub include_viscous_lift_in_the_circulation: bool
+}
 
 impl LineForceModel {
     /// Function used to calculate the *felt* velocity at each control point. That is, 
@@ -256,7 +265,15 @@ impl LineForceModel {
         angles_of_attack: &[Float],
         velocity: &[SpatialVector], 
     ) -> Vec<Float> {
-        let cl = self.lift_coefficients_pre_stall_with_stall_drop_off(angles_of_attack, velocity);
+        let mut cl = self.lift_coefficients_pre_stall_with_stall_drop_off(angles_of_attack, velocity);
+        
+        if self.force_calculation_settings.include_viscous_lift_in_the_circulation {
+            let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(angles_of_attack);
+            
+            for i in 0..cl.len() {
+                cl[i] += cl_viscous[i];
+            }
+        }
 
         (0..velocity.len()).map(|index| {
             -0.5 * self.chord_lengths[index] * velocity[index].length() * cl[index]
@@ -371,21 +388,25 @@ impl LineForceModel {
     }
 
     pub fn viscous_lift_forces(&self, angles_of_attack: &[Float], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
-        let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(
-            angles_of_attack
-        );
-
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let lift_direction = self.span_lines_local[index].relative_vector().cross(velocity[index]).normalize();
-
-                let lift_area = self.chord_lengths[index] * self.span_lines_local[index].length();
-
-                let force_factor = 0.5 * lift_area * self.density * velocity[index].length_squared();
-
-                lift_direction * cl_viscous[index] * force_factor
-            }
-        ).collect()
+        if self.force_calculation_settings.include_viscous_lift_in_the_circulation {
+            vec![SpatialVector::default(); self.nr_span_lines()]
+        } else {
+            let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(
+                angles_of_attack
+            );
+    
+            (0..self.nr_span_lines()).map(
+                |index| {
+                    let lift_direction = self.span_lines_local[index].relative_vector().cross(velocity[index]).normalize();
+    
+                    let lift_area = self.chord_lengths[index] * self.span_lines_local[index].length();
+    
+                    let force_factor = 0.5 * lift_area * self.density * velocity[index].length_squared();
+    
+                    lift_direction * cl_viscous[index] * force_factor
+                }
+            ).collect()
+        }
     }
 
     /// Calculates the forces on each line element due to the sectional drag model. This is most

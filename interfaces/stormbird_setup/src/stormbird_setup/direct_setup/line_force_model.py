@@ -28,6 +28,9 @@ class WingBuilder(StormbirdSetupBaseModel):
     non_zero_circulation_at_ends: tuple[bool, bool] = (False, False)
     nr_sections: int | None = None
     input_power_model: InputPowerModel = InputPowerModel()
+    
+class ForceCalculationSettings(StormbirdSetupBaseModel):
+    include_viscous_lift_in_the_circulation: bool = False
 
 class LineForceModelBuilder(StormbirdSetupBaseModel):
     '''
@@ -41,6 +44,7 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     translation: SpatialVector = SpatialVector()
     circulation_correction: CirculationCorrectionBuilder = CirculationCorrectionBuilder()
     output_coordinate_system: CoordinateSystem = CoordinateSystem.Global
+    force_calculation_settings: ForceCalculationSettings = ForceCalculationSettings()
 
     def add_wing_builder(self, wing_builder: WingBuilder):
         self.wing_builders.append(wing_builder)

@@ -15,7 +15,17 @@ from .wake import QuasiSteadyWakeSettings, DynamicWakeBuilder
 
 class QuasiSteadySettings(StormbirdSetupBaseModel):
     solver: Linearized | SimpleIterative = Linearized()
-    wake: QuasiSteadyWakeSettings  = QuasiSteadyWakeSettings ()
+    wake: QuasiSteadyWakeSettings  = QuasiSteadyWakeSettings()
+    
+    @classmethod
+    def new_steady_iterative(cls) -> "QuasiSteadySettings":
+        return cls(
+            solver = SimpleIterative(
+                max_iterations_per_time_step = 1000,
+                damping_factor = 0.05
+            ),
+            wake  = QuasiSteadyWakeSettings()
+        )
     
     @model_validator(mode='before')
     @classmethod

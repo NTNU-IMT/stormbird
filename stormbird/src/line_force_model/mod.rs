@@ -43,6 +43,8 @@ use corrections::{
 use builder::single_wing::SingleWing;
 use span_line::*;
 
+use force_calculations::ForceCalculationSettings;
+
 use input_power::InputPowerModel;
 
 #[derive(Clone, Debug)]
@@ -105,6 +107,8 @@ pub struct LineForceModel {
     pub ctrl_point_spanwise_distance_circulation_model: Vec<Float>,
     /// Models for estimating the input energy for the sails
     pub input_power_models: Vec<InputPowerModel>,
+    /// Settings for the force calculation
+    pub force_calculation_settings: ForceCalculationSettings,
 }
 
 impl Default for LineForceModel {
@@ -145,6 +149,7 @@ impl LineForceModel {
             ctrl_point_spanwise_distance_non_dimensional: Vec::new(),
             ctrl_point_spanwise_distance_circulation_model: Vec::new(),
             input_power_models: Vec::new(),
+            force_calculation_settings: ForceCalculationSettings::default()
         }
     }
 
