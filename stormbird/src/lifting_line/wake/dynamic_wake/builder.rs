@@ -21,6 +21,7 @@ use super::{
     DynamicWake,
     settings::{
         WakeSettings,
+        FirstWakePointsDirection,
         WakeIndices,
     },
 };
@@ -73,7 +74,7 @@ pub struct DynamicWakeBuilder {
     #[serde(default)]
     /// Determines if the chord direction should be used when calculating the direction of the first
     /// wake panels
-    pub use_chord_direction: bool,
+    pub first_wake_points_direction: FirstWakePointsDirection,
     #[serde(default)]
     /// Symmetry condition
     pub symmetry_condition: SymmetryCondition,
@@ -137,13 +138,13 @@ impl DynamicWakeBuilder {
 
         let end_index_induced_velocities_on_wake = (
             self.ratio_of_wake_affected_by_induced_velocities *
-            indices.nr_panels_per_line_element as Float
+            (indices.nr_points() - 1) as Float
         ).ceil() as usize;
 
         let settings = WakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
             last_panel_relative_length: self.last_panel_relative_length,
-            use_chord_direction: self.use_chord_direction,
+            first_wake_points_direction: self.first_wake_points_direction,
             end_index_induced_velocities_on_wake,
             shape_damping_factor: self.shape_damping_factor,
             neglect_self_induced_velocities: self.neglect_self_induced_velocities,
@@ -283,7 +284,7 @@ impl Default for DynamicWakeBuilder {
             viscous_core_length_evolution: Default::default(),
             first_panel_relative_length: Self::default_first_panel_relative_length(),
             last_panel_relative_length: Self::default_last_panel_relative_length(),
-            use_chord_direction: false,
+            first_wake_points_direction: FirstWakePointsDirection::default(),
             symmetry_condition: Default::default(),
             ratio_of_wake_affected_by_induced_velocities: Default::default(),
             far_field_ratio: PotentialTheorySettings::default_far_field_ratio(),

@@ -61,7 +61,7 @@ impl DynamicWake {
     /// Update the wake points by streaming them downstream.
     ///
     /// The first and second "rows" - meaning the wing geometries and the first row of wake points -
-    /// are treaded as special cases. The rest are moved based on the euler method
+    /// are treated as special cases. The rest are moved based on the euler method
     pub fn update_wake_points_before_solving(
         &mut self,
         time_step: Float,
@@ -148,6 +148,55 @@ impl DynamicWake {
             self.strengths[i] = new_circulation_strength[i];
         }
     }
+    
+    fn first_free_wake_points_direction(
+        &self,
+        line_force_model: &LineForceModel,
+        felt_span_points_freestream: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
+        let nr_first_wake_points = self.indices.nr_points_along_span;
+        
+        let mut direction_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_first_wake_points);
+        
+        match self.settings.first_wake_points_direction {
+            FirstWakePointsDirection::Chord => {
+                for i in 0..nr_first_wake_points{
+                    direction_vectors.push(
+                        line_force_model.chord_vectors_global_at_span_points[i].normalize()
+                    )
+                }
+            },
+            FirstWakePointsDirection::Freestream => {
+                for i in 0..nr_first_wake_points {
+                    direction_vectors.push(
+                        felt_span_points_freestream[i].normalize()
+                    )
+                }
+            },
+            FirstWakePointsDirection::ActualVelocity => {
+                if self.number_of_time_steps_completed > 2 {
+                    for i in 0..nr_first_wake_points {
+                        let local_velocity = 0.5 * (
+                            self.velocity_at_points[i] + 
+                            self.velocity_at_points[nr_first_wake_points + i]
+                        );
+                        
+                        direction_vectors.push(
+                            local_velocity.normalize()
+                        )
+                    }
+                } else {
+                    for i in 0..nr_first_wake_points {
+                        direction_vectors.push(
+                            felt_span_points_freestream[i].normalize()
+                        )
+                    }
+                }
+            }
+        }
+        
+        direction_vectors
+    }
 
     /// Moves the first wake points after the wing geometry itself.
     ///
@@ -158,23 +207,10 @@ impl DynamicWake {
         line_force_model: &LineForceModel,
         felt_span_points_freestream: &[SpatialVector]
     ) {
-        let nr_first_wake_points = self.indices.nr_points_along_span;
-
-        let mut direction_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_first_wake_points);
-
-        if self.settings.use_chord_direction {
-            for i in 0..nr_first_wake_points{
-                direction_vectors.push(
-                    line_force_model.chord_vectors_global_at_span_points[i].normalize()
-                )
-            }
-        } else {
-            for i in 0..nr_first_wake_points {
-                direction_vectors.push(
-                    felt_span_points_freestream[i].normalize()
-                )
-            }
-        }
+        let direction_vectors = self.first_free_wake_points_direction(
+            line_force_model, 
+            felt_span_points_freestream
+        );
 
         let first_panel_length = self.representative_chord_length * self.settings.first_panel_relative_length;
 
@@ -197,25 +233,12 @@ impl DynamicWake {
         let old_start_index = self.indices.nr_points_along_span;
         let old_end_index   = 2 * self.indices.nr_points_along_span;
 
-        let nr_first_wake_points = self.indices.nr_points_along_span;
-
         let old_wake_points = self.points[old_start_index..old_end_index].to_vec();
 
-        let mut direction_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_first_wake_points);
-
-        if self.settings.use_chord_direction {
-            for i in 0..nr_first_wake_points{
-                direction_vectors.push(
-                    line_force_model.chord_vectors_global_at_span_points[i].normalize()
-                )
-            }
-        } else {
-            for i in 0..nr_first_wake_points {
-                direction_vectors.push(
-                    felt_span_points_freestream[i].normalize()
-                )
-            }
-        }
+        let direction_vectors = self.first_free_wake_points_direction(
+            line_force_model, 
+            felt_span_points_freestream
+        );
 
         let first_panel_length = self.representative_chord_length * self.settings.first_panel_relative_length;
 

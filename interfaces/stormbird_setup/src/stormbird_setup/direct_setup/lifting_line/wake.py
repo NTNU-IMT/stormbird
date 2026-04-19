@@ -89,15 +89,57 @@ class QuasiSteadyWakeSettings(StormbirdSetupBaseModel):
     wake_length_factor: float = 100.0
     symmetry_condition: SymmetryCondition = SymmetryCondition.NoSymmetry
     viscous_core_length: ViscousCoreLength = ViscousCoreLength()
+    
+class SinIncreasedViscousCoreLength(StormbirdSetupBaseModel):
+    last_panel_value: ViscousCoreLength = ViscousCoreLength()
+    evolution_length_factor: float = 1.0
+    
+class ViscousCoreLengthEvolutionType(Enum):
+    Constant = "Constant"
+    SinIncrease = "SinIncrease"
+    
+class ViscousCoreLengthEvolution(StormbirdSetupBaseModel):
+    value_type: ViscousCoreLengthEvolutionType = ViscousCoreLengthEvolutionType.Constant
+    value: SinIncreasedViscousCoreLength | None = None
+    
+    @classmethod
+    def new_sin_increase(cls, *, last_panel_value_absolute: float, evolution_length_factor: float):
+        return cls(
+            value_type = ViscousCoreLengthEvolutionType.SinIncrease,
+            value = SinIncreasedViscousCoreLength(
+                last_panel_value=ViscousCoreLength.new_absolute(last_panel_value_absolute),
+                evolution_length_factor=evolution_length_factor
+            )
+        )
+    
+    @model_serializer
+    def ser_model(self):
+        match self.value_type:
+            case ViscousCoreLengthEvolutionType.SinIncrease:
+                return {
+                    "SinIncrease": self.value
+                }
+            case ViscousCoreLengthEvolutionType.Constant:
+                return "Constant"
+            case _:
+                raise ValueError("Invalid ViscousCoreLengthEvolutionType")
+
+class FirstWakePointsDirection(Enum):
+    Chord = "Chord"
+    Freestream = "Freestream"
+    ActualVelocity = "ActualVelocity"
 
 
 class DynamicWakeBuilder(StormbirdSetupBaseModel):
     nr_panels_per_line_element: int = 100
     viscous_core_length: ViscousCoreLength = ViscousCoreLength()
+    viscous_core_length_evolution: ViscousCoreLengthEvolution = ViscousCoreLengthEvolution()
     symmetry_condition: SymmetryCondition = SymmetryCondition.NoSymmetry
     first_panel_relative_length: float = 0.75
     last_panel_relative_length: float = 25.0
-    use_chord_direction: bool = False
+    first_wake_points_direction: FirstWakePointsDirection = FirstWakePointsDirection.Chord
+    ratio_of_wake_affected_by_induced_velocities: float = 0.0
+    shape_damping_factor: float = 0.0
     write_wake_data_to_file: bool = False
     wake_files_folder_path: str = ""
     

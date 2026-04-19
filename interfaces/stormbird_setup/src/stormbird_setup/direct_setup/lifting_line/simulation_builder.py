@@ -130,3 +130,6 @@ class SimulationBuilder(StormbirdSetupBaseModel):
                     "Dynamic": simulation_settings_dict
                 }
             }
+            
+    def dynamic(self) -> bool:
+        return isinstance(self.simulation_settings, DynamicSettings)
