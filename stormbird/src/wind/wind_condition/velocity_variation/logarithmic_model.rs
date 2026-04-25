@@ -40,7 +40,7 @@ impl LogarithmicModel {
             
             if length > 0.0 {
                 // Stable
-                -5.0 * zeta
+                -4.8 * zeta
             } else {
                 // Unstable
                 let x = (1.0 - 16.0 * zeta).powf(0.25);
@@ -64,3 +64,28 @@ impl LogarithmicModel {
         non_scaled_correction * self.scale_factor()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    /// Test that the unscaled Businger-Dyer correction equals zero when the height is also zero
+    fn test_businger_dyer_unscaled_correction_at_zero_height() {
+        let model = LogarithmicModel{
+            friction_velocity: 1.0,
+            surface_roughness: 0.001,
+            von_karman_constant: LogarithmicModel::default_von_karman_constant(),
+            obukhov_length: Some(10.0)
+        };
+        
+        let test_correction_value = model.businger_dyer_unscaled_correction(0.0);
+        
+        dbg!(test_correction_value);
+        assert!(
+            test_correction_value < 1e-6, 
+            "Value is the unscaled Businger Dyer correction is significantly larger than zero"
+        );
+    }
+}
+
