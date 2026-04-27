@@ -39,6 +39,27 @@ class SailType(Enum):
                 type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
                 value = 2.0
             )
+            
+    def default_section_model(self, iterative_solver=False) -> SectionModel:
+        match self:
+            case SailType.WingSailSingleElement:
+                section_model = SectionModel.default_wing_sail_single_element()
+                
+                if iterative_solver:
+                    section_model.model.mean_positive_stall_angle += np.radians(1.5)
+                    section_model.model.mean_negative_stall_angle += np.radians(1.5)
+                
+            case SailType.WingSailTwoElement:
+                section_model = SectionModel.default_wing_sail_two_element()
+            case SailType.RotorSail:
+                section_model = SectionModel.default_rotor_sail()
+            case SailType.SuctionSail:
+                section_model = SectionModel.default_suction_sail_turbosail(scale_factor = 1.1)
+            case _:
+                raise ValueError("Unsupported sail type:", self.sail_type)
+                
+        return section_model
+        
 
 class SimpleSailSetup(StormbirdSetupBaseModel):
     '''
@@ -66,22 +87,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
             SpatialVector(x=self.chord_length, y=0.0, z=0.0)
         ]
 
-        match self.sail_type:
-            case SailType.WingSailSingleElement:
-                section_model = SectionModel.default_wing_sail_single_element()
-                
-                if self.iterative_solver:
-                    section_model.model.mean_positive_stall_angle += np.radians(1.5)
-                    section_model.model.mean_negative_stall_angle += np.radians(1.5)
-                
-            case SailType.WingSailTwoElement:
-                section_model = SectionModel.default_wing_sail_two_element()
-            case SailType.RotorSail:
-                section_model = SectionModel.default_rotor_sail()
-            case SailType.SuctionSail:
-                section_model = SectionModel.default_suction_sail_turbosail(scale_factor = 1.1)
-            case _:
-                raise ValueError("Unsupported sail type:", self.sail_type)
+        section_model = self.sail_type.default_section_model()
 
         non_zero_circulation_at_ends = (False, False)
 
@@ -133,5 +139,3 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                 return ControllerSetPoints.new_default_suction_sail(max_aoa_deg=32)
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
-                
-

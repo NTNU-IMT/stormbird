@@ -159,7 +159,7 @@ impl Foil {
 
     #[inline(always)]
     pub fn lift_coefficient_linear(&self, angle_of_attack: Float) -> Float {
-        self.cl_zero_angle + self.cl_initial_slope * angle_of_attack
+        self.cl_zero_angle + self.cl_initial_slope * angle_of_attack.sin()
     }
 
     #[inline(always)]

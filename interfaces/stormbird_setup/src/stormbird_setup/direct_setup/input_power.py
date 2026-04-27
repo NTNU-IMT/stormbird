@@ -40,7 +40,8 @@ class InputPowerModel(StormbirdSetupBaseModel):
         cls,
         max_power: float,
         max_rps: float,
-        area: float
+        area: float,
+        poly_power: float = 2.5
     ) -> "InputPowerModel":
         '''
         Simple model for the power based on a polynomial relationship between the power and RPS.
@@ -52,11 +53,9 @@ class InputPowerModel(StormbirdSetupBaseModel):
 
         section_models_internal_state_data = np.linspace(0, max_rps, 20)
 
-        power = 2.5
+        factor = max_power / (max_rps**poly_power * area)
 
-        factor = max_power / (max_rps**power * area)
-
-        input_power_coefficient_data = factor * (section_models_internal_state_data**power)
+        input_power_coefficient_data = factor * (section_models_internal_state_data**poly_power)
 
         return cls(
             input_power_type = InputPowerDataType.InterpolateFromInternalStateOnly,
