@@ -4,17 +4,25 @@ use stormath::type_aliases::Float;
 use stormath::consts::PI;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+/// Logarithmic model of how velocity varies as a function of height, which also includes optional
+/// stability corrections
 pub struct LogarithmicModel {
     pub friction_velocity: Float,
     pub surface_roughness: Float,
-    #[serde(default="LogarithmicModel::default_von_karman_constant")]
-    pub von_karman_constant: Float,
     #[serde(default)]
     pub obukhov_length: Option<Float>,
+    #[serde(default="LogarithmicModel::default_von_karman_constant")]
+    pub von_karman_constant: Float,
+    #[serde(default="LogarithmicModel::default_stable_coefficient")]
+    pub stable_coefficient: Float,
+    #[serde(default="LogarithmicModel::default_unstable_coefficient")]
+    pub unstable_coefficient: Float
 }
 
 impl LogarithmicModel {
     pub fn default_von_karman_constant() -> Float {0.41}
+    pub fn default_stable_coefficient() -> Float {6.0}
+    pub fn default_unstable_coefficient() -> Float {19.3}
     
     pub fn velocity_at_height(&self, height: Float) -> Float {
         self.neutral_velocity_at_height(height) - self.businger_dyer_correction(height)
@@ -40,10 +48,10 @@ impl LogarithmicModel {
             
             if length > 0.0 {
                 // Stable
-                -4.8 * zeta
+                -self.stable_coefficient * zeta
             } else {
                 // Unstable
-                let x = (1.0 - 16.0 * zeta).powf(0.25);
+                let x = (1.0 - self.unstable_coefficient* zeta).powf(0.25);
                 
                 let first_term = 2.0 * ((1.0 + x) / 2.0).ln();
                 let second_term = ((1.0 + x.powi(2)) / 2.0).ln();
@@ -76,10 +84,12 @@ mod tests {
             friction_velocity: 1.0,
             surface_roughness: 0.001,
             von_karman_constant: LogarithmicModel::default_von_karman_constant(),
-            obukhov_length: Some(10.0)
+            obukhov_length: Some(10.0),
+            stable_coefficient: LogarithmicModel::default_stable_coefficient(),
+            unstable_coefficient: LogarithmicModel::default_unstable_coefficient()
         };
         
-        let test_correction_value = model.businger_dyer_unscaled_correction(0.0);
+        let test_correction_value = model.businger_dyer_unscaled_correction(0.0).abs();
         
         dbg!(test_correction_value);
         assert!(
@@ -88,4 +98,3 @@ mod tests {
         );
     }
 }
-

@@ -89,7 +89,6 @@ impl WindCondition {
         direction_coming_from,
         friction_velocity,
         surface_roughness,
-        von_karman_constant = 0.41,
         obukhov_length = 0.0,
     ))]
     pub fn new_logarithmic_model(
@@ -97,7 +96,6 @@ impl WindCondition {
         direction_coming_from: f64,
         friction_velocity: f64,
         surface_roughness: f64,
-        von_karman_constant: f64,
         obukhov_length: f64
     ) -> Self {
         let mut obukhov_length_rust = None;
@@ -113,8 +111,10 @@ impl WindCondition {
                     LogarithmicModel {
                         friction_velocity,
                         surface_roughness,
-                        von_karman_constant,
-                        obukhov_length: obukhov_length_rust
+                        von_karman_constant: LogarithmicModel::default_von_karman_constant(),
+                        obukhov_length: obukhov_length_rust,
+                        stable_coefficient: LogarithmicModel::default_stable_coefficient(),
+                        unstable_coefficient: LogarithmicModel::default_unstable_coefficient()
                     }
                 ),
                 parallel_gust: None,
@@ -140,10 +140,35 @@ impl WindCondition {
         self.data.unsteady_vertical_true_wind_velocity(time)
     }
     
+    pub fn businger_dyer_unscaled_correction(&self, height: f64) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => {
+                model.businger_dyer_unscaled_correction(height)
+            },
+            _ => 0.0
+        }
+    }
+    
     #[getter]
     pub fn get_von_karman_constant(&self) -> f64 {
         match self.data.velocity_variation {
             VelocityVariation::LogarithmicModel(model) => model.von_karman_constant,
+            _ => 0.0
+        }
+    }
+    
+    #[getter]
+    pub fn get_stable_coefficient(&self) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => model.stable_coefficient,
+            _ => 0.0
+        }
+    }
+    
+    #[getter]
+    pub fn get_unstable_coefficient(&self) -> f64 {
+        match self.data.velocity_variation {
+            VelocityVariation::LogarithmicModel(model) => model.unstable_coefficient,
             _ => 0.0
         }
     }
@@ -208,12 +233,5 @@ impl WindCondition {
         }
     }
     
-    pub fn businger_dyer_unscaled_correction(&self, height: f64) -> f64 {
-        match self.data.velocity_variation {
-            VelocityVariation::LogarithmicModel(model) => {
-                model.businger_dyer_unscaled_correction(height)
-            },
-            _ => 0.0
-        }
-    }
+    
 }
