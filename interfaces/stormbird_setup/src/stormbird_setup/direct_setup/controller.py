@@ -45,9 +45,9 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
                 raise ValueError("Unsupported internal state type:", value)
                 
     @classmethod
-    def new_default_wing_sail_single_element(cls):
+    def new_default_wing_sail_single_element(cls, max_angle_deg: float = 15.0):
         apparent_wind_directions_data = np.radians([-180, -15, -10, 10, 15, 180])
-        angle_of_attack_data = np.radians([-15.0, -15.0, 0.0, 0.0, 15, 15])
+        angle_of_attack_data = np.radians([-max_angle_deg, -max_angle_deg, 0.0, 0.0, max_angle_deg, max_angle_deg])
 
         return ControllerSetPoints(
             apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
@@ -55,9 +55,9 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         )
         
     @classmethod
-    def new_default_wing_sail_two_element(cls):
+    def new_default_wing_sail_two_element(cls, max_angle_deg: float = 12.0):
         apparent_wind_directions_data = np.radians([-180, -15, -10, 10, 15, 180])
-        angle_of_attack_data = np.radians([-12.0, -12.0, 0.0, 0.0, 12, 12])
+        angle_of_attack_data = np.radians([-max_angle_deg, -max_angle_deg, 0.0, 0.0, max_angle_deg, max_angle_deg])
         section_model_internal_state_data = np.radians([-30.0, -30.0, 0.0, 0.0, 30.0, 30.0])
 
         return ControllerSetPoints(

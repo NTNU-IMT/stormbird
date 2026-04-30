@@ -4,11 +4,11 @@ from typing_extensions import Dict
 import numpy as np
 
 from stormbird_setup.direct_setup.spatial_vector import SpatialVector
-from stormbird_setup.direct_setup.section_models import SectionModel, RotatingCylinder
+from stormbird_setup.direct_setup.section_models import SectionModel
 from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings
 from stormbird_setup.direct_setup.lifting_line.solver import Linearized, SimpleIterative
-from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition, ViscousCoreLength, ViscousCoreLengthType
+from stormbird_setup.direct_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition
 
 from stormbird_setup.direct_setup.lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
 
@@ -24,19 +24,6 @@ TEST_SETTINGS = {
     "smoothing_lengths": [0.0, 0.0, 0.0, 0.05],
     "solver_types": [SolverType.SimpleIterative, SolverType.SimpleIterative, SolverType.Linearized, SolverType.SimpleIterative]
 }
-
-def get_section_model():
-    '''
-    Returns the section model. Slightly modified from the default. The lift data is tuned to match 
-    the 3D CFD results that is used for comparison in this case, which is often necessary.
-    '''
-
-    return SectionModel(
-        model = RotatingCylinder(
-            spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
-            cl_data = [0.0, 1.22, 2.56, 5.93, 8.87, 9.56, 10.22, 12.0, 13.00]
-        )
-    )
 
 def revolutions_per_second_from_spin_ratio(
     *,
@@ -66,10 +53,12 @@ def simulate_single_case(
 ) -> list[dict]:
 
     diameter = 5.0
-    height   = 35.0
+    height   = 30.0
     velocity = 8.0
+    foundation_height = 1.875
     density  = 1.225
     nr_sections = 32
+    
     
     non_zero_circulation_at_ends = (True, False)
     
@@ -85,14 +74,14 @@ def simulate_single_case(
         wing_builders.append(
             WingBuilder(
                 section_points = [
-                    SpatialVector(x=x, y=y, z=0.0),
-                    SpatialVector(x=x, y=y, z=height)
+                    SpatialVector(x=x, y=y, z=foundation_height),
+                    SpatialVector(x=x, y=y, z=foundation_height + height)
                 ],
                 chord_vectors = [
                     chord_vector,
                     chord_vector
                 ],
-                section_model = get_section_model(),
+                section_model = SectionModel.default_rotor_sail(),
                 non_zero_circulation_at_ends = non_zero_circulation_at_ends
             )
         )

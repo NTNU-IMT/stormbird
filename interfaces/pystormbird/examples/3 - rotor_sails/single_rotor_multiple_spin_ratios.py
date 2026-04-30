@@ -12,7 +12,7 @@ import json
 from setup import simulate_single_case, TEST_SETTINGS
 
 if __name__ == "__main__":
-    comparison_data = json.load(open("../comparison_data/ostman_cfd_comparison_data.json", "r"))
+    comparison_data = json.load(open("../comparison_data/deybach_2024_rotor_sail_data.json", "r"))
     
     spin_ratio = np.arange(0.0, 5.5, 0.25)
     n_spin_ratios = len(spin_ratio)

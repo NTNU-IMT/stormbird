@@ -49,10 +49,23 @@ class SectionModel(StormbirdSetupBaseModel):
     model: Foil | VaryingFoil | RotatingCylinder | EffectiveWindSensor
     
     @classmethod
-    def default_rotor_sail(cls) -> "SectionModel":
+    def rotor_sail_deybach_2024(cls) -> "SectionModel":
         """
-        Default model for a rotor sail, which also equals the default model for the RotatingCylinder
-        model
+        Model of a rotor sail that is tuned based on the data in: Deybach, 2024, Aerodynamics of the 
+        Flettner rotor at high Reynolds number, RINA Wind propulsion conference
+        """
+        return cls(
+            model = RotatingCylinder(
+                spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
+                cl_data = [0.0, 1.3484, 2.6596, 4.6177, 7.1980, 7.9874, 8.0, 9.0, 9.00],
+            )
+        )
+        
+    @classmethod
+    def rotor_sail_ostman_2023(cls) -> "SectionModel":
+        """
+        Model of a rotor sail that is tuned based on data in: Ostman, 2023, Calculation of Flettner 
+        rotor forces using lifting line and CFD methods, NuTTS conference
         """
         return cls(
             model = RotatingCylinder(

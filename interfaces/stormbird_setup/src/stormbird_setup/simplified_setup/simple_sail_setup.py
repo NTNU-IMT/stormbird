@@ -52,7 +52,7 @@ class SailType(Enum):
             case SailType.WingSailTwoElement:
                 section_model = SectionModel.default_wing_sail_two_element()
             case SailType.RotorSail:
-                section_model = SectionModel.default_rotor_sail()
+                section_model = SectionModel.rotor_sail_deybach_2024()
             case SailType.SuctionSail:
                 section_model = SectionModel.default_suction_sail_turbosail(scale_factor = 1.1)
             case _:
