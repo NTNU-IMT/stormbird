@@ -59,6 +59,10 @@ pub struct LineForceModel {
     pub chord_vectors_local_not_rotated: Vec<SpatialVector>,
     /// The length of the chord vectors, stored as it is needed for several calculations
     pub chord_lengths: Vec<Float>,
+    /// A vector with booleans that indicate wether each span line is "virtual" or "real". A virtual 
+    /// line segment is predominately used to effectively increase the aspect ratio, without having 
+    /// add more line segments in the force calculation
+    pub line_segment_is_virtual: Vec<bool>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
     pub section_models: Vec<SectionModel>,
     /// Indices used to sort different wings from each other.
@@ -130,6 +134,7 @@ impl LineForceModel {
             span_lines_local: Vec::new(),
             chord_vectors_local_not_rotated: Vec::new(),
             chord_lengths: Vec::new(),
+            line_segment_is_virtual: Vec::new(),
             section_models: Vec::new(),
             wing_indices: Vec::new(),
             rigid_body_motion: RigidBodyMotion::default(),
@@ -183,6 +188,10 @@ impl LineForceModel {
 
         for chord_length in &wing.chord_lengths {
             self.chord_lengths.push(*chord_length);
+        }
+
+        for is_virtual in &wing.line_segment_is_virtual {
+            self.line_segment_is_virtual.push(*is_virtual);
         }
 
         self.section_models.push(wing.section_model.clone());

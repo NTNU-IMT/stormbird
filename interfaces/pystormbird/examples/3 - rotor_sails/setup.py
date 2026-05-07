@@ -20,9 +20,10 @@ from pystormbird.lifting_line import Simulation
 
 # These settings are used to generate multiple versions of the simulation, for test purposes
 TEST_SETTINGS = {
-    "max_induced_velocity_ratios": [0.0, 2.0, 2.0, 0.0],
-    "smoothing_lengths": [0.0, 0.0, 0.0, 0.05],
-    "solver_types": [SolverType.SimpleIterative, SolverType.SimpleIterative, SolverType.Linearized, SolverType.SimpleIterative]
+    "solver_types": [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative],
+    "max_induced_velocity_ratios": [0.0, 0.0, 0.0],
+    "smoothing_lengths": [0.0, 0.0, 0.0],
+    "virtual_extension_factor_top": [0.0, 0.0, 0.1]
 }
 
 def revolutions_per_second_from_spin_ratio(
@@ -49,7 +50,8 @@ def simulate_single_case(
     solver_type: SolverType = SolverType.Linearized,
     max_induced_velocity_ratio: float = 2.0,
     smoothing_length: float = 0.0,
-    wind_direction_deg = 0.0
+    wind_direction_deg: float = 0.0,
+    virtual_extension_factor_top: float = 0.0
 ) -> list[dict]:
 
     diameter = 5.0
@@ -59,8 +61,7 @@ def simulate_single_case(
     density  = 1.225
     nr_sections = 32
     
-    
-    non_zero_circulation_at_ends = (True, False)
+    non_zero_circulation_at_ends = (True, True)
     
     nr_sails = len(rotor_x_locations)
     
@@ -70,18 +71,34 @@ def simulate_single_case(
     
     wing_builders = []
     
-    for x, y in zip(rotor_x_locations, rotor_y_locations):        
+    for x, y in zip(rotor_x_locations, rotor_y_locations):
+        section_points = [
+            SpatialVector(x=x, y=y, z=foundation_height),
+            SpatialVector(x=x, y=y, z=foundation_height + height)
+        ]
+
+        chord_vectors = [
+            chord_vector,
+            chord_vector
+        ]
+
+        line_segment_is_virtual = None
+        if virtual_extension_factor_top > 0.0:
+            section_points.append(
+                SpatialVector(x=x, y=y, z=foundation_height + height + virtual_extension_factor_top * diameter)
+            )
+
+            chord_vectors.append(chord_vector)
+
+            line_segment_is_virtual = [False, True]
+            
+        
         wing_builders.append(
             WingBuilder(
-                section_points = [
-                    SpatialVector(x=x, y=y, z=foundation_height),
-                    SpatialVector(x=x, y=y, z=foundation_height + height)
-                ],
-                chord_vectors = [
-                    chord_vector,
-                    chord_vector
-                ],
-                section_model = SectionModel.default_rotor_sail(),
+                section_points = section_points,
+                chord_vectors = chord_vectors,
+                line_segment_is_virtual = line_segment_is_virtual,
+                section_model = SectionModel.rotor_sail_deybach_2024(),
                 non_zero_circulation_at_ends = non_zero_circulation_at_ends
             )
         )

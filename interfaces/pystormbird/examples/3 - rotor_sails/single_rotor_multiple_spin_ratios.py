@@ -14,7 +14,7 @@ from setup import simulate_single_case, TEST_SETTINGS
 if __name__ == "__main__":
     comparison_data = json.load(open("../comparison_data/deybach_2024_rotor_sail_data.json", "r"))
     
-    spin_ratio = np.arange(0.0, 5.5, 0.25)
+    spin_ratio = np.arange(0.0, 4.5, 0.25)
     n_spin_ratios = len(spin_ratio)
 
     w_plot = 18
@@ -28,13 +28,16 @@ if __name__ == "__main__":
         solver = TEST_SETTINGS["solver_types"][index]
         max_induced_velocity_ratio = TEST_SETTINGS["max_induced_velocity_ratios"][index]
         smoothing_length = TEST_SETTINGS["smoothing_lengths"][index]
+        virtual_extension_factor_top = TEST_SETTINGS["virtual_extension_factor_top"][index]
         
         label = solver.name
 
         if max_induced_velocity_ratio > 0.0:
             label += f", max u_i ratio {max_induced_velocity_ratio:.1f}"
         if smoothing_length > 0.0:
-            label += f", smoothing length {smoothing_length:.3f}"
+            label += f", smoothing length {smoothing_length:.2f}"
+        if virtual_extension_factor_top > 0.0:
+            label += f", virtual extension factor {virtual_extension_factor_top:.2f}"
 
         print()
         print(label)
@@ -51,14 +54,15 @@ if __name__ == "__main__":
                 spin_ratio = spin_ratio[spin_index],
                 solver_type = solver,
                 max_induced_velocity_ratio = max_induced_velocity_ratio,
-                smoothing_length = smoothing_length
+                smoothing_length = smoothing_length,
+                virtual_extension_factor_top = virtual_extension_factor_top
             )[0]
 
             cl[spin_index] = res['cy']
             cd[spin_index] = res['cx']
 
         ax1.plot(spin_ratio, cl, label='Lifting line, ' + label)
-        ax2.plot(spin_ratio, cd, label='Lifting line, ' + label)
+        ax2.plot(cl, cd, label='Lifting line, ' + label)
 
 
     # --------------- Comparison data ------------------------
@@ -66,26 +70,29 @@ if __name__ == "__main__":
         comparison_data["spin_ratios"], 
         comparison_data["cl"], 
         "-o",
-        label="CFD, Ostman et al. (2022)"
+        label="Experiment, Deybach et al. (2024)"
     )
     
     ax2.plot(
-        comparison_data["spin_ratios"], 
+        comparison_data["cl"], 
         comparison_data["cd"], 
         "-o",
-        label="CFD, Ostman et al. (2022)"
+        label="Experiment, Deybach et al. (2024)"
     )
+
+    spin_ratio_max = 4.25
+    cl_max = 9.5
     
-    ax1.set_xlim(0.0, 5.25)
-    ax1.set_ylim(0.0, 12.0)
+    ax1.set_xlim(0.0, spin_ratio_max)
+    ax1.set_ylim(0.0, cl_max)
     
-    ax2.set_xlim(0.0, 5.25)
+    ax2.set_xlim(0.0, cl_max)
     ax2.set_ylim(0.0, 5.0)
         
     ax1.set_xlabel("Spin ratio")
     ax1.set_ylabel("Lift coefficient")
 
-    ax2.set_xlabel("Spin ratio")
+    ax2.set_xlabel("Lift coefficient")
     ax2.set_ylabel("Drag coefficient")
 
     ax1.legend(loc=4)

@@ -25,6 +25,7 @@ class WingBuilder(StormbirdSetupBaseModel):
     section_points: list[SpatialVector]
     chord_vectors: list[SpatialVector]
     section_model: SectionModel
+    line_segment_is_virtual: list[bool] | None = None
     non_zero_circulation_at_ends: tuple[bool, bool] = (False, False)
     nr_sections: int | None = None
     input_power_model: InputPowerModel = InputPowerModel()
@@ -37,7 +38,7 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     Interface to the line force model builder
     '''
     wing_builders: list[WingBuilder] = []
-    nr_sections: int = 20
+    nr_sections: int = 32
     density: float = 1.225
     local_wing_angles: list[float] = []
     rotation: SpatialVector = SpatialVector()
