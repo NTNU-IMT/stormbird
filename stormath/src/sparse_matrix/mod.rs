@@ -12,11 +12,12 @@ pub mod linalg;
 pub struct SparseMatrix<const N: usize, > {
     pub values: Vec<[Float; N]>,
     pub col_indices: Vec<[usize; N]>,
-    pub row_length: Vec<usize>
+    pub row_length: Vec<usize>,
+    pub shape: [usize; 2]
 }
 
 impl <const N: usize> SparseMatrix<N> {
-    pub fn new_default(nr_rows: usize) -> Self {
+    pub fn new_default(nr_rows: usize, nr_cols: usize) -> Self {
         let values = vec![[0.0; N]; nr_rows];
         let col_indices = vec![[0; N]; nr_rows];
         let row_length = vec![0; nr_rows];
@@ -24,7 +25,8 @@ impl <const N: usize> SparseMatrix<N> {
         Self {
             values,
             col_indices,
-            row_length
+            row_length,
+            shape: [nr_rows, nr_cols]
         }
     }
     

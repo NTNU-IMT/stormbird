@@ -23,6 +23,7 @@ pub struct Simulation {
     pub velocity: StaggeredSpatialVectors,
     pub body_force: Vec<SpatialVector>,
     pub boundary_conditions: BoundaryConditions,
+    pub pressure_fixed_rhs: Vec<Float>,
     pub pressure_solver: PressureSolver,
     pub grid: Grid,
     pub viscosity: Float,
@@ -302,7 +303,7 @@ impl Simulation {
                     let dv_dy = (velocity.data[1][i_l.current] - velocity.data[1][i_l.neg[1]]) / dy;
                     let dw_dz = (velocity.data[2][i_l.current] - velocity.data[2][i_l.neg[2]]) / dz;
                     
-                    out[i_0_int] = self.pressure_solver.fixed_rhs[i_0_int] + 
+                    out[i_0_int] = self.pressure_fixed_rhs[i_0_int] + 
                         self.density * (du_dx + dv_dy + dw_dz) / time_step;
                 }
             }

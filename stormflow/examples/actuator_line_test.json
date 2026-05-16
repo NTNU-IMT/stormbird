@@ -9,9 +9,12 @@
   ],
   "nr_interior_cells": [128, 64, 48],
   "viscosity": 0.001,
-  "solver_settings": {
-    "min_number_of_iterations": 1,
-    "max_number_of_iterations": 100
+  "pressure_solver": {
+    "solver_settings": {
+      "min_number_of_iterations": 5,
+      "max_number_of_iterations": 10
+    },
+    "solver_type": "Multigrid"
   },
   "actuator_line": {
     "line_force_model": {

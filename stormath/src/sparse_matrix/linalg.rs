@@ -5,7 +5,6 @@ use rayon::prelude::*;
 use crate::matrix::linalg::IterativeSolverSettings;
 use crate::error::Error;
 
-
 impl<const N: usize> SparseMatrix<N> {
     /// Solves the equation system Ax = b using the Jacobi method.
     ///
@@ -68,7 +67,7 @@ mod tests {
             shape: [3, 3],
         };
         
-        let mut a_sparse: SparseMatrix<3> = SparseMatrix::new_default(3);
+        let mut a_sparse: SparseMatrix<3> = SparseMatrix::new_default(3, 3);
         
         for i in 0..3 {
             for j in 0..3 {

@@ -1,20 +1,47 @@
+pub mod builder;
+pub mod jacobi;
+pub mod multigrid;
+
 use stormath::type_aliases::Float;
 use stormath::sparse_matrix::SparseMatrix;
-use stormath::matrix::linalg::IterativeSolverSettings;
 
 use crate::grid::Grid;
 use crate::boundary_conditions::{BoundaryCondition, BoundaryConditions};
 
+use jacobi::PressureSolverJacobi;
+use multigrid::PressureSolverMultiGrid;
+
 const MATRIX_ROW_LENGTH: usize = 9;
 
-#[derive(Debug, Clone)]
-pub struct PressureSolver {
-    pub matrix: SparseMatrix<MATRIX_ROW_LENGTH>,
-    pub fixed_rhs: Vec<Float>,
-    pub solver_settings: IterativeSolverSettings
+pub enum PressureSolver {
+    Jacobi(PressureSolverJacobi),
+    Multigrid(PressureSolverMultiGrid)
 }
 
 impl PressureSolver {
+    pub fn solve(&self, initial_guess: &[Float], rhs: &[Float])-> Vec<Float> {
+        let x = match self {
+            Self::Jacobi(solver) => solver.solve(initial_guess, rhs),
+            Self::Multigrid(solver) => solver.solve(initial_guess, rhs)
+        };
+
+        let matrix_product = match self {
+            Self::Jacobi(solver) => solver.matrix.vector_multiply(&x),
+            Self::Multigrid(solver) => solver.matrices[0].vector_multiply(&x)
+        };
+
+        let residual_sum = matrix_product
+            .iter()
+            .zip(rhs.iter())
+            .map(|(ax, r)| (r - ax).abs())
+            .sum::<Float>() / rhs.len() as Float;
+
+        println!("Residual sum: {}", residual_sum);
+
+        x
+    }
+    
+    /// Sets up the equation system for the a Poisson matrix 
     pub fn poisson_matrix_and_rhs(
         grid: &Grid, 
         boundary_conditions: &BoundaryConditions
@@ -25,7 +52,10 @@ impl PressureSolver {
         
         let nr_interior_cells = nx * ny * nz;
         
-        let mut matrix: SparseMatrix<MATRIX_ROW_LENGTH> = SparseMatrix::new_default(nr_interior_cells);
+        let mut matrix: SparseMatrix<MATRIX_ROW_LENGTH> = SparseMatrix::new_default(
+            nr_interior_cells, 
+            nr_interior_cells
+        );
         let mut rhs: Vec<Float> = vec![0.0; nr_interior_cells];
         
         for i_x in 0..nx {
@@ -76,7 +106,7 @@ impl PressureSolver {
                         matrix[[i_l.current, i_l.current]] += -2.0 / dx.powi(2);
                         matrix[[i_l.current, i_l.pos[0]]] += 1.0 / dx.powi(2);
                     }
-
+    
                     // Y direction
                     if i_y == 0 {
                         match boundary_conditions.pressure[1][0] {
@@ -93,7 +123,7 @@ impl PressureSolver {
                                 // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{2 * value - p_j - 2 p_j + p_{j+1}}{dy^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
                                 matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
-
+    
                                 rhs[i_l.current] += -2.0 * value / dy.powi(2);
                             }
                         }
@@ -112,7 +142,7 @@ impl PressureSolver {
                                 // \frac{p_{j-1} - 2 p_j + p_{j+1}}{dy^2} = \frac{p_{j-1} - 2 p_j + 2 * value - p_j}{dy^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dy.powi(2);
                                 matrix[[i_l.current, i_l.neg[1]]] += 1.0 / dy.powi(2);
-
+    
                                 rhs[i_l.current] += -2.0 * value / dy.powi(2);
                             }
                         }
@@ -121,7 +151,7 @@ impl PressureSolver {
                         matrix[[i_l.current, i_l.current]] += -2.0 / dy.powi(2);
                         matrix[[i_l.current, i_l.pos[1]]] += 1.0 / dy.powi(2);
                     }
-
+    
                     // Z direction
                     if i_z == 0 {
                         match boundary_conditions.pressure[2][0] {
@@ -138,7 +168,7 @@ impl PressureSolver {
                                 // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{2 * value - p_k - 2 p_k + p_{k+1}}{dz^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
                                 matrix[[i_l.current, i_l.pos[2]]] += 1.0 / dz.powi(2);
-
+    
                                 rhs[i_l.current] += -2.0 * value / dz.powi(2);
                             }
                         }
@@ -157,7 +187,7 @@ impl PressureSolver {
                                 // \frac{p_{k-1} - 2 p_k + p_{k+1}}{dz^2} = \frac{p_{k-1} - 2 p_k + 2 * value - p_k}{dz^2}
                                 matrix[[i_l.current, i_l.current]] += -3.0 / dz.powi(2);
                                 matrix[[i_l.current, i_l.neg[2]]] += 1.0 / dz.powi(2);
-
+    
                                 rhs[i_l.current] += -2.0 * value / dz.powi(2);
                             }
                         }
@@ -172,12 +202,5 @@ impl PressureSolver {
         
         (matrix, rhs)
     }
-    
-    pub fn solve(&self, initial_guess: &[Float], rhs: &[Float])-> Vec<Float> {        
-        let pressure_interior = self.matrix.solve_jacobi(
-            rhs, &initial_guess, &self.solver_settings
-        ).unwrap();
-        
-        pressure_interior
-    }
 }
+

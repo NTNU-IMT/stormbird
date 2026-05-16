@@ -5,7 +5,6 @@ use serde::{Serialize, Deserialize};
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
-use stormath::matrix::linalg::IterativeSolverSettings;
 
 use stormbird::actuator_line::builder::ActuatorLineBuilder;
 
@@ -15,7 +14,10 @@ use crate::boundary_conditions::{BoundaryConditionBuilder, BoundaryConditions, B
 use crate::grid::{Grid, INTERIOR_OFFSET};
 use crate::simulation::Simulation;
 use crate::geometry::Geometry;
-use crate::pressure_solver::PressureSolver;
+use crate::pressure_solver::{
+    PressureSolver,
+    builder::PressureSolverBuilder
+};
 
 use crate::error::Error;
 use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
@@ -30,7 +32,7 @@ pub struct SimulationBuilder {
     pub nr_interior_cells: [usize; 3],
     pub viscosity: Float,
     #[serde(default)]
-    pub solver_settings: IterativeSolverSettings,
+    pub pressure_solver: PressureSolverBuilder,
     #[serde(default)]
     pub actuator_line: Option<ActuatorLineBuilder>,
     #[serde(default)]
@@ -117,13 +119,15 @@ impl SimulationBuilder {
             }
         }
         
-        let (matrix, fixed_rhs) = PressureSolver::poisson_matrix_and_rhs(&grid, &boundary_conditions);
+        let (_, pressure_fixed_rhs) = PressureSolver::poisson_matrix_and_rhs(
+            &grid, 
+            &boundary_conditions
+        );
         
-        let pressure_solver = PressureSolver{
-            matrix,
-            fixed_rhs,
-            solver_settings: self.solver_settings.clone()
-        };
+        let pressure_solver = self.pressure_solver.build(
+            &grid,
+            &boundary_conditions
+        );
         
         let actuator_line = if let Some(builder) = &self.actuator_line {
             Some(
@@ -142,6 +146,7 @@ impl SimulationBuilder {
             velocity,
             body_force,
             boundary_conditions,
+            pressure_fixed_rhs,
             pressure_solver,
             grid,
             viscosity: self.viscosity,

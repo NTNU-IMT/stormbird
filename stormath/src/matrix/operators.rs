@@ -131,15 +131,15 @@ where T: Default + Clone + Copy + Debug +
     }
 
     /// Performs a multiplication with the supplied vector
-    pub fn vector_multiply(&self, vector: &[T]) -> Vec<T> {
-        assert_eq!(self.shape[1], vector.len(), "Matrix and vector shapes do not match for multiplication");
+    pub fn vector_multiply(&self, x: &[T]) -> Vec<T> {
+        assert_eq!(self.shape[1], x.len(), "Matrix and vector shapes do not match for multiplication");
 
         let mut result = vec![T::default(); self.shape[0]];
 
         for i in 0..self.shape[0] {
             let mut sum = T::default();
             for j in 0..self.shape[1] {
-                sum = sum + self[[i, j]] * vector[j];
+                sum = sum + self[[i, j]] * x[j];
             }
             result[i] = sum;
         }
