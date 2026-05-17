@@ -20,7 +20,6 @@ use crate::pressure_solver::{
 };
 
 use crate::error::Error;
-use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -70,13 +69,10 @@ impl SimulationBuilder {
         let total_nr_cells = nr_extended_cells[0] * nr_extended_cells[1] * nr_extended_cells[2];
         
         let pressure = vec![0.0; total_nr_cells];
-        let velocity = StaggeredSpatialVectors{
-            data: [
-                vec![self.initial_velocity[0]; total_nr_cells],
-                vec![self.initial_velocity[1]; total_nr_cells],
-                vec![self.initial_velocity[2]; total_nr_cells],
-            ]
-        };
+
+        let velocity = vec![self.initial_velocity; total_nr_cells];
+        let velocity_org = vec![SpatialVector::default(); total_nr_cells];
+        let velocity_star = vec![SpatialVector::default(); total_nr_cells];
         
         let body_force = vec![SpatialVector::default(); total_nr_cells];
         
@@ -144,6 +140,8 @@ impl SimulationBuilder {
         Simulation {
             pressure, 
             velocity,
+            velocity_org,
+            velocity_star,
             body_force,
             boundary_conditions,
             pressure_fixed_rhs,

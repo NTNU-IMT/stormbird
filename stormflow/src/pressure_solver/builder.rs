@@ -1,4 +1,4 @@
-use stormath::matrix::linalg::IterativeSolverSettings;
+use stormath::sparse_matrix::linalg::IterativeSolverSettings;
 
 use serde::{Serialize, Deserialize};
 
@@ -26,11 +26,12 @@ impl PressureSolverBuilder {
     pub fn build(&self, grid: &Grid, boundary_conditions: &BoundaryConditions) -> PressureSolver {
         match self.solver_type {
             PressureSolverType::Jacobi => {
-                let (matrix, _) = PressureSolver::poisson_matrix_and_rhs(grid, boundary_conditions);
+                let (matrix, rhs) = PressureSolver::poisson_matrix_and_rhs(grid, boundary_conditions);
                 
                 PressureSolver::Jacobi(
                     PressureSolverJacobi {
                         matrix,
+                        work: vec![0.0; rhs.len()],
                         solver_settings: self.solver_settings.clone()
                     }
                 )

@@ -12,34 +12,6 @@ use super::*;
 
 use crate::error::Error;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IterativeSolverSettings {
-    #[serde(default="IterativeSolverSettings::default_min_number_of_iterations")]
-    pub min_number_of_iterations: usize,
-    #[serde(default="IterativeSolverSettings::default_max_number_of_iterations")]
-    pub max_number_of_iterations: usize,
-    #[serde(default="IterativeSolverSettings::default_relative_residual_limit")]
-    pub relative_residual_limit: Float
-}
-
-impl IterativeSolverSettings {
-    fn default_min_number_of_iterations() -> usize {1}
-    fn default_max_number_of_iterations() -> usize {1000}
-    fn default_relative_residual_limit() -> Float {0.00001}
-}
-
-impl Default for IterativeSolverSettings {
-    fn default() -> Self {
-        Self {
-            min_number_of_iterations: Self::default_min_number_of_iterations(),
-            max_number_of_iterations: Self::default_max_number_of_iterations(),
-            relative_residual_limit: Self::default_relative_residual_limit()
-        }
-    }
-}
 
 impl Matrix<Float>{
     pub fn check_dimensions_for_solvability(&self, rhs: &[Float]) {
@@ -131,60 +103,6 @@ impl Matrix<Float>{
 
         Ok(x)
     }
-    
-    /// Solves the equation system Ax = b using Gauss-Seidel method.
-    ///
-    /// Source: <https://en.wikipedia.org/wiki/Gauss%E2%80%93Seidel_method>
-    pub fn solve_gauss_seidel(
-        &self, 
-        rhs: &[Float], 
-        initial_guess: &[Float], 
-        settings: &IterativeSolverSettings
-    ) -> Result<Vec<Float>, Error> {
-        self.check_dimensions_for_solvability(rhs);
-
-        let n = self.nr_rows();
-
-        let mut estimated_solution = initial_guess.to_vec();
-        
-        let initial_residual = self.linear_residual_absolute_sum(rhs, &estimated_solution);
-        
-        for i in 0..n {
-            if self[[i, i]].abs() < 1e-12 {
-                return Err(
-                    Error::NoSolution(format!("Matrix is singular or nearly singular at row {}", i))
-                );
-            }
-        }
-        
-        let diag_inv: Vec<Float> = (0..n).map(|i| 1.0 / self[[i, i]]).collect();
-
-        for iteration in 0..settings.max_number_of_iterations {
-            for i in 0..n {
-                let row = self.row_slice(i);
-                
-                let sigma =
-                    row[..i].iter().zip(&estimated_solution[..i])
-                        .map(|(a, x)| a * x).sum::<Float>()
-                  + row[i+1..].iter().zip(&estimated_solution[i+1..])
-                        .map(|(a, x)| a * x).sum::<Float>();
-                
-                estimated_solution[i] = (rhs[i] - sigma) * diag_inv[i];
-            }
-            
-            
-            if iteration > settings.min_number_of_iterations {
-                let new_residual = self.linear_residual_absolute_sum(rhs, &estimated_solution);
-                
-                if new_residual / initial_residual < settings.relative_residual_limit {
-                    break
-                }
-            }
-            
-        }
-
-        Ok(estimated_solution)
-    }
 }
 
 #[cfg(test)]
@@ -205,31 +123,16 @@ mod tests {
         let b = vec![1.0, 2.0, 3.0];
 
         let x_solved_elimination = a.solve_gaussian_elimination(&b).unwrap();
-        
-        let initial_guess = vec![0.0; 3];
-        
-        let x_solved_iterative = a.solve_gauss_seidel(
-            &b, 
-            &initial_guess, 
-            &IterativeSolverSettings::default()
-        ).unwrap();
 
         let x_numpy = vec![0.6, -0.4,  2.0]; // Manually extracted from NumPy
 
         dbg!(&x_solved_elimination);
-        dbg!(&x_solved_iterative);
 
         for i in 0..x_solved_elimination.len() {
             assert!(
                 (x_solved_elimination[i] - x_numpy[i]).abs() < allowable_error,
                 "Mismatch at index {}: {} != {}",
                 i, x_solved_elimination[i], x_numpy[i]
-            );
-
-            assert!(
-                (x_solved_iterative[i] - x_numpy[i]).abs() < allowable_error,
-                "Mismatch at index {}: {} != {}",
-                i, x_solved_iterative[i], x_numpy[i]
             );
         }
     }

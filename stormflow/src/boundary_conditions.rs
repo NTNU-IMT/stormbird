@@ -5,8 +5,6 @@ use stormath::spatial_vector::SpatialVector;
 
 use serde::{Serialize, Deserialize};
 
-use crate::staggered_spatial_vectors::StaggeredSpatialVectors;
-
 use super::grid::Grid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,7 +41,7 @@ impl BoundaryConditions {
     pub fn set_velocity_ghost_cells(
         &self, 
         grid: &Grid, 
-        velocity: &mut StaggeredSpatialVectors
+        velocity: &mut [SpatialVector]
     ) {
         let [nx, ny, nz] = grid.nr_extended_cells.clone();
         
@@ -107,17 +105,22 @@ impl BoundaryConditions {
                                 if axis_index == 0 {
                                     // Principle: velocity_x is defined on the boundary face directly
                                     let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
-                                    velocity.data[0][face_flat] = value
+                                    velocity[face_flat][0] = value;
+                                    
+                                    // For the positive boundary, also set the ghost cell
+                                    if face_index == 1 {
+                                        velocity[flat_index_current][0] = value;
+                                    }
                                 } else {
                                     // Principle: the x-component is half a cell length away from the boundary
                                     // face. u_face = 0.5 * (u_j + u_{j+1})
                                     // u_{j} = 2 * u_face - u_{j+1}
-                                    velocity.data[0][flat_index_current] = 2.0 * value - velocity.data[0][flat_index_neighbor]
+                                    velocity[flat_index_current][0] = 2.0 * value - velocity[flat_index_neighbor][0]
                                 }
                                 
                             },
                             BoundaryCondition::ZeroGradient => {
-                                velocity.data[0][flat_index_current] = velocity.data[0][flat_index_neighbor]
+                                velocity[flat_index_current][0] = velocity[flat_index_neighbor][0]
                             }
                         }
                         
@@ -125,14 +128,19 @@ impl BoundaryConditions {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 1 {
                                     let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
-                                    velocity.data[1][face_flat] = value
+                                    velocity[face_flat][1] = value;
+                                    
+                                    // For the positive boundary, also set the ghost cell
+                                    if face_index == 1 {
+                                        velocity[flat_index_current][1] = value;
+                                    }
                                 } else {
-                                    velocity.data[1][flat_index_current] = 2.0 * value - velocity.data[1][flat_index_neighbor]
+                                    velocity[flat_index_current][1] = 2.0 * value - velocity[flat_index_neighbor][1]
                                 }
                                 
                             },
                             BoundaryCondition::ZeroGradient => {
-                                velocity.data[1][flat_index_current] = velocity.data[1][flat_index_neighbor]
+                                velocity[flat_index_current][1] = velocity[flat_index_neighbor][1]
                             }
                         }
                         
@@ -140,13 +148,18 @@ impl BoundaryConditions {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 2 {
                                     let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
-                                    velocity.data[2][face_flat] = value
+                                    velocity[face_flat][2] = value;
+                                    
+                                    // For the positive boundary, also set the ghost cell
+                                    if face_index == 1 {
+                                        velocity[flat_index_current][2] = value;
+                                    }
                                 } else {
-                                    velocity.data[2][flat_index_current] = 2.0 * value - velocity.data[2][flat_index_neighbor]
+                                    velocity[flat_index_current][2] = 2.0 * value - velocity[flat_index_neighbor][2]
                                 }
                             },
                             BoundaryCondition::ZeroGradient => {
-                                velocity.data[2][flat_index_current] = velocity.data[2][flat_index_neighbor]
+                                velocity[flat_index_current][2] = velocity[flat_index_neighbor][2]
                             }
                         }
                     }

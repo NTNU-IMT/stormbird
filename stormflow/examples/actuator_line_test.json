@@ -7,12 +7,12 @@
     ["Slip", "Slip"],
     ["Slip", "Slip"]
   ],
-  "nr_interior_cells": [128, 64, 48],
+  "nr_interior_cells": [128, 64, 64],
   "viscosity": 0.001,
   "pressure_solver": {
     "solver_settings": {
-      "min_number_of_iterations": 5,
-      "max_number_of_iterations": 10
+      "min_number_of_iterations": 3,
+      "max_number_of_iterations": 5
     },
     "solver_type": "Multigrid"
   },

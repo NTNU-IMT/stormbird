@@ -2,6 +2,8 @@ use super::*;
 
 use std::ops::{Index, IndexMut};
 
+use rayon::prelude::*;
+
 impl<const N: usize> Index<[usize; 2]> for SparseMatrix<N> {
     type Output = Float;
 
@@ -83,5 +85,39 @@ impl <const N: usize> SparseMatrix<N> {
         }
 
         result
+    }
+    
+    /// Performs a matrix multiplication with the supplied vector x in parallel,
+    /// writing the result into the provided buffer.
+    /// 
+    /// Each row's dot product is computed independently using Rayon's parallel iterators.
+    /// For small matrices, the sequential `vector_multiply` may be faster due to 
+    /// parallelization overhead.
+    pub fn vector_multiply_parallel(&self, x: &[Float], result: &mut [Float]) {
+        assert_eq!(
+            self.shape[1], 
+            x.len(), 
+            "Matrix and vector shapes do not match for multiplication"
+        );
+        
+        assert_eq!(
+            self.shape[0],
+            result.len(),
+            "Result buffer size does not match matrix row count"
+        );
+
+        result
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(i, result_i)| {
+                let mut sum = 0.0;
+
+                for j in 0..self.row_length[i] {
+                    let col_index = self.col_indices[i][j];
+                    sum += self.values[i][j] * x[col_index];
+                }
+
+                *result_i = sum;
+            });
     }
 }

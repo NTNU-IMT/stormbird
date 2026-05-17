@@ -19,15 +19,15 @@ pub enum PressureSolver {
 }
 
 impl PressureSolver {
-    pub fn solve(&self, initial_guess: &[Float], rhs: &[Float])-> Vec<Float> {
-        let x = match self {
-            Self::Jacobi(solver) => solver.solve(initial_guess, rhs),
-            Self::Multigrid(solver) => solver.solve(initial_guess, rhs)
+    pub fn solve(&mut self, pressure: &mut [Float], rhs: &[Float]) {
+        match self {
+            Self::Jacobi(solver) => solver.solve(pressure, rhs),
+            Self::Multigrid(solver) => solver.solve(pressure, rhs)
         };
 
         let matrix_product = match self {
-            Self::Jacobi(solver) => solver.matrix.vector_multiply(&x),
-            Self::Multigrid(solver) => solver.matrices[0].vector_multiply(&x)
+            Self::Jacobi(solver) => solver.matrix.vector_multiply(pressure),
+            Self::Multigrid(solver) => solver.matrices[0].vector_multiply(pressure)
         };
 
         let residual_sum = matrix_product
@@ -37,8 +37,6 @@ impl PressureSolver {
             .sum::<Float>() / rhs.len() as Float;
 
         println!("Residual sum: {}", residual_sum);
-
-        x
     }
     
     /// Sets up the equation system for the a Poisson matrix 

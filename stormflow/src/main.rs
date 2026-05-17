@@ -1,3 +1,4 @@
+use std::time::Instant;
 
 use stormflow::{
     simulation::builder::SimulationBuilder,
@@ -14,14 +15,14 @@ struct Args {
     /// Path to the settings file
     #[arg(short, long)]
     file_path: String,
-    
-    /// Time step
-    #[arg(short, long)]
-    time_step: Float,
-    
+
     /// End time
     #[arg(short, long)]
-    end_time: Float
+    end_time: Float,
+    
+    /// Time step
+    #[arg(short, long, default_value_t = 0.5)]
+    courant_number: Float,
 }
 
 
@@ -35,13 +36,21 @@ pub fn main() -> Result<(), Error> {
     sim.initialize_after_build();
     
     let mut time = 0.0;
+
+    let start_time = Instant::now();
     
     while time < args.end_time {
-        println!("Running time {}", time);
-        sim.do_step(time, args.time_step);
+        let time_step = sim.time_step_from_courant_number(args.courant_number);
         
-        time += args.time_step;
+        println!("Running time {}, with time step {}", time, time_step);
+        sim.do_step(time, time_step);
+        
+        time += time_step;
     }
+
+    let duration = start_time.elapsed();
+
+    println!("Total simulation time {:?} s", duration.as_secs());
     
     sim.export_fields_as_vtk("sim_result.vtk", true);
     
