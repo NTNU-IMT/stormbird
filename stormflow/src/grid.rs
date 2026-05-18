@@ -180,13 +180,12 @@ impl Grid {
         }
     }
     
-    pub fn interior_values_from_extended_values(
+    pub fn transfer_extended_values_to_interior_grid(
         &self,
-        extended_values: &[Float], 
-    ) -> Vec<Float> {
+        extended_values: &[Float],
+        interior_values: &mut [Float]
+    ) {
         let [nx, ny, nz] = self.nr_interior_cells();
-        
-        let mut out = vec![0.0; nx*ny*nz];
         
         for i_x in 0..nx {
             for i_y in 0..ny {
@@ -197,12 +196,10 @@ impl Grid {
                     let extended_indices = self.extended_indices_from_interior_indices(interior_indices);
                     let flat_index_extended = self.flat_index_on_extended_grid(extended_indices);
                     
-                    out[flat_index_interior] = extended_values[flat_index_extended];
+                    interior_values[flat_index_interior] = extended_values[flat_index_extended];
                 }
             }
         }
-        
-        out
     }
     
     /// Returns the coordinate of the cell center from the indices given. 

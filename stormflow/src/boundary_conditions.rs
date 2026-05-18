@@ -105,12 +105,7 @@ impl BoundaryConditions {
                                 if axis_index == 0 {
                                     // Principle: velocity_x is defined on the boundary face directly
                                     let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
-                                    velocity[face_flat][0] = value;
-                                    
-                                    // For the positive boundary, also set the ghost cell
-                                    if face_index == 1 {
-                                        velocity[flat_index_current][0] = value;
-                                    }
+                                    velocity[face_flat][0] = value
                                 } else {
                                     // Principle: the x-component is half a cell length away from the boundary
                                     // face. u_face = 0.5 * (u_j + u_{j+1})
@@ -128,12 +123,7 @@ impl BoundaryConditions {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 1 {
                                     let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
-                                    velocity[face_flat][1] = value;
-                                    
-                                    // For the positive boundary, also set the ghost cell
-                                    if face_index == 1 {
-                                        velocity[flat_index_current][1] = value;
-                                    }
+                                    velocity[face_flat][1] = value
                                 } else {
                                     velocity[flat_index_current][1] = 2.0 * value - velocity[flat_index_neighbor][1]
                                 }
@@ -148,12 +138,7 @@ impl BoundaryConditions {
                             BoundaryCondition::Value(value) => {
                                 if axis_index == 2 {
                                     let face_flat = if face_index == 0 { flat_index_current } else { flat_index_neighbor };
-                                    velocity[face_flat][2] = value;
-                                    
-                                    // For the positive boundary, also set the ghost cell
-                                    if face_index == 1 {
-                                        velocity[flat_index_current][2] = value;
-                                    }
+                                    velocity[face_flat][2] = value
                                 } else {
                                     velocity[flat_index_current][2] = 2.0 * value - velocity[flat_index_neighbor][2]
                                 }

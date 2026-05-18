@@ -24,7 +24,6 @@ pub struct PressureSolverMultiGrid {
 }
 
 const SMALLEST_NR_CELLS: usize = 2;
-const MAX_CELLS_FOR_EXACT_SOLVER: usize = 128;
 
 impl PressureSolverMultiGrid {
     pub fn new(
@@ -152,24 +151,14 @@ impl PressureSolverMultiGrid {
         }
 
         // Solve at the coarsest level
-        let coarsest_grid_size = self.rhs_at_levels[nr_grids-1].len();
-
-        if coarsest_grid_size > MAX_CELLS_FOR_EXACT_SOLVER {
-            self.x_at_levels[nr_grids-1].fill(0.0);
-            
-            self.matrices[nr_grids-1].solve_jacobi_into(
-                &self.rhs_at_levels[nr_grids-1],
-                &mut self.x_at_levels[nr_grids-1],
-                &mut self.x_at_levels_work[nr_grids-1],
-                nr_iterations
-            );
-        } else {
-            let solution = self.matrices[nr_grids-1].solve_exact(
-                &self.rhs_at_levels[nr_grids-1]
-            ).unwrap();
-            
-            self.x_at_levels[nr_grids-1].copy_from_slice(&solution);
-        }
+        self.x_at_levels[nr_grids-1].fill(0.0);
+        
+        self.matrices[nr_grids-1].solve_jacobi_into(
+            &self.rhs_at_levels[nr_grids-1],
+            &mut self.x_at_levels[nr_grids-1],
+            &mut self.x_at_levels_work[nr_grids-1],
+            nr_iterations * 2
+        );
         
         // Prolongate and smooth back up
         for i_g in (0..nr_grids-1).rev() {

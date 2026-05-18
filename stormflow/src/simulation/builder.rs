@@ -136,15 +136,20 @@ impl SimulationBuilder {
         } else {
             None
         };
+
+        let pressure_interior = vec![0.0; pressure_fixed_rhs.len()];
+        let pressure_rhs = vec![0.0; pressure_fixed_rhs.len()];
         
         Simulation {
-            pressure, 
             velocity,
             velocity_org,
             velocity_star,
+            pressure,
+            pressure_interior,
             body_force,
             boundary_conditions,
             pressure_fixed_rhs,
+            pressure_rhs,
             pressure_solver,
             grid,
             viscosity: self.viscosity,

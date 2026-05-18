@@ -37,7 +37,16 @@
         }
       ],
       "nr_sections": 32,
-      "density": 1.0
+      "density": 1.0,
+      "circulation_correction": {
+        "Smoothing": {
+          "smoothing_type": {
+            "Gaussian": {
+              "smoothing_length_factor": 0.05
+            }
+          }
+        }
+      }
     },
     "solver_settings": {
       "damping_factor": 0.5
