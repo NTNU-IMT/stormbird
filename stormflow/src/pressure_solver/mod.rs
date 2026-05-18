@@ -46,7 +46,7 @@ impl PressureSolver {
     ) -> (SparseMatrix<MATRIX_ROW_LENGTH>, Vec<Float>) {
         let [dx, dy, dz] = grid.cell_length.0;
            
-        let [nx, ny, nz] = grid.nr_interior_cells();
+        let [nx, ny, nz] = grid.interior_shape;
         
         let nr_interior_cells = nx * ny * nz;
         
@@ -201,4 +201,3 @@ impl PressureSolver {
         (matrix, rhs)
     }
 }
-

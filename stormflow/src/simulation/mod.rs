@@ -76,19 +76,14 @@ impl Simulation {
 
         self.velocity_org.copy_from_slice(&self.velocity);
 
-        println!("First prediction");
-        self.convect_and_diffuse(time_step);
-        self.correct_velocities_for_geometry();
-        self.project_pressure(time_step);
-        self.update_velocity(time_step);
-        self.correct_velocities_for_geometry();
-        
-        println!("Second prediction");
-        self.convect_and_diffuse(time_step);
-        self.correct_velocities_for_geometry();
-        self.project_pressure(time_step);
-        self.update_velocity(time_step);
-        self.correct_velocities_for_geometry();
+        for iteration in 0..2 {
+            println!("Prediction {}", iteration+1);
+            self.convect_and_diffuse(time_step);
+            self.correct_velocities_for_geometry();
+            self.project_pressure(time_step);
+            self.update_velocity(time_step);
+            self.correct_velocities_for_geometry();
+        }
         
         self.run_actuator_line_model(time, time_step);
         
@@ -136,7 +131,7 @@ impl Simulation {
     pub fn correct_velocities_for_geometry(&mut self) {
         let start_time = Instant::now();
         
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        let [nx, ny, nz] = self.grid.interior_shape;
         
         let mut max_dx = 0.0;
         for axis_index in 0..3 {
@@ -192,7 +187,7 @@ impl Simulation {
     
     pub fn actuator_line_initialization(&mut self) {
         if let Some(actuator_line) = self.actuator_line.as_mut() {
-            let [nx, ny, nz] = self.grid.nr_interior_cells();
+            let [nx, ny, nz] = self.grid.interior_shape;
             let nr_interior_cells = nx * ny * nz;
     
             // Collect results in parallel
@@ -220,7 +215,7 @@ impl Simulation {
     
     pub fn actuator_line_ctrl_points_velocity(&self) -> Vec<SpatialVector> {
         if let Some(actuator_line) = &self.actuator_line {
-            let [nx, ny, nz] = self.grid.nr_interior_cells();
+            let [nx, ny, nz] = self.grid.interior_shape;
             
             let nr_interior_cells = nx * ny * nz;
             
@@ -283,7 +278,7 @@ impl Simulation {
         
         // Transfer body forces to the grid
         if let Some(actuator_line) = &self.actuator_line {
-            let [nx, ny, nz] = self.grid.nr_interior_cells();
+            let [nx, ny, nz] = self.grid.interior_shape;
             
             let nr_interior_cells = nx * ny * nz;
             
@@ -320,7 +315,7 @@ impl Simulation {
     pub fn pressure_projection_rhs(&mut self, time_step: Float) {
         let start_time = Instant::now();
         
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        let [nx, ny, nz] = self.grid.interior_shape;
         let [dx, dy, dz] = self.grid.cell_length.0;
         
         for i_x in 0..nx {
@@ -365,7 +360,7 @@ impl Simulation {
     pub fn convect_and_diffuse(&mut self, time_step: Float) {
         let start_time = Instant::now();
         
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        let [nx, ny, nz] = self.grid.interior_shape;
         let nr_interior_cells = nx * ny * nz;
         
         // Get raw pointer and cast to usize for thread-safe sharing
@@ -412,7 +407,7 @@ impl Simulation {
     pub fn update_velocity(&mut self, time_step: Float) {
         let start_time = Instant::now();
         
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        let [nx, ny, nz] = self.grid.interior_shape;
         
         let nr_interior_cells = nx * ny * nz;
         

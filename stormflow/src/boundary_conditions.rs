@@ -43,7 +43,7 @@ impl BoundaryConditions {
         grid: &Grid, 
         velocity: &mut [SpatialVector]
     ) {
-        let [nx, ny, nz] = grid.nr_extended_cells.clone();
+        let [nx, ny, nz] = grid.extended_shape.clone();
         
         // x-faces
         for axis_index in 0..3 {
@@ -160,7 +160,7 @@ impl BoundaryConditions {
         grid: &Grid, 
         p: &mut [Float]
     ) {
-        let [nx, ny, nz] = grid.nr_extended_cells.clone();
+        let [nx, ny, nz] = grid.extended_shape.clone();
         
         for axis_index in 0..3 {
             let axis_length = match axis_index {
@@ -236,7 +236,7 @@ impl BoundaryConditions {
         grid: &Grid, 
         p: &mut [Float]
     ) {
-        let [nx, ny, nz] = grid.nr_extended_cells.clone();
+        let [nx, ny, nz] = grid.extended_shape.clone();
         
         for axis_index in 0..3 {
             let axis_length = match axis_index {

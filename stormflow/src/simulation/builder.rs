@@ -60,13 +60,19 @@ impl SimulationBuilder {
             domain_length[2] / self.nr_interior_cells[2] as Float,
         ]);
         
-        let nr_extended_cells = [
+        let extended_shape = [
             self.nr_interior_cells[0] + 2 * INTERIOR_OFFSET,
             self.nr_interior_cells[1] + 2 * INTERIOR_OFFSET,
             self.nr_interior_cells[2] + 2 * INTERIOR_OFFSET,
         ];
+
+        let interior_shape = [
+            self.nr_interior_cells[0],
+            self.nr_interior_cells[1],
+            self.nr_interior_cells[2] ,
+        ];
         
-        let total_nr_cells = nr_extended_cells[0] * nr_extended_cells[1] * nr_extended_cells[2];
+        let total_nr_cells = extended_shape[0] * extended_shape[1] * extended_shape[2];
         
         let pressure = vec![0.0; total_nr_cells];
 
@@ -79,7 +85,8 @@ impl SimulationBuilder {
         let grid = Grid{
             start_point: self.domain_start_point,
             cell_length,
-            nr_extended_cells
+            interior_shape,
+            extended_shape
         };
         
         let mut boundary_conditions = BoundaryConditions::default();

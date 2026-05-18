@@ -5,7 +5,7 @@ use std::io::{BufWriter, Write};
 
 impl Simulation {
     pub fn export_fields_as_vtk(&self, file_path: &str, binary: bool) {
-        let [nx, ny, nz] = self.grid.nr_interior_cells();
+        let [nx, ny, nz] = self.grid.interior_shape;
         let [x0, y0, z0] = self.grid.start_point.0;
         let [dx, dy, dz] = self.grid.cell_length.0;
 

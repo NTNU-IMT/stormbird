@@ -17,7 +17,8 @@ impl PressureSolverJacobi {
             rhs, 
             pressure, 
             &mut self.work, 
-            self.solver_settings.max_number_of_iterations
+            self.solver_settings.max_number_of_iterations,
+            self.solver_settings.jacobi_weight
         );
     }
 }

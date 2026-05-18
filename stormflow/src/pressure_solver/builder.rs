@@ -26,7 +26,9 @@ impl PressureSolverBuilder {
     pub fn build(&self, grid: &Grid, boundary_conditions: &BoundaryConditions) -> PressureSolver {
         match self.solver_type {
             PressureSolverType::Jacobi => {
-                let (matrix, rhs) = PressureSolver::poisson_matrix_and_rhs(grid, boundary_conditions);
+                let (mut matrix, rhs) = PressureSolver::poisson_matrix_and_rhs(grid, boundary_conditions);
+
+                matrix.set_diagonal_data();
                 
                 PressureSolver::Jacobi(
                     PressureSolverJacobi {
