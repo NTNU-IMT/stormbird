@@ -25,10 +25,8 @@ pub struct Simulation {
     pub velocity_org: Vec<SpatialVector>,
     pub velocity_star: Vec<SpatialVector>,
     pub pressure: Vec<Float>,
-    pub pressure_interior: Vec<Float>,
     pub body_force: Vec<SpatialVector>,
     pub boundary_conditions: BoundaryConditions,
-    pub pressure_fixed_rhs: Vec<Float>,
     pub pressure_rhs: Vec<Float>,
     pub pressure_solver: PressureSolver,
     pub grid: Grid,
@@ -333,8 +331,7 @@ impl Simulation {
                     let dv_dy = (self.velocity_star[i_l.current][1] - self.velocity_star[i_l.neg[1]][1]) / dy;
                     let dw_dz = (self.velocity_star[i_l.current][2] - self.velocity_star[i_l.neg[2]][2]) / dz;
                     
-                    self.pressure_rhs[i_0_int] = self.pressure_fixed_rhs[i_0_int] + 
-                        self.density * (du_dx + dv_dy + dw_dz) / time_step;
+                    self.pressure_rhs[i_0_int] = self.density * (du_dx + dv_dy + dw_dz) / time_step;
                 }
             }
         }
@@ -346,11 +343,7 @@ impl Simulation {
         let start_time = Instant::now();
         self.pressure_projection_rhs(time_step);
         
-        self.grid.transfer_extended_values_to_interior_grid(&self.pressure, &mut self.pressure_interior);
-        
-        self.pressure_solver.solve(&mut self.pressure_interior, &self.pressure_rhs);
-        
-        self.grid.transfer_interior_values_to_extended_grid(&self.pressure_interior, &mut self.pressure);
+        self.pressure_solver.solve(&mut self.pressure, &self.pressure_rhs);
         
         self.boundary_conditions.set_pressure_ghost_cells(&self.grid, &mut self.pressure);
 

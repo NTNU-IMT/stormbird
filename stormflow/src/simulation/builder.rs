@@ -15,7 +15,6 @@ use crate::grid::{Grid, INTERIOR_OFFSET};
 use crate::simulation::Simulation;
 use crate::geometry::Geometry;
 use crate::pressure_solver::{
-    PressureSolver,
     builder::PressureSolverBuilder
 };
 
@@ -73,8 +72,11 @@ impl SimulationBuilder {
         ];
         
         let total_nr_cells = extended_shape[0] * extended_shape[1] * extended_shape[2];
+
+        let total_nr_interior_cells = interior_shape[0] * interior_shape[1] * interior_shape[2];
         
         let pressure = vec![0.0; total_nr_cells];
+        let pressure_rhs = vec![0.0; total_nr_interior_cells];
 
         let velocity = vec![self.initial_velocity; total_nr_cells];
         let velocity_org = vec![SpatialVector::default(); total_nr_cells];
@@ -122,11 +124,6 @@ impl SimulationBuilder {
             }
         }
         
-        let (_, pressure_fixed_rhs) = PressureSolver::poisson_matrix_and_rhs(
-            &grid, 
-            &boundary_conditions
-        );
-        
         let pressure_solver = self.pressure_solver.build(
             &grid,
             &boundary_conditions
@@ -143,19 +140,14 @@ impl SimulationBuilder {
         } else {
             None
         };
-
-        let pressure_interior = vec![0.0; pressure_fixed_rhs.len()];
-        let pressure_rhs = vec![0.0; pressure_fixed_rhs.len()];
         
         Simulation {
             velocity,
             velocity_org,
             velocity_star,
             pressure,
-            pressure_interior,
             body_force,
             boundary_conditions,
-            pressure_fixed_rhs,
             pressure_rhs,
             pressure_solver,
             grid,

@@ -1,22 +1,21 @@
 use rayon::prelude::*;
 
 use stormath::type_aliases::Float;
-use stormath::sparse_matrix::SparseMatrix;
 use stormath::sparse_matrix::linalg::IterativeSolverSettings;
+
+use super::kernels;
 
 use crate::{boundary_conditions::BoundaryConditions, grid::Grid};
 
-use super::{
-    MATRIX_ROW_LENGTH,
-    PressureSolver
-};
-
 pub struct PressureSolverMultiGrid {
     pub grids: Vec<Grid>,
-    pub matrices: Vec<SparseMatrix::<MATRIX_ROW_LENGTH>>,
+    pub boundary_conditions: BoundaryConditions,
     pub solver_settings: IterativeSolverSettings,
+    /// Solution values at each grid level. Stored on the **extended** grid (includes ghost cells).
     pub x_at_levels: Vec<Vec<Float>>,
+    /// Work buffer for Jacobi iterations. Stored on the **extended** grid.
     pub x_at_levels_work: Vec<Vec<Float>>,
+    /// Right-hand side at each grid level. Stored on the **interior** grid.
     pub rhs_at_levels: Vec<Vec<Float>>,
 }
 
@@ -30,8 +29,6 @@ impl PressureSolverMultiGrid {
     ) -> Self {
         let mut grid_can_get_coarser = true;
 
-        let mut matrices: Vec<SparseMatrix::<MATRIX_ROW_LENGTH>> = Vec::new();
-
         let mut x_at_levels: Vec<Vec<Float>> = Vec::new();
         let mut rhs_at_levels: Vec<Vec<Float>> = Vec::new();
 
@@ -40,30 +37,19 @@ impl PressureSolverMultiGrid {
         let mut grids: Vec<Grid> = Vec::new();
 
         while grid_can_get_coarser {
-            let (mut matrix, _) = PressureSolver::poisson_matrix_and_rhs(
-                &current_grid, 
-                boundary_conditions
-            );
-
             grids.push(current_grid.clone());
 
-            matrix.set_diagonal_data();
+            // x_at_levels uses extended grid (for ghost cells / boundary conditions)
+            x_at_levels.push(
+                vec![0.0; current_grid.nr_extended_cells()]
+            );
 
-            matrices.push(matrix);
+            // rhs_at_levels uses interior grid (RHS is defined on interior only)
+            rhs_at_levels.push(
+                vec![0.0; current_grid.nr_interior_cells()]
+            );
 
             let interior_shape_current = current_grid.interior_shape;
-
-            let nr_cells_total = interior_shape_current[0] * 
-                interior_shape_current[1] *
-                interior_shape_current[2];
-
-            x_at_levels.push(
-                vec![0.0; nr_cells_total]
-            );
-
-            rhs_at_levels.push(
-                vec![0.0; nr_cells_total]
-            );
 
             if interior_shape_current[0] % 2 != 0 ||
                 interior_shape_current[1] % 2 != 0 ||
@@ -87,7 +73,7 @@ impl PressureSolverMultiGrid {
 
         Self {
             grids,
-            matrices,
+            boundary_conditions: boundary_conditions.clone(),
             solver_settings,
             x_at_levels,
             x_at_levels_work,
@@ -101,6 +87,12 @@ impl PressureSolverMultiGrid {
     /// For each coarse cell, computes residuals for its 8 fine children on-the-fly and averages them.
     /// 
     /// The residual for fine cell i is: r_i = rhs_i - (A * x)_i
+    /// where A is the discrete Laplacian (Poisson matrix).
+    /// 
+    /// # Grid layout
+    /// - `x_fine` is on the **extended** grid (includes ghost cells)
+    /// - `rhs_fine` is on the **interior** grid
+    /// - `rhs_coarse` (output) is on the **interior** grid
     /// 
     /// # Safety
     /// Uses unsafe pointer access to enable parallel writes. This is safe because each
@@ -109,65 +101,88 @@ impl PressureSolverMultiGrid {
         let coarse_level = fine_level + 1;
         let weight = 1.0 / 8.0;
         
-        let nr_coarse_cells = self.grids[coarse_level].nr_interior_cells();
-        let [_, ny_f, nz_f] = self.grids[fine_level].interior_shape;
+        let fine_grid = &self.grids[fine_level];
+        let coarse_grid = &self.grids[coarse_level];
         
-        // Precompute strides for the fine grid
-        let stride_k: usize = 1;
-        let stride_j: usize = nz_f;
-        let stride_i: usize = ny_f * nz_f;
+        let nr_coarse_interior_cells = coarse_grid.nr_interior_cells();
+        
+        // Precompute stencil coefficients for the fine grid
+        let [dx, dy, dz] = fine_grid.cell_length.0;
+        let inv_dx2 = 1.0 / (dx * dx);
+        let inv_dy2 = 1.0 / (dy * dy);
+        let inv_dz2 = 1.0 / (dz * dz);
+        let diag = -2.0 * (inv_dx2 + inv_dy2 + inv_dz2);
+        
+        // Strides for the fine extended grid
+        let stride_x_fine: usize = fine_grid.extended_shape[1] * fine_grid.extended_shape[2];
+        let stride_y_fine: usize = fine_grid.extended_shape[2];
         
         // Get pointers and references for parallel access
         let rhs_coarse_ptr = self.rhs_at_levels[coarse_level].as_mut_ptr() as usize;
         let x_fine = &self.x_at_levels[fine_level];
         let rhs_fine = &self.rhs_at_levels[fine_level];
-        let matrix = &self.matrices[fine_level];
-        let coarse_grid = &self.grids[coarse_level];
         
-        // Offsets for the 8 fine children of a coarse cell (unrolled 2x2x2 stencil)
-        let offsets = [
-            0,
-            stride_k,
-            stride_j,
-            stride_j + stride_k,
-            stride_i,
-            stride_i + stride_k,
-            stride_i + stride_j,
-            stride_i + stride_j + stride_k,
+        // Offsets for the 8 fine children of a coarse cell (2x2x2 stencil)
+        // These are in terms of interior indices
+        let child_offsets: [(usize, usize, usize); 8] = [
+            (0, 0, 0),
+            (0, 0, 1),
+            (0, 1, 0),
+            (0, 1, 1),
+            (1, 0, 0),
+            (1, 0, 1),
+            (1, 1, 0),
+            (1, 1, 1),
         ];
         
-        (0..nr_coarse_cells)
+        (0..nr_coarse_interior_cells)
             .into_par_iter()
-            .for_each(|flat_index_coarse| {
-                let [i_c, j_c, k_c] = coarse_grid.interior_indices_from_flat_index(flat_index_coarse);
+            .for_each(|flat_index_coarse_interior| {
+                // Get coarse interior indices
+                let [i_c, j_c, k_c] = coarse_grid.interior_indices_from_flat_index(flat_index_coarse_interior);
                 
-                // Compute base index for the fine grid cell at (2*i_c, 2*j_c, 2*k_c)
-                let base = (2 * i_c) * stride_i + (2 * j_c) * stride_j + (2 * k_c);
+                // Base fine interior indices (each coarse cell maps to 2x2x2 fine cells)
+                let base_i_f = 2 * i_c;
+                let base_j_f = 2 * j_c;
+                let base_k_f = 2 * k_c;
                 
                 let mut restricted_value: Float = 0.0;
                 
                 // For each of the 8 fine children, compute residual and accumulate
-                for &offset in &offsets {
-                    let fine_idx = base + offset;
+                for &(di, dj, dk) in &child_offsets {
+                    // Fine interior indices
+                    let i_f = base_i_f + di;
+                    let j_f = base_j_f + dj;
+                    let k_f = base_k_f + dk;
                     
-                    // Compute (A * x)[fine_idx] - the matrix-vector product for this row
-                    let (row_values, row_cols) = matrix.row_entries(fine_idx);
-                    let mut ax_i: Float = 0.0;
-                    for k in 0..row_values.len() {
-                        ax_i += row_values[k] * x_fine[row_cols[k]];
-                    }
+                    // Flat interior index for rhs_fine
+                    let flat_fine_interior = fine_grid.flat_index_on_interior_grid([i_f, j_f, k_f]);
+                    
+                    // Extended indices for x_fine (offset by 1 for ghost layer)
+                    let ei_f = i_f + 1;
+                    let ej_f = j_f + 1;
+                    let ek_f = k_f + 1;
+                    let idx_fine_extended = ei_f * stride_x_fine + ej_f * stride_y_fine + ek_f;
+                    
+                    // Compute (A * x)[fine_idx] using the Laplacian stencil
+                    let ax_i = kernels::apply_laplacian_stencil(
+                        x_fine,
+                        idx_fine_extended,
+                        inv_dx2, inv_dy2, inv_dz2, diag,
+                        stride_x_fine, stride_y_fine
+                    );
                     
                     // Compute residual: r_i = rhs_i - (A * x)_i
-                    let residual_i = rhs_fine[fine_idx] - ax_i;
+                    let residual_i = rhs_fine[flat_fine_interior] - ax_i;
                     
                     restricted_value += weight * residual_i;
                 }
                 
                 // Write result using unsafe pointer access
-                // Safety: Each flat_index_coarse is unique, so no data races occur
+                // Safety: Each flat_index_coarse_interior is unique, so no data races occur
                 unsafe {
                     let ptr = rhs_coarse_ptr as *mut Float;
-                    *ptr.add(flat_index_coarse) = restricted_value;
+                    *ptr.add(flat_index_coarse_interior) = restricted_value;
                 }
             });
     }
@@ -180,25 +195,42 @@ impl PressureSolverMultiGrid {
     /// 
     /// Each fine cell value is updated as: x_fine += interpolated(x_coarse)
     /// 
+    /// # Grid layout
+    /// - `x_fine` is on the **extended** grid
+    /// - `x_coarse` is on the **extended** grid
+    /// - Only interior cells of x_fine are updated
+    /// 
     /// # Safety
     /// Uses unsafe pointer access to enable parallel read-modify-write. This is safe because
     /// each fine cell index is processed exactly once, so there are no data races.
     pub fn prolongate_and_correct(&mut self, fine_level: usize) {
         let coarse_level = fine_level + 1;
         
-        let [nx_c, ny_c, nz_c] = self.grids[coarse_level].interior_shape;
-        let nr_fine_cells = self.grids[fine_level].nr_interior_cells();
+        let fine_grid = &self.grids[fine_level];
+        let coarse_grid = &self.grids[coarse_level];
+        
+        let [nx_c, ny_c, nz_c] = coarse_grid.interior_shape;
+        let nr_fine_interior_cells = fine_grid.nr_interior_cells();
+        
+        // Strides for extended grids
+        let stride_x_fine = fine_grid.extended_shape[1] * fine_grid.extended_shape[2];
+        let stride_y_fine = fine_grid.extended_shape[2];
+        
+        let stride_x_coarse = coarse_grid.extended_shape[1] * coarse_grid.extended_shape[2];
+        let stride_y_coarse = coarse_grid.extended_shape[2];
         
         // Get raw pointers for parallel access
         let x_fine_ptr = self.x_at_levels[fine_level].as_mut_ptr() as usize;
         let coarse_values = &self.x_at_levels[coarse_level];
-        let fine_grid = &self.grids[fine_level];
-        let coarse_grid = &self.grids[coarse_level];
         
-        (0..nr_fine_cells)
+        (0..nr_fine_interior_cells)
             .into_par_iter()
-            .for_each(|flat_index_fine| {
-                let [i_f, j_f, k_f] = fine_grid.interior_indices_from_flat_index(flat_index_fine);
+            .for_each(|flat_index_fine_interior| {
+                // Get fine interior indices
+                let [i_f, j_f, k_f] = fine_grid.interior_indices_from_flat_index(flat_index_fine_interior);
+                
+                // Fine extended index (for writing to x_fine)
+                let idx_fine_extended = (i_f + 1) * stride_x_fine + (j_f + 1) * stride_y_fine + (k_f + 1);
                 
                 // Fine cell center position in "coarse cell units"
                 // Fine cell i_f has center at (i_f + 0.5) * dx_f = (i_f + 0.5) * dx_c / 2
@@ -236,18 +268,21 @@ impl PressureSolverMultiGrid {
                             
                             let weight = wx[di] * wy[dj] * wz[dk];
                             
-                            let flat_index_coarse = coarse_grid.flat_index_on_interior_grid([i_c, j_c, k_c]);
+                            // Coarse extended index (offset by 1 for ghost layer)
+                            let idx_coarse_extended = (i_c + 1) * stride_x_coarse 
+                                                    + (j_c + 1) * stride_y_coarse 
+                                                    + (k_c + 1);
                             
-                            correction_value += weight * coarse_values[flat_index_coarse];
+                            correction_value += weight * coarse_values[idx_coarse_extended];
                         }
                     }
                 }
                 
                 // Add correction directly to x using unsafe pointer access
-                // Safety: Each flat_index_fine is unique, so no data races occur
+                // Safety: Each flat_index_fine_interior maps to a unique idx_fine_extended, so no data races
                 unsafe {
                     let ptr = x_fine_ptr as *mut Float;
-                    *ptr.add(flat_index_fine) += correction_value;
+                    *ptr.add(idx_fine_extended) += correction_value;
                 }
             });
     }
@@ -256,8 +291,9 @@ impl PressureSolverMultiGrid {
         &mut self,
         rhs: &[Float]
     ) {
-        let nr_grids = self.matrices.len();
+        let nr_grids = self.grids.len();
 
+        // rhs is on interior grid
         self.rhs_at_levels[0].copy_from_slice(rhs);
 
         let nr_iterations = self.solver_settings.max_number_of_iterations;
@@ -266,10 +302,26 @@ impl PressureSolverMultiGrid {
         // Smooth and restrict down to the coarsest level
         for i_g in 0..nr_grids-1 {
             if i_g > 0 {
+                // Zero out the interior cells of x for coarser levels
+                // Note: x_at_levels is on extended grid, but we only need to zero interior values
+                // For simplicity, we zero the entire buffer (ghost cells will be set by BCs anyway)
+                // TODO: Only zero interior cells for efficiency, or set ghost cells appropriately
                 self.x_at_levels[i_g].fill(0.0);
+                self.x_at_levels_work[i_g].fill(0.0);
             }
 
-            self.matrices[i_g].solve_jacobi_into(
+            self.boundary_conditions.set_pressure_ghost_cells(
+                &self.grids[i_g], 
+                &mut self.x_at_levels[i_g]
+            );
+
+            self.boundary_conditions.set_pressure_ghost_cells(
+                &self.grids[i_g], 
+                &mut self.x_at_levels_work[i_g]
+            );
+
+            kernels::poisson_jacobi_smoother(
+                &self.grids[i_g], 
                 &self.rhs_at_levels[i_g], 
                 &mut self.x_at_levels[i_g], 
                 &mut self.x_at_levels_work[i_g], 
@@ -281,13 +333,20 @@ impl PressureSolverMultiGrid {
             self.compute_residual_and_restrict(i_g);
         }
 
+        self.boundary_conditions.set_pressure_ghost_cells(
+            &self.grids[nr_grids-1], 
+            &mut self.x_at_levels[nr_grids-1]
+        );
+
         // Solve at the coarsest level
         // Note: We reuse the previous values as initial guess (warm start)
         // since we do more iterations here and the RHS changes gradually
-        self.matrices[nr_grids-1].solve_jacobi_into(
-            &self.rhs_at_levels[nr_grids-1],
-            &mut self.x_at_levels[nr_grids-1],
-            &mut self.x_at_levels_work[nr_grids-1],
+        // TODO: Ghost cells at coarsest level need to be set appropriately
+        kernels::poisson_jacobi_smoother(
+            &self.grids[nr_grids-1], 
+            &self.rhs_at_levels[nr_grids-1], 
+            &mut self.x_at_levels[nr_grids-1], 
+            &mut self.x_at_levels_work[nr_grids-1], 
             nr_iterations * 2,
             omega
         );
@@ -297,7 +356,13 @@ impl PressureSolverMultiGrid {
             // Fused: prolongate correction from coarse level and add directly to x
             self.prolongate_and_correct(i_g);
 
-            self.matrices[i_g].solve_jacobi_into(
+            self.boundary_conditions.set_pressure_ghost_cells(
+                &self.grids[i_g], 
+                &mut self.x_at_levels[i_g]
+            );
+
+            kernels::poisson_jacobi_smoother(
+                &self.grids[i_g], 
                 &self.rhs_at_levels[i_g], 
                 &mut self.x_at_levels[i_g], 
                 &mut self.x_at_levels_work[i_g], 
@@ -307,8 +372,20 @@ impl PressureSolverMultiGrid {
         }
     }
 
+    /// Solves the Poisson equation using multigrid V-cycles.
+    /// 
+    /// # Arguments
+    /// * `solution` - On input: initial guess on **extended** grid. On output: solution on **extended** grid.
+    /// * `rhs` - Right-hand side on **interior** grid.
+    /// 
+    /// # Note
+    /// The caller is responsible for setting ghost cell values in `solution` before calling this,
+    /// and the ghost cells in the returned solution will have been modified during iteration.
+    /// You may need to re-apply boundary conditions after calling this function.
     pub fn solve(&mut self, solution: &mut [Float], rhs: &[Float]) {
+        // solution is on extended grid
         self.x_at_levels[0].copy_from_slice(solution);
+        self.x_at_levels_work[0].copy_from_slice(solution);
 
         for _ in 0..self.solver_settings.min_number_of_iterations {
             self.perform_v_cycle(rhs);
@@ -317,3 +394,39 @@ impl PressureSolverMultiGrid {
         solution.copy_from_slice(&self.x_at_levels[0]);
     }
 }
+
+// =============================================================================
+// POTENTIAL ISSUES WITH EXTENDED GRID ASSUMPTIONS
+// =============================================================================
+// 
+// The following areas may need attention when working with extended grids:
+//
+// 1. **Ghost cell initialization at coarser levels (perform_v_cycle)**:
+//    - When we zero out x_at_levels[i_g] for i_g > 0, we zero ALL cells including ghost cells.
+//    - Ghost cells at coarser levels need proper boundary condition values.
+//    - Currently marked with TODO in the code.
+//
+// 2. **Boundary conditions at coarser levels**:
+//    - The coarse grids need their own boundary conditions applied to ghost cells.
+//    - This is NOT currently done - the smoother reads from ghost cells which may be zero.
+//    - For correct multigrid, ghost cells at each level should be set before smoothing.
+//
+// 3. **solve() function - input/output size**:
+//    - The solution parameter must be extended-grid sized.
+//    - Callers must be aware of this and provide correctly sized buffers.
+//
+// 4. **rhs size at level 0**:
+//    - rhs is interior-grid sized, which is correct.
+//    - The copy_from_slice in perform_v_cycle assumes rhs has the right size.
+//
+// 5. **Restriction operator (compute_residual_and_restrict)**:
+//    - Correctly handles extended vs interior: reads x from extended, writes residual to interior.
+//    - The restricted residual goes to rhs_at_levels[coarse] which is interior-sized. ✓
+//
+// 6. **Prolongation operator (prolongate_and_correct)**:
+//    - Correctly reads from coarse extended grid and writes to fine extended grid.
+//    - Only updates interior cells of the fine grid. ✓
+//
+// 7. **poisson_jacobi_smoother**:
+//    - Expects solution/work on extended grid, rhs on interior grid. ✓
+//    - Ghost cells are preserved (not modified by smoother). ✓
