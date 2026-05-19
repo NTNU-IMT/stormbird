@@ -310,18 +310,9 @@ impl PressureSolverMultiGrid {
                 self.x_at_levels_work[i_g].fill(0.0);
             }
 
-            self.boundary_conditions.set_pressure_ghost_cells(
-                &self.grids[i_g], 
-                &mut self.x_at_levels[i_g]
-            );
-
-            self.boundary_conditions.set_pressure_ghost_cells(
-                &self.grids[i_g], 
-                &mut self.x_at_levels_work[i_g]
-            );
-
             kernels::poisson_jacobi_smoother(
-                &self.grids[i_g], 
+                &self.grids[i_g],
+                &self.boundary_conditions,
                 &self.rhs_at_levels[i_g], 
                 &mut self.x_at_levels[i_g], 
                 &mut self.x_at_levels_work[i_g], 
@@ -333,10 +324,8 @@ impl PressureSolverMultiGrid {
             self.compute_residual_and_restrict(i_g);
         }
 
-        self.boundary_conditions.set_pressure_ghost_cells(
-            &self.grids[nr_grids-1], 
-            &mut self.x_at_levels[nr_grids-1]
-        );
+        self.x_at_levels[nr_grids - 1].fill(0.0);
+        self.x_at_levels_work[nr_grids - 1].fill(0.0);
 
         // Solve at the coarsest level
         // Note: We reuse the previous values as initial guess (warm start)
@@ -344,6 +333,7 @@ impl PressureSolverMultiGrid {
         // TODO: Ghost cells at coarsest level need to be set appropriately
         kernels::poisson_jacobi_smoother(
             &self.grids[nr_grids-1], 
+            &self.boundary_conditions,
             &self.rhs_at_levels[nr_grids-1], 
             &mut self.x_at_levels[nr_grids-1], 
             &mut self.x_at_levels_work[nr_grids-1], 
@@ -356,13 +346,9 @@ impl PressureSolverMultiGrid {
             // Fused: prolongate correction from coarse level and add directly to x
             self.prolongate_and_correct(i_g);
 
-            self.boundary_conditions.set_pressure_ghost_cells(
-                &self.grids[i_g], 
-                &mut self.x_at_levels[i_g]
-            );
-
             kernels::poisson_jacobi_smoother(
-                &self.grids[i_g], 
+                &self.grids[i_g],
+                &self.boundary_conditions,
                 &self.rhs_at_levels[i_g], 
                 &mut self.x_at_levels[i_g], 
                 &mut self.x_at_levels_work[i_g], 

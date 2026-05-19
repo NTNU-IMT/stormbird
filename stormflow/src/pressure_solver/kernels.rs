@@ -1,4 +1,7 @@
-use crate::grid::Grid;
+use crate::{
+    boundary_conditions::BoundaryConditions, 
+    grid::Grid
+};
 
 use rayon::prelude::*;
 use stormath::type_aliases::Float;
@@ -61,6 +64,7 @@ fn jacobi_iteration_step(
 
 pub fn poisson_jacobi_smoother(
     grid: &Grid,
+    boundary_conditions: &BoundaryConditions,
     rhs: &[Float], 
     solution: &mut [Float], 
     work: &mut [Float], 
@@ -68,6 +72,9 @@ pub fn poisson_jacobi_smoother(
     omega: Float
 ) {
     work.copy_from_slice(solution);
+
+    boundary_conditions.set_pressure_ghost_cells(grid, work);
+    boundary_conditions.set_pressure_ghost_cells(grid, solution);
     
     for iteration in 0..nr_iterations {
         // Swap buffers: read from current, write to new
@@ -75,8 +82,12 @@ pub fn poisson_jacobi_smoother(
         // Odd iterations: read from work, write to solution
         if iteration % 2 == 0 {
             jacobi_iteration_step(grid, rhs, solution, work, omega);
+
+            boundary_conditions.set_pressure_ghost_cells(grid, work);
         } else {
             jacobi_iteration_step(grid, rhs, work, solution, omega);
+
+            boundary_conditions.set_pressure_ghost_cells(grid, solution);
         }
     }
     
