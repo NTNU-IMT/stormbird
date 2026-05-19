@@ -63,10 +63,26 @@ impl Grid {
     }
 
     #[inline(always)]
+    pub fn interior_indices_from_extended_indices(&self, extended_indices: [usize; 3]) -> [usize; 3] {
+        [
+            extended_indices[0] - INTERIOR_OFFSET,
+            extended_indices[1] - INTERIOR_OFFSET,
+            extended_indices[2] - INTERIOR_OFFSET,
+        ]
+    }
+
+    #[inline(always)]
     pub fn flat_index_on_extended_grid_from_interior_indices(&self, interior_indices: [usize; 3]) -> usize {
         let extended_indices = self.extended_indices_from_interior_indices(interior_indices);
         
         self.flat_index_on_extended_grid(extended_indices)
+    }
+
+    #[inline(always)]
+    pub fn is_cell_interior(&self, indices: [usize; 3]) -> bool {
+        indices[0] >= 1 && indices[0] < self.extended_shape[0] - 1
+            && indices[1] >= 1 && indices[1] < self.extended_shape[1] - 1
+            && indices[2] >= 1 && indices[2] < self.extended_shape[2] - 1
     }
 
     #[inline(always)]
