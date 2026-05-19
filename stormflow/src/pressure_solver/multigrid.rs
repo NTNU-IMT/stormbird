@@ -1,5 +1,7 @@
 use rayon::prelude::*;
 
+use std::time::Instant;
+
 use stormath::type_aliases::Float;
 use stormath::sparse_matrix::linalg::IterativeSolverSettings;
 
@@ -98,6 +100,8 @@ impl PressureSolverMultiGrid {
     /// Uses unsafe pointer access to enable parallel writes. This is safe because each
     /// coarse cell index is processed exactly once, so there are no data races.
     pub fn compute_residual_and_restrict(&mut self, fine_level: usize) {
+        let start_time = Instant::now();
+        
         let coarse_level = fine_level + 1;
         let weight = 1.0 / 8.0;
         
@@ -185,6 +189,8 @@ impl PressureSolverMultiGrid {
                     *ptr.add(flat_index_coarse_interior) = restricted_value;
                 }
             });
+
+        println!("Restrict time: {:.?}", start_time.elapsed());
     }
 
     /// Prolongates (interpolates) the correction from a coarser grid level to a finer level
@@ -204,6 +210,8 @@ impl PressureSolverMultiGrid {
     /// Uses unsafe pointer access to enable parallel read-modify-write. This is safe because
     /// each fine cell index is processed exactly once, so there are no data races.
     pub fn prolongate_and_correct(&mut self, fine_level: usize) {
+        let start_time = Instant::now();
+        
         let coarse_level = fine_level + 1;
         
         let fine_grid = &self.grids[fine_level];
@@ -285,6 +293,10 @@ impl PressureSolverMultiGrid {
                     *ptr.add(idx_fine_extended) += correction_value;
                 }
             });
+
+        if fine_level == 0 {
+            println!("Prolongate and correct time: {:.?}", start_time.elapsed());
+        }
     }
     
     pub fn perform_v_cycle(
