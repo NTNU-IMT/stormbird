@@ -21,10 +21,51 @@ pub struct Grid {
     pub start_point: SpatialVector,
     pub cell_length: SpatialVector,
     pub extended_shape: [usize; 3],
-    pub interior_shape: [usize; 3]
+    pub extended_stride: [usize; 2],
+    pub interior_shape: [usize; 3],
+    pub interior_stride: [usize; 2]
 }
 
 impl Grid {
+    pub fn new(
+        start_point: SpatialVector, 
+        end_point: SpatialVector,
+        interior_shape: [usize; 3]
+    ) -> Self {
+        let domain_length = end_point - start_point;
+        
+        let cell_length = SpatialVector([
+            domain_length[0] / interior_shape[0] as Float,
+            domain_length[1] / interior_shape[1] as Float,
+            domain_length[2] / interior_shape[2] as Float,
+        ]);
+        
+        let extended_shape = [
+            interior_shape[0] + 2 * INTERIOR_OFFSET,
+            interior_shape[1] + 2 * INTERIOR_OFFSET,
+            interior_shape[2] + 2 * INTERIOR_OFFSET,
+        ];
+
+        let extended_stride = [
+            extended_shape[1] * extended_shape[2], 
+            extended_shape[2]
+        ];
+
+        let interior_stride = [
+            interior_shape[1] * interior_shape[2],
+            interior_shape[2]
+        ];
+
+        Self {
+            start_point,
+            cell_length,
+            extended_shape,
+            extended_stride,
+            interior_shape,
+            interior_stride
+        }
+    }
+    
     #[inline(always)]
     pub fn nr_interior_cells(&self) -> usize {
         self.interior_shape[0] * self.interior_shape[1] * self.interior_shape[2]
@@ -39,8 +80,8 @@ impl Grid {
     /// Returns the index to values that exist on the full extended grid, from the indices in x, y 
     /// and z direction respectively.
     pub fn flat_index_on_extended_grid(&self, indices: [usize; 3]) -> usize {
-        indices[0] * self.extended_shape[1] * self.extended_shape[2] +
-        indices[1] * self.extended_shape[2] + 
+        indices[0] * self.extended_stride[0] +
+        indices[1] * self.extended_stride[1] + 
         indices[2]
     }
 
@@ -48,8 +89,8 @@ impl Grid {
     /// Returns the index to values that exist on the interior grid, from the interior indices in x, 
     /// y and z direction respectively.
     pub fn flat_index_on_interior_grid(&self, indices: [usize; 3]) -> usize { 
-        indices[0] * self.interior_shape[1] * self.interior_shape[2] +
-        indices[1] * self.interior_shape[2] + 
+        indices[0] * self.interior_stride[0] +
+        indices[1] * self.interior_stride[1] + 
         indices[2]
     }
 
@@ -253,6 +294,28 @@ impl Grid {
             "Cannot coarsen grid: interior cell counts must be even. Got [{}, {}, {}]",
             nx, ny, nz
         );
+
+        let extended_shape = [
+            nx / 2 + 2 * INTERIOR_OFFSET,
+            ny / 2 + 2 * INTERIOR_OFFSET,
+            nz / 2 + 2 * INTERIOR_OFFSET,
+        ];
+
+        let extended_stride = [
+            extended_shape[1] * extended_shape[2], 
+            extended_shape[2]
+        ];
+
+        let interior_shape = [
+            nx / 2,
+            ny / 2,
+            nz / 2
+        ];
+
+        let interior_stride = [
+            interior_shape[1] * interior_shape[2],
+            interior_shape[2]
+        ];
         
         Grid {
             start_point: self.start_point,
@@ -261,16 +324,10 @@ impl Grid {
                 self.cell_length[1] * 2.0,
                 self.cell_length[2] * 2.0,
             ]),
-            extended_shape: [
-                nx / 2 + 2 * INTERIOR_OFFSET,
-                ny / 2 + 2 * INTERIOR_OFFSET,
-                nz / 2 + 2 * INTERIOR_OFFSET,
-            ],
-            interior_shape: [
-                nx / 2,
-                ny / 2,
-                nz / 2
-            ]
+            extended_shape,
+            extended_stride,
+            interior_shape,
+            interior_stride
         }
     }
 }

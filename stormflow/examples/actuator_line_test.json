@@ -7,7 +7,7 @@
     ["Slip", "Slip"],
     ["Slip", "Slip"]
   ],
-  "nr_interior_cells": [128, 64, 64],
+  "nr_interior_cells": [512, 256, 256],
   "viscosity": 0.001,
   "pressure_solver": {
     "settings": {

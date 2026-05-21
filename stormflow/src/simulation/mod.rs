@@ -348,48 +348,65 @@ impl Simulation {
     
     pub fn convect_and_diffuse(&mut self, time_step: Float) {
         let start_time = Instant::now();
-        
-        let [nx, ny, nz] = self.grid.interior_shape;
-        let nr_interior_cells = nx * ny * nz;
-        
-        // Get raw pointer and cast to usize for thread-safe sharing
-        // SAFETY: We guarantee disjoint access - each interior index maps to a unique extended index
-        let data_ptr = self.velocity_star.as_mut_ptr() as usize;
-        
-        // Parallel computation with direct writes to velocity_star
-        // SAFETY: Each interior index maps to a unique extended index via
-        // flat_index_on_extended_grid_from_interior_indices, so no two parallel
-        // iterations write to the same memory location.
-        (0..nr_interior_cells)
-            .into_par_iter()
-            .for_each(|i| {
-                let i_extended = self.grid.flat_index_on_extended_grid_from_interior_indices(
-                    self.grid.interior_indices_from_flat_index(i)
-                );
-                
-                let convective_term = kernels::convective_term(i, &self.grid, &self.velocity);
-                let viscous_term = kernels::viscous_term(i, &self.grid, &self.velocity, self.viscosity);
-                let body_force_term = kernels::body_force_term(i, &self.grid, &self.body_force, self.density);
-
-                let new_velocity = SpatialVector([
-                    self.velocity_org[i_extended][0] + (convective_term[0] + viscous_term[0] - body_force_term[0]) * time_step,
-                    self.velocity_org[i_extended][1] + (convective_term[1] + viscous_term[1] - body_force_term[1]) * time_step,
-                    self.velocity_org[i_extended][2] + (convective_term[2] + viscous_term[2] - body_force_term[2]) * time_step,
-                ]);
-                
-                // SAFETY: Disjoint writes guaranteed by unique interior->extended mapping
-                // Convert usize back to pointer for the write
-                unsafe {
-                    let ptr = data_ptr as *mut SpatialVector;
-                    *ptr.add(i_extended) = new_velocity;
+    
+        // Destructure borrows up front so the parallel closure can hold an
+        // exclusive borrow of `velocity_star` alongside shared borrows of the
+        // read-only fields, without capturing `&self` as a whole.
+        let grid = &self.grid;
+        let velocity = &self.velocity;
+        let velocity_org = &self.velocity_org;
+        let body_force = &self.body_force;
+        let viscosity = self.viscosity;
+        let density = self.density;
+        let velocity_star = &mut self.velocity_star;
+    
+        let [nxi, nyi, nzi] = grid.interior_shape;
+        let [_nx, ny, nz] = grid.extended_shape;
+        let plane = ny * nz; // one full i-plane on the extended grid, contiguous
+    
+        // Parallelize over interior i-planes. Each task owns one contiguous
+        // i-plane of `velocity_star` exclusively → no unsafe, no data races.
+        // `skip(1).take(nxi)` selects interior planes, assuming a 1-cell halo.
+        velocity_star
+            .par_chunks_mut(plane)
+            .enumerate()
+            .skip(1)
+            .take(nxi)
+            .for_each(|(i, star_plane)| {
+                let ii = i - 1; // interior i index
+                for ji in 0..nyi {
+                    let j = ji + 1;
+                    // Interior flat index for (ii, ji, 0); advanced by +1 per k.
+                    let mut flat_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
+                    // Extended flat index for (i, j, 1); advanced by +1 per k.
+                    let mut i_extended = grid.flat_index_on_extended_grid([i, j, 1]);
+    
+                    for _k in 0..nzi {
+                        let convective_term = kernels::convective_term(flat_interior, grid, velocity);
+                        let viscous_term    = kernels::viscous_term(flat_interior, grid, velocity, viscosity);
+                        let body_force_term = kernels::body_force_term(flat_interior, grid, body_force, density);
+    
+                        let org = velocity_org[i_extended];
+                        let new_velocity = SpatialVector([
+                            org[0] + (convective_term[0] + viscous_term[0] - body_force_term[0]) * time_step,
+                            org[1] + (convective_term[1] + viscous_term[1] - body_force_term[1]) * time_step,
+                            org[2] + (convective_term[2] + viscous_term[2] - body_force_term[2]) * time_step,
+                        ]);
+    
+                        // i_extended lies in plane `i`; index within the chunk.
+                        star_plane[i_extended - i * plane] = new_velocity;
+    
+                        flat_interior += 1;
+                        i_extended += 1;
+                    }
                 }
             });
-        
+    
         self.boundary_conditions.set_velocity_ghost_cells(
-            &self.grid, 
-            &mut self.velocity_star
+            &self.grid,
+            &mut self.velocity_star,
         );
-
+    
         println!("Convect and diffuse time: {:.?}", start_time.elapsed());
     }
     

@@ -11,7 +11,7 @@ use stormbird::actuator_line::builder::ActuatorLineBuilder;
 use crate::actuator_line_interface::ActuatorLineInterface;
 
 use crate::boundary_conditions::{BoundaryConditionBuilder, BoundaryConditions, BoundaryCondition};
-use crate::grid::{Grid, INTERIOR_OFFSET};
+use crate::grid::Grid;
 use crate::simulation::Simulation;
 use crate::geometry::Geometry;
 use crate::pressure_solver::{
@@ -51,40 +51,19 @@ impl SimulationBuilder {
     }
     
     pub fn build(&self) -> Simulation {
-        let domain_length = self.domain_end_point - self.domain_start_point;
+        let grid = Grid::new(
+            self.domain_start_point, 
+            self.domain_end_point, 
+            self.nr_interior_cells
+        );
         
-        let cell_length = SpatialVector([
-            domain_length[0] / self.nr_interior_cells[0] as Float,
-            domain_length[1] / self.nr_interior_cells[1] as Float,
-            domain_length[2] / self.nr_interior_cells[2] as Float,
-        ]);
-        
-        let extended_shape = [
-            self.nr_interior_cells[0] + 2 * INTERIOR_OFFSET,
-            self.nr_interior_cells[1] + 2 * INTERIOR_OFFSET,
-            self.nr_interior_cells[2] + 2 * INTERIOR_OFFSET,
-        ];
-
-        let interior_shape = [
-            self.nr_interior_cells[0],
-            self.nr_interior_cells[1],
-            self.nr_interior_cells[2] ,
-        ];
-        
-        let total_nr_cells = extended_shape[0] * extended_shape[1] * extended_shape[2];
+        let total_nr_cells = grid.nr_extended_cells();
 
         let velocity = vec![self.initial_velocity; total_nr_cells];
         let velocity_org = vec![SpatialVector::default(); total_nr_cells];
         let velocity_star = vec![SpatialVector::default(); total_nr_cells];
         
         let body_force = vec![SpatialVector::default(); total_nr_cells];
-        
-        let grid = Grid{
-            start_point: self.domain_start_point,
-            cell_length,
-            interior_shape,
-            extended_shape
-        };
         
         let mut boundary_conditions = BoundaryConditions::default();
         

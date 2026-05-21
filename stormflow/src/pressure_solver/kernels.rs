@@ -18,50 +18,54 @@ fn jacobi_iteration_step(
     omega: Float,
 ) {
     let [dx, dy, dz] = grid.cell_length.0;
-    
+
     // Precompute stencil coefficients
     let inv_dx2 = 1.0 / (dx * dx);
     let inv_dy2 = 1.0 / (dy * dy);
     let inv_dz2 = 1.0 / (dz * dz);
-    
+
     // Diagonal coefficient: -2/dx² - 2/dy² - 2/dz²
     let inv_diag = 1.0 / (-2.0 * (inv_dx2 + inv_dy2 + inv_dz2));
-    
+
     let one_minus_omega = 1.0 - omega;
 
-    let nr_interior_cells = grid.nr_interior_cells();
+    let [nxi, nyi, nzi] = grid.interior_shape;
 
-    let new_ptr = new.as_mut_ptr() as usize;
+    let [stride_x, stride_y] = grid.extended_stride;
 
-    (0..nr_interior_cells)
+    let nr_lines = nxi * nyi;
+
+    (0..nr_lines)
         .into_par_iter()
-        .for_each(|flat_interior| {
-            let interior_indices = grid.interior_indices_from_flat_index(flat_interior);
+        .for_each(|line| {
+            let ii = line / nyi; // interior i index
+            let ji = line % nyi; // interior j index
 
-            let [i, j, k] = grid.extended_indices_from_interior_indices(interior_indices);
+            // Extended-grid coordinates (assuming a 1-cell halo on each side).
+            let i = ii + 1;
+            let j = ji + 1;
 
-            let i_0  = grid.flat_index_on_extended_grid([i, j, k]);
-            let i_xp = grid.flat_index_on_extended_grid([i+1, j, k]);
-            let i_xm = grid.flat_index_on_extended_grid([i-1, j, k]);
-            let i_yp = grid.flat_index_on_extended_grid([i, j+1, k]);
-            let i_ym = grid.flat_index_on_extended_grid([i, j-1, k]);
-            let i_zp = grid.flat_index_on_extended_grid([i, j, k+1]);
-            let i_zm = grid.flat_index_on_extended_grid([i, j, k-1]);
-            
-            // Compute off-diagonal contribution (sum of neighbor contributions)
-            let off_diag = inv_dx2 * (current[i_xp] + current[i_xm])
-                         + inv_dy2 * (current[i_yp] + current[i_ym])
-                         + inv_dz2 * (current[i_zp] + current[i_zm]);
-            
-            // Standard Jacobi update: p_new = (rhs - off_diag) / diag
-            let jacobi_update = (rhs[flat_interior] - off_diag) * inv_diag;
-            
-            // Weighted Jacobi: p_new = (1 - ω) * p_old + ω * jacobi_update
-            let new_val = one_minus_omega * current[i_0] + omega * jacobi_update;
+            let base_extended = grid.flat_index_on_extended_grid([i, j, 1]);
+            let base_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
 
-            unsafe {
-                let ptr = new_ptr as *mut Float;
-                *ptr.add(i_0) = new_val;
+            let mut i_0 = base_extended;
+            let mut flat_interior = base_interior;
+
+            for _k in 0..nzi {
+                let off_diag = inv_dx2 * (current[i_0 + stride_x] + current[i_0 - stride_x])
+                             + inv_dy2 * (current[i_0 + stride_y] + current[i_0 - stride_y])
+                             + inv_dz2 * (current[i_0 + 1]        + current[i_0 - 1]);
+
+                let jacobi_update = (rhs[flat_interior] - off_diag) * inv_diag;
+
+                let new_val = one_minus_omega * current[i_0] + omega * jacobi_update;
+
+                unsafe {
+                    *new.as_ptr().add(i_0).cast_mut() = new_val;
+                }
+
+                i_0 += 1;
+                flat_interior += 1;
             }
         });
 }
