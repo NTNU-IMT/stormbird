@@ -72,7 +72,7 @@ impl Simulation {
                     let ez = iz + 1;
 
                     let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
-                    let p: f64 = self.pressure[flat] as f64;
+                    let p: f64 = self.pressure_solver.x_at_levels[0][flat] as f64;
 
                     if binary {
                         w.write_all(&p.to_be_bytes()).unwrap();

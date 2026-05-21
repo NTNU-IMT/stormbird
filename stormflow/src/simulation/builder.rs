@@ -73,11 +73,6 @@ impl SimulationBuilder {
         
         let total_nr_cells = extended_shape[0] * extended_shape[1] * extended_shape[2];
 
-        let total_nr_interior_cells = interior_shape[0] * interior_shape[1] * interior_shape[2];
-        
-        let pressure = vec![0.0; total_nr_cells];
-        let pressure_rhs = vec![0.0; total_nr_interior_cells];
-
         let velocity = vec![self.initial_velocity; total_nr_cells];
         let velocity_org = vec![SpatialVector::default(); total_nr_cells];
         let velocity_star = vec![SpatialVector::default(); total_nr_cells];
@@ -145,10 +140,8 @@ impl SimulationBuilder {
             velocity,
             velocity_org,
             velocity_star,
-            pressure,
             body_force,
             boundary_conditions,
-            pressure_rhs,
             pressure_solver,
             grid,
             viscosity: self.viscosity,

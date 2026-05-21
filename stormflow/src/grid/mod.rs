@@ -80,9 +80,10 @@ impl Grid {
 
     #[inline(always)]
     pub fn is_cell_interior(&self, indices: [usize; 3]) -> bool {
-        indices[0] >= 1 && indices[0] < self.extended_shape[0] - 1
-            && indices[1] >= 1 && indices[1] < self.extended_shape[1] - 1
-            && indices[2] >= 1 && indices[2] < self.extended_shape[2] - 1
+        let s = &self.extended_shape;
+        (indices[0].wrapping_sub(1) < s[0].wrapping_sub(2))
+            & (indices[1].wrapping_sub(1) < s[1].wrapping_sub(2))
+            & (indices[2].wrapping_sub(1) < s[2].wrapping_sub(2))
     }
 
     #[inline(always)]

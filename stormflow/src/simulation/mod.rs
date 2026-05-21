@@ -14,7 +14,7 @@ use crate::geometry::{
     blending_function
 };
 
-use crate::pressure_solver::PressureSolver;
+use crate::pressure_solver::PressureSolverMultiGrid;
 
 use rayon::prelude::*;
 
@@ -24,11 +24,9 @@ pub struct Simulation {
     pub velocity: Vec<SpatialVector>,
     pub velocity_org: Vec<SpatialVector>,
     pub velocity_star: Vec<SpatialVector>,
-    pub pressure: Vec<Float>,
     pub body_force: Vec<SpatialVector>,
     pub boundary_conditions: BoundaryConditions,
-    pub pressure_rhs: Vec<Float>,
-    pub pressure_solver: PressureSolver,
+    pub pressure_solver: PressureSolverMultiGrid,
     pub grid: Grid,
     pub viscosity: Float,
     pub density: Float,
@@ -331,7 +329,7 @@ impl Simulation {
                     let dv_dy = (self.velocity_star[i_l.current][1] - self.velocity_star[i_l.neg[1]][1]) / dy;
                     let dw_dz = (self.velocity_star[i_l.current][2] - self.velocity_star[i_l.neg[2]][2]) / dz;
                     
-                    self.pressure_rhs[i_0_int] = self.density * (du_dx + dv_dy + dw_dz) / time_step;
+                    self.pressure_solver.rhs_at_levels[0][i_0_int] = self.density * (du_dx + dv_dy + dw_dz) / time_step;
                 }
             }
         }
@@ -343,9 +341,7 @@ impl Simulation {
         let start_time = Instant::now();
         self.pressure_projection_rhs(time_step);
         
-        self.pressure_solver.solve(&mut self.pressure, &self.pressure_rhs);
-        
-        self.boundary_conditions.set_pressure_ghost_cells(&self.grid, &mut self.pressure);
+        self.pressure_solver.solve();
 
         println!("Project pressure time: {:.?}", start_time.elapsed());
     }
@@ -408,6 +404,8 @@ impl Simulation {
 
         let data_ptr = self.velocity.as_mut_ptr() as usize;
 
+        let pressure = &self.pressure_solver.x_at_levels[0];
+
         (0..nr_interior_cells)
             .into_par_iter()
             .for_each(|i_flat| {
@@ -418,9 +416,9 @@ impl Simulation {
 
                 let dp_dx = SpatialVector(
                     [
-                        (self.pressure[i_l.pos[0]] - self.pressure[i_l.current]) / dx,
-                        (self.pressure[i_l.pos[1]] - self.pressure[i_l.current]) / dy,
-                        (self.pressure[i_l.pos[2]] - self.pressure[i_l.current]) / dz
+                        (pressure[i_l.pos[0]] - pressure[i_l.current]) / dx,
+                        (pressure[i_l.pos[1]] - pressure[i_l.current]) / dy,
+                        (pressure[i_l.pos[2]] - pressure[i_l.current]) / dz
                     ]
                 );
 

@@ -28,20 +28,19 @@ fn jacobi_iteration_step(
     let inv_diag = 1.0 / (-2.0 * (inv_dx2 + inv_dy2 + inv_dz2));
     
     let one_minus_omega = 1.0 - omega;
-    
-    new.par_iter_mut()
-        .enumerate()
-        .for_each(|(i0, new_val)| {
-            let [i, j, k] = grid.extended_indices_from_flat_index(i0);
-            let is_interior = grid.is_cell_interior([i, j, k]);
-            
-            if !is_interior {
-                return; // Skip ghost cells - leave them unchanged
-            }
 
-            let interior_indices = grid.interior_indices_from_extended_indices([i, j, k]);
-            let flat_interior = grid.flat_index_on_interior_grid(interior_indices);
+    let nr_interior_cells = grid.nr_interior_cells();
 
+    let new_ptr = new.as_mut_ptr() as usize;
+
+    (0..nr_interior_cells)
+        .into_par_iter()
+        .for_each(|flat_interior| {
+            let interior_indices = grid.interior_indices_from_flat_index(flat_interior);
+
+            let [i, j, k] = grid.extended_indices_from_interior_indices(interior_indices);
+
+            let i_0  = grid.flat_index_on_extended_grid([i, j, k]);
             let i_xp = grid.flat_index_on_extended_grid([i+1, j, k]);
             let i_xm = grid.flat_index_on_extended_grid([i-1, j, k]);
             let i_yp = grid.flat_index_on_extended_grid([i, j+1, k]);
@@ -58,7 +57,12 @@ fn jacobi_iteration_step(
             let jacobi_update = (rhs[flat_interior] - off_diag) * inv_diag;
             
             // Weighted Jacobi: p_new = (1 - ω) * p_old + ω * jacobi_update
-            *new_val = one_minus_omega * current[i0] + omega * jacobi_update;
+            let new_val = one_minus_omega * current[i_0] + omega * jacobi_update;
+
+            unsafe {
+                let ptr = new_ptr as *mut Float;
+                *ptr.add(i_0) = new_val;
+            }
         });
 }
 
