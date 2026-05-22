@@ -105,11 +105,7 @@ impl SimulationBuilder {
         
         let actuator_line = if let Some(builder) = &self.actuator_line {
             Some(
-                ActuatorLineInterface{
-                    model: builder.build(),
-                    dominating_line_indices: Vec::new(),
-                    summed_projection_weights: Vec::new()
-                }
+                ActuatorLineInterface::new(builder.build(), &grid)
             )
         } else {
             None

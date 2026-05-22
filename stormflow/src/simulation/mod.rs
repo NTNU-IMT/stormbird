@@ -37,8 +37,6 @@ pub struct Simulation {
 impl Simulation {
     pub fn initialize_after_build(&mut self) {
         println!("Initializing after build");
-        self.actuator_line_initialization();
-        
         self.correct_velocities_for_geometry();
 
         println!();
@@ -181,55 +179,28 @@ impl Simulation {
         println!("Correct velocities for geometry time: {:.?}", start_time.elapsed());
     }
     
-    pub fn actuator_line_initialization(&mut self) {
-        if let Some(actuator_line) = self.actuator_line.as_mut() {
-            let [nx, ny, nz] = self.grid.interior_shape;
-            let nr_interior_cells = nx * ny * nz;
-    
-            // Collect results in parallel
-            let results: Vec<_> = (0..nr_interior_cells)
-                .into_par_iter()
-                .map(|i_flat_interior| {
-                    let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
-                    let cell_center = self.grid.cell_center(interior_indices);
-                    
-                    let line_index = actuator_line.model.dominating_line_element_index_at_point(cell_center);
-                    let projection_weight = actuator_line.model.summed_projection_weights_at_point(cell_center);
-                    
-                    (line_index, projection_weight)
-                })
-                .collect();
-    
-            // Unzip the results into the two vectors
-            let (dominating_line_indices, summed_projection_weights): (Vec<_>, Vec<_>) = 
-                results.into_iter().unzip();
-            
-            actuator_line.dominating_line_indices = dominating_line_indices;
-            actuator_line.summed_projection_weights = summed_projection_weights;
-        }
-    }
-    
     pub fn actuator_line_ctrl_points_velocity(&self) -> Vec<SpatialVector> {
-        if let Some(actuator_line) = &self.actuator_line {
-            let [nx, ny, nz] = self.grid.interior_shape;
-            
-            let nr_interior_cells = nx * ny * nz;
+        if let Some(actuator_line) = &self.actuator_line {            
+            let nr_cells_to_check = actuator_line.cell_indices_to_check.len();
             
             let nr_span_lines = actuator_line.model.line_force_model.nr_span_lines();
             
             let mut numerator = vec![SpatialVector::default(); nr_span_lines];
             let mut denominator = vec![0.0; nr_span_lines];
+
+            let cell_volume = self.grid.cell_length[0] * self.grid.cell_length[1] * self.grid.cell_length[2];
             
-            for i_flat_interior in 0..nr_interior_cells {
-                let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
+            for i in 0..nr_cells_to_check {
+                let i_flat_extended = actuator_line.cell_indices_to_check[i];
+                
+                let extended_indices = self.grid.extended_indices_from_flat_index(i_flat_extended);
+                let interior_indices = self.grid.interior_indices_from_extended_indices(extended_indices);
                 
                 let cell_center = self.grid.cell_center(interior_indices);
                 
                 let velocity = self.cell_center_velocity_from_interior_indices(interior_indices);
                 
-                let cell_volume = self.grid.cell_length[0] * self.grid.cell_length[1] * self.grid.cell_length[2];
-                
-                let line_index = actuator_line.dominating_line_indices[i_flat_interior];
+                let line_index = actuator_line.dominating_line_indices[i];
                 
                 let (temp_num, temp_den) = actuator_line.model.get_weighted_velocity_sampling_integral_terms_for_cell(
                     line_index, 
@@ -274,22 +245,20 @@ impl Simulation {
         
         // Transfer body forces to the grid
         if let Some(actuator_line) = &self.actuator_line {
-            let [nx, ny, nz] = self.grid.interior_shape;
+            let nr_cells_to_check = actuator_line.cell_indices_to_check.len();
             
-            let nr_interior_cells = nx * ny * nz;
-            
-            let new_body_forces: Vec<(usize, SpatialVector)> = (0..nr_interior_cells)
+            let new_body_forces: Vec<(usize, SpatialVector)> = (0..nr_cells_to_check)
                 .into_par_iter()
-                .map(|i_flat_interior| {
-                    let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
-                    let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
-                    let i_flat_extended = self.grid.flat_index_on_extended_grid(extended_indices);
+                .map(|i| {
+                    let i_flat_extended = actuator_line.cell_indices_to_check[i];
+                    let extended_indices = self.grid.extended_indices_from_flat_index(i_flat_extended);
+                    let interior_indices = self.grid.interior_indices_from_extended_indices(extended_indices);
                     
                     let cell_velocity = self.cell_center_velocity_from_interior_indices(interior_indices);
                     
-                    let line_index = actuator_line.dominating_line_indices[i_flat_interior];
+                    let line_index = actuator_line.dominating_line_indices[i];
                     
-                    let body_force_weight = actuator_line.summed_projection_weights[i_flat_interior];
+                    let body_force_weight = actuator_line.summed_projection_weights[i];
                     
                     let force_to_project = actuator_line.model.force_to_project_at_cell(
                         line_index, 
@@ -311,28 +280,32 @@ impl Simulation {
     pub fn pressure_projection_rhs(&mut self, time_step: Float) {
         let start_time = Instant::now();
         
-        let [nx, ny, nz] = self.grid.interior_shape;
-        let [dx, dy, dz] = self.grid.cell_length.0;
+        let nr_interior_cells = self.grid.nr_interior_cells();
         
-        for i_x in 0..nx {
-            for i_y in 0..ny {
-                for i_z in 0..nz {
-                    let interior_indices = [i_x, i_y, i_z];
-                    
-                    let i_0_int = self.grid.flat_index_on_interior_grid(interior_indices);
-                    
-                    let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
-                    
-                    let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
-                    
-                    let du_dx = (self.velocity_star[i_l.current][0] - self.velocity_star[i_l.neg[0]][0]) / dx;
-                    let dv_dy = (self.velocity_star[i_l.current][1] - self.velocity_star[i_l.neg[1]][1]) / dy;
-                    let dw_dz = (self.velocity_star[i_l.current][2] - self.velocity_star[i_l.neg[2]][2]) / dz;
-                    
-                    self.pressure_solver.rhs_at_levels[0][i_0_int] = self.density * (du_dx + dv_dy + dw_dz) / time_step;
+        let [dx, dy, dz] = self.grid.cell_length.0;
+
+        let data_ptr = self.pressure_solver.rhs_at_levels[0].as_mut_ptr() as usize;
+
+        (0..nr_interior_cells)
+            .into_par_iter()
+            .for_each(|i_flat_interior| {
+                let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
+                let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
+
+                let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
+
+                let du_dx = (self.velocity_star[i_l.current][0] - self.velocity_star[i_l.neg[0]][0]) / dx;
+                let dv_dy = (self.velocity_star[i_l.current][1] - self.velocity_star[i_l.neg[1]][1]) / dy;
+                let dw_dz = (self.velocity_star[i_l.current][2] - self.velocity_star[i_l.neg[2]][2]) / dz;
+
+                let new_value = self.density * (du_dx + dv_dy + dw_dz) / time_step;
+
+                unsafe {
+                    let ptr = data_ptr as *mut Float;
+                    *ptr.add(i_flat_interior) = new_value;
                 }
-            }
-        }
+                
+            });
 
         println!("Pressure projection rhs time: {:.?}", start_time.elapsed());
     }
