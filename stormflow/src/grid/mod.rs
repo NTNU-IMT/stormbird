@@ -9,10 +9,13 @@ pub const INTERIOR_OFFSET: usize = 1;
 pub struct Grid {
     pub start_point: SpatialVector,
     pub cell_length: SpatialVector,
+    pub inv_cell_length: SpatialVector,
+    pub inv_cell_length_squared: SpatialVector,
+    pub poisson_diagonal: Float,
     pub extended_shape: [usize; 3],
-    pub extended_stride: [usize; 2],
+    pub extended_stride: [usize; 3],
     pub interior_shape: [usize; 3],
-    pub interior_stride: [usize; 2]
+    pub interior_stride: [usize; 3]
 }
 
 impl Grid {
@@ -28,6 +31,24 @@ impl Grid {
             domain_length[1] / interior_shape[1] as Float,
             domain_length[2] / interior_shape[2] as Float,
         ]);
+
+        let inv_cell_length = SpatialVector([
+            1.0 / cell_length[0],
+            1.0 / cell_length[1],
+            1.0 / cell_length[2]
+        ]);
+
+        let inv_cell_length_squared = SpatialVector([
+            inv_cell_length[0].powi(2),
+            inv_cell_length[1].powi(2),
+            inv_cell_length[2].powi(2),
+        ]);
+
+        let poisson_diagonal = 1.0 / (-2.0 * (
+            inv_cell_length_squared[0] + 
+            inv_cell_length_squared[1] + 
+            inv_cell_length_squared[2])
+        );
         
         let extended_shape = [
             interior_shape[0] + 2 * INTERIOR_OFFSET,
@@ -37,17 +58,22 @@ impl Grid {
 
         let extended_stride = [
             extended_shape[1] * extended_shape[2], 
-            extended_shape[2]
+            extended_shape[2],
+            1usize
         ];
 
         let interior_stride = [
             interior_shape[1] * interior_shape[2],
-            interior_shape[2]
+            interior_shape[2],
+            1usize
         ];
 
         Self {
             start_point,
             cell_length,
+            inv_cell_length,
+            inv_cell_length_squared,
+            poisson_diagonal,
             extended_shape,
             extended_stride,
             interior_shape,
@@ -197,7 +223,8 @@ impl Grid {
 
         let extended_stride = [
             extended_shape[1] * extended_shape[2], 
-            extended_shape[2]
+            extended_shape[2],
+            1usize
         ];
 
         let interior_shape = [
@@ -208,16 +235,40 @@ impl Grid {
 
         let interior_stride = [
             interior_shape[1] * interior_shape[2],
-            interior_shape[2]
+            interior_shape[2],
+            1usize
         ];
+
+        let cell_length = SpatialVector([
+            self.cell_length[0] * 2.0,
+            self.cell_length[1] * 2.0,
+            self.cell_length[2] * 2.0,
+        ]);
+
+        let inv_cell_length = SpatialVector([
+            1.0 / cell_length[0],
+            1.0 / cell_length[1],
+            1.0 / cell_length[2]
+        ]);
+
+        let inv_cell_length_squared = SpatialVector([
+            inv_cell_length[0].powi(2),
+            inv_cell_length[1].powi(2),
+            inv_cell_length[2].powi(2),
+        ]);
+
+        let poisson_diagonal = 1.0 / (-2.0 * (
+            inv_cell_length_squared[0] + 
+            inv_cell_length_squared[1] + 
+            inv_cell_length_squared[2])
+        );
         
         Grid {
             start_point: self.start_point,
-            cell_length: SpatialVector([
-                self.cell_length[0] * 2.0,
-                self.cell_length[1] * 2.0,
-                self.cell_length[2] * 2.0,
-            ]),
+            cell_length,
+            inv_cell_length,
+            inv_cell_length_squared,
+            poisson_diagonal,
             extended_shape,
             extended_stride,
             interior_shape,

@@ -9,7 +9,6 @@ use stormath::type_aliases::Float;
 /// Performs a single Jacobi iteration step for the Poisson equation.
 /// 
 /// Reads from `current` buffer and writes to `new` buffer.
-#[inline]
 fn jacobi_iteration_step(
     grid: &Grid,
     rhs: &[Float],
@@ -17,55 +16,36 @@ fn jacobi_iteration_step(
     new: &mut [Float],
     omega: Float,
 ) {
-    let [dx, dy, dz] = grid.cell_length.0;
+    new.par_chunks_mut(grid.extended_stride[0])
+        .enumerate()
+        .for_each(|(i, plane)| {
+            // i is the extended-grid i index. Skip halo planes i == 0 and i == nxi + 1.
+            if i == 0 || i > grid.interior_shape[0] {
+                return;
+            }
+            let ii = i - 1; // interior i index
 
-    // Precompute stencil coefficients
-    let inv_dx2 = 1.0 / (dx * dx);
-    let inv_dy2 = 1.0 / (dy * dy);
-    let inv_dz2 = 1.0 / (dz * dz);
+            for ji in 0..grid.interior_shape[1] {
+                let j = ji + 1;
 
-    // Diagonal coefficient: -2/dx² - 2/dy² - 2/dz²
-    let inv_diag = 1.0 / (-2.0 * (inv_dx2 + inv_dy2 + inv_dz2));
+                // Index of (i, j, k=1) within THIS plane: subtract the plane's base (i * stride_x).
+                let base_extended = grid.flat_index_on_extended_grid([i, j, 1]);
+                let plane_base = base_extended - i * grid.extended_stride[0];
+                let base_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
 
-    let one_minus_omega = 1.0 - omega;
+                // The contiguous k-column we WRITE lives entirely inside `plane`.
+                let out_col = &mut plane[plane_base..plane_base + grid.interior_shape[2]];
 
-    let [nxi, nyi, nzi] = grid.interior_shape;
+                for k in 0..grid.interior_shape[2] {
+                    let i_0 = base_extended + k;
+                    let off_diag =
+                          grid.inv_cell_length_squared[0] * (current[i_0 + grid.extended_stride[0]] + current[i_0 - grid.extended_stride[0]])
+                        + grid.inv_cell_length_squared[1] * (current[i_0 + grid.extended_stride[1]] + current[i_0 - grid.extended_stride[1]])
+                        + grid.inv_cell_length_squared[2] * (current[i_0 + 1]        + current[i_0 - 1]);
 
-    let [stride_x, stride_y] = grid.extended_stride;
-
-    let nr_lines = nxi * nyi;
-
-    (0..nr_lines)
-        .into_par_iter()
-        .for_each(|line| {
-            let ii = line / nyi; // interior i index
-            let ji = line % nyi; // interior j index
-
-            // Extended-grid coordinates (assuming a 1-cell halo on each side).
-            let i = ii + 1;
-            let j = ji + 1;
-
-            let base_extended = grid.flat_index_on_extended_grid([i, j, 1]);
-            let base_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
-
-            let mut i_0 = base_extended;
-            let mut flat_interior = base_interior;
-
-            for _k in 0..nzi {
-                let off_diag = inv_dx2 * (current[i_0 + stride_x] + current[i_0 - stride_x])
-                             + inv_dy2 * (current[i_0 + stride_y] + current[i_0 - stride_y])
-                             + inv_dz2 * (current[i_0 + 1]        + current[i_0 - 1]);
-
-                let jacobi_update = (rhs[flat_interior] - off_diag) * inv_diag;
-
-                let new_val = one_minus_omega * current[i_0] + omega * jacobi_update;
-
-                unsafe {
-                    *new.as_ptr().add(i_0).cast_mut() = new_val;
+                    let jacobi_update = (rhs[base_interior + k] - off_diag) * grid.poisson_diagonal;
+                    out_col[k] = (1.0 - omega) * current[i_0] + omega * jacobi_update;
                 }
-
-                i_0 += 1;
-                flat_interior += 1;
             }
         });
 }
@@ -150,7 +130,6 @@ pub fn compute_residual(
     grid: &Grid,
     x: &[Float],
     rhs: &[Float],
-    residual: &mut [Float],
 ) -> Float {
     let [dx, dy, dz] = grid.cell_length.0;
     
@@ -160,31 +139,23 @@ pub fn compute_residual(
     let inv_dz2 = 1.0 / (dz * dz);
     let diag = -2.0 * (inv_dx2 + inv_dy2 + inv_dz2);
     
-    // Strides for extended grid
-    let stride_x = grid.extended_shape[1] * grid.extended_shape[2];
-    let stride_y = grid.extended_shape[2];
-    
-    let residual_sum: Float = residual
-        .par_iter_mut()
-        .enumerate()
-        .map(|(flat_interior, res)| {
+    (0..rhs.len())
+        .into_par_iter()
+        .map(|flat_interior| {
             // Convert interior index to extended index
             let interior_indices = grid.interior_indices_from_flat_index(flat_interior);
             let [i, j, k] = interior_indices;
-            let idx_extended = (i + 1) * stride_x + (j + 1) * stride_y + (k + 1);
+            let idx_extended = (i + 1) * grid.extended_stride[0] + (j + 1) * grid.extended_stride[1] + (k + 1);
             
             // Compute A*x at this cell
             let ax = apply_laplacian_stencil(
                 x, idx_extended,
                 inv_dx2, inv_dy2, inv_dz2, diag,
-                stride_x, stride_y
+                grid.extended_stride[0], grid.extended_stride[1]
             );
             
             // r = rhs - A*x
-            *res = rhs[flat_interior] - ax;
+            let res = rhs[flat_interior] - ax;
             res.abs()
-        })
-        .sum();
-    
-    residual_sum
+        }).sum::<Float>() / rhs.len() as Float
 }

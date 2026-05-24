@@ -23,11 +23,23 @@ struct Args {
     /// Time step
     #[arg(short, long, default_value_t = 0.75)]
     courant_number: Float,
+
+    /// Number of cores
+    #[arg(short, long, default_value_t = 0)]
+    nr_of_cores: usize
 }
 
 
 pub fn main() -> Result<(), Error> {
     let args = Args::parse();
+
+    if args.nr_of_cores > 0 {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(args.nr_of_cores)
+            .build_global()
+            .unwrap();
+    }
+    
     
     let sim_builder = SimulationBuilder::from_json_file(&args.file_path)?;
     

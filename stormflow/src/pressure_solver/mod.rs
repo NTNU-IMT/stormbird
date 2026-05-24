@@ -40,6 +40,8 @@ impl Default for PressureSolverSettings {
     }
 }
 
+const RESTRICT_WEIGHT: Float = 1.0 / 8.0;
+
 pub struct PressureSolverMultiGrid {
     pub grids: Vec<Grid>,
     pub boundary_conditions: PressureBoundaryConditions,
@@ -134,7 +136,6 @@ impl PressureSolverMultiGrid {
         let start_time = Instant::now();
         
         let coarse_level = fine_level + 1;
-        let weight = 1.0 / 8.0;
         
         let fine_grid = &self.grids[fine_level];
         let coarse_grid = &self.grids[coarse_level];
@@ -142,15 +143,13 @@ impl PressureSolverMultiGrid {
         let nr_coarse_interior_cells = coarse_grid.nr_interior_cells();
         
         // Precompute stencil coefficients for the fine grid
-        let [dx, dy, dz] = fine_grid.cell_length.0;
-        let inv_dx2 = 1.0 / (dx * dx);
-        let inv_dy2 = 1.0 / (dy * dy);
-        let inv_dz2 = 1.0 / (dz * dz);
+        let inv_dx2 = fine_grid.inv_cell_length[0].powi(2);
+        let inv_dy2 = fine_grid.inv_cell_length[1].powi(2);
+        let inv_dz2 = fine_grid.inv_cell_length[2].powi(2);
         let diag = -2.0 * (inv_dx2 + inv_dy2 + inv_dz2);
         
         // Strides for the fine extended grid
-        let stride_x_fine: usize = fine_grid.extended_shape[1] * fine_grid.extended_shape[2];
-        let stride_y_fine: usize = fine_grid.extended_shape[2];
+        let [stride_x_fine, stride_y_fine, _] = fine_grid.extended_stride;
         
         // Get pointers and references for parallel access
         let rhs_coarse_ptr = self.rhs_at_levels[coarse_level].as_mut_ptr() as usize;
@@ -210,7 +209,7 @@ impl PressureSolverMultiGrid {
                     // Compute residual: r_i = rhs_i - (A * x)_i
                     let residual_i = rhs_fine[flat_fine_interior] - ax_i;
                     
-                    restricted_value += weight * residual_i;
+                    restricted_value += RESTRICT_WEIGHT * residual_i;
                 }
                 
                 // Write result using unsafe pointer access
@@ -339,12 +338,7 @@ impl PressureSolverMultiGrid {
         // Smooth and restrict down to the coarsest level
         for i_g in 0..nr_grids-1 {
             if i_g > 0 {
-                // Zero out the interior cells of x for coarser levels
-                // Note: x_at_levels is on extended grid, but we only need to zero interior values
-                // For simplicity, we zero the entire buffer (ghost cells will be set by BCs anyway)
-                // TODO: Only zero interior cells for efficiency, or set ghost cells appropriately
                 self.x_at_levels[i_g].fill(0.0);
-                self.x_at_levels_work[i_g].fill(0.0);
             }
 
             kernels::poisson_jacobi_smoother(
@@ -356,31 +350,24 @@ impl PressureSolverMultiGrid {
                 nr_iterations,
                 omega
             );
-            
-            // Fused: compute residuals and restrict to coarser level in one pass
+
             self.compute_residual_and_restrict(i_g);
         }
 
         self.x_at_levels[nr_grids - 1].fill(0.0);
-        self.x_at_levels_work[nr_grids - 1].fill(0.0);
 
-        // Solve at the coarsest level
-        // Note: We reuse the previous values as initial guess (warm start)
-        // since we do more iterations here and the RHS changes gradually
-        // TODO: Ghost cells at coarsest level need to be set appropriately
         kernels::poisson_jacobi_smoother(
             &self.grids[nr_grids-1], 
             &self.boundary_conditions,
             &self.rhs_at_levels[nr_grids-1], 
             &mut self.x_at_levels[nr_grids-1], 
             &mut self.x_at_levels_work[nr_grids-1], 
-            nr_iterations * 2,
+            nr_iterations * 4,
             omega
         );
         
         // Prolongate and smooth back up
         for i_g in (0..nr_grids-1).rev() {
-            // Fused: prolongate correction from coarse level and add directly to x
             self.prolongate_and_correct(i_g);
 
             kernels::poisson_jacobi_smoother(
@@ -410,13 +397,12 @@ impl PressureSolverMultiGrid {
             self.perform_v_cycle();
         }
 
-        // Compute residual using stencil-based approach
-        let grid = &self.grids[0];
-        let rhs = &self.rhs_at_levels[0];
-        
-        let mut residual = vec![0.0; rhs.len()];
-        let residual_sum = kernels::compute_residual(grid, &self.x_at_levels[0], rhs, &mut residual);
-        let avg_residual = residual_sum / rhs.len() as Float;
+        // Compute residual using stencil-based approach        
+        let avg_residual = kernels::compute_residual(
+            &self.grids[0], 
+            &self.x_at_levels[0], 
+            &self.rhs_at_levels[0]
+        );
 
         println!("Residual sum: {}", avg_residual);
     }

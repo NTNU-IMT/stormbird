@@ -10,3 +10,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 stormath = {path = "../stormath", features=["single_precision"]}
 stormbird = {path = "../stormbird", features=["single_precision"]}
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
