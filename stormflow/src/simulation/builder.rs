@@ -6,11 +6,20 @@ use serde::{Serialize, Deserialize};
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 
-use stormbird::actuator_line::builder::ActuatorLineBuilder;
+use stormbird::{
+    wind::{
+        environment::WindEnvironment,
+        wind_condition::WindCondition
+    },
+    actuator_line::builder::ActuatorLineBuilder
+};
 
 use crate::actuator_line_interface::ActuatorLineInterface;
 
-use crate::boundary_conditions::{BoundaryConditionBuilder, BoundaryConditions, BoundaryCondition};
+use crate::boundary_conditions::{
+    pressure::PressureBoundaryConditions,
+    velocity::VelocityBoundaryConditions
+};
 use crate::grid::Grid;
 use crate::simulation::Simulation;
 use crate::geometry::{
@@ -28,19 +37,24 @@ use crate::error::Error;
 pub struct SimulationBuilder {
     pub domain_start_point: SpatialVector,
     pub domain_end_point: SpatialVector,
-    pub initial_velocity: SpatialVector,
-    pub boundary_conditions: [[BoundaryConditionBuilder; 2]; 3],
-    pub nr_interior_cells: [usize; 3],
-    pub viscosity: Float,
-    #[serde(default)]
-    pub pressure_solver: PressureSolverBuilder,
+    pub wind_condition: WindCondition,
+    pub linear_velocity: SpatialVector,
+    pub grid_interior_shape: [usize; 3],
     #[serde(default)]
     pub actuator_line: Option<ActuatorLineBuilder>,
     #[serde(default)]
-    pub geometries: Vec<GeometryBuilder>
+    pub geometries: Vec<GeometryBuilder>,
+    #[serde(default="SimulationBuilder::default_effective_viscosity")]
+    pub effective_viscosity: Float,
+    #[serde(default)]
+    pub wind_environment: WindEnvironment,
+    #[serde(default)]
+    pub pressure_solver: PressureSolverBuilder,
 }
 
 impl SimulationBuilder {
+    pub fn default_effective_viscosity() -> Float {0.001}
+    
     pub fn from_json_str(input: &str) -> Result<Self, Error> {
         let out = serde_json::from_str(input)?;
         
@@ -57,53 +71,30 @@ impl SimulationBuilder {
         let grid = Grid::new(
             self.domain_start_point, 
             self.domain_end_point, 
-            self.nr_interior_cells
+            self.grid_interior_shape
         );
         
         let total_nr_cells = grid.nr_extended_cells();
 
-        let velocity = vec![self.initial_velocity; total_nr_cells];
-        let velocity_org = vec![SpatialVector::default(); total_nr_cells];
-        let velocity_star = vec![SpatialVector::default(); total_nr_cells];
-        
+        let pressure_boundary_conditions = PressureBoundaryConditions::new_from_up_direction(
+            self.wind_environment.up_direction
+        );
+
+        let velocity_boundary_conditions = VelocityBoundaryConditions::new(
+            &self.wind_environment,
+            &self.wind_condition,
+            self.linear_velocity,
+            self.wind_environment.up_direction
+        );
+
+        let velocity = velocity_boundary_conditions.initial_velocity(&grid);
+        let velocity_org = velocity.clone();
+        let velocity_star = velocity.clone();
         let body_force = vec![SpatialVector::default(); total_nr_cells];
-        
-        let mut boundary_conditions = BoundaryConditions::default();
-        
-        for i_a in 0..3 {
-            for i_e in 0..2 {
-                match self.boundary_conditions[i_a][i_e] {
-                    BoundaryConditionBuilder::Slip => {
-                        boundary_conditions.pressure[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_x[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_y[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_z[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                    },
-                    BoundaryConditionBuilder::NoSlip => {
-                        boundary_conditions.pressure[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_x[i_a][i_e] = BoundaryCondition::Value(0.0);
-                        boundary_conditions.velocity_y[i_a][i_e] = BoundaryCondition::Value(0.0);
-                        boundary_conditions.velocity_z[i_a][i_e] = BoundaryCondition::Value(0.0);
-                    },
-                    BoundaryConditionBuilder::Outlet => {
-                        boundary_conditions.pressure[i_a][i_e] = BoundaryCondition::Value(0.0);
-                        boundary_conditions.velocity_x[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_y[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_z[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                    },
-                    BoundaryConditionBuilder::Inlet(inlet_velocity) => {
-                        boundary_conditions.pressure[i_a][i_e] = BoundaryCondition::ZeroGradient;
-                        boundary_conditions.velocity_x[i_a][i_e] = BoundaryCondition::Value(inlet_velocity[0]);
-                        boundary_conditions.velocity_y[i_a][i_e] = BoundaryCondition::Value(inlet_velocity[1]);
-                        boundary_conditions.velocity_z[i_a][i_e] = BoundaryCondition::Value(inlet_velocity[2]);
-                    }
-                }
-            }
-        }
         
         let pressure_solver = self.pressure_solver.build(
             &grid,
-            &boundary_conditions
+            &pressure_boundary_conditions
         );
         
         let actuator_line = if let Some(builder) = &self.actuator_line {
@@ -123,7 +114,7 @@ impl SimulationBuilder {
         }
 
         println!("Calculating SDF");
-        let signed_distance_function = Geometry::signed_distance_function_on_grid(
+        let signed_distance_function = Geometry::signed_distance_function_on_extended_grid(
             &geometries, &grid
         );
         
@@ -131,11 +122,11 @@ impl SimulationBuilder {
             velocity,
             velocity_org,
             velocity_star,
+            velocity_boundary_conditions,
             body_force,
-            boundary_conditions,
             pressure_solver,
             grid,
-            viscosity: self.viscosity,
+            viscosity: self.effective_viscosity,
             density: 1.0,
             actuator_line,
             signed_distance_function

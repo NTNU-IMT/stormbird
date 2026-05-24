@@ -1,19 +1,20 @@
-use stormath::sparse_matrix::linalg::IterativeSolverSettings;
-
 use serde::{Serialize, Deserialize};
 
-use crate::boundary_conditions::BoundaryConditions;
+use crate::boundary_conditions::pressure::PressureBoundaryConditions;
 use crate::grid::Grid;
 
-use super::PressureSolverMultiGrid;
+use super::{
+    PressureSolverMultiGrid,
+    PressureSolverSettings
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PressureSolverBuilder {
-    pub settings: IterativeSolverSettings,
+    pub settings: PressureSolverSettings,
 }
 
 impl PressureSolverBuilder {
-    pub fn build(&self, grid: &Grid, boundary_conditions: &BoundaryConditions) -> PressureSolverMultiGrid {
+    pub fn build(&self, grid: &Grid, boundary_conditions: &PressureBoundaryConditions) -> PressureSolverMultiGrid {
         PressureSolverMultiGrid::new(
             grid, 
             boundary_conditions, self.settings.clone()

@@ -21,7 +21,7 @@ struct Args {
     end_time: Float,
     
     /// Time step
-    #[arg(short, long, default_value_t = 0.5)]
+    #[arg(short, long, default_value_t = 0.75)]
     courant_number: Float,
 }
 

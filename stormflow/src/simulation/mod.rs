@@ -7,7 +7,9 @@ pub mod kernels;
 
 use crate::grid::Grid;
 
-use crate::boundary_conditions::BoundaryConditions;
+use crate::boundary_conditions::{
+    velocity::VelocityBoundaryConditions
+};
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::geometry::{
     Geometry,
@@ -23,13 +25,13 @@ pub struct Simulation {
     pub velocity: Vec<SpatialVector>,
     pub velocity_org: Vec<SpatialVector>,
     pub velocity_star: Vec<SpatialVector>,
+    pub velocity_boundary_conditions: VelocityBoundaryConditions,
     pub body_force: Vec<SpatialVector>,
-    pub boundary_conditions: BoundaryConditions,
     pub pressure_solver: PressureSolverMultiGrid,
     pub grid: Grid,
     pub viscosity: Float,
     pub density: Float,
-    pub signed_distance_function: Vec<SpatialVector>,
+    pub signed_distance_function: Vec<Float>,
     pub actuator_line: Option<ActuatorLineInterface>,
 }
 
@@ -62,7 +64,7 @@ impl Simulation {
     }
 
     pub fn do_step(&mut self, time: Float, time_step: Float) {      
-        self.boundary_conditions.set_velocity_ghost_cells(
+        self.velocity_boundary_conditions.set_ghost_cells(
             &self.grid,
             &mut self.velocity
         );
@@ -131,14 +133,22 @@ impl Simulation {
             .into_par_iter()
             .for_each(|i_flat_interior| {
                 let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
-                let [i, j, k] = self.grid.extended_indices_from_interior_indices(interior_indices);
-                let i_0 = self.grid.flat_index_on_extended_grid([i, j, k]);
+                let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
+                let i_0 = self.grid.flat_index_on_extended_grid(extended_indices);
 
                 let mut new_velocity = SpatialVector::default();
                 let mut new_velocity_star = SpatialVector::default();
                 
                 for axis_index in 0..3 {
-                    let sdf = self.signed_distance_function[i_flat_interior][axis_index];
+                    let mut extended_indices_p = extended_indices;
+                    extended_indices_p[axis_index] += 1;
+
+                    let i_p = self.grid.flat_index_on_extended_grid(extended_indices_p);
+                    
+                    let sdf = 0.5 * (
+                        self.signed_distance_function[i_0] + 
+                        self.signed_distance_function[i_p]
+                    );
                     
                     let mu = Geometry::blending_function(sdf, epsilon);
                     
@@ -262,8 +272,6 @@ impl Simulation {
         let start_time = Instant::now();
         
         let nr_interior_cells = self.grid.nr_interior_cells();
-        
-        let [dx, dy, dz] = self.grid.cell_length.0;
 
         let data_ptr = self.pressure_solver.rhs_at_levels[0].as_mut_ptr() as usize;
 
@@ -272,14 +280,24 @@ impl Simulation {
             .for_each(|i_flat_interior| {
                 let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
                 let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
+                let i_0 = self.grid.flat_index_on_extended_grid(extended_indices);
 
-                let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
+                let mut new_value = 0.0;
+                
+                for axis_index in 0..3 {
+                    let mut extended_indices_n = extended_indices;
 
-                let du_dx = (self.velocity_star[i_l.current][0] - self.velocity_star[i_l.neg[0]][0]) / dx;
-                let dv_dy = (self.velocity_star[i_l.current][1] - self.velocity_star[i_l.neg[1]][1]) / dy;
-                let dw_dz = (self.velocity_star[i_l.current][2] - self.velocity_star[i_l.neg[2]][2]) / dz;
+                    extended_indices_n[axis_index] -= 1;
+                    
+                    let i_n = self.grid.flat_index_on_extended_grid(extended_indices_n);
 
-                let new_value = self.density * (du_dx + dv_dy + dw_dz) / time_step;
+                    new_value += (
+                        self.velocity_star[i_0][axis_index] - 
+                        self.velocity_star[i_n][axis_index]
+                    ) / self.grid.cell_length[axis_index];
+                }
+
+                new_value *= self.density / time_step;
 
                 unsafe {
                     let ptr = data_ptr as *mut Float;
@@ -331,32 +349,31 @@ impl Simulation {
                 for ji in 0..nyi {
                     let j = ji + 1;
                     // Interior flat index for (ii, ji, 0); advanced by +1 per k.
-                    let mut flat_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
-                    // Extended flat index for (i, j, 1); advanced by +1 per k.
+                    let mut i_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
                     let mut i_extended = grid.flat_index_on_extended_grid([i, j, 1]);
     
                     for _k in 0..nzi {
-                        let convective_term = kernels::convective_term(flat_interior, grid, velocity);
-                        let viscous_term    = kernels::viscous_term(flat_interior, grid, velocity, viscosity);
-                        let body_force_term = kernels::body_force_term(flat_interior, grid, body_force, density);
+                        let new_value = kernels::convect_and_diffuse(
+                            i_interior, 
+                            grid, 
+                            velocity,
+                            body_force,
+                            viscosity,
+                            density
+                        );
     
-                        let org = velocity_org[i_extended];
-                        let new_velocity = SpatialVector([
-                            org[0] + (convective_term[0] + viscous_term[0] - body_force_term[0]) * time_step,
-                            org[1] + (convective_term[1] + viscous_term[1] - body_force_term[1]) * time_step,
-                            org[2] + (convective_term[2] + viscous_term[2] - body_force_term[2]) * time_step,
-                        ]);
+                        let new_velocity = velocity_org[i_extended] + time_step * new_value;
     
                         // i_extended lies in plane `i`; index within the chunk.
                         star_plane[i_extended - i * plane] = new_velocity;
     
-                        flat_interior += 1;
+                        i_interior += 1;
                         i_extended += 1;
                     }
                 }
             });
     
-        self.boundary_conditions.set_velocity_ghost_cells(
+        self.velocity_boundary_conditions.set_ghost_cells(
             &self.grid,
             &mut self.velocity_star,
         );
@@ -367,11 +384,7 @@ impl Simulation {
     pub fn update_velocity(&mut self, time_step: Float) {
         let start_time = Instant::now();
         
-        let [nx, ny, nz] = self.grid.interior_shape;
-        
-        let nr_interior_cells = nx * ny * nz;
-        
-        let [dx, dy, dz] = self.grid.cell_length.0;
+        let nr_interior_cells = self.grid.nr_interior_cells();
 
         let data_ptr = self.velocity.as_mut_ptr() as usize;
 
@@ -382,26 +395,32 @@ impl Simulation {
             .for_each(|i_flat| {
                 let interior_indices = self.grid.interior_indices_from_flat_index(i_flat);
                 let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
+
+                let i_0 = self.grid.flat_index_on_extended_grid(extended_indices);
+
+                let mut dp_dx = SpatialVector::default();
+
+                for axis_index in 0..3 {
+                    let mut extended_indices_p = extended_indices;
+                    extended_indices_p[axis_index] += 1;
+
+                    let i_p = self.grid.flat_index_on_extended_grid(extended_indices_p);
+
+                    dp_dx[axis_index] = (
+                        pressure[i_p] - 
+                        pressure[i_0]
+                    ) / self.grid.cell_length[axis_index];
+                }
                 
-                let i_l = self.grid.local_flat_indices_on_extended_grid(extended_indices);
-
-                let dp_dx = SpatialVector(
-                    [
-                        (pressure[i_l.pos[0]] - pressure[i_l.current]) / dx,
-                        (pressure[i_l.pos[1]] - pressure[i_l.current]) / dy,
-                        (pressure[i_l.pos[2]] - pressure[i_l.current]) / dz
-                    ]
-                );
-
-                let new_velocity = self.velocity_star[i_l.current] - (time_step / self.density) * dp_dx;
+                let new_velocity = self.velocity_star[i_0] - (time_step / self.density) * dp_dx;
 
                 unsafe {
                     let ptr = data_ptr as *mut SpatialVector;
-                    *ptr.add(i_l.current) = new_velocity;
+                    *ptr.add(i_0) = new_velocity;
                 }
             });
         
-        self.boundary_conditions.set_velocity_ghost_cells(
+        self.velocity_boundary_conditions.set_ghost_cells(
             &self.grid,
             &mut self.velocity
         );

@@ -1,5 +1,5 @@
 use crate::{
-    boundary_conditions::BoundaryConditions, 
+    boundary_conditions::pressure::PressureBoundaryConditions, 
     grid::Grid
 };
 
@@ -72,7 +72,7 @@ fn jacobi_iteration_step(
 
 pub fn poisson_jacobi_smoother(
     grid: &Grid,
-    boundary_conditions: &BoundaryConditions,
+    boundary_conditions: &PressureBoundaryConditions,
     rhs: &[Float], 
     solution: &mut [Float], 
     work: &mut [Float], 
@@ -81,8 +81,8 @@ pub fn poisson_jacobi_smoother(
 ) {
     work.copy_from_slice(solution);
 
-    boundary_conditions.set_pressure_ghost_cells(grid, work);
-    boundary_conditions.set_pressure_ghost_cells(grid, solution);
+    boundary_conditions.set_ghost_cells(grid, work);
+    boundary_conditions.set_ghost_cells(grid, solution);
     
     for iteration in 0..nr_iterations {
         // Swap buffers: read from current, write to new
@@ -91,11 +91,11 @@ pub fn poisson_jacobi_smoother(
         if iteration % 2 == 0 {
             jacobi_iteration_step(grid, rhs, solution, work, omega);
 
-            boundary_conditions.set_pressure_ghost_cells(grid, work);
+            boundary_conditions.set_ghost_cells(grid, work);
         } else {
             jacobi_iteration_step(grid, rhs, work, solution, omega);
 
-            boundary_conditions.set_pressure_ghost_cells(grid, solution);
+            boundary_conditions.set_ghost_cells(grid, solution);
         }
     }
     

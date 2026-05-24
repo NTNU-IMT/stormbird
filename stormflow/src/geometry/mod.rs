@@ -69,28 +69,19 @@ impl Geometry {
         value
     }
 
-    pub fn signed_distance_function_on_grid(geometries: &[Geometry], grid: &Grid) -> Vec<SpatialVector> {
-        let nr_interior_cells = grid.nr_interior_cells();
+    pub fn signed_distance_function_on_extended_grid(geometries: &[Geometry], grid: &Grid) -> Vec<Float> {
+        let nr_extended_cells = grid.nr_extended_cells();
 
-        (0..nr_interior_cells).into_par_iter()
-            .map(|i_flat_interior| {
-                let interior_indices = grid.interior_indices_from_flat_index(i_flat_interior);
+        (0..nr_extended_cells).into_par_iter()
+            .map(|i_flat_extended| {
+                let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
                 
-                let cell_center = grid.cell_center(interior_indices);
+                let cell_center = grid.cell_center_extended(extended_indices);
 
-                let mut sdf_vector = SpatialVector::default();
-
-                for axis_index in 0..3 {
-                    let mut face = cell_center;
-                    face[axis_index] += 0.5 * grid.cell_length[axis_index];
-
-                    sdf_vector[axis_index] = Geometry::signed_distance_function_union(
-                        geometries, 
-                        face
-                    );
-                }
-
-                sdf_vector
+                Geometry::signed_distance_function_union(
+                    geometries, 
+                    cell_center
+                )
             }).collect()
     }
 

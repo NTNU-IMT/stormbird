@@ -7,14 +7,43 @@ use rayon::prelude::*;
 
 use std::time::Instant;
 
-use stormath::sparse_matrix::linalg::IterativeSolverSettings;
+use crate::{
+    boundary_conditions::pressure::PressureBoundaryConditions, 
+    grid::Grid
+};
 
-use crate::{boundary_conditions::BoundaryConditions, grid::Grid};
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PressureSolverSettings {
+    #[serde(default="PressureSolverSettings::default_nr_v_cycles")]
+    pub nr_v_cycles: usize,
+    #[serde(default="PressureSolverSettings::default_nr_smooth_iterations")]
+    pub nr_smooth_iterations: usize,
+    #[serde(default="PressureSolverSettings::default_jacobi_weight")]
+    pub jacobi_weight: Float
+}
+
+impl PressureSolverSettings {
+    pub fn default_nr_v_cycles() -> usize {2}
+    pub fn default_nr_smooth_iterations() -> usize {4}
+    pub fn default_jacobi_weight() -> Float {2.0/3.0}
+}
+
+impl Default for PressureSolverSettings {
+    fn default() -> Self {
+        Self {
+            nr_v_cycles: Self::default_nr_v_cycles(),
+            nr_smooth_iterations: Self::default_nr_smooth_iterations(),
+            jacobi_weight: Self::default_jacobi_weight()
+        }
+    }
+}
 
 pub struct PressureSolverMultiGrid {
     pub grids: Vec<Grid>,
-    pub boundary_conditions: BoundaryConditions,
-    pub solver_settings: IterativeSolverSettings,
+    pub boundary_conditions: PressureBoundaryConditions,
+    pub solver_settings: PressureSolverSettings,
     /// Solution values at each grid level. Stored on the **extended** grid (includes ghost cells).
     pub x_at_levels: Vec<Vec<Float>>,
     /// Work buffer for Jacobi iterations. Stored on the **extended** grid.
@@ -28,8 +57,8 @@ const SMALLEST_NR_CELLS: usize = 2;
 impl PressureSolverMultiGrid {
     pub fn new(
         grid: &Grid, 
-        boundary_conditions: &BoundaryConditions, 
-        solver_settings: IterativeSolverSettings
+        boundary_conditions: &PressureBoundaryConditions, 
+        solver_settings: PressureSolverSettings
     ) -> Self {
         let mut grid_can_get_coarser = true;
 
@@ -304,7 +333,7 @@ impl PressureSolverMultiGrid {
     pub fn perform_v_cycle(&mut self) {
         let nr_grids = self.grids.len();
 
-        let nr_iterations = self.solver_settings.max_number_of_iterations;
+        let nr_iterations = self.solver_settings.nr_smooth_iterations;
         let omega = self.solver_settings.jacobi_weight;
 
         // Smooth and restrict down to the coarsest level
@@ -377,7 +406,7 @@ impl PressureSolverMultiGrid {
     /// and the ghost cells in the returned solution will have been modified during iteration.
     /// You may need to re-apply boundary conditions after calling this function.
     pub fn solve(&mut self) {
-        for _ in 0..self.solver_settings.min_number_of_iterations {
+        for _ in 0..self.solver_settings.nr_v_cycles {
             self.perform_v_cycle();
         }
 

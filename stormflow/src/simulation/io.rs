@@ -158,23 +158,25 @@ impl Simulation {
 
         if binary { write!(w, "\n").unwrap(); }
 
-        write!(w, "VECTORS sdf_vector double\n").unwrap();
+        // --- Pressure (scalar, stored at cell centers on the extended grid) ---
+        write!(w, "SCALARS sdf double 1\n").unwrap();
+        write!(w, "LOOKUP_TABLE default\n").unwrap();
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    let i_flat = self.grid.flat_index_on_interior_grid([ix, iy, iz]);
-                    
-                    let fx = self.signed_distance_function[i_flat][0] as f64;
-                    let fy = self.signed_distance_function[i_flat][1] as f64;
-                    let fz = self.signed_distance_function[i_flat][2] as f64;
+                    // Convert interior indices to extended indices (offset by 1 ghost layer).
+                    let ex = ix + 1;
+                    let ey = iy + 1;
+                    let ez = iz + 1;
+
+                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let sdf: f64 = self.signed_distance_function[flat] as f64;
 
                     if binary {
-                        w.write_all(&fx.to_be_bytes()).unwrap();
-                        w.write_all(&fy.to_be_bytes()).unwrap();
-                        w.write_all(&fz.to_be_bytes()).unwrap();
+                        w.write_all(&sdf.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", fx, fy, fz).unwrap();
+                        write!(w, "{}\n", sdf).unwrap();
                     }
                 }
             }
