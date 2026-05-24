@@ -13,7 +13,10 @@ use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::boundary_conditions::{BoundaryConditionBuilder, BoundaryConditions, BoundaryCondition};
 use crate::grid::Grid;
 use crate::simulation::Simulation;
-use crate::geometry::Geometry;
+use crate::geometry::{
+    Geometry,
+    GeometryBuilder
+};
 use crate::pressure_solver::{
     builder::PressureSolverBuilder
 };
@@ -34,7 +37,7 @@ pub struct SimulationBuilder {
     #[serde(default)]
     pub actuator_line: Option<ActuatorLineBuilder>,
     #[serde(default)]
-    pub geometries: Vec<Geometry>
+    pub geometries: Vec<GeometryBuilder>
 }
 
 impl SimulationBuilder {
@@ -110,6 +113,19 @@ impl SimulationBuilder {
         } else {
             None
         };
+
+        let mut geometries: Vec<Geometry> = Vec::new();
+
+        for geo_builder in &self.geometries {
+            geometries.push(
+                geo_builder.build()
+            )
+        }
+
+        println!("Calculating SDF");
+        let signed_distance_function = Geometry::signed_distance_function_on_grid(
+            &geometries, &grid
+        );
         
         Simulation {
             velocity,
@@ -122,7 +138,7 @@ impl SimulationBuilder {
             viscosity: self.viscosity,
             density: 1.0,
             actuator_line,
-            geometries: self.geometries.clone()
+            signed_distance_function
         }
     }
 }

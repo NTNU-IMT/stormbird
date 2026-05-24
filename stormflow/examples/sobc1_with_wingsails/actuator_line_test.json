@@ -1,0 +1,62 @@
+{
+  "domain_start_point": [-128.0, -128.0, 0.0],
+  "domain_end_point": [128.0, 128.0, 64.0],
+  "initial_velocity": [8.0, 0.0, 0.0],
+  "boundary_conditions": [
+    [{"Inlet": [8.0, 0.0, 0.0]}, "Outlet"],
+    ["Slip", "Slip"],
+    ["Slip", "Slip"]
+  ],
+  "nr_interior_cells": [256, 256, 64],
+  "viscosity": 0.001,
+  "pressure_solver": {
+    "settings": {
+      "min_number_of_iterations": 2,
+      "max_number_of_iterations": 4
+    }
+  },
+  "actuator_line": {
+    "line_force_model": {
+      "wing_builders": [
+        {
+          "section_points": [
+            {"x": 0.0, "y": 0.0, "z": 10.0},
+            {"x": 0.0, "y": 0.0, "z": 43.0}
+          ],
+          "chord_vectors": [
+            {"x": 11.0, "y": 0.0, "z": 0.0},
+            {"x": 11.0, "y": 0.0, "z": 0.0}
+          ],
+          "section_model": {
+            "Foil": {
+              "cl_zero_angle": 1.5
+            }
+          },
+          "non_zero_circulation_at_ends": [true, false]
+        }
+      ],
+      "nr_sections": 32,
+      "density": 1.0,
+      "circulation_correction": {
+        "Smoothing": {
+          "smoothing_type": {
+            "Gaussian": {
+              "smoothing_length_factor": 0.05
+            }
+          }
+        }
+      }
+    },
+    "solver_settings": {
+      "damping_factor": 0.5
+    },
+    "write_iterations_full_result": 10
+  },
+  "geometries": [
+    {
+      "TriangleMesh": {
+        "file_path": "sobc1_superstructure.obj"
+      }
+    }
+  ]
+}

@@ -11,7 +11,6 @@ use crate::boundary_conditions::BoundaryConditions;
 use crate::actuator_line_interface::ActuatorLineInterface;
 use crate::geometry::{
     Geometry,
-    blending_function
 };
 
 use crate::pressure_solver::PressureSolverMultiGrid;
@@ -30,7 +29,7 @@ pub struct Simulation {
     pub grid: Grid,
     pub viscosity: Float,
     pub density: Float,
-    pub geometries: Vec<Geometry>,
+    pub signed_distance_function: Vec<SpatialVector>,
     pub actuator_line: Option<ActuatorLineInterface>,
 }
 
@@ -67,6 +66,8 @@ impl Simulation {
             &self.grid,
             &mut self.velocity
         );
+
+        self.correct_velocities_for_geometry();
 
         self.velocity_org.copy_from_slice(&self.velocity);
 
@@ -107,21 +108,6 @@ impl Simulation {
         SpatialVector([u, v, w])
     }
     
-    /// Computes the union of the signed distance functions in geometries
-    pub fn signed_distance_function(&self, point: SpatialVector) -> Float {
-        let mut value = Float::MAX;
-        
-        for geometry in &self.geometries {
-            let local_value = geometry.signed_distance(point);
-            
-            if local_value < value {
-                value = local_value;
-            }
-        }
-        
-        value
-    }
-    
     pub fn correct_velocities_for_geometry(&mut self) {
         let start_time = Instant::now();
         
@@ -147,19 +133,14 @@ impl Simulation {
                 let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
                 let [i, j, k] = self.grid.extended_indices_from_interior_indices(interior_indices);
                 let i_0 = self.grid.flat_index_on_extended_grid([i, j, k]);
-                
-                let cell_center = self.grid.cell_center(interior_indices);
 
                 let mut new_velocity = SpatialVector::default();
                 let mut new_velocity_star = SpatialVector::default();
                 
                 for axis_index in 0..3 {
-                    let mut face = cell_center;
-                    face[axis_index] += 0.5 * self.grid.cell_length[axis_index];
+                    let sdf = self.signed_distance_function[i_flat_interior][axis_index];
                     
-                    let sdf = self.signed_distance_function(face);
-                    
-                    let mu = blending_function(sdf, epsilon);
+                    let mu = Geometry::blending_function(sdf, epsilon);
                     
                     new_velocity[axis_index] = mu * self.velocity[i_0][axis_index] + (1.0 - mu) * 1e-6;
                     new_velocity_star[axis_index] = mu * self.velocity_star[i_0][axis_index] + (1.0 - mu) * 1e-6;

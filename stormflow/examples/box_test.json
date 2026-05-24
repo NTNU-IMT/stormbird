@@ -9,9 +9,11 @@
   ],
   "nr_interior_cells": [128, 64, 48],
   "viscosity": 0.01,
-  "solver_settings": {
-    "min_number_of_iterations": 1,
-    "max_number_of_iterations": 50
+  "pressure_solver": {
+    "settings": {
+      "min_number_of_iterations": 2,
+      "max_number_of_iterations": 4
+    }
   },
   "geometries": [
     {

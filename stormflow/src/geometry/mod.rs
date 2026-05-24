@@ -5,75 +5,108 @@ use stormath::consts::PI;
 
 use serde::{Serialize, Deserialize};
 
-/// Blending function that goes between 0 and 1 from -epsilon to epsilon
-pub fn blending_function(distance: Float, epsilon: Float) -> Float {
-    if distance > epsilon {
-        1.0
-    } else if distance < -epsilon {
-        0.0
-    } else {
-        0.5 * (1.0 + distance/epsilon + (PI * distance / epsilon).sin() / PI)
+pub mod triangle_mesh;
+pub mod analytical_shapes;
+
+use crate::grid::Grid;
+
+use rayon::prelude::*;
+
+use triangle_mesh::{
+    TriangleMesh,
+    TriangleMeshBuilder
+};
+use analytical_shapes::{
+    Sphere,
+    Box3D
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum GeometryBuilder {
+    Sphere(Sphere),
+    Box3D(Box3D),
+    TriangleMesh(TriangleMeshBuilder)
+}
+
+impl GeometryBuilder {
+    pub fn build(&self) -> Geometry {
+        match self {
+            Self::Box3D(box_3d) => Geometry::Box3D(box_3d.clone()),
+            Self::Sphere(sphere) => Geometry::Sphere(sphere.clone()),
+            Self::TriangleMesh(tri_mesh_builder) => Geometry::TriangleMesh(tri_mesh_builder.build())
+        }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Geometry {
     Sphere(Sphere),
     Box3D(Box3D),
+    TriangleMesh(TriangleMesh)
 }
 
 impl Geometry {
     pub fn signed_distance(&self, point: SpatialVector) -> Float {
         match self {
             Self::Sphere(sphere) => sphere.signed_distance(point),
-            Self::Box3D(box_3d) => box_3d.signed_distance(point)
+            Self::Box3D(box_3d) => box_3d.signed_distance(point),
+            Self::TriangleMesh(triangle_mesh) => triangle_mesh.signed_distance(point)
+        }
+    }
+
+    /// Computes the union of the signed distance functions in geometries
+    pub fn signed_distance_function_union(geometries: &[Geometry], point: SpatialVector) -> Float {
+        let mut value = Float::MAX;
+        
+        for geometry in geometries {
+            let local_value = geometry.signed_distance(point);
+            
+            if local_value < value {
+                value = local_value;
+            }
+        }
+        
+        value
+    }
+
+    pub fn signed_distance_function_on_grid(geometries: &[Geometry], grid: &Grid) -> Vec<SpatialVector> {
+        let nr_interior_cells = grid.nr_interior_cells();
+
+        (0..nr_interior_cells).into_par_iter()
+            .map(|i_flat_interior| {
+                let interior_indices = grid.interior_indices_from_flat_index(i_flat_interior);
+                
+                let cell_center = grid.cell_center(interior_indices);
+
+                let mut sdf_vector = SpatialVector::default();
+
+                for axis_index in 0..3 {
+                    let mut face = cell_center;
+                    face[axis_index] += 0.5 * grid.cell_length[axis_index];
+
+                    sdf_vector[axis_index] = Geometry::signed_distance_function_union(
+                        geometries, 
+                        face
+                    );
+                }
+
+                sdf_vector
+            }).collect()
+    }
+
+    /// Blending function that goes between 0 and 1 from -epsilon to epsilon
+    pub fn blending_function(distance: Float, epsilon: Float) -> Float {
+        if distance > epsilon {
+            1.0
+        } else if distance < -epsilon {
+            0.0
+        } else {
+            0.5 * (1.0 + distance/epsilon + (PI * distance / epsilon).sin() / PI)
         }
     }
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Sphere {
-    pub center: SpatialVector,
-    pub radius: Float,
-}
 
-impl Sphere {
-    pub fn signed_distance(&self, point: SpatialVector) -> Float {
-        let distance_from_center = (point - self.center).length();
-        
-        distance_from_center - self.radius
-    }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Box3D {
-    pub center: SpatialVector,
-    pub half_extents: SpatialVector, // (hx, hy, hz)
-}
 
-impl Box3D {
-    pub fn signed_distance(&self, point: SpatialVector) -> Float {
-        // Translate point into box-local space
-        let p = point - self.center;
-
-        // Per-axis distance to the box surface
-        let q = SpatialVector::new(
-            p[0].abs() - self.half_extents[0],
-            p[1].abs() - self.half_extents[1],
-            p[2].abs() - self.half_extents[2],
-        );
-
-        // Positive components of q = outside the box on that axis
-        let outside = SpatialVector::new(
-            q[0].max(0.0),
-            q[1].max(0.0),
-            q[2].max(0.0),
-        );
-
-        // Negative components of q = inside the box on that axis
-        let inside_dist = q[0].max(q[1]).max(q[2]).min(0.0);
-
-        outside.length() + inside_dist
-    }
-}
