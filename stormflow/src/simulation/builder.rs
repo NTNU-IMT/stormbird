@@ -53,7 +53,7 @@ pub struct SimulationBuilder {
 }
 
 impl SimulationBuilder {
-    pub fn default_effective_viscosity() -> Float {0.001}
+    pub fn default_effective_viscosity() -> Float {0.0001}
     
     pub fn from_json_str(input: &str) -> Result<Self, Error> {
         let out = serde_json::from_str(input)?;

@@ -84,10 +84,6 @@ impl Simulation {
         
         self.run_actuator_line_model(time, time_step);
         
-        if let Some(actuator_line) = &self.actuator_line {
-            actuator_line.model.write_results("");
-        }
-        
         println!();
     }
     
@@ -263,6 +259,14 @@ impl Simulation {
                 self.body_force[i_flat_extended] = force;
             }
             
+        }
+
+        if let Some(actuator_line) = self.actuator_line.as_mut() {
+            let _need_update = actuator_line.model.update_controller(time, time_step);
+        }
+
+        if let Some(actuator_line) = &self.actuator_line {
+            actuator_line.model.write_results("postProcessing");
         }
 
         println!("Running actuator line model: {:.?}", start_time.elapsed());

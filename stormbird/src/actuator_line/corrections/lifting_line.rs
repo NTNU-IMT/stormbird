@@ -26,6 +26,16 @@ pub struct LiftingLineCorrectionBuilder {
     pub initialization_time: Option<Float>
 }
 
+impl Default for LiftingLineCorrectionBuilder {
+    fn default() -> Self {
+        Self {
+            wake_length_factor: Self::default_wake_length_factor(),
+            symmetry_condition: SymmetryCondition::NoSymmetry,
+            initialization_time: None
+        }
+    }
+}
+
 impl LiftingLineCorrectionBuilder {
     fn default_wake_length_factor() -> Float {100.0}
 

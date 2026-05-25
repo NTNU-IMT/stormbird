@@ -4,6 +4,7 @@ use crate::grid::Grid;
 
 use stormath::spatial_vector::SpatialVector;
 
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 /// The different boundary conditions that can be applied to the pressure field.
@@ -18,6 +19,12 @@ pub enum PressureBoundaryCondition {
 pub struct PressureBoundaryConditions {
     face_conditions: [[PressureBoundaryCondition; 2]; 3]
 }
+
+const PLANE_AXIS: [(usize, usize); 3] = [
+    (1, 2),
+    (0, 2),
+    (0, 1)
+];
 
 impl PressureBoundaryConditions {
     pub fn new_from_up_direction(up_direction: SpatialVector) -> Self {
@@ -42,84 +49,90 @@ impl PressureBoundaryConditions {
         }
     }
 
+    #[inline]
     /// Updates the ghost cells on the pressure, p, using the boundary conditions in self and the 
     /// supplied grid for the indexing logic
-    pub fn set_ghost_cells(
-        &self, 
-        grid: &Grid, 
-        p: &mut [Float]
-    ) {
-        let [nx, ny, nz] = grid.extended_shape.clone();
-        
+    pub fn set_ghost_cells(&self, grid: &Grid, p: &mut [Float]) {
+        let shape = grid.extended_shape;
+        let stride = grid.extended_stride;
+
+        let p_ptr = p.as_mut_ptr() as usize;
+    
         for axis_index in 0..3 {
-            let axis_length = match axis_index {
-                0 => nx,
-                1 => ny,
-                2 => nz,
-                _ => panic!("Axis index larger than 2")
-            };
-            
-            let (n1, n2) = match axis_index {
-                0 => (ny, nz),
-                1 => (nx, nz),
-                2 => (nx, ny),
-                _ => panic!("Axis index larger than 2")
-            };
-            
+            let axis_length = shape[axis_index];
+            let axis_stride = stride[axis_index];
+    
+            // The two in-plane axes (everything that isn't axis_index).
+            let (plane_axes_0, plane_axes_1) = PLANE_AXIS[axis_index];
+    
+            // Order the in-plane loops so the smaller stride is innermost
+            // (best cache locality). With this layout that puts the
+            // contiguous axis 2 innermost whenever it's in the plane.
+            let (inner_axis, outer_axis) =
+                if stride[plane_axes_0] <= stride[plane_axes_1] {
+                    (plane_axes_0, plane_axes_1)
+                } else {
+                    (plane_axes_1, plane_axes_0)
+                };
+    
+            let inner_n = shape[inner_axis];
+            let outer_n = shape[outer_axis];
+            let inner_stride = stride[inner_axis];
+            let outer_stride = stride[outer_axis];
+    
             for face_index in 0..2 {
-                for i_1 in 0..n1 {
-                    for i_2 in 0..n2 {
-                        let mut indices_current = [0, 0, 0];
-                        let mut indices_neighbor = [0, 0, 0];
+                // Constant offsets for this layer, computed once per face.
+                let (current_axis_offset, neighbor_delta) = if face_index == 0 {
+                    // current layer 0, neighbor layer 1 -> neighbor = current + axis_stride
+                    (0, axis_stride as isize)
+                } else {
+                    // current layer L-1, neighbor layer L-2 -> neighbor = current - axis_stride
+                    ((axis_length - 1) * axis_stride, -(axis_stride as isize))
+                };
+    
+                // Pick the operation once — it's constant across the whole face.
+                let cond = self.face_conditions[axis_index][face_index];
+
+                (0..outer_n)
+                    .into_par_iter()
+                    .with_min_len(2048)
+                    .for_each(|i_outer| {
+                        let row_base = current_axis_offset + i_outer * outer_stride;
+                        let mut flat_current = row_base;
                         
-                        if face_index == 0 {
-                            indices_current[axis_index] = 0;
-                            indices_neighbor[axis_index] = 1;
-                        } else {
-                            indices_current[axis_index] = axis_length-1;
-                            indices_neighbor[axis_index] = axis_length-2;
-                        }
-                        
-                        match axis_index {
-                            0 => {     
-                                indices_current[1] = i_1;
-                                indices_neighbor[1] = i_1;
-                                indices_current[2] = i_2;
-                                indices_neighbor[2] = i_2;
-                            },
-                            1 => {
-                                indices_current[0] = i_1;
-                                indices_neighbor[0] = i_1;
-                                indices_current[2] = i_2;
-                                indices_neighbor[2] = i_2;
-                            },
-                            2 => {
-                                indices_current[0] = i_1;
-                                indices_neighbor[0] = i_1;
-                                indices_current[1] = i_2;
-                                indices_neighbor[1] = i_2;
-                            },
-                            _ => panic!("Axis index larger than 2")
-                        }
-                        
-                        let flat_index_current = grid.flat_index_on_extended_grid(indices_current);
-                        let flat_index_neighbor = grid.flat_index_on_extended_grid(indices_neighbor);
-                            
-                        match self.face_conditions[axis_index][face_index] {
-                            PressureBoundaryCondition::ZeroValue => {
-                                p[flat_index_current] = -p[flat_index_neighbor]
-                            },
+                        match cond {
                             PressureBoundaryCondition::ZeroGradient => {
-                                p[flat_index_current] = p[flat_index_neighbor]
+                                for _ in 0..inner_n {
+                                    let flat_neighbor = (flat_current as isize + neighbor_delta) as usize;
+    
+                                    let new_value = p[flat_neighbor];
+                                    
+                                    unsafe {
+                                        let ptr = p_ptr as *mut Float;
+    
+                                        *ptr.add(flat_current) = new_value;
+                                    }
+    
+                                    flat_current += inner_stride;
+                                }
+                            }
+                            PressureBoundaryCondition::ZeroValue => {
+                                for _ in 0..inner_n {
+                                    let flat_neighbor = (flat_current as isize + neighbor_delta) as usize;
+                        
+                                    let new_value = -p[flat_neighbor];
+    
+                                    unsafe {
+                                        let ptr = p_ptr as *mut Float;
+    
+                                        *ptr.add(flat_current) = new_value;
+                                    }
+                                    flat_current += inner_stride;
+                                }
                             }
                         }
-                    }
-                }
+                    });
             }
         }
     }
-}
-
-impl PressureBoundaryCondition {
-    
 }

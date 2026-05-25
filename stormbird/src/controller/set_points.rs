@@ -48,7 +48,7 @@ pub fn limit_value(
     let raw_difference = raw_new_value - old_value;
     
     if raw_difference.abs() > max_change {
-        old_value * max_change * raw_difference.signum()
+        old_value + max_change * raw_difference.signum()
     } else {
         raw_new_value
     }

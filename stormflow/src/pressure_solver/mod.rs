@@ -42,6 +42,17 @@ impl Default for PressureSolverSettings {
 
 const RESTRICT_WEIGHT: Float = 1.0 / 8.0;
 
+const RESTRICT_CHILD_OFFSETS: [(usize, usize, usize); 8] = [
+    (0, 0, 0),
+    (0, 0, 1),
+    (0, 1, 0),
+    (0, 1, 1),
+    (1, 0, 0),
+    (1, 0, 1),
+    (1, 1, 0),
+    (1, 1, 1),
+];
+
 pub struct PressureSolverMultiGrid {
     pub grids: Vec<Grid>,
     pub boundary_conditions: PressureBoundaryConditions,
@@ -158,16 +169,7 @@ impl PressureSolverMultiGrid {
         
         // Offsets for the 8 fine children of a coarse cell (2x2x2 stencil)
         // These are in terms of interior indices
-        let child_offsets: [(usize, usize, usize); 8] = [
-            (0, 0, 0),
-            (0, 0, 1),
-            (0, 1, 0),
-            (0, 1, 1),
-            (1, 0, 0),
-            (1, 0, 1),
-            (1, 1, 0),
-            (1, 1, 1),
-        ];
+        
         
         (0..nr_coarse_interior_cells)
             .into_par_iter()
@@ -183,7 +185,7 @@ impl PressureSolverMultiGrid {
                 let mut restricted_value: Float = 0.0;
                 
                 // For each of the 8 fine children, compute residual and accumulate
-                for &(di, dj, dk) in &child_offsets {
+                for &(di, dj, dk) in &RESTRICT_CHILD_OFFSETS {
                     // Fine interior indices
                     let i_f = base_i_f + di;
                     let j_f = base_j_f + dj;
@@ -248,81 +250,71 @@ impl PressureSolverMultiGrid {
         let coarse_grid = &self.grids[coarse_level];
         
         let [nx_c, ny_c, nz_c] = coarse_grid.interior_shape;
-        let nr_fine_interior_cells = fine_grid.nr_interior_cells();
-        
-        // Strides for extended grids
-        let stride_x_fine = fine_grid.extended_shape[1] * fine_grid.extended_shape[2];
-        let stride_y_fine = fine_grid.extended_shape[2];
-        
-        let stride_x_coarse = coarse_grid.extended_shape[1] * coarse_grid.extended_shape[2];
-        let stride_y_coarse = coarse_grid.extended_shape[2];
+        let [nx_f, ny_f, nz_f] = fine_grid.interior_shape;
         
         // Get raw pointers for parallel access
         let x_fine_ptr = self.x_at_levels[fine_level].as_mut_ptr() as usize;
         let coarse_values = &self.x_at_levels[coarse_level];
-        
-        (0..nr_fine_interior_cells)
-            .into_par_iter()
-            .for_each(|flat_index_fine_interior| {
-                // Get fine interior indices
-                let [i_f, j_f, k_f] = fine_grid.interior_indices_from_flat_index(flat_index_fine_interior);
-                
-                // Fine extended index (for writing to x_fine)
-                let idx_fine_extended = (i_f + 1) * stride_x_fine + (j_f + 1) * stride_y_fine + (k_f + 1);
-                
-                // Fine cell center position in "coarse cell units"
-                // Fine cell i_f has center at (i_f + 0.5) * dx_f = (i_f + 0.5) * dx_c / 2
-                // In coarse cell units (where coarse cell j has center at j + 0.5),
-                // the fine cell center is at: (i_f + 0.5) / 2 = i_f/2 + 0.25
-                // We want position relative to coarse cell centers at j + 0.5,
-                // so xi = (i_f + 0.5) / 2 - 0.5 = i_f/2 - 0.25
-                let xi = (i_f as Float) / 2.0 - 0.25;
-                let eta = (j_f as Float) / 2.0 - 0.25;
-                let zeta = (k_f as Float) / 2.0 - 0.25;
-                
-                // Find the "lower" coarse cell index for interpolation
-                let i_c_base = (xi.floor() as isize).max(0).min((nx_c - 1) as isize) as usize;
-                let j_c_base = (eta.floor() as isize).max(0).min((ny_c - 1) as isize) as usize;
-                let k_c_base = (zeta.floor() as isize).max(0).min((nz_c - 1) as isize) as usize;
-                
-                // Local coordinates within the interpolation stencil [0, 1]
-                let sx = (xi - (i_c_base as Float)).clamp(0.0, 1.0);
-                let sy = (eta - (j_c_base as Float)).clamp(0.0, 1.0);
-                let sz = (zeta - (k_c_base as Float)).clamp(0.0, 1.0);
-                
-                // Trilinear interpolation weights
-                let wx = [1.0 - sx, sx];
-                let wy = [1.0 - sy, sy];
-                let wz = [1.0 - sz, sz];
-                
-                let mut correction_value: Float = 0.0;
-                
-                for di in 0..2 {
-                    for dj in 0..2 {
-                        for dk in 0..2 {
-                            let i_c = (i_c_base + di).min(nx_c - 1);
-                            let j_c = (j_c_base + dj).min(ny_c - 1);
-                            let k_c = (k_c_base + dk).min(nz_c - 1);
-                            
-                            let weight = wx[di] * wy[dj] * wz[dk];
-                            
-                            // Coarse extended index (offset by 1 for ghost layer)
-                            let idx_coarse_extended = (i_c + 1) * stride_x_coarse 
-                                                    + (j_c + 1) * stride_y_coarse 
-                                                    + (k_c + 1);
-                            
-                            correction_value += weight * coarse_values[idx_coarse_extended];
+
+        (0..nx_f).into_par_iter().for_each(|i_f| {
+            for j_f in 0..ny_f {
+                for k_f in 0..nz_f {
+                    // Fine extended index (for writing to x_fine)
+                    let idx_fine_extended = (i_f + 1) * fine_grid.extended_stride[0] + (j_f + 1) * fine_grid.extended_stride[1] + (k_f + 1);
+                    
+                    // Fine cell center position in "coarse cell units"
+                    // Fine cell i_f has center at (i_f + 0.5) * dx_f = (i_f + 0.5) * dx_c / 2
+                    // In coarse cell units (where coarse cell j has center at j + 0.5),
+                    // the fine cell center is at: (i_f + 0.5) / 2 = i_f/2 + 0.25
+                    // We want position relative to coarse cell centers at j + 0.5,
+                    // so xi = (i_f + 0.5) / 2 - 0.5 = i_f/2 - 0.25
+                    let xi = (i_f as Float) * 0.5 - 0.25;
+                    let eta = (j_f as Float) * 0.5 - 0.25;
+                    let zeta = (k_f as Float) * 0.5 - 0.25;
+                    
+                    // Find the "lower" coarse cell index for interpolation
+                    let i_c_base = (xi.floor() as isize).max(0).min((nx_c - 1) as isize) as usize;
+                    let j_c_base = (eta.floor() as isize).max(0).min((ny_c - 1) as isize) as usize;
+                    let k_c_base = (zeta.floor() as isize).max(0).min((nz_c - 1) as isize) as usize;
+                    
+                    // Local coordinates within the interpolation stencil [0, 1]
+                    let sx = (xi - (i_c_base as Float)).clamp(0.0, 1.0);
+                    let sy = (eta - (j_c_base as Float)).clamp(0.0, 1.0);
+                    let sz = (zeta - (k_c_base as Float)).clamp(0.0, 1.0);
+                    
+                    // Trilinear interpolation weights
+                    let wx = [1.0 - sx, sx];
+                    let wy = [1.0 - sy, sy];
+                    let wz = [1.0 - sz, sz];
+                    
+                    let mut correction_value: Float = 0.0;
+                    
+                    for di in 0..2 {
+                        for dj in 0..2 {
+                            for dk in 0..2 {
+                                let i_c = (i_c_base + di).min(nx_c - 1);
+                                let j_c = (j_c_base + dj).min(ny_c - 1);
+                                let k_c = (k_c_base + dk).min(nz_c - 1);
+                                
+                                let weight = wx[di] * wy[dj] * wz[dk];
+                                
+                                // Coarse extended index (offset by 1 for ghost layer)
+                                let idx_coarse_extended = (i_c + 1) * coarse_grid.extended_stride[0] 
+                                                        + (j_c + 1) * coarse_grid.extended_stride[1] 
+                                                        + (k_c + 1);
+                                
+                                correction_value += weight * coarse_values[idx_coarse_extended];
+                            }
                         }
                     }
+                    
+                    unsafe {
+                        let ptr = x_fine_ptr as *mut Float;
+                        *ptr.add(idx_fine_extended) += correction_value;
+                    }
                 }
-                
-                // Add correction directly to x using unsafe pointer access
-                // Safety: Each flat_index_fine_interior maps to a unique idx_fine_extended, so no data races
-                unsafe {
-                    let ptr = x_fine_ptr as *mut Float;
-                    *ptr.add(idx_fine_extended) += correction_value;
-                }
-            });
+            }
+        });
 
         if fine_level == 0 {
             println!("Prolongate and correct time: {:.?}", start_time.elapsed());

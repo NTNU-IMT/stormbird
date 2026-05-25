@@ -189,7 +189,10 @@ impl ActuatorLine {
 
                 need_update = true;
 
-                ControllerOutput::write_to_csv_file(&controller_output, "controller_output.csv");
+                ControllerOutput::write_to_csv_file(
+                    &controller_output, 
+                    "postProcessing/controller_output.csv"
+                );
             }
 
             need_update
@@ -456,13 +459,17 @@ impl ActuatorLine {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
         let mut max_weight = -1.0;
-        let mut max_index = 0;
+        let mut max_index = self.line_force_model.nr_span_lines();
 
         for (i, weight) in projection_weights.iter().enumerate() {
             if *weight > max_weight {
                 max_weight = *weight;
                 max_index = i;
             }
+        }
+
+        if max_index == self.line_force_model.nr_span_lines() {
+            panic!("No dominating line element found!");
         }
 
         max_index

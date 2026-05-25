@@ -39,7 +39,7 @@ pub struct ActuatorLineBuilder {
     pub start_time: Float,
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
-    #[serde(default)]
+    #[serde(default="ActuatorLineBuilder::default_lifting_line_correction")]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
@@ -47,6 +47,11 @@ pub struct ActuatorLineBuilder {
 
 impl ActuatorLineBuilder {
     pub fn default_write_iterations_full_result() -> usize {100}
+    pub fn default_lifting_line_correction() -> Option<LiftingLineCorrectionBuilder> {
+        Some(
+            LiftingLineCorrectionBuilder::default()
+        )
+    }
 
     pub fn new(line_force_model: LineForceModelBuilder) -> Self {
         Self {

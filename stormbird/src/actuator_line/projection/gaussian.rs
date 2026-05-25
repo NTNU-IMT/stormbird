@@ -21,8 +21,8 @@ pub struct Gaussian {
 impl Default for Gaussian {
     fn default() -> Self {
         Self {
-            chord_factor: 0.25,
-            thickness_factor: 0.25
+            chord_factor: 0.4,
+            thickness_factor: 0.4
         }
     }
 }
@@ -51,7 +51,7 @@ impl Gaussian {
 
         let relative_span = point_lc.span / line_length;
 
-        let span_factor = if relative_span > -0.5 && relative_span < 0.5 {
+        let span_factor = if relative_span > -0.5 && relative_span <= 0.5 {
             1.0 / line_length
         } else {
             0.0

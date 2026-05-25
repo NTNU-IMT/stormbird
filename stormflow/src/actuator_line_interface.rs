@@ -39,7 +39,7 @@ impl ActuatorLineInterface {
         for i in 0..results.len() {
             let (flat_index, line_index, projection_weight) = results[i];
 
-            if projection_weight > 1e-6 {
+            if projection_weight > model.sampling_settings.weight_limit {
                 cell_indices_to_check.push(flat_index);
                 dominating_line_indices.push(line_index);
                 summed_projection_weights.push(projection_weight);
