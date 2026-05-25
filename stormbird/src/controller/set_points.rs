@@ -131,7 +131,7 @@ impl ControllerSetPoints {
 
             angle_error = Self::correct_angle_to_be_between_pi_and_negative_pi(angle_error);
 
-            let out = angle_measurement + angle_error;
+            let out = input.current_local_wing_angle + angle_error;
 
             Self::correct_angle_to_be_between_pi_and_negative_pi(out)
         } else {

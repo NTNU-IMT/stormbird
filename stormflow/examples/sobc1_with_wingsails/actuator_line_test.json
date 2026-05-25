@@ -26,7 +26,7 @@
           ],
           "section_model": {
             "Foil": {
-              "cl_zero_angle": 1.5
+              "cl_zero_angle": -1.5
             }
           },
           "non_zero_circulation_at_ends": [false, false]
@@ -46,7 +46,7 @@
     "solver_settings": {
       "damping_factor": 0.5
     },
-    "write_iterations_full_result": 100,
+    "write_iterations_full_result": 10,
     "controller": {
       "set_points": [
         {
