@@ -256,7 +256,7 @@ impl Simulation {
                 }).collect();
             
             for (i_flat_extended, force) in new_body_forces {
-                self.body_force[i_flat_extended] = force;
+                self.body_force[i_flat_extended] = -force;
             }
             
         }

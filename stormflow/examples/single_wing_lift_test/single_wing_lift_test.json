@@ -24,10 +24,10 @@
           ],
           "section_model": {
             "Foil": {
-              "cl_zero_angle": 1.5
+              "cl_zero_angle": 0.5
             }
           },
-          "non_zero_circulation_at_ends": [false, false]
+          "non_zero_circulation_at_ends": [true, false]
         }
       ],
       "nr_sections": 20,
@@ -39,7 +39,8 @@
             }
           }
         }
-      }
+      },
+      "local_wing_angles": [-0.174532925]
     },
     "solver_settings": {
       "damping_factor": 0.5
