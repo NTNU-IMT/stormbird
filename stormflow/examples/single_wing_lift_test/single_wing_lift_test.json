@@ -1,20 +1,15 @@
 {
-  "domain_start_point": [-60.0, -30.0, 0.0],
-  "domain_end_point": [60.0, 30.0, 45.0],
-  "initial_velocity": [8.0, 0.0, 0.0],
-  "boundary_conditions": [
-    [{"Inlet": [8.0, 0.0, 0.0]}, "Outlet"],
-    ["Slip", "Slip"],
-    ["Slip", "Slip"]
-  ],
-  "nr_interior_cells": [256, 128, 128],
-  "viscosity": 0.001,
-  "pressure_solver": {
-    "settings": {
-      "min_number_of_iterations": 2,
-      "max_number_of_iterations": 4
+  "domain_start_point": [-64.0, -64.0, 0.0],
+  "domain_end_point": [64.0, 64.0, 64.0],
+  "grid_interior_shape": [128, 128, 64],
+  "effective_viscosity": 0.00001,
+  "wind_condition": {
+    "direction_coming_from": 0.0,
+    "velocity_variation": {
+      "Constant": 8.0
     }
   },
+  "linear_velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
   "actuator_line": {
     "line_force_model": {
       "wing_builders": [
@@ -24,19 +19,18 @@
             {"x": 0.0, "y": 0.0, "z": 30.0}
           ],
           "chord_vectors": [
-            {"x": 5.0, "y": 0.0, "z": 0.0},
-            {"x": 5.0, "y": 0.0, "z": 0.0}
+            {"x": 8.0, "y": 0.0, "z": 0.0},
+            {"x": 8.0, "y": 0.0, "z": 0.0}
           ],
           "section_model": {
             "Foil": {
-              "cl_zero_angle": 0.5
+              "cl_zero_angle": 1.5
             }
           },
-          "non_zero_circulation_at_ends": [true, false]
+          "non_zero_circulation_at_ends": [false, false]
         }
       ],
-      "nr_sections": 32,
-      "density": 1.0,
+      "nr_sections": 20,
       "circulation_correction": {
         "Smoothing": {
           "smoothing_type": {

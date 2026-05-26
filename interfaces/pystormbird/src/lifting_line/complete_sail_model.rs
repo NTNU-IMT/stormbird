@@ -40,7 +40,7 @@ impl CompleteSailModel {
         ship_velocity,
         controller_loading
     ))]
-    pub fn apply_controller(
+    pub fn apply_controller_based_on_wind_condition(
         &mut self,
         time: f64,
         time_step: f64,
@@ -48,12 +48,34 @@ impl CompleteSailModel {
         ship_velocity: f64,
         controller_loading: f64
     ) {
-        self.data.apply_controller(
+        self.data.apply_controller_based_on_wind_condition(
             time,
             time_step,
             &wind_condition.data,
             ship_velocity,
             controller_loading
+        );
+    }
+
+    #[pyo3(signature=(
+        *,
+        time,
+        time_step,
+        loading,
+        simulation_result
+    ))]
+    pub fn apply_controller_based_on_simulation_result(
+        &mut self,
+        time: f64,
+        time_step: f64,
+        loading: f64,
+        simulation_result: SimulationResult
+    ) {
+        self.data.apply_controller_based_on_simulation_result(
+            time,
+            time_step,
+            loading,
+            &simulation_result.data
         );
     }
 

@@ -108,7 +108,7 @@ impl CompleteSailModel {
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
-        self.apply_controller(
+        self.apply_controller_based_on_wind_condition(
             0.0, 
             1.0, 
             wind_condition, 
@@ -191,7 +191,7 @@ impl CompleteSailModel {
         )
     }
     
-    pub fn apply_controller(
+    pub fn apply_controller_based_on_wind_condition(
         &mut self,
         current_time: Float,
         time_step: Float,
@@ -275,6 +275,36 @@ impl CompleteSailModel {
             ctrl_points_velocity,
             &self.controller.flow_measurement_settings,
             &self.wind_environment,
+        );
+
+        let controller_output = self.controller.update(
+            current_time,
+            time_step,
+            &controller_input
+        );
+
+        if let Some(output) = &controller_output {
+            self.lifting_line_simulation.line_force_model.set_controller_output(
+                output
+            );
+        }
+    }
+
+    pub fn apply_controller_based_on_simulation_result(
+        &mut self,
+        current_time: Float,
+        time_step: Float,
+        loading: Float,
+        simulation_result: &SimulationResult
+    ) {
+        
+        let controller_input = ControllerInput::new_from_simulation_result(
+            loading,
+            &self.lifting_line_simulation.line_force_model,
+            simulation_result,
+            &self.controller.flow_measurement_settings,
+            &self.wind_environment,
+            self.controller.use_input_velocity_for_apparent_wind_direction
         );
 
         let controller_output = self.controller.update(
