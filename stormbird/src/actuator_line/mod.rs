@@ -364,10 +364,6 @@ impl ActuatorLine {
                 let mut lift_force = simulation_result.sectional_forces.circulatory[line_index];
                 let mut drag_force = SpatialVector::default();
                 
-                if self.projection_settings.project_viscous_lift {
-                    lift_force += simulation_result.sectional_forces.viscous_lift[line_index];
-                }
-                
                 if self.projection_settings.project_sectional_drag {
                     drag_force = simulation_result.sectional_forces.sectional_drag[line_index];
                 }
@@ -382,8 +378,16 @@ impl ActuatorLine {
                         .normalize();
                     
                     let drag_direction = velocity.normalize();
+
+                    let lift_dot = lift_direction.dot(lift_force);
+
+                    let lift_sign = if lift_dot >= 0.0 {
+                        1.0
+                    } else {
+                        -1.0
+                    };
                     
-                    lift_force = lift_force.length() * lift_direction;
+                    lift_force = lift_force.length() * lift_direction * lift_sign;
                     drag_force = drag_force.length() * drag_direction;
                 }
                 
@@ -395,7 +399,6 @@ impl ActuatorLine {
             self.sectional_lift_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
             self.sectional_drag_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
         }
-        
     }
 
     /// Returns the force to be projected, based on the line index
