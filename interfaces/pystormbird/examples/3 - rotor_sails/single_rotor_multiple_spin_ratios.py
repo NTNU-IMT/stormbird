@@ -7,15 +7,29 @@ settings works best.
 import numpy as np
 import matplotlib.pyplot as plt
 
-import json
+from setup import simulate_single_case
 
-from setup import simulate_single_case, TEST_SETTINGS
+from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
+
+import pandas as pd
+
+# These settings are used to generate multiple versions of the simulation, for test purposes
+TEST_SETTINGS = {
+    "solver_types": [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative],
+    "max_induced_velocity_ratios": [0.0, 0.0, 0.0],
+    "smoothing_lengths": [0.0, 0.0, 0.0],
+    "virtual_extension_factor_top": [0.0, 0.0, 0.1]
+}
 
 if __name__ == "__main__":
-    comparison_data = json.load(open("../comparison_data/deybach_2024_rotor_sail_data.json", "r"))
+    comparison_data = pd.read_csv("data/deybach_2024_single_rotor.csv")
     
     spin_ratio = np.arange(0.0, 4.5, 0.25)
     n_spin_ratios = len(spin_ratio)
+
+    diameter = 5.0
+    height = 30.0
+    foundation_height = 1.875
 
     w_plot = 18
     h_plot = w_plot / 2.35
@@ -49,6 +63,9 @@ if __name__ == "__main__":
             print("Testing spin ratio: ", spin_ratio[spin_index])
 
             res = simulate_single_case(
+                diameter = diameter,
+                height=height,
+                foundation_height=foundation_height,
                 rotor_x_locations = [0.0],
                 rotor_y_locations = [0.0],
                 spin_ratio = spin_ratio[spin_index],

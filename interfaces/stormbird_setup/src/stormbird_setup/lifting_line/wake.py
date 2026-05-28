@@ -1,0 +1,160 @@
+'''
+Copyright (C) 2024, NTNU
+Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
+License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+'''
+
+from typing import Any
+from enum import Enum
+
+from ..base_model import StormbirdSetupBaseModel
+
+from pydantic import model_serializer, model_validator
+
+class SymmetryCondition(Enum):
+    NoSymmetry = "NoSymmetry"
+    Z = "Z"
+    Y = "Y"
+    X = "X"
+
+class ViscousCoreLengthType(Enum):
+    Relative = "Relative"
+    Absolute = "Absolute"
+    NoViscousCore = "NoViscousCore"
+
+class ViscousCoreLength(StormbirdSetupBaseModel):
+    value_type: ViscousCoreLengthType = ViscousCoreLengthType.Relative
+    value: float = 0.1
+    
+    @classmethod
+    def new_relative(cls, relative_value: float) -> "ViscousCoreLength":
+        return cls(
+            value_type = ViscousCoreLengthType.Relative,
+            value = relative_value
+        )
+    
+    @classmethod
+    def new_absolute(cls, absolute_value: float) -> "ViscousCoreLength":
+        return cls(
+            value_type = ViscousCoreLengthType.Absolute,
+            value = absolute_value
+        )
+        
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_viscous_core_length(cls, data: Any) -> Any:
+        # If already in correct format, return as-is
+        if isinstance(data, dict) and 'value_type' in data:
+            return data
+        
+        # Handle string format for NoViscousCore
+        if isinstance(data, str) and data == "NoViscousCore":
+            return {
+                "value_type": ViscousCoreLengthType.NoViscousCore,
+                "value": 0.0  # Default value, won't be used
+            }
+        
+        # Handle dict formats with Relative or Absolute
+        if isinstance(data, dict):
+            if "Relative" in data:
+                return {
+                    "value_type": ViscousCoreLengthType.Relative,
+                    "value": data["Relative"]
+                }
+            elif "Absolute" in data:
+                return {
+                    "value_type": ViscousCoreLengthType.Absolute,
+                    "value": data["Absolute"]
+                }
+        
+        return data
+
+    @model_serializer
+    def ser_model(self):
+        match self.value_type:
+            case ViscousCoreLengthType.Relative:
+                return {
+                    "Relative": self.value
+                }
+            case ViscousCoreLengthType.Absolute:
+                return {
+                    "Absolute": self.value
+                }
+            case ViscousCoreLengthType.NoViscousCore:
+                return "NoViscousCore"
+            case _:
+                raise ValueError("Invalid ViscousCoreLengthType")
+
+class QuasiSteadyWakeSettings(StormbirdSetupBaseModel):
+    wake_length_factor: float = 100.0
+    symmetry_condition: SymmetryCondition = SymmetryCondition.NoSymmetry
+    viscous_core_length: ViscousCoreLength = ViscousCoreLength()
+    
+class SinIncreasedViscousCoreLength(StormbirdSetupBaseModel):
+    last_panel_value: ViscousCoreLength = ViscousCoreLength()
+    evolution_length_factor: float = 1.0
+    
+class ViscousCoreLengthEvolutionType(Enum):
+    Constant = "Constant"
+    SinIncrease = "SinIncrease"
+    
+class ViscousCoreLengthEvolution(StormbirdSetupBaseModel):
+    value_type: ViscousCoreLengthEvolutionType = ViscousCoreLengthEvolutionType.Constant
+    value: SinIncreasedViscousCoreLength | None = None
+    
+    @classmethod
+    def new_sin_increase(cls, *, last_panel_value_absolute: float, evolution_length_factor: float):
+        return cls(
+            value_type = ViscousCoreLengthEvolutionType.SinIncrease,
+            value = SinIncreasedViscousCoreLength(
+                last_panel_value=ViscousCoreLength.new_absolute(last_panel_value_absolute),
+                evolution_length_factor=evolution_length_factor
+            )
+        )
+    
+    @model_serializer
+    def ser_model(self):
+        match self.value_type:
+            case ViscousCoreLengthEvolutionType.SinIncrease:
+                return {
+                    "SinIncrease": self.value
+                }
+            case ViscousCoreLengthEvolutionType.Constant:
+                return "Constant"
+            case _:
+                raise ValueError("Invalid ViscousCoreLengthEvolutionType")
+
+class FirstWakePointsDirection(Enum):
+    Chord = "Chord"
+    Freestream = "Freestream"
+    ActualVelocity = "ActualVelocity"
+
+
+class DynamicWakeBuilder(StormbirdSetupBaseModel):
+    nr_panels_per_line_element: int = 100
+    viscous_core_length: ViscousCoreLength = ViscousCoreLength()
+    viscous_core_length_evolution: ViscousCoreLengthEvolution = ViscousCoreLengthEvolution()
+    symmetry_condition: SymmetryCondition = SymmetryCondition.NoSymmetry
+    first_panel_relative_length: float = 0.75
+    last_panel_relative_length: float = 1.0
+    first_wake_points_direction: FirstWakePointsDirection = FirstWakePointsDirection.Chord
+    ratio_of_wake_affected_by_induced_velocities: float = 0.0
+    shape_damping_factor: float = 0.0
+    write_wake_data_to_file: bool = False
+    wake_files_folder_path: str = ""
+    
+    @classmethod
+    def new_default(
+        cls, 
+        *, 
+        time_step: float, 
+        chord_length: float, 
+        velocity: float,
+        nr_panels_per_line_element: int = 100
+    ) -> "DynamicWakeBuilder":
+        first_panel_relative_length = time_step * velocity / chord_length
+        
+        return DynamicWakeBuilder(
+            nr_panels_per_line_element = nr_panels_per_line_element,
+            first_panel_relative_length = first_panel_relative_length
+        )

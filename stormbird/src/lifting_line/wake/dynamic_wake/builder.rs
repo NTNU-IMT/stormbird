@@ -114,9 +114,9 @@ pub struct DynamicWakeBuilder {
 
 impl DynamicWakeBuilder {
     fn default_number_of_panels_per_line_element() -> usize {100}
-    fn default_initial_relative_wake_length() -> Float {100.0}
+    fn default_initial_relative_wake_length() -> Float {50.0}
     fn default_first_panel_relative_length() -> Float {0.75}
-    fn default_last_panel_relative_length() -> Float {25.0}
+    fn default_last_panel_relative_length() -> Float {0.25}
 
     pub fn build(
         &self,
@@ -296,5 +296,3 @@ impl Default for DynamicWakeBuilder {
         }
     }
 }
-
-

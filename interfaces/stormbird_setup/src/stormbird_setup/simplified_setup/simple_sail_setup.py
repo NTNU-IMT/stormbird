@@ -7,14 +7,14 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from enum import Enum
 
 from ..base_model import StormbirdSetupBaseModel
-from ..direct_setup.spatial_vector import SpatialVector
-from ..direct_setup.line_force_model import WingBuilder
-from ..direct_setup.section_models import SectionModel
-from ..direct_setup.controller import ControllerSetPoints
-from ..direct_setup.input_power import InputPowerModel
+from ..spatial_vector import SpatialVector
+from ..line_force_model import WingBuilder
+from ..section_models import SectionModel
+from ..controller import ControllerSetPoints
+from ..input_power import InputPowerModel
 
-from ..direct_setup.lifting_line import SimulationBuilder
-from ..direct_setup.lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
+from ..lifting_line import SimulationBuilder
+from ..lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
 
 import numpy as np
 

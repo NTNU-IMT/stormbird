@@ -1,5 +1,5 @@
-# Simulation of a single rotor sail
+# Simulation of rotor sails
 
-This example demonstrates how a single rotor sail can be simulated. 
+This example demonstrates how rotor sails can be simulated, including how to use different correction techniques.
 
-**Important**: current tests indicate that the lifting line model is not capable of modeling a rotor sail accurately without some form of corrections. The drag forces
+Each example is compared against data from experiments that tested rotor sails in a wind tunnel.

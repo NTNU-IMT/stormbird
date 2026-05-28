@@ -1,11 +1,9 @@
-import json
-
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stormbird_setup.direct_setup.section_models import Foil as FoilSetup
-from stormbird_setup.direct_setup.section_models import VaryingFoil as VaryingFoilSetup
-from stormbird_setup.direct_setup.section_models import SectionModel as SectionModelSetup
+from stormbird_setup.section_models import Foil as FoilSetup
+from stormbird_setup.section_models import VaryingFoil as VaryingFoilSetup
+from stormbird_setup.section_models import SectionModel as SectionModelSetup
 
 from pystormbird.section_models import VaryingFoil as VaryingFoilModel
 
@@ -114,11 +112,3 @@ if __name__ == '__main__':
     plt.ylabel("Drag coefficient")
 
     plt.show()
-
-
-    
-
-
-
-
-

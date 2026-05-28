@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from typing import Any
 
 from stormbird_setup.simplified_setup.single_wing_simulation import SingleWingSimulation, SolverType
-from stormbird_setup.direct_setup.section_models import SectionModel, Foil
+from stormbird_setup.section_models import SectionModel, Foil
 
 from pystormbird.lifting_line import Simulation
 

@@ -8,10 +8,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from pystormbird.lifting_line import Simulation
-from stormbird_setup.direct_setup import SpatialVector
-from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
-from stormbird_setup.direct_setup.section_models import SectionModel, Foil
-from stormbird_setup.direct_setup.lifting_line import (
+from stormbird_setup import SpatialVector
+from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.section_models import SectionModel, Foil
+from stormbird_setup.lifting_line import (
     SimpleIterative, 
     SymmetryCondition,
     QuasiSteadyWakeSettings,
@@ -113,5 +113,3 @@ class SimulationCase:
             )
 
         return result
-
-

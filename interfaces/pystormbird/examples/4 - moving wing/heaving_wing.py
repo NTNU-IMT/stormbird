@@ -14,11 +14,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly
 
-from stormbird_setup.direct_setup.spatial_vector import SpatialVector
-from stormbird_setup.direct_setup.section_models import SectionModel, Foil
-from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
-from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
-from stormbird_setup.direct_setup.lifting_line.wake import DynamicWakeBuilder
+from stormbird_setup.spatial_vector import SpatialVector
+from stormbird_setup.section_models import SectionModel, Foil
+from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
+from stormbird_setup.lifting_line.wake import DynamicWakeBuilder
 
 from pystormbird.lifting_line import Simulation
 

@@ -13,7 +13,7 @@ from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
 from single_case import simulate_single_case
 
 if __name__ == "__main__":
-    comparison_data = json.load(open("../comparison_data/graf_2014_data.json", "r"))
+    comparison_data = json.load(open("data/graf_2014_data.json", "r"))
 
     angles_of_attack_deg = np.arange(0.0, 20.5, 0.5)
     n_angles = len(angles_of_attack_deg)
