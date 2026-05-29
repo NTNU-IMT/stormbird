@@ -17,7 +17,7 @@ pub mod statistics;
 pub mod array_generation;
 pub mod finite_difference;
 pub mod spatial_vector;
-pub mod special_functions;
+pub mod transition_functions;
 pub mod solvers;
 pub mod matrix;
 pub mod sparse_matrix;

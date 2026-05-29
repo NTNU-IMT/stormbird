@@ -6,7 +6,7 @@ use super::*;
 use stormath::{
     type_aliases::Float,
     consts::{PI, TAU},
-    special_functions
+    transition_functions
 };
 
 use crate::error::Error;
@@ -262,7 +262,7 @@ impl Foil {
             self.mean_negative_stall_angle.abs()
         };
 
-        special_functions::sigmoid_zero_to_one(
+        transition_functions::sigmoid_zero_to_one(
             effective_angle.abs(),
             mean_stall_angle,
             self.stall_range

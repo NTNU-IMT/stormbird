@@ -9,7 +9,7 @@ use crate::line_force_model::LineForceModel;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
-use stormath::special_functions::cosine_transition_zero_to_one;
+use stormath::transition_functions::cosine_transition_zero_to_one;
 
 use serde::{Serialize, Deserialize};
 

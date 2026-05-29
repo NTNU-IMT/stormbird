@@ -67,3 +67,9 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 - Refactoring of control system to handle different setup when using multiple sails
 - Fix of bug and refactoring of the input power model
 - Small updates to the foil model
+
+## 0.9.0 - 2026-06-xx
+### Highlights
+- New wind models, including different atmospheric boundary layer models and gust spectrums
+- Addition of *Stormflow*, a custom CFD solver specialized for simple actuator line simulations
+- Many minor bug fixes
