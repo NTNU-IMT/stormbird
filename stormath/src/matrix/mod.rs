@@ -14,7 +14,7 @@ pub mod operators;
 use crate::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// A 2D matrix structure for storing Float.
+/// A 2D matrix structure for storing any type T.
 pub struct Matrix<T> {
     /// The data stored in the matrix, represented as a flat vector. The data is stored in
     /// row-major order.

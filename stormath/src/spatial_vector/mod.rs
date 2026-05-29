@@ -2,7 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality related to vectors representing spatial quantities.
+//! Functionality related to vectors representing spatial quantities, e.g., position, velocity and
+//! acceleration.
 //! 
 //! The data structure does not assume anything about the number of dimensions, meaning it can be 
 //! used both for 2D and 3D vectors.
@@ -109,7 +110,3 @@ impl std::fmt::Display for SpatialVector {
         write!(f, "{:?}", self.0)
     }
 }
-
-
-
-

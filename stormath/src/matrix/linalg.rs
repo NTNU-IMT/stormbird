@@ -2,11 +2,10 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Implementation block for the matric data type for linear algebra operations. This includes the
+//! Implementation block for the matrix data type for linear algebra operations. This includes the
 //! following:
 //!
 //! - [`solve_gaussian_elimination`](Matrix::solve_gaussian_elimination)
-//! - [`solve_gauss_seidel`](Matrix::solve_gauss_seidel)
 
 use super::*;
 

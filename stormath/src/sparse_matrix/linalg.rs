@@ -8,9 +8,8 @@ use crate::error::Error;
 impl<const N: usize> SparseMatrix<N> {
     /// Converts the sparse matrix to a dense Matrix.
     /// 
-    /// This is useful when an exact solver is needed, as Gaussian elimination
-    /// causes fill-in that cannot be efficiently handled by the fixed-row-length
-    /// sparse format.
+    /// This is useful when an exact solver is needed, as Gaussian elimination causes fill-in that 
+    /// cannot be efficiently handled by the fixed-row-length sparse format.
     pub fn to_dense(&self) -> Matrix<Float> {
         let mut dense = Matrix::new_default(self.shape);
         
@@ -27,10 +26,9 @@ impl<const N: usize> SparseMatrix<N> {
     
     /// Solves the equation system Ax = b exactly using Gaussian elimination.
     /// 
-    /// This method converts the sparse matrix to a dense format and uses
-    /// Gaussian elimination with partial pivoting. It is best suited for
-    /// small systems (e.g., coarsest grid in multigrid) where the overhead
-    /// of dense storage is acceptable.
+    /// This method converts the sparse matrix to a dense format and uses Gaussian elimination with 
+    /// partial pivoting. It is best suited for small systems (e.g., coarsest grid in multigrid) 
+    /// where the overhead of dense storage is acceptable.
     /// 
     /// For large sparse systems, use iterative methods like `solve_jacobi` instead.
     pub fn solve_exact(&self, rhs: &[Float]) -> Result<Vec<Float>, Error> {

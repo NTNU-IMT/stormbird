@@ -2,6 +2,9 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+
+//! Models for the wind, including different shapes for the atmospheric boundary layer
+
 pub mod inflow_corrections;
 pub mod environment;
 pub mod wind_condition;

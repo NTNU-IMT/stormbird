@@ -87,12 +87,11 @@ impl <const N: usize> SparseMatrix<N> {
         result
     }
     
-    /// Performs a matrix multiplication with the supplied vector x in parallel,
-    /// writing the result into the provided buffer.
+    /// Performs a matrix multiplication with the supplied vector x in parallel, writing the result 
+    /// into the provided buffer.
     /// 
-    /// Each row's dot product is computed independently using Rayon's parallel iterators.
-    /// For small matrices, the sequential `vector_multiply` may be faster due to 
-    /// parallelization overhead.
+    /// Each row's dot product is computed independently using Rayon's parallel iterators. For small 
+    /// matrices, the sequential `vector_multiply` may be faster due to parallelization overhead.
     pub fn vector_multiply_parallel(&self, x: &[Float], result: &mut [Float]) {
         assert_eq!(
             self.shape[1], 

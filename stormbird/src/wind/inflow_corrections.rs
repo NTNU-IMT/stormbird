@@ -2,6 +2,9 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Functionality to empirically correct an input velocity to account for disturbances in the flow,
+//! such as disturbances due to the deck or superstructure on a ship. 
+
 use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;

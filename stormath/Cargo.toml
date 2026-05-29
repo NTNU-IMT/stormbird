@@ -6,12 +6,11 @@ description = "A selection of math utility functionality"
 homepage = "https://github.com/NTNU-IMT/stormbird"
 readme = "README.md"
 license = "GPL-3.0"
-license_file = "LICENSE"
 edition = "2021"
 
 [dependencies]
 rand = "0.9.1"
-serde = { version = "1.0.204", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 rayon = { version = "1.12.0"}
 
 [features]

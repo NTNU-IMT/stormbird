@@ -2,9 +2,10 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use std::ops::Range;
+//! Functionality to represent the a wind environment, e.g. containing settings for directions and
+//! methods to get the apparent velocity at different locations.
 
-/// Functionality to represent the a wind environment
+use std::ops::Range;
 
 use stormath::{
     type_aliases::Float,
@@ -20,18 +21,34 @@ use super::wind_condition::WindCondition;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Structure used to represent a wind environment. Can be used to query about the wind velocity at
-/// different locations.
+/// Structure used to represent a wind environment, meaning all settings for the wind that is 
+/// assumed to be constant for a given model. Wind parameters that vary is given in 
+/// [crate::wind::wind_condition]. The structure defines the definition of different *directions*, 
+/// and can be used to generate velocity vectors for different locations, based on the input 
+/// wind condition and linear velocity
 pub struct WindEnvironment {
     #[serde(default="WindEnvironment::default_up_direction")]
+    /// The up direction specifies which direction is considered to be up relative to the ocean or 
+    /// ground. This vector is predominantly used to compute the height for any given point, which 
+    /// are later used to get the true wind speed.  
     pub up_direction: SpatialVector,
     #[serde(default="WindEnvironment::default_wind_rotation_axis")]
+    /// The wind rotation axis which axis that is used when rotating the wind vector based on the 
+    /// wind direction. This is kept separate from the *up-direction* to allow for arbitrary 
+    /// definitions of wind direction
     pub wind_rotation_axis: SpatialVector,
     #[serde(default="WindEnvironment::default_zero_direction_vector")]
+    /// The zero direction vector is the direction at which the true wind will point when the wind
+    /// direction is zero. 
     pub zero_direction_vector: SpatialVector,
     #[serde(default)]
+    /// The height of the water plane. Can be used to change the height that is used as input to 
+    /// a model for the atmospheric boundary, for instance to allow the sails to be defined in a 
+    /// different coordinate system than using the water plane as z=0.0
     pub water_plane_height: Float,
     #[serde(default)]
+    /// Optional empirical inflow corrections to use when calculating the effective inflow to each 
+    /// sail
     pub inflow_corrections: Option<InflowCorrections>,
 }
 
@@ -48,9 +65,9 @@ impl Default for WindEnvironment {
 }
 
 impl WindEnvironment {
-    pub fn default_zero_direction_vector() -> SpatialVector {SpatialVector::from([1.0, 0.0, 0.0])}
-    pub fn default_up_direction() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
-    pub fn default_wind_rotation_axis() -> SpatialVector {SpatialVector::from([0.0, 0.0, -1.0])}
+    fn default_zero_direction_vector() -> SpatialVector {SpatialVector::from([1.0, 0.0, 0.0])}
+    fn default_up_direction() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
+    fn default_wind_rotation_axis() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
 
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
