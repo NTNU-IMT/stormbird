@@ -1,4 +1,5 @@
 use super::Simulation;
+use crate::pressure_solver::PressureSolver;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -63,6 +64,12 @@ impl Simulation {
         write!(w, "SCALARS pressure double 1\n").unwrap();
         write!(w, "LOOKUP_TABLE default\n").unwrap();
 
+        let pressure = match &self.pressure_solver {
+            PressureSolver::CPU(solver) => {
+                solver.x_at_levels[0].clone()
+            }
+        };
+
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
@@ -72,7 +79,8 @@ impl Simulation {
                     let ez = iz + 1;
 
                     let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
-                    let p: f64 = self.pressure_solver.x_at_levels[0][flat] as f64;
+
+                    let p: f64 = pressure[flat] as f64;
 
                     if binary {
                         w.write_all(&p.to_be_bytes()).unwrap();

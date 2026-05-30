@@ -15,7 +15,7 @@ use crate::geometry::{
     Geometry,
 };
 
-use crate::pressure_solver::PressureSolverMultiGrid;
+use crate::pressure_solver::PressureSolver;
 
 use rayon::prelude::*;
 
@@ -27,7 +27,7 @@ pub struct Simulation {
     pub velocity_star: Vec<SpatialVector>,
     pub velocity_boundary_conditions: VelocityBoundaryConditions,
     pub body_force: Vec<SpatialVector>,
-    pub pressure_solver: PressureSolverMultiGrid,
+    pub pressure_solver: PressureSolver,
     pub grid: Grid,
     pub viscosity: Float,
     pub density: Float,
@@ -277,7 +277,9 @@ impl Simulation {
         
         let nr_interior_cells = self.grid.nr_interior_cells();
 
-        let data_ptr = self.pressure_solver.rhs_at_levels[0].as_mut_ptr() as usize;
+        let mut rhs = vec![0.0; nr_interior_cells];
+
+        let data_ptr =  rhs.as_mut_ptr() as usize;//self.pressure_solver.rhs_at_levels[0].as_mut_ptr() as usize;
 
         (0..nr_interior_cells)
             .into_par_iter()
@@ -309,6 +311,10 @@ impl Simulation {
                 }
                 
             });
+
+        match self.pressure_solver {
+            PressureSolver::CPU(ref mut solver) => solver.rhs_at_levels[0].copy_from_slice(&rhs)
+        }
 
         println!("Pressure projection rhs time: {:.?}", start_time.elapsed());
     }
@@ -392,7 +398,9 @@ impl Simulation {
 
         let data_ptr = self.velocity.as_mut_ptr() as usize;
 
-        let pressure = &self.pressure_solver.x_at_levels[0];
+        let pressure = match &self.pressure_solver {
+            PressureSolver::CPU(solver) => solver.x_at_levels[0].clone()
+        };
 
         (0..nr_interior_cells)
             .into_par_iter()

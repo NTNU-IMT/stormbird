@@ -15,8 +15,8 @@ use std::ops::Range;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Structure that stores inflow correction data for multiple sails for a single apparent wind
-/// direction, as a function of a scalar height value. The correction consists if a spatial vector
-/// that contain correction factors for each component of the velocity.
+/// direction, as a function of a scalar height value. The correction consists of both magnitude
+/// corrections and angle corrections.
 pub struct InflowCorrectionsSingleDirection {
     pub height_values: Vec<Float>,
     pub magnitude_corrections: Vec<Float>,

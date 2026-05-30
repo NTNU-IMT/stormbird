@@ -26,6 +26,10 @@ pub enum VelocityVariation {
 }
 
 impl VelocityVariation {
+    pub fn new_constant(velocity: Float) -> Self {
+        Self::Constant(velocity)
+    }
+    
     pub fn true_wind_velocity_at_height(&self, height: Float) -> Float {
         match self {
             Self::Constant(value) => *value,

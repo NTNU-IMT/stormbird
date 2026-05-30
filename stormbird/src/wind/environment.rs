@@ -23,9 +23,9 @@ use super::wind_condition::WindCondition;
 #[serde(deny_unknown_fields)]
 /// Structure used to represent a wind environment, meaning all settings for the wind that is 
 /// assumed to be constant for a given model. Wind parameters that vary is given in 
-/// [crate::wind::wind_condition]. The structure defines the definition of different *directions*, 
-/// and can be used to generate velocity vectors for different locations, based on the input 
-/// wind condition and linear velocity
+/// [`crate::wind::wind_condition::WindCondition`]. The wind environment defines the definition of 
+/// different *directions*, and can be used to generate velocity vectors for different locations, 
+/// based on the input wind condition and linear velocity
 pub struct WindEnvironment {
     #[serde(default="WindEnvironment::default_up_direction")]
     /// The up direction specifies which direction is considered to be up relative to the ocean or 
@@ -69,12 +69,14 @@ impl WindEnvironment {
     fn default_up_direction() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
     fn default_wind_rotation_axis() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
 
+    /// Creates a wind environment from a JSON string
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(json_string)?;
 
         Ok(serde_res)
     }
 
+    /// Creates a wind environment from a JSON file
     pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
         let json_string = std::fs::read_to_string(file_path)?;
 
@@ -98,7 +100,8 @@ impl WindEnvironment {
             self.wind_rotation_axis
         )
     }
-    
+
+    /// Returns the steady part of the true wind conditions at the specified location
     pub fn steady_true_wind_velocity_at_location(
         &self,
         condition: &WindCondition,
@@ -109,7 +112,7 @@ impl WindEnvironment {
         condition.steady_true_wind_velocity_at_height(height)
     }
 
-    /// Computes the height of the input location and then the true wind velocity at this height
+    /// Computes unsteady true wind that is parallel to the steady wind. 
     pub fn unsteady_parallel_true_wind_velocity_at_location(
         &self,
         condition: &WindCondition,
@@ -121,7 +124,7 @@ impl WindEnvironment {
         condition.unsteady_parallel_true_wind_velocity_at_height(height, time)
     }
 
-    /// Returns the true wind vector at the location given as input
+    /// Returns the unsteady true wind magnitude at the location given as input
     pub fn unsteady_true_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
@@ -157,7 +160,8 @@ impl WindEnvironment {
 
         parallel_vel * parallel_dir
     }
-    
+
+    /// Returns the steady apparent wind vector at the supplied location
     pub fn steady_apparent_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
@@ -171,7 +175,8 @@ impl WindEnvironment {
         
         true_wind + linear_velocity
     }
-    
+
+    /// Returns the unsteady apparent wind vector at the supplied location
     pub fn unsteady_apparent_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
@@ -188,6 +193,8 @@ impl WindEnvironment {
         true_wind + linear_velocity
     }
 
+    
+    /// Computes the apparent wind velocity with corrections at the control points. 
     pub fn apparent_wind_velocity_vectors_at_ctrl_points_with_corrections_applied(
         &self,
         condition: &WindCondition,
@@ -267,6 +274,7 @@ impl WindEnvironment {
         }
     }
 
+    /// Computes the apparent wind direction from the supplied condition and linear velocity
     pub fn apparent_wind_direction_from_condition_and_linear_velocity(
         &self,
         condition: &WindCondition,
@@ -337,68 +345,67 @@ impl WindEnvironment {
     }
 }
 
-/* 
+ 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    /// Performs basic tests of the rotation logic. 
+    /// 
+    /// The "north wind" is assumed to be in the direction of the positive x-axis by default 
+    /// (e.g., positive x axis points backwards)
     fn test_true_wind_velocity_vectors() {
+        
         let wind_environment = WindEnvironment::default();
         let location = SpatialVector::new(0.0, 0.0, 10.0);
 
         let wind_velocity = 8.2;
 
-        let north_wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: 0.0,
-            ..Default::default()
-        };
-
-        let east_wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: Float::from(90.0).to_radians(),
-            ..Default::default()
-        };
-
-        let west_wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: Float::from(-90.0).to_radians(),
-            ..Default::default()
-        };
-
-        let south_wind_condition = WindCondition{
-            velocity: wind_velocity,
-            direction_coming_from: Float::from(180.0).to_radians(),
-            ..Default::default()
-        };
-
-        let north_vector = wind_environment.true_wind_velocity_vector_at_location(
-            north_wind_condition, location
+        let head_wind_condition = WindCondition::new_constant(
+            0.0, 
+            wind_velocity
+        );
+        let starboard_wind_condition = WindCondition::new_constant(
+            Float::from(-90.0).to_radians(), 
+            wind_velocity
         );
 
-        let east_vector = wind_environment.true_wind_velocity_vector_at_location(
-            east_wind_condition, location
+        let port_wind_condition = WindCondition::new_constant(
+            Float::from(90.0).to_radians(), 
+            wind_velocity
         );
 
-        let west_vector = wind_environment.true_wind_velocity_vector_at_location(
-            west_wind_condition, location
+        let tail_wind_condition = WindCondition::new_constant(
+            Float::from(180.0).to_radians(), 
+            wind_velocity
         );
 
-        let south_vector = wind_environment.true_wind_velocity_vector_at_location(
-            south_wind_condition, location
+        let head_vector = wind_environment.steady_true_wind_velocity_vector_at_location(
+            &head_wind_condition, location
         );
 
-        assert!(north_vector[0] > 0.0);
-        assert!(east_vector[1] < 0.0);
-        assert!(west_vector[1] > 0.0);
-        assert!(south_vector[0] < 0.0);
+        let starboard_vector = wind_environment.steady_true_wind_velocity_vector_at_location(
+            &starboard_wind_condition, location
+        );
 
-        dbg!(north_vector);
-        dbg!(east_vector);
-        dbg!(west_vector);
-        dbg!(south_vector);
+        let port_vector = wind_environment.steady_true_wind_velocity_vector_at_location(
+            &port_wind_condition, location
+        );
+
+        let tail_vector = wind_environment.steady_true_wind_velocity_vector_at_location(
+            &tail_wind_condition, location
+        );
+
+        dbg!(head_vector);
+        dbg!(starboard_vector);
+        dbg!(port_vector);
+        dbg!(tail_vector);
+
+        assert!(head_vector[0] > 0.0); // x-axis points backwards, so head wind should be positive in x
+        assert!(tail_vector[0] < 0.0); // Opposite of above
+        
+        assert!(starboard_vector[1] < 0.0); // y-axis points towards right, so wind from starboard should be negative in y
+        assert!(port_vector[1] > 0.0); // Opposite of above
     }
 }
-
-*/

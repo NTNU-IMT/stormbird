@@ -11,8 +11,11 @@ use stormath::consts::TAU;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// Structure used to represent a spectrum as discrete harmonic signals
 pub struct DiscretizedSpectrum {
+    /// The discrete frequencies in the spectrum
     pub frequencies: Vec<Float>,
+    /// The amplitudes for each frequency
     pub amplitudes: Vec<Float>,
+    /// The phase shift for each frequency
     pub phases: Vec<Float>,
 }
 
@@ -29,7 +32,8 @@ impl DiscretizedSpectrum {
     pub fn to_json_string(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
-    
+
+    /// Computes the oscillating velocity as a function of time
     pub fn value_at_time(&self, time: Float) -> Float {
         let mut out = 0.0;
         

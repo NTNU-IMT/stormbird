@@ -7,11 +7,20 @@ use stormath::consts::PI;
 /// Logarithmic model of how velocity varies as a function of height, which also includes optional
 /// stability corrections
 pub struct LogarithmicModel {
+    /// The frictional velocity, defined as the square root of the surface friction from the wind on 
+    /// the ground or ocean, divided by density. This type of parameter is often available directly 
+    /// in hindcast data
     pub friction_velocity: Float,
+    /// The surface roughness of the ground or ocean (e.g., how much waves). Can either be computed 
+    /// based if some reference velocity and the frictional velocity is known, or set directly from
+    /// hindcast data
     pub surface_roughness: Float,
     #[serde(default)]
+    /// The [Obukhov length](https://en.wikipedia.org/wiki/Monin%E2%80%93Obukhov_length) is used to 
+    /// correct the profile for non-neutral conditions, e.g., stable or unstable atmospheres.
     pub obukhov_length: Option<Float>,
     #[serde(default="LogarithmicModel::default_von_karman_constant")]
+    /// The [Von Karman constant](https://en.wikipedia.org/wiki/Von_K%C3%A1rm%C3%A1n_constant) 
     pub von_karman_constant: Float,
     #[serde(default="LogarithmicModel::default_stable_coefficient")]
     pub stable_coefficient: Float,

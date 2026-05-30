@@ -4,6 +4,7 @@ pub mod pressure_solver;
 pub mod simulation;
 pub mod actuator_line_interface;
 pub mod geometry;
+pub mod gpu_context;
 
 
 pub mod error;

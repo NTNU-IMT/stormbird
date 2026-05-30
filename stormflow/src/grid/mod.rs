@@ -12,6 +12,7 @@ pub struct Grid {
     pub inv_cell_length: SpatialVector,
     pub inv_cell_length_squared: SpatialVector,
     pub poisson_diagonal: Float,
+    pub poisson_inv_diagonal: Float,
     pub extended_shape: [usize; 3],
     pub extended_stride: [usize; 3],
     pub interior_shape: [usize; 3],
@@ -19,19 +20,11 @@ pub struct Grid {
 }
 
 impl Grid {
-    pub fn new(
-        start_point: SpatialVector, 
-        end_point: SpatialVector,
+    pub fn new_direct(
+        start_point: SpatialVector,
+        cell_length: SpatialVector,
         interior_shape: [usize; 3]
     ) -> Self {
-        let domain_length = end_point - start_point;
-        
-        let cell_length = SpatialVector([
-            domain_length[0] / interior_shape[0] as Float,
-            domain_length[1] / interior_shape[1] as Float,
-            domain_length[2] / interior_shape[2] as Float,
-        ]);
-
         let inv_cell_length = SpatialVector([
             1.0 / cell_length[0],
             1.0 / cell_length[1],
@@ -44,11 +37,13 @@ impl Grid {
             inv_cell_length[2].powi(2),
         ]);
 
-        let poisson_diagonal = 1.0 / (-2.0 * (
+        let poisson_diagonal = -2.0 * (
             inv_cell_length_squared[0] + 
             inv_cell_length_squared[1] + 
-            inv_cell_length_squared[2])
+            inv_cell_length_squared[2]
         );
+
+        let poisson_inv_diagonal = 1.0 / poisson_diagonal;
         
         let extended_shape = [
             interior_shape[0] + 2 * INTERIOR_OFFSET,
@@ -74,11 +69,28 @@ impl Grid {
             inv_cell_length,
             inv_cell_length_squared,
             poisson_diagonal,
+            poisson_inv_diagonal,
             extended_shape,
             extended_stride,
             interior_shape,
             interior_stride
         }
+    }
+    
+    pub fn new(
+        start_point: SpatialVector, 
+        end_point: SpatialVector,
+        interior_shape: [usize; 3]
+    ) -> Self {
+        let domain_length = end_point - start_point;
+        
+        let cell_length = SpatialVector([
+            domain_length[0] / interior_shape[0] as Float,
+            domain_length[1] / interior_shape[1] as Float,
+            domain_length[2] / interior_shape[2] as Float,
+        ]);
+
+        Self::new_direct(start_point, cell_length, interior_shape)        
     }
     
     #[inline(always)]
@@ -215,17 +227,11 @@ impl Grid {
             nx, ny, nz
         );
 
-        let extended_shape = [
-            nx / 2 + 2 * INTERIOR_OFFSET,
-            ny / 2 + 2 * INTERIOR_OFFSET,
-            nz / 2 + 2 * INTERIOR_OFFSET,
-        ];
-
-        let extended_stride = [
-            extended_shape[1] * extended_shape[2], 
-            extended_shape[2],
-            1usize
-        ];
+        let cell_length = SpatialVector([
+            self.cell_length[0] * 2.0,
+            self.cell_length[1] * 2.0,
+            self.cell_length[2] * 2.0,
+        ]);
 
         let interior_shape = [
             nx / 2,
@@ -233,46 +239,6 @@ impl Grid {
             nz / 2
         ];
 
-        let interior_stride = [
-            interior_shape[1] * interior_shape[2],
-            interior_shape[2],
-            1usize
-        ];
-
-        let cell_length = SpatialVector([
-            self.cell_length[0] * 2.0,
-            self.cell_length[1] * 2.0,
-            self.cell_length[2] * 2.0,
-        ]);
-
-        let inv_cell_length = SpatialVector([
-            1.0 / cell_length[0],
-            1.0 / cell_length[1],
-            1.0 / cell_length[2]
-        ]);
-
-        let inv_cell_length_squared = SpatialVector([
-            inv_cell_length[0].powi(2),
-            inv_cell_length[1].powi(2),
-            inv_cell_length[2].powi(2),
-        ]);
-
-        let poisson_diagonal = 1.0 / (-2.0 * (
-            inv_cell_length_squared[0] + 
-            inv_cell_length_squared[1] + 
-            inv_cell_length_squared[2])
-        );
-        
-        Grid {
-            start_point: self.start_point,
-            cell_length,
-            inv_cell_length,
-            inv_cell_length_squared,
-            poisson_diagonal,
-            extended_shape,
-            extended_stride,
-            interior_shape,
-            interior_stride
-        }
+        Self::new_direct(self.start_point, cell_length, interior_shape)
     }
 }

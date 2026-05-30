@@ -4,12 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bytemuck = "1.25.0"
 clap = { version = "4.5.53", features = ["derive"] }
+pollster = "0.4.0"
 rayon = "1.12.0"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-stormath = {path = "../stormath", features=["single_precision"]}
+serde_json = "1.0.150"
+stormath = {version = "0.3.0", features=["single_precision"]}
 stormbird = {path = "../stormbird", features=["single_precision"]}
+wgpu = "29.0.3"
 
 [profile.release]
 lto = "fat"
