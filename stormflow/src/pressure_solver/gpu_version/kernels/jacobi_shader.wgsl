@@ -7,7 +7,7 @@ struct GridUniforms {
     inv_dx2          : f32,
     inv_dy2          : f32,
     inv_dz2          : f32,
-    poisson_diagonal : f32,
+    poisson_inv_diagonal : f32,
 }
 
 @group(0) @binding(0) var<uniform>            grid     : GridUniforms;
@@ -46,7 +46,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         + grid.inv_dy2 * (current[idx + grid.extended_stride_y] + current[idx - grid.extended_stride_y])
         + grid.inv_dz2 * (current[idx + 1u]                     + current[idx - 1u]);
 
-    let jacobi_update = (rhs[idx_int] - off_diag) * grid.poisson_diagonal;
+    let jacobi_update = (rhs[idx_int] - off_diag) * grid.poisson_inv_diagonal;
 
     new_sol[idx] = (1.0 - JACOBI_WEIGHT) * current[idx] + JACOBI_WEIGHT * jacobi_update;
 }

@@ -8,18 +8,22 @@ use crate::{
     grid::Grid
 };
 
-use crate::gpu_context::GpuContext;
+use crate::gpu_interface::context::GpuContext;
+use crate::gpu_interface::shader::ComputeShader;
 
 const JACOBI_SHADER: &str = include_str!("kernels/jacobi_smoother.wgsl");
 
 pub struct PressureSolverGPU {
     pub grid: Grid,
-    pub x: Vec<Float>,
+    pub solution: Vec<Float>,
     pub rhs: Vec<Float>,
     pub boundary_conditions: PressureBoundaryConditions,
     pub solver_settings: PressureSolverSettings,
     pub gpu_context: GpuContext,
-    pub shader: wgpu::ShaderModule
+    pub shader: ComputeShader,
+    pub solution_buffer: wgpu::Buffer,
+    pub solution_staging_buffer: wgpu::Buffer,
+    pub rhs_buffer: wgpu::Buffer
 }
 
 impl PressureSolverGPU {
@@ -28,21 +32,60 @@ impl PressureSolverGPU {
         boundary_conditions: &PressureBoundaryConditions, 
         solver_settings: PressureSolverSettings
     ) -> Self {
-        let x = vec![0.0; grid.nr_extended_cells()];
+        let solution = vec![0.0; grid.nr_extended_cells()];
         let rhs = vec![0.0; grid.nr_interior_cells()];
 
         let gpu_context = GpuContext::new();
 
-        let shader = gpu_context.create_shader(JACOBI_SHADER);
+        let solution_buffer = gpu_context.create_buffer_from_src(&solution);
+
+        let solution_staging_buffer = gpu_context.create_staging_buffer(solution.len());
+
+        let rhs_buffer = gpu_context.create_buffer_from_src(&rhs);
+
+        let buffers = [
+            &rhs_buffer, 
+            &solution_buffer,
+        ];
+
+        let read_only = [true, false];
+
+        let shader = ComputeShader::new(
+            &gpu_context,
+            &buffers,
+            &read_only,
+            JACOBI_SHADER
+        );
 
         Self {
             grid: grid.clone(),
-            x,
+            solution,
             rhs,
             boundary_conditions: boundary_conditions.clone(),
             solver_settings: solver_settings.clone(),
             gpu_context,
-            shader
+            shader,
+            solution_buffer,
+            solution_staging_buffer,
+            rhs_buffer
         }
+    }
+
+    pub fn solve(&mut self) {
+        self.gpu_context.write_buffer(&self.rhs_buffer, &self.rhs);
+
+        let index = self.gpu_context.run_compute_shader(
+            &self.shader, 
+            &self.solution_buffer, 
+            &self.solution_staging_buffer, 
+            self.solution.len()
+        );
+
+        let solution = self.gpu_context.read_from_staging_buffer(
+            &self.solution_staging_buffer,
+            index
+        );
+
+        self.solution.copy_from_slice(&solution);
     }
 }
