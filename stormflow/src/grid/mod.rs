@@ -1,6 +1,10 @@
 
+pub mod gpu_version;
+
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
+
+use gpu_version::GpuGrid;
 
 pub const INTERIOR_OFFSET: usize = 1;
 
@@ -91,6 +95,63 @@ impl Grid {
         ]);
 
         Self::new_direct(start_point, cell_length, interior_shape)        
+    }
+
+    pub fn as_gpu_version(&self) -> GpuGrid {
+        GpuGrid {
+            start_point: [
+                self.start_point[0], 
+                self.start_point[1], 
+                self.start_point[2], 
+                0.0
+            ], 
+            cell_length: [
+                self.cell_length[0], 
+                self.cell_length[1], 
+                self.cell_length[2], 
+                0.0
+            ], 
+            inv_cell_length: [
+                self.inv_cell_length[0], 
+                self.inv_cell_length[1], 
+                self.inv_cell_length[2], 
+                0.0
+            ], 
+            inv_cell_length_squared: [
+                self.inv_cell_length_squared[0], 
+                self.inv_cell_length_squared[1], 
+                self.inv_cell_length_squared[2], 
+                0.0
+            ], 
+            poisson_diagonal: self.poisson_diagonal,
+            poisson_inv_diagonal: self.poisson_inv_diagonal,
+            _pad0: 0, 
+            _pad1: 0, 
+            extended_shape: [
+                self.extended_shape[0] as u32, 
+                self.extended_shape[1] as u32, 
+                self.extended_shape[2] as u32, 
+                0
+            ], 
+            extended_stride: [
+                self.extended_stride[0] as u32, 
+                self.extended_stride[1] as u32, 
+                self.extended_stride[2] as u32, 
+                0
+            ], 
+            interior_shape: [
+                self.interior_shape[0] as u32, 
+                self.interior_shape[1] as u32, 
+                self.interior_shape[2] as u32, 
+                0
+            ], 
+            interior_stride: [
+                self.interior_stride[0] as u32, 
+                self.interior_stride[1] as u32, 
+                self.interior_stride[2] as u32, 
+                0
+            ]
+        }
     }
     
     #[inline(always)]

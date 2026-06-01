@@ -1,7 +1,7 @@
 
 use crate::gpu_interface::context::GpuContext;
 
-const GRID_SRC: &str = include_str!("grid.wgsl");
+const GRID_SRC: &str = include_str!("../../../grid/gpu_version/grid.wgsl");
 const JACOBI_SRC: &str = include_str!("jacobi_shader.wgsl");
 
 
@@ -27,23 +27,15 @@ impl JacobiShader {
             }
         );
 
-        let nr_buffers = 3;
+        let nr_buffers = 4;
         
         let mut layout_entries: Vec<wgpu::BindGroupLayoutEntry> = Vec::with_capacity(nr_buffers);
+
         let read_only = vec![true, true, false];
 
         for (index, ro) in read_only.iter().enumerate() {
             layout_entries.push(
-                wgpu::BindGroupLayoutEntry {
-                    binding: index as u32,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: *ro },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }
+                GpuContext::bind_group_layout_entry(index, *ro)
             );
         }
 
@@ -81,12 +73,9 @@ impl JacobiShader {
             work_buffer
         ];
 
-        for buffer in buffers_sol_to_work.iter() {
+        for (index, buffer) in buffers_sol_to_work.iter().enumerate() {
             entries_sol_to_work.push(
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buffer.as_entire_binding(),
-                }
+                GpuContext::bind_group_entry(index + 1, buffer)
             );
         }
 
@@ -98,12 +87,9 @@ impl JacobiShader {
             solution_buffer
         ];
 
-        for buffer in buffers_work_to_sol.iter() {
+        for (index, buffer) in buffers_work_to_sol.iter().enumerate() {
             entries_work_to_sol.push(
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buffer.as_entire_binding(),
-                }
+                GpuContext::bind_group_entry(index + 1, buffer)
             );
         }
         

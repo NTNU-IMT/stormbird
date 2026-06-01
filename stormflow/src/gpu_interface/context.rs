@@ -3,8 +3,6 @@ use stormath::type_aliases::Float;
 
 use wgpu::util::DeviceExt;
 
-use super::shader::ComputeShader;
-
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue
@@ -57,6 +55,29 @@ impl GpuContext {
         );
     }
 
+    pub fn bind_group_layout_entry(binding: usize, read_only: bool) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: binding as u32,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: read_only },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }
+    }
+
+    pub fn bind_group_entry<'a>(
+        binding: usize, 
+        buffer: &'a wgpu::Buffer
+    ) -> wgpu::BindGroupEntry<'a> {
+        wgpu::BindGroupEntry {
+            binding: binding as u32,
+            resource: buffer.as_entire_binding(),
+        }
+    }
+
     pub fn create_staging_buffer(&self, length: usize) -> wgpu::Buffer {
         let byte_len = Self::byte_length_from_length(length);
 
@@ -68,29 +89,6 @@ impl GpuContext {
                 mapped_at_creation: false,
             }
         )
-    }
-
-    pub fn run_compute_shader(
-        &self, 
-        shader: &ComputeShader,
-        storage_buffer: &wgpu::Buffer,
-        staging_buffer: &wgpu::Buffer,
-        data_length: usize
-    ) -> wgpu::SubmissionIndex {
-        let byte_len = Self::byte_length_from_length(data_length);
-
-        let mut encoder = self.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor::default()
-        );
-        {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&shader.pipeline);
-            pass.set_bind_group(0, &shader.bind_group, &[]);
-            pass.dispatch_workgroups(data_length as u32, 1, 1); // one thread per element
-        }
-        // Copy GPU result → staging buffer for CPU to read
-        encoder.copy_buffer_to_buffer(storage_buffer, 0, staging_buffer, 0, byte_len);
-        self.queue.submit([encoder.finish()])
     }
 
     pub fn read_from_staging_buffer(

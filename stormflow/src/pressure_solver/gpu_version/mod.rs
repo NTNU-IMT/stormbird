@@ -39,9 +39,8 @@ impl PressureSolverGPU {
 
         let gpu_context = GpuContext::new();
 
-        let solution_buffer = gpu_context.create_buffer_from_src(&solution);
-        let solution_work_buffer = gpu_context.create_buffer_from_src(&solution);
-
+        let solution_buffer         = gpu_context.create_buffer_from_src(&solution);
+        let solution_work_buffer    = gpu_context.create_buffer_from_src(&solution);
         let solution_staging_buffer = gpu_context.create_staging_buffer(solution.len());
 
         let rhs_buffer = gpu_context.create_buffer_from_src(&rhs);
