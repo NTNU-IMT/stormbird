@@ -1,19 +1,8 @@
-struct GridUniforms {
-    interior_shape_x : u32,
-    interior_shape_y : u32,
-    interior_shape_z : u32,
-    extended_stride_x: u32,
-    extended_stride_y: u32,
-    inv_dx2          : f32,
-    inv_dy2          : f32,
-    inv_dz2          : f32,
-    poisson_inv_diagonal : f32,
-}
+// The grid.wgsl shader will be prepended before the rest of the source during loading
 
-@group(0) @binding(0) var<uniform>            grid     : GridUniforms;
-@group(0) @binding(1) var<storage, read>      current  : array<f32>;  // extended grid
-@group(0) @binding(2) var<storage, read>      rhs      : array<f32>;  // interior grid
-@group(0) @binding(3) var<storage, read_write> new_sol : array<f32>;  // extended grid
+@group(0) @binding(1) var<storage, read> current: array<f32>;
+@group(0) @binding(2) var<storage, read> rhs: array<f32>; 
+@group(0) @binding(3) var<storage, read_write> new_sol: array<f32>;
 
 const WG: u32 = 4u;
 const JACOBI_WEIGHT: f32 = 0.6666666667;
