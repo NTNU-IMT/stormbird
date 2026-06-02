@@ -55,29 +55,6 @@ impl GpuContext {
         );
     }
 
-    pub fn bind_group_layout_entry(binding: usize, read_only: bool) -> wgpu::BindGroupLayoutEntry {
-        wgpu::BindGroupLayoutEntry {
-            binding: binding as u32,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Storage { read_only: read_only },
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        }
-    }
-
-    pub fn bind_group_entry<'a>(
-        binding: usize, 
-        buffer: &'a wgpu::Buffer
-    ) -> wgpu::BindGroupEntry<'a> {
-        wgpu::BindGroupEntry {
-            binding: binding as u32,
-            resource: buffer.as_entire_binding(),
-        }
-    }
-
     pub fn create_staging_buffer(&self, length: usize) -> wgpu::Buffer {
         let byte_len = Self::byte_length_from_length(length);
 
@@ -109,5 +86,48 @@ impl GpuContext {
         let result: Vec<f32> = bytemuck::cast_slice(&slice.get_mapped_range()).to_vec();
 
         result
+    }
+
+    pub fn create_bind_group_layout(&self, entries: &[wgpu::BindGroupLayoutEntry]) -> wgpu::BindGroupLayout {
+        self.device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &entries,
+            }
+        )
+    }
+
+    pub fn create_pipeline(
+        &self, 
+        entry_point: &str, 
+        bind_group_layout: &wgpu::BindGroupLayout
+    ) -> wgpu::ComputePipeline {
+        let pipeline_layout = self.device.create_pipeline_layout(
+            &wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[Some(bind_group_layout)],
+                immediate_size: 0,
+            }
+        );
+    
+        self.device.create_compute_pipeline(
+            &wgpu::ComputePipelineDescriptor {
+                label: None,
+                layout: Some(&pipeline_layout),
+                module: &shader,
+                entry_point: Some(entry_point.into()),
+                compilation_options: Default::default(),
+                cache: None,
+            }
+        )
+    }
+
+    pub fn create_shader_module(&self, shader_src: &str) -> wgpu::ShaderModule {
+        self.device.create_shader_module(
+            wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(shader_src.into())
+            }
+        )
     }
 }

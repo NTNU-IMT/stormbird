@@ -1,8 +1,13 @@
 
-use crate::gpu_interface::context::GpuContext;
+use crate::gpu_interface::{
+    context::GpuContext,
+    utils as gpu_utils
+};
 
 const GRID_SRC: &str = include_str!("../../../grid/gpu_version/grid.wgsl");
 const JACOBI_SRC: &str = include_str!("jacobi_shader.wgsl");
+
+use crate::grid::gpu_version::GpuGrid;
 
 
 pub struct JacobiShader {
@@ -12,6 +17,15 @@ pub struct JacobiShader {
 }
 
 impl JacobiShader {
+    pub fn bind_group_layout_entries() -> [wgpu::BindGroupLayoutEntry; 4] {
+        [
+            GpuGrid::bind_group_entry(0),
+            gpu_utils::storage_bind_group_layout_entry(1, true),
+            gpu_utils::storage_bind_group_layout_entry(2, true)
+            gpu_utils::storage_bind_group_layout_entry(3, false)
+        ]
+    }
+    
     pub fn new(
         context: &GpuContext,
         solution_buffer: &wgpu::Buffer,
@@ -20,50 +34,11 @@ impl JacobiShader {
     ) -> Self {
         let shader_src = format!("{}\n{}", GRID_SRC, JACOBI_SRC);
     
-        let shader = context.device.create_shader_module(
-            wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(shader_src.into())
-            }
-        );
-
-        let nr_buffers = 4;
+        let shader = context.create_shader_module(&shader_src);
+        let layout_entries = Self::bind_group_layout_entries();
+        let bind_group_layout = context.create_bind_group_layout(&layout_entries);
+        let pipeline = context.create_pipeline("main", &bind_group_layout);
         
-        let mut layout_entries: Vec<wgpu::BindGroupLayoutEntry> = Vec::with_capacity(nr_buffers);
-
-        let read_only = vec![true, true, false];
-
-        for (index, ro) in read_only.iter().enumerate() {
-            layout_entries.push(
-                GpuContext::bind_group_layout_entry(index, *ro)
-            );
-        }
-
-        let bind_group_layout = context.device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &layout_entries,
-            }
-        );
-
-        let pipeline_layout = context.device.create_pipeline_layout(
-            &wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[Some(&bind_group_layout)],
-                immediate_size: 0,
-            }
-        );
-    
-        let pipeline = context.device.create_compute_pipeline(
-            &wgpu::ComputePipelineDescriptor {
-                label: None,
-                layout: Some(&pipeline_layout),
-                module: &shader,
-                entry_point: Some("main"),
-                compilation_options: Default::default(),
-                cache: None,
-            }
-        );
         
         let mut entries_sol_to_work : Vec<wgpu::BindGroupEntry> = Vec::with_capacity(nr_buffers);
 
@@ -75,7 +50,7 @@ impl JacobiShader {
 
         for (index, buffer) in buffers_sol_to_work.iter().enumerate() {
             entries_sol_to_work.push(
-                GpuContext::bind_group_entry(index + 1, buffer)
+                gpu_utils::bind_group_entry(index + 1, buffer)
             );
         }
 
@@ -89,7 +64,7 @@ impl JacobiShader {
 
         for (index, buffer) in buffers_work_to_sol.iter().enumerate() {
             entries_work_to_sol.push(
-                GpuContext::bind_group_entry(index + 1, buffer)
+                gpu_utils::bind_group_entry(index + 1, buffer)
             );
         }
         

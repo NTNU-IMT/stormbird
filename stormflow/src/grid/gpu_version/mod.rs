@@ -32,9 +32,9 @@ impl GpuGrid {
         )
     }
 
-    pub fn bind_group_layout_entry() -> wgpu::BindGroupLayoutEntry {
+    pub fn bind_group_layout_entry(binding: usize) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
-            binding: 0,
+            binding: binding as u32,
             visibility: wgpu::ShaderStages::COMPUTE,
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Uniform,
