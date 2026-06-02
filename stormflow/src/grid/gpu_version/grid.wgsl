@@ -1,5 +1,4 @@
-// Data structure representing the grid, with variable necessary to extract the information from
-// it
+// Data structure representing the grid, with variable necessary to extract the information from it
 struct Grid {
     start_point:              vec4<f32>,
     cell_length:              vec4<f32>,
