@@ -12,13 +12,3 @@ pub fn storage_bind_group_layout_entry(binding: usize, read_only: bool) -> wgpu:
         count: None,
     }
 }
-
-pub fn bind_group_entry<'a>(
-    binding: usize, 
-    buffer: &'a wgpu::Buffer
-) -> wgpu::BindGroupEntry<'a> {
-    wgpu::BindGroupEntry {
-        binding: binding as u32,
-        resource: buffer.as_entire_binding(),
-    }
-}

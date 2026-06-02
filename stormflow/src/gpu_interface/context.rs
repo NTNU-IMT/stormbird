@@ -97,10 +97,38 @@ impl GpuContext {
         )
     }
 
+    pub fn create_bind_group(
+        &self, 
+        buffers: &[&wgpu::Buffer], 
+        bind_group_layout: &wgpu::BindGroupLayout
+    ) -> wgpu::BindGroup {
+        let nr_buffers = buffers.len();
+
+        let mut entries: Vec<wgpu::BindGroupEntry> = Vec::with_capacity(nr_buffers);
+
+        for (index, buffer) in buffers.iter().enumerate() {
+            entries.push(
+                wgpu::BindGroupEntry {
+                    binding: index as u32,
+                    resource: buffer.as_entire_binding(),
+                }
+            );
+        }
+
+        self.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &entries,
+            }
+        )
+    }
+
     pub fn create_pipeline(
         &self, 
         entry_point: &str, 
-        bind_group_layout: &wgpu::BindGroupLayout
+        bind_group_layout: &wgpu::BindGroupLayout,
+        shader: &wgpu::ShaderModule
     ) -> wgpu::ComputePipeline {
         let pipeline_layout = self.device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {

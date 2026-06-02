@@ -13,9 +13,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let ji = gid.y;
     let ki = gid.z;
 
-    if ii >= grid.interior_shape_x ||
-       ji >= grid.interior_shape_y ||
-       ki >= grid.interior_shape_z {
+    if ii >= grid.interior_shape.x ||
+       ji >= grid.interior_shape.y ||
+       ki >= grid.interior_shape.z {
         return;
     }
 
@@ -23,16 +23,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = ii + 1u;
     let j = ji + 1u;
     let k = ki + 1u;
-    let idx = i * grid.extended_stride_x + j * grid.extended_stride_y + k;
+    let idx = i * grid.extended_stride.x + j * grid.extended_stride.y + k;
 
     // Interior-grid index for RHS (z-major, no ghost cells)
-    let idx_int = ii * (grid.interior_shape_y * grid.interior_shape_z)
-                + ji *  grid.interior_shape_z
+    let idx_int = ii * (grid.interior_shape.y * grid.interior_shape.z)
+                + ji *  grid.interior_shape.z
                 + ki;
 
     let off_diag =
-          grid.inv_dx2 * (current[idx + grid.extended_stride_x] + current[idx - grid.extended_stride_x])
-        + grid.inv_dy2 * (current[idx + grid.extended_stride_y] + current[idx - grid.extended_stride_y])
+          grid.inv_dx2 * (current[idx + grid.extended_stride.x] + current[idx - grid.extended_stride.x])
+        + grid.inv_dy2 * (current[idx + grid.extended_stride.y] + current[idx - grid.extended_stride.y])
         + grid.inv_dz2 * (current[idx + 1u]                     + current[idx - 1u]);
 
     let jacobi_update = (rhs[idx_int] - off_diag) * grid.poisson_inv_diagonal;

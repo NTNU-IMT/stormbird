@@ -49,14 +49,50 @@ impl PressureBoundaryConditions {
         }
     }
 
+    pub fn set_ghost_cells_kernel(
+        condition: &PressureBoundaryCondition,
+        current_axis_offset: usize,
+        inner_n: usize,
+        outer_n: usize,
+        inner_stride: usize,
+        outer_stride: usize,
+        neighbor_delta: isize,
+        p: &mut [Float]
+    ) {
+        let p_ptr = p.as_mut_ptr() as usize;
+        
+        (0..outer_n)
+            .into_par_iter()
+            .with_min_len(2048)
+            .for_each(|i_outer| {
+                let row_base = current_axis_offset + i_outer * outer_stride;
+                let mut flat_current = row_base;
+
+                for _ in 0..inner_n {
+                    let flat_neighbor = (flat_current as isize + neighbor_delta) as usize;
+
+                    let new_value = match condition {
+                        PressureBoundaryCondition::ZeroGradient => p[flat_neighbor],
+                        PressureBoundaryCondition::ZeroValue => -p[flat_neighbor]
+                    };
+
+                    unsafe {
+                        let ptr = p_ptr as *mut Float;
+
+                        *ptr.add(flat_current) = new_value;
+                    }
+
+                    flat_current += inner_stride;
+                }
+            });
+    }
+
     #[inline]
     /// Updates the ghost cells on the pressure, p, using the boundary conditions in self and the 
     /// supplied grid for the indexing logic
     pub fn set_ghost_cells(&self, grid: &Grid, p: &mut [Float]) {
         let shape = grid.extended_shape;
         let stride = grid.extended_stride;
-
-        let p_ptr = p.as_mut_ptr() as usize;
     
         for axis_index in 0..3 {
             let axis_length = shape[axis_index];
@@ -91,47 +127,18 @@ impl PressureBoundaryConditions {
                 };
     
                 // Pick the operation once — it's constant across the whole face.
-                let cond = self.face_conditions[axis_index][face_index];
+                let condition = self.face_conditions[axis_index][face_index];
 
-                (0..outer_n)
-                    .into_par_iter()
-                    .with_min_len(2048)
-                    .for_each(|i_outer| {
-                        let row_base = current_axis_offset + i_outer * outer_stride;
-                        let mut flat_current = row_base;
-                        
-                        match cond {
-                            PressureBoundaryCondition::ZeroGradient => {
-                                for _ in 0..inner_n {
-                                    let flat_neighbor = (flat_current as isize + neighbor_delta) as usize;
-    
-                                    let new_value = p[flat_neighbor];
-                                    
-                                    unsafe {
-                                        let ptr = p_ptr as *mut Float;
-    
-                                        *ptr.add(flat_current) = new_value;
-                                    }
-    
-                                    flat_current += inner_stride;
-                                }
-                            }
-                            PressureBoundaryCondition::ZeroValue => {
-                                for _ in 0..inner_n {
-                                    let flat_neighbor = (flat_current as isize + neighbor_delta) as usize;
-                        
-                                    let new_value = -p[flat_neighbor];
-    
-                                    unsafe {
-                                        let ptr = p_ptr as *mut Float;
-    
-                                        *ptr.add(flat_current) = new_value;
-                                    }
-                                    flat_current += inner_stride;
-                                }
-                            }
-                        }
-                    });
+                Self::set_ghost_cells_kernel(
+                    &condition, 
+                    current_axis_offset, 
+                    inner_n, 
+                    outer_n, 
+                    inner_stride, 
+                    outer_stride, 
+                    neighbor_delta, 
+                    p
+                );
             }
         }
     }

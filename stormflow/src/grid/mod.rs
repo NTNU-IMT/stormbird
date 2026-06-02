@@ -1,5 +1,6 @@
 
 pub mod gpu_version;
+pub mod boundary_face;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;

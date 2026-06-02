@@ -39,6 +39,7 @@ impl PressureSolverGPU {
 
         let gpu_context = GpuContext::new();
 
+        let grid_buffer = grid.as_gpu_version().as_buffer(&gpu_context);
         let solution_buffer         = gpu_context.create_buffer_from_src(&solution);
         let solution_work_buffer    = gpu_context.create_buffer_from_src(&solution);
         let solution_staging_buffer = gpu_context.create_staging_buffer(solution.len());
@@ -47,9 +48,10 @@ impl PressureSolverGPU {
 
         let shader = JacobiShader::new(
             &gpu_context,
+            &grid_buffer,
             &solution_buffer,
+            &rhs_buffer,
             &solution_work_buffer,
-            &rhs_buffer
         );
         
         Self {
