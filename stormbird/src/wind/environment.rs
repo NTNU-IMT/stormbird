@@ -2,8 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality to represent the a wind environment, e.g. containing settings for directions and
-//! methods to get the apparent velocity at different locations.
+//! Functionality to represent the constant variables in a wind environment, and methods necessary 
+//! to compute velocities in spaces.s
 
 use std::ops::Range;
 

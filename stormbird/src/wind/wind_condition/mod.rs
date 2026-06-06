@@ -2,7 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality to represent the wind at a given instance.
+//! Functionality to represent the wind at a given instance. This includes the variables necessary 
+//! to represent the "true wind". 
 
 use serde::{Serialize, Deserialize};
 
@@ -19,6 +20,8 @@ use discretized_spectrum::DiscretizedSpectrum;
 /// - The direction of the true wind
 /// - How the velocity varies with height
 /// - Optional gust spectrums parallel, perpendicular and vertically relative to the steady wind
+/// 
+/// The structure is typically input to methods in [`super::environment::WindEnvironment`]
 pub struct WindCondition {
     /// The direction the wind is coming from, measured in radians. The rotational direction (around 
     /// which axis the wind is rotated) is defined in [`crate::wind::environment::WindEnvironment`] 
