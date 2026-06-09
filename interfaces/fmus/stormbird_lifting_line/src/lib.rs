@@ -20,7 +20,9 @@ use stormbird::lifting_line::simulation_builder::SimulationBuilder;
 
 use stormbird::wind::{
     environment::WindEnvironment,
-    wind_condition::WindCondition
+    wind_condition::WindCondition,
+    wind_condition::velocity_variation::VelocityVariation,
+    wind_condition::velocity_variation::power_model::PowerModel,
 };
 
 use stormbird::controller::{
@@ -30,8 +32,6 @@ use stormbird::controller::{
     output::ControllerOutput,
     measurements::FlowMeasurementSettings
 };
-
-use stormbird::empirical_models::blendermann_superstructre_forces::BlendermannSuperstructureForces;
 
 use fmu_from_struct::FmuInfo;
 
@@ -177,14 +177,6 @@ pub struct StormbirdLiftingLine {
     pub moment_sail_10_y: f64,
     pub moment_sail_10_z: f64,
 
-    /// Forces on the superstructure, if that is included in the model
-    pub force_superstructure_x: f64,
-    pub force_superstructure_y: f64,
-    pub force_superstructure_z: f64,
-    pub moment_superstructure_x: f64,
-    pub moment_superstructure_y: f64,
-    pub moment_superstructure_z: f64,
-
     /// Measurements of the effective angle of attack at different wings. Max 10 as output in the
     /// FMU
     pub angle_of_attack_measurement_1: f64,
@@ -254,8 +246,7 @@ pub struct StormbirdLiftingLine {
     wind_environment: Option<WindEnvironment>,
     controller: Option<Controller>,
     input_filters: Option<InputFilters>,
-    time_model_scaling: Option<ModelScaling>,
-    superstructure_force_model: Option<BlendermannSuperstructureForces>,
+    time_model_scaling: Option<ModelScaling>
 }
 
 impl FmuFunctions for StormbirdLiftingLine {
@@ -265,7 +256,6 @@ impl FmuFunctions for StormbirdLiftingLine {
         self.build_controller();
         self.build_filters();
         self.build_lifting_line_model();
-        self.build_superstructure_force_model();
 
         if self.time_model_scale > 0.0 {
             self.time_model_scaling = Some(
@@ -563,8 +553,18 @@ impl StormbirdLiftingLine {
 
         // Get the wind field from the wind environment, based on the wind condition
         let wind_condition = WindCondition {
-            velocity: self.wind_velocity,
-            direction_coming_from: self.wind_direction()
+            direction_coming_from: self.wind_direction(),
+            velocity_variation: VelocityVariation::PowerModel(
+                PowerModel {
+                    reference_velocity: self.wind_velocity,
+                    reference_height: PowerModel::default_reference_height(),
+                    power_factor: PowerModel::default_power_factor()
+                }
+            ),
+            parallel_gust: None,
+            perpendicular_gust: None,
+            vertical_gust: None
+            
         };
 
         // Apply the linear motion of the wings to the freestream if this option is activated
@@ -575,17 +575,21 @@ impl StormbirdLiftingLine {
         };
 
         let out = if let Some(env) = &self.wind_environment {
-            let apparent_wind_direction = env.apparent_wind_direction_from_condition_and_linear_velocity_and_height(
-                wind_condition,
+            let apparent_wind_direction = env.apparent_wind_direction_from_condition_and_linear_velocity(
+                &wind_condition,
                 linear_velocity,
                 10.0
             );
 
-            let mut freestream_velocity = env.apparent_wind_velocity_vectors_at_locations(
-                wind_condition,
-                &freestream_velocity_points,
-                linear_velocity
-            );
+            let mut freestream_velocity: Vec<SpatialVector> = freestream_velocity_points.iter().map(
+                |p| {
+                    env.steady_apparent_wind_velocity_vector_at_location(
+                        &wind_condition,
+                        *p,
+                        linear_velocity
+                    )
+                }
+            ).collect();
 
             if let Some(model) = &self.stormbird_model {
                 let ctrl_points = &model.line_force_model.ctrl_points_global;
@@ -674,41 +678,6 @@ impl StormbirdLiftingLine {
         section_models_internal_state
     }
 
-    fn superstructure_force_and_moment(&self) -> (SpatialVector, SpatialVector) {
-        if let Some(model) = &self.superstructure_force_model {
-            let representative_height = model.center_of_effort[2].abs();
-
-            // Get the wind field from the wind environment, based on the wind condition
-            let true_wind_condition = WindCondition {
-                velocity: self.wind_velocity,
-                direction_coming_from: self.wind_direction()
-            };
-
-            // Apply the linear motion of the ship to the freestream
-            let linear_velocity =  -1.0 * self.motion_velocity_linear_vector();
-
-            // TODO: consider including angular motion on the apparent wind calculation
-            let apparent_wind_vector = if let Some(env) = &self.wind_environment {
-                let locations = vec![representative_height * env.up_direction];
-
-                env.apparent_wind_velocity_vectors_at_locations(
-                    true_wind_condition,
-                    &locations,
-                    linear_velocity
-                )[0]
-            } else {
-                panic!("Wind environment is not defined!")
-            };
-
-            let force = model.body_fixed_force(apparent_wind_vector);
-            let moment = model.body_fixed_moment(force);
-
-            (force, moment)
-        } else {
-            (SpatialVector::default(), SpatialVector::default())
-        }
-    }
-
     fn set_zero_force_output(&mut self) {
         self.force_x = 0.0;
         self.force_y = 0.0;
@@ -717,14 +686,6 @@ impl StormbirdLiftingLine {
         self.moment_x = 0.0;
         self.moment_y = 0.0;
         self.moment_z = 0.0;
-
-        self.force_superstructure_x = 0.0;
-        self.force_superstructure_y = 0.0;
-        self.force_superstructure_z = 0.0;
-
-        self.moment_superstructure_x = 0.0;
-        self.moment_superstructure_y = 0.0;
-        self.moment_superstructure_z = 0.0;
 
         self.force_sail_1_x = 0.0;
         self.force_sail_1_y = 0.0;
@@ -801,23 +762,13 @@ impl StormbirdLiftingLine {
         let integrated_forces = result.integrated_forces_sum();
         let integrated_moments = result.integrated_moments_sum();
 
-        let (superstructure_force, superstructure_moment) = self.superstructure_force_and_moment();
+        self.force_x = integrated_forces[0];
+        self.force_y = integrated_forces[1];
+        self.force_z = integrated_forces[2];
 
-        self.force_x = integrated_forces[0] + superstructure_force[0];
-        self.force_y = integrated_forces[1] + superstructure_force[1];
-        self.force_z = integrated_forces[2] + superstructure_force[2];
-
-        self.moment_x = integrated_moments[0] + superstructure_moment[0];
-        self.moment_y = integrated_moments[1] + superstructure_moment[1];
-        self.moment_z = integrated_moments[2] + superstructure_moment[2];
-
-        self.force_superstructure_x = superstructure_force[0];
-        self.force_superstructure_y = superstructure_force[1];
-        self.force_superstructure_z = superstructure_force[2];
-
-        self.moment_superstructure_x = superstructure_moment[0];
-        self.moment_superstructure_y = superstructure_moment[1];
-        self.moment_superstructure_z = superstructure_moment[2];
+        self.moment_x = integrated_moments[0];
+        self.moment_y = integrated_moments[1];
+        self.moment_z = integrated_moments[2];
 
         let mut individual_force_x_raw = [0.0; 10];
         let mut individual_force_y_raw = [0.0; 10];

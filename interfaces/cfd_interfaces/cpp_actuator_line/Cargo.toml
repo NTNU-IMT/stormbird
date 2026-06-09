@@ -9,5 +9,5 @@ crate-type = ["staticlib"]
 [dependencies]
 cxx = "1.0"
 
-stormbird = {version = "0.8.0"}
-stormath  = {version = "0.2.0"}
+stormbird = {version = "0.9.0"}
+stormath  = {version = "0.3.0"}
