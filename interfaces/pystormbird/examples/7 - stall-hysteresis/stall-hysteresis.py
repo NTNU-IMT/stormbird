@@ -6,15 +6,15 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 
-from stormbird_setup.direct_setup.spatial_vector import SpatialVector
-from stormbird_setup.direct_setup.section_models import SectionModel, Foil
-from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
-from stormbird_setup.direct_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
-from stormbird_setup.direct_setup.lifting_line.solver import SimpleIterative
-from stormbird_setup.direct_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
-from stormbird_setup.direct_setup.lifting_line.velocity_corrections import VelocityCorrections
+from stormbird_setup.spatial_vector import SpatialVector
+from stormbird_setup.section_models import SectionModel, Foil
+from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
+from stormbird_setup.lifting_line.solver import SimpleIterative
+from stormbird_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
+from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrections
 
-from stormbird_setup.direct_setup.circulation_corrections import CirculationCorrectionBuilder
+from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
 from pystormbird.lifting_line import Simulation
 

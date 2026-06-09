@@ -48,7 +48,7 @@ pub fn limit_value(
     let raw_difference = raw_new_value - old_value;
     
     if raw_difference.abs() > max_change {
-        old_value * max_change * raw_difference.signum()
+        old_value + max_change * raw_difference.signum()
     } else {
         raw_new_value
     }
@@ -131,7 +131,7 @@ impl ControllerSetPoints {
 
             angle_error = Self::correct_angle_to_be_between_pi_and_negative_pi(angle_error);
 
-            let out = angle_measurement + angle_error;
+            let out = input.current_local_wing_angle + angle_error;
 
             Self::correct_angle_to_be_between_pi_and_negative_pi(out)
         } else {

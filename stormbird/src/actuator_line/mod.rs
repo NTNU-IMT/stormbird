@@ -189,7 +189,10 @@ impl ActuatorLine {
 
                 need_update = true;
 
-                ControllerOutput::write_to_csv_file(&controller_output, "controller_output.csv");
+                ControllerOutput::write_to_csv_file(
+                    &controller_output, 
+                    "postProcessing/controller_output.csv"
+                );
             }
 
             need_update
@@ -361,10 +364,6 @@ impl ActuatorLine {
                 let mut lift_force = simulation_result.sectional_forces.circulatory[line_index];
                 let mut drag_force = SpatialVector::default();
                 
-                if self.projection_settings.project_viscous_lift {
-                    lift_force += simulation_result.sectional_forces.viscous_lift[line_index];
-                }
-                
                 if self.projection_settings.project_sectional_drag {
                     drag_force = simulation_result.sectional_forces.sectional_drag[line_index];
                 }
@@ -379,8 +378,16 @@ impl ActuatorLine {
                         .normalize();
                     
                     let drag_direction = velocity.normalize();
+
+                    let lift_dot = lift_direction.dot(lift_force);
+
+                    let lift_sign = if lift_dot >= 0.0 {
+                        1.0
+                    } else {
+                        -1.0
+                    };
                     
-                    lift_force = lift_force.length() * lift_direction;
+                    lift_force = lift_force.length() * lift_direction * lift_sign;
                     drag_force = drag_force.length() * drag_direction;
                 }
                 
@@ -392,7 +399,6 @@ impl ActuatorLine {
             self.sectional_lift_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
             self.sectional_drag_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
         }
-        
     }
 
     /// Returns the force to be projected, based on the line index
@@ -456,13 +462,17 @@ impl ActuatorLine {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
         let mut max_weight = -1.0;
-        let mut max_index = 0;
+        let mut max_index = self.line_force_model.nr_span_lines();
 
         for (i, weight) in projection_weights.iter().enumerate() {
             if *weight > max_weight {
                 max_weight = *weight;
                 max_index = i;
             }
+        }
+
+        if max_index == self.line_force_model.nr_span_lines() {
+            panic!("No dominating line element found!");
         }
 
         max_index

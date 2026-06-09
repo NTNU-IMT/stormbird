@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.optimize as opt
 
-from stormbird_setup.direct_setup.section_models import Foil as FoilSetup
-from stormbird_setup.direct_setup.section_models import SectionModel as SectionModelSetup
+from stormbird_setup.section_models import Foil as FoilSetup
+from stormbird_setup.section_models import SectionModel as SectionModelSetup
 from pystormbird.section_models import Foil as FoilModel
 
 class FoilTuner:
@@ -77,5 +77,3 @@ class FoilTuner:
         ).x
 
         self.set_cd_parameters(cd_x)
-
-

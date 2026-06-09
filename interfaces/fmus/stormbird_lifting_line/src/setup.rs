@@ -120,29 +120,4 @@ impl StormbirdLiftingLine {
             }
         }
     }
-
-    pub fn build_superstructure_force_model(&mut self) {
-        if !self.parameters.superstructure_force_setup_path.is_empty() {
-            let mut setup_path = self.parameters_path();
-            setup_path.pop();
-            setup_path.push(self.parameters.superstructure_force_setup_path.clone());
-            
-            let superstructure_force_model = BlendermannSuperstructureForces::from_json_file(
-                &setup_path.to_string_lossy()
-            );
-
-            match superstructure_force_model {
-                Ok(model) => {
-                    self.superstructure_force_model = Some(model);
-                },
-                Err(e) => {
-                    println!(
-                        "Error reading superstructure force setup file from path: {}. Error: {}", 
-                        &self.parameters.superstructure_force_setup_path, 
-                        e
-                    );
-                }
-            }
-        }
-    }
 }

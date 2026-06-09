@@ -2,6 +2,15 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Functionality to empirically correct an input velocity to account for disturbances in the flow,
+//! such as disturbances due to the deck or superstructure on a ship. 
+//! 
+//! The empirical model consists of two correction variable; a factor that can be used to adjust the 
+//! effective velocity at different line segments, and an angle that can be used to rotate the 
+//! effective velocity. The factors themselves must come from some external source. Typically, they 
+//! are either set directly from an analysis of the velocity field over a ship without any sails
+//! present, or tuned based on force measurements of sails on a real ship.
+
 use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;
@@ -12,8 +21,8 @@ use std::ops::Range;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Structure that stores inflow correction data for multiple sails for a single apparent wind
-/// direction, as a function of a scalar height value. The correction consists if a spatial vector
-/// that contain correction factors for each component of the velocity.
+/// direction, as a function of a scalar height value. The correction consists of both magnitude
+/// corrections and angle corrections.
 pub struct InflowCorrectionsSingleDirection {
     pub height_values: Vec<Float>,
     pub magnitude_corrections: Vec<Float>,
@@ -48,6 +57,7 @@ impl InflowCorrectionsSingleDirection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Inflow corrections
 pub struct InflowCorrections {
     pub apparent_wind_directions: Vec<Float>,
     pub corrections: Vec<InflowCorrectionsSingleDirection>,

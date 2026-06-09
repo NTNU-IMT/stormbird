@@ -1,0 +1,50 @@
+{
+  "domain_start_point": [-64.0, -64.0, 0.0],
+  "domain_end_point": [64.0, 64.0, 64.0],
+  "grid_interior_shape": [128, 128, 64],
+  "effective_viscosity": 0.00001,
+  "wind_condition": {
+    "direction_coming_from": 0.0,
+    "velocity_variation": {
+      "Constant": 8.0
+    }
+  },
+  "linear_velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
+  "actuator_line": {
+    "line_force_model": {
+      "wing_builders": [
+        {
+          "section_points": [
+            {"x": 0.0, "y": 0.0, "z": 0.0},
+            {"x": 0.0, "y": 0.0, "z": 30.0}
+          ],
+          "chord_vectors": [
+            {"x": 8.0, "y": 0.0, "z": 0.0},
+            {"x": 8.0, "y": 0.0, "z": 0.0}
+          ],
+          "section_model": {
+            "Foil": {
+              "cl_zero_angle": 1.0
+            }
+          },
+          "non_zero_circulation_at_ends": [true, false]
+        }
+      ],
+      "nr_sections": 20,
+      "circulation_correction": {
+        "Smoothing": {
+          "smoothing_type": {
+            "Gaussian": {
+              "smoothing_length_factor": 0.05
+            }
+          }
+        }
+      },
+      "local_wing_angles": [0.0]
+    },
+    "solver_settings": {
+      "damping_factor": 0.5
+    },
+    "write_iterations_full_result": 10
+  }
+}

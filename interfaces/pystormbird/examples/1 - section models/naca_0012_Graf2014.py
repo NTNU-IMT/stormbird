@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from foil_tuner import FoilTuner
 
 def comparison_data():
-    comparison_data = json.load(open("../comparison_data/graf_2014_data.json", "r"))['two_dim_cfd']
+    comparison_data = json.load(open("graf_2014_data.json", "r"))['two_dim_cfd']
 
     angles_of_attack_data = comparison_data["angles_of_attack"]
     cd_data = comparison_data["drag_coefficients"]

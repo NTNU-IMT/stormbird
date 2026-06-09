@@ -7,11 +7,14 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from enum import Enum
 
 from ..base_model import StormbirdSetupBaseModel
-from ..direct_setup.spatial_vector import SpatialVector
-from ..direct_setup.line_force_model import WingBuilder
-from ..direct_setup.section_models import SectionModel
-from ..direct_setup.controller import ControllerSetPoints
-from ..direct_setup.input_power import InputPowerModel
+from ..spatial_vector import SpatialVector
+from ..line_force_model import WingBuilder
+from ..section_models import SectionModel
+from ..controller import ControllerSetPoints
+from ..input_power import InputPowerModel
+
+from ..lifting_line import SimulationBuilder
+from ..lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
 
 import numpy as np
 
@@ -29,6 +32,34 @@ class SailType(Enum):
                 return False
             case _:
                 raise ValueError("Unsupported sail type:", self)
+                
+    def add_default_corrections(self, simulation_builder: SimulationBuilder):
+        if self == SailType.RotorSail:
+            simulation_builder.simulation_settings.solver.velocity_corrections = VelocityCorrections(
+                type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
+                value = 2.0
+            )
+            
+    def default_section_model(self, iterative_solver=False) -> SectionModel:
+        match self:
+            case SailType.WingSailSingleElement:
+                section_model = SectionModel.default_wing_sail_single_element()
+                
+                if iterative_solver:
+                    section_model.model.mean_positive_stall_angle += np.radians(1.5)
+                    section_model.model.mean_negative_stall_angle += np.radians(1.5)
+                
+            case SailType.WingSailTwoElement:
+                section_model = SectionModel.default_wing_sail_two_element()
+            case SailType.RotorSail:
+                section_model = SectionModel.rotor_sail_deybach_2024()
+            case SailType.SuctionSail:
+                section_model = SectionModel.default_suction_sail_turbosail(scale_factor = 1.1)
+            case _:
+                raise ValueError("Unsupported sail type:", self.sail_type)
+                
+        return section_model
+        
 
 class SimpleSailSetup(StormbirdSetupBaseModel):
     '''
@@ -39,6 +70,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
     chord_length: float
     height: float
     sail_type: SailType
+    iterative_solver: bool = False
 
     def wing_builder(self) -> WingBuilder:
         section_points = [
@@ -55,17 +87,7 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
             SpatialVector(x=self.chord_length, y=0.0, z=0.0)
         ]
 
-        match self.sail_type:
-            case SailType.WingSailSingleElement:
-                section_model = SectionModel.default_wing_sail_single_element()
-            case SailType.WingSailTwoElement:
-                section_model = SectionModel.default_wing_sail_two_element()
-            case SailType.RotorSail:
-                section_model = SectionModel.default_rotor_sail()
-            case SailType.SuctionSail:
-                section_model = SectionModel.default_suction_sail()
-            case _:
-                raise ValueError("Unsupported sail type:", self.sail_type)
+        section_model = self.sail_type.default_section_model()
 
         non_zero_circulation_at_ends = (False, False)
 
@@ -114,6 +136,6 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                     max_rps = np.interp(self.chord_length, diameter_data, max_rps_data)
                 )
             case SailType.SuctionSail:
-                return ControllerSetPoints.new_default_suction_sail()
+                return ControllerSetPoints.new_default_suction_sail(max_aoa_deg=32)
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)

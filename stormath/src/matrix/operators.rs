@@ -16,7 +16,7 @@ use std::ops::{Index, IndexMut, Add, Sub, Mul};
 use super::*;
 
 impl<T> Index<[usize; 2]> for Matrix<T>
-where T: Default + Clone + Copy + Debug,
+where T: Default + Clone + Copy + Debug, 
 {
     type Output = T;
 
@@ -111,7 +111,7 @@ where T: Default + Clone + Copy + Debug +
     Add<Output = T>,
 
 {
-    /// Performs a matrix multiplciation with the supplied matrix
+    /// Performs a matrix multiplication with the supplied matrix
     pub fn matrix_multiply(&self, other: &Matrix<T>) -> Matrix<T> {
         assert_eq!(self.shape[1], other.shape[0], "Matrix shapes do not match for multiplication");
 
@@ -130,16 +130,16 @@ where T: Default + Clone + Copy + Debug +
         result
     }
 
-    /// Performs a multiplcaiton with the supplied vector
-    pub fn vector_multiply(&self, vector: &[T]) -> Vec<T> {
-        assert_eq!(self.shape[1], vector.len(), "Matrix and vector shapes do not match for multiplication");
+    /// Performs a multiplication with the supplied vector
+    pub fn vector_multiply(&self, x: &[T]) -> Vec<T> {
+        assert_eq!(self.shape[1], x.len(), "Matrix and vector shapes do not match for multiplication");
 
         let mut result = vec![T::default(); self.shape[0]];
 
         for i in 0..self.shape[0] {
             let mut sum = T::default();
             for j in 0..self.shape[1] {
-                sum = sum + self[[i, j]] * vector[j];
+                sum = sum + self[[i, j]] * x[j];
             }
             result[i] = sum;
         }

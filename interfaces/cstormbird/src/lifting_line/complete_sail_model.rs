@@ -90,7 +90,7 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition(
     let wind_condition_rust = WindConditionImpl::from(wind_condition);
     
     let rust_results = rust_model.simulate_steady_state_condition_simple_output(
-        wind_condition_rust, 
+        &wind_condition_rust, 
         ship_velocity, 
         controller_loading
     );

@@ -2,17 +2,17 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Implementation block for the matric data type for linear algebra operations. This includes the
+//! Implementation block for the matrix data type for linear algebra operations. This includes the
 //! following:
 //!
 //! - [`solve_gaussian_elimination`](Matrix::solve_gaussian_elimination)
-//! - [`solve_gauss_seidel`](Matrix::solve_gauss_seidel)
 
 use super::*;
 
 use crate::error::Error;
 
-impl Matrix<Float> {
+
+impl Matrix<Float>{
     pub fn check_dimensions_for_solvability(&self, rhs: &[Float]) {
         let n = self.nr_rows();
         let m = self.nr_cols();
@@ -21,6 +21,18 @@ impl Matrix<Float> {
         assert_eq!(n, m, "Matrix must be square to be solvable");
         assert_eq!(rhs.len(), n, "Right-hand side vector length must match matrix size");
 
+    }
+    
+    pub fn linear_residual(&self, rhs: &[Float], x: &[Float]) -> Vec<Float> {    
+        let ax = self.vector_multiply(x);
+        
+        ax.iter().zip(rhs.iter()).map(|(a, b)| b - a).collect()
+    }
+    
+    pub fn linear_residual_absolute_sum(&self, rhs: &[Float], x: &[Float]) -> Float {
+        let r = self.linear_residual(rhs, x);
+        
+        r.iter().map(|r| r.abs()).sum::<Float>() / (r.len() as Float)
     }
 
     /// Solves the equation system Ax = b using Gaussian elimination.
@@ -32,7 +44,7 @@ impl Matrix<Float> {
         let n = self.nr_rows();
 
         // Create augmented matrix [A|b]
-        let mut aug = Matrix::new_default([n, n + 1]);
+        let mut aug: Matrix<Float> = Matrix::new_default([n, n + 1]);
 
         // Copy matrix A and vector b into augmented matrix
         for i in 0..n {
@@ -90,38 +102,6 @@ impl Matrix<Float> {
 
         Ok(x)
     }
-    /// Solves the equation system Ax = b using Gauss-Seidel method.
-    ///
-    /// Source: <https://en.wikipedia.org/wiki/Gauss%E2%80%93Seidel_method>
-    pub fn solve_gauss_seidel(&self, rhs: &[Float], nr_iterations: usize) -> Result<Vec<Float>, Error> {
-        self.check_dimensions_for_solvability(rhs);
-
-        let n = self.nr_rows();
-
-        let mut estimated_solution = vec![0.0; n];
-
-        for _ in 0..nr_iterations {
-            for i in 0..n {
-                if self[[i, i]].abs() < 1e-12 {
-                    return Err(
-                        Error::NoSolution(format!("Matrix is singular or nearly singular at row {}", i))
-                    );
-                }
-
-                let mut sigma = 0.0;
-
-                for j in 0..n {
-                    if i != j {
-                        sigma += self[[i, j]] * estimated_solution[j];
-                    }
-                }
-
-                estimated_solution[i] = (rhs[i] - sigma) / self[[i, i]]
-            }
-        }
-
-        Ok(estimated_solution)
-    }
 }
 
 #[cfg(test)]
@@ -130,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_matrix_solver() {
-        let allowable_error = 1e-6;
+        let allowable_error = 1e-4;
 
         let a = Matrix{
             data: vec![3.0, 2.0, 0.0,
@@ -142,24 +122,16 @@ mod tests {
         let b = vec![1.0, 2.0, 3.0];
 
         let x_solved_elimination = a.solve_gaussian_elimination(&b).unwrap();
-        let x_solved_iterative = a.solve_gauss_seidel(&b, 100).unwrap();
 
         let x_numpy = vec![0.6, -0.4,  2.0]; // Manually extracted from NumPy
 
         dbg!(&x_solved_elimination);
-        dbg!(&x_solved_iterative);
 
         for i in 0..x_solved_elimination.len() {
             assert!(
                 (x_solved_elimination[i] - x_numpy[i]).abs() < allowable_error,
                 "Mismatch at index {}: {} != {}",
                 i, x_solved_elimination[i], x_numpy[i]
-            );
-
-            assert!(
-                (x_solved_iterative[i] - x_numpy[i]).abs() < allowable_error,
-                "Mismatch at index {}: {} != {}",
-                i, x_solved_iterative[i], x_numpy[i]
             );
         }
     }

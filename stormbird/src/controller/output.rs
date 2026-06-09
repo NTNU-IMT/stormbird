@@ -15,8 +15,6 @@ pub struct ControllerOutput {
     pub section_model_internal_state: Float,
 }
 
-
-
 impl ControllerOutput {
     pub fn as_csv_string(output_to_write: &[Self]) -> (String, String) {
         let mut header = String::new();
@@ -35,10 +33,8 @@ impl ControllerOutput {
         }
         
         for i in 0..nr_wings {
-            if i > 0 {
-                header.push(',');
-                data.push(',');
-            }
+            header.push(',');
+            data.push(',');
             
             header.push_str(&format!("section_model_internal_state_{}", i));
             data.push_str(&format!("{:.6}", output_to_write[i].section_model_internal_state));

@@ -115,7 +115,7 @@ impl<T: SmoothingOps> GaussianSmoothing<T> {
             
             let smoothing_length = self.smoothing_length * smoothing_weight[i_0];
             
-            if smoothing_length.abs() < f64::MIN_POSITIVE {
+            if smoothing_length.abs() < Float::MIN_POSITIVE {
                 y_smooth.push(y[i_0])
             } else {
                 for i in 0..n_mod {

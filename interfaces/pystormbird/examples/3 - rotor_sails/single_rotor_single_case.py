@@ -3,13 +3,18 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from setup import simulate_single_case, TEST_SETTINGS
+from setup import simulate_single_case
+from single_rotor_multiple_spin_ratios import TEST_SETTINGS
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a single case")
-    parser.add_argument("--spin-ratio", type=float, default = 4.0, help="Spin ratio")
+    parser.add_argument("--spin-ratio", type=float, default = 3.0, help="Spin ratio")
 
     args = parser.parse_args()
+
+    diameter = 5.0
+    height = 30.0
+    foundation_height = 1.875
 
     w_plot = 16
     fig = plt.figure(figsize=(w_plot, w_plot/2.35))
@@ -20,6 +25,7 @@ if __name__ == "__main__":
         solver = TEST_SETTINGS["solver_types"][index]
         max_induced_velocity_ratio = TEST_SETTINGS["max_induced_velocity_ratios"][index]
         smoothing_length = TEST_SETTINGS["smoothing_lengths"][index]
+        virtual_extension_factor_top = TEST_SETTINGS["virtual_extension_factor_top"][index]
         
         label = solver.name
 
@@ -31,12 +37,16 @@ if __name__ == "__main__":
         print("Running simulation case:", label)
 
         res = simulate_single_case(
+            diameter = diameter,
+            height = height,
+            foundation_height = foundation_height,
             rotor_x_locations = [0.0],
             rotor_y_locations = [0.0],
             spin_ratio = args.spin_ratio,
             solver_type = solver,
             max_induced_velocity_ratio = max_induced_velocity_ratio,
-            smoothing_length = smoothing_length
+            smoothing_length = smoothing_length,
+            virtual_extension_factor_top = virtual_extension_factor_top
         )[0]
 
         print('Lift coefficient:', res['cy'])

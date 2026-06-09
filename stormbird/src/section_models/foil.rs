@@ -6,7 +6,7 @@ use super::*;
 use stormath::{
     type_aliases::Float,
     consts::{PI, TAU},
-    special_functions
+    transition_functions
 };
 
 use crate::error::Error;
@@ -159,7 +159,7 @@ impl Foil {
 
     #[inline(always)]
     pub fn lift_coefficient_linear(&self, angle_of_attack: Float) -> Float {
-        self.cl_zero_angle + self.cl_initial_slope * angle_of_attack
+        self.cl_zero_angle + self.cl_initial_slope * angle_of_attack.sin()
     }
 
     #[inline(always)]
@@ -262,7 +262,7 @@ impl Foil {
             self.mean_negative_stall_angle.abs()
         };
 
-        special_functions::sigmoid_zero_to_one(
+        transition_functions::sigmoid_zero_to_one(
             effective_angle.abs(),
             mean_stall_angle,
             self.stall_range

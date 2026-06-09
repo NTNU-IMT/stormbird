@@ -14,7 +14,7 @@ pub mod operators;
 use crate::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// A 2D matrix structure that can store data of any type `T`.
+/// A 2D matrix structure for storing any type T.
 pub struct Matrix<T> {
     /// The data stored in the matrix, represented as a flat vector. The data is stored in
     /// row-major order.
@@ -63,6 +63,11 @@ where T: Default + Clone + Copy + Debug,
     /// Returns the number of columns
     pub fn nr_cols(&self) -> usize {
         self.shape[1]
+    }
+    
+    pub fn row_slice(&self, row: usize) -> &[T] {
+        let start = row * self.shape[1];
+        &self.data[start .. start + self.shape[1]]
     }
 }
 

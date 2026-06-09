@@ -67,3 +67,15 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 - Refactoring of control system to handle different setup when using multiple sails
 - Fix of bug and refactoring of the input power model
 - Small updates to the foil model
+
+## 0.9.0 - 2026-06-xx
+### Highlights
+- New wind models, including different atmospheric boundary layer models and gust spectrums
+- Added the option to use "virtual line elements" to simulate end-plates and other similar mechanisms for reducing lift-induced velocities
+- Addition of a new crate called *Stormflow*, which is a custom CFD solver specialized for simple actuator line simulations
+- Simplified stormbird_setup imports
+### Bug fixes
+- Fixed bug in the effective angle of attack controller, introduced in version 0.8.0
+- Added proper sign for the residual calculation
+- Removed spanwise velocities in the linearized solver
+- Fixed issue in the actuator line when `realign_sectional_forces` where set to true. Previously this only worked when he lift was positive. Now it handles negative lift as well.

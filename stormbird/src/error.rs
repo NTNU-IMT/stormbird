@@ -10,7 +10,7 @@ use serde_json;
 use std::fmt;
 
 #[derive(Debug)]
-/// A common error type intended to represent the various error that can occur while suing this
+/// A common error type intended to represent the various error that can occur while using this
 /// library.
 pub enum Error {
     /// Interface to the standard library IO error

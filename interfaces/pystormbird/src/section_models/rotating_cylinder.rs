@@ -9,7 +9,7 @@ use stormbird::section_models::SectionModel as SectionModelRust;
 
 use super::SectionModel;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RotatingCylinder {
     pub data: RotatingCylinderRust

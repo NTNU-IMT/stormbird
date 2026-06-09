@@ -13,12 +13,12 @@ from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
 from single_case import simulate_single_case
 
 if __name__ == "__main__":
-    comparison_data = json.load(open("../comparison_data/graf_2014_data.json", "r"))
+    comparison_data = json.load(open("data/graf_2014_data.json", "r"))
 
     angles_of_attack_deg = np.arange(0.0, 20.5, 0.5)
     n_angles = len(angles_of_attack_deg)
 
-    dynamic = [False, False, False]
+    dynamic = [False, False, False, True]
     solver_types = [SolverType.Linearized, SolverType.SimpleIterative, 
                     SolverType.SimpleIterative, SolverType.SimpleIterative]
     smoothing_length = [0.0, 0.0, 0.1, 0.1]
@@ -52,6 +52,8 @@ if __name__ == "__main__":
                 dynamic = dyn,
                 smoothing_length = smoothing
             )
+
+            print("Number of iterations:", res["iterations"])
 
             cl[angle_index] = res['cl']
             cd[angle_index] = res['cd']

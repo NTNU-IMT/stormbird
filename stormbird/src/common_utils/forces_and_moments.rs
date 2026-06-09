@@ -111,12 +111,14 @@ impl SectionalForces {
             let mut wing_result = IntegratedValues::default();
 
             for i in wing_indices.start..wing_indices.end {
-                wing_result.circulatory += self.circulatory[i];
-                wing_result.viscous_lift += self.viscous_lift[i];
-                wing_result.sectional_drag += self.sectional_drag[i];
-                wing_result.added_mass += self.added_mass[i];
-                wing_result.gyroscopic += self.gyroscopic[i];
-                wing_result.total += self.total[i];
+                if !line_force_model.line_segment_is_virtual[i] {
+                    wing_result.circulatory += self.circulatory[i];
+                    wing_result.viscous_lift += self.viscous_lift[i];
+                    wing_result.sectional_drag += self.sectional_drag[i];
+                    wing_result.added_mass += self.added_mass[i];
+                    wing_result.gyroscopic += self.gyroscopic[i];
+                    wing_result.total += self.total[i];
+                }
             }
 
             integrated_values.push(wing_result);
@@ -139,12 +141,14 @@ impl SectionalForces {
             let mut wing_result = IntegratedValues::default();
 
             for i in wing_indices.start..wing_indices.end {
-                wing_result.circulatory += sectional_circulatory_moments[i];
-                wing_result.viscous_lift += sectional_viscous_lift_moments[i];
-                wing_result.sectional_drag += sectional_drag_moments[i];
-                wing_result.added_mass += sectional_added_mass_moments[i];
-                wing_result.gyroscopic += sectional_gyroscopic_moments[i];
-                wing_result.total += sectional_total_moments[i];
+                if !line_force_model.line_segment_is_virtual[i] {
+                    wing_result.circulatory += sectional_circulatory_moments[i];
+                    wing_result.viscous_lift += sectional_viscous_lift_moments[i];
+                    wing_result.sectional_drag += sectional_drag_moments[i];
+                    wing_result.added_mass += sectional_added_mass_moments[i];
+                    wing_result.gyroscopic += sectional_gyroscopic_moments[i];
+                    wing_result.total += sectional_total_moments[i];
+                }
             }
 
             integrated_values.push(wing_result);

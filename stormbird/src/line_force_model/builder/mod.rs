@@ -14,6 +14,7 @@ use super::*;
 use single_wing::WingBuilder;
 
 use crate::error::Error;
+use super::force_calculations::ForceCalculationSettings;
 
 use corrections::circulation::CirculationCorrectionBuilder;
 
@@ -40,6 +41,8 @@ pub struct LineForceModelBuilder {
     pub rotation: SpatialVector,
     #[serde(default)]
     pub translation: SpatialVector,
+    #[serde(default)]
+    pub force_calculation_settings: ForceCalculationSettings
 }
 
 impl LineForceModelBuilder {
@@ -55,6 +58,7 @@ impl LineForceModelBuilder {
             local_wing_angles: Vec::new(),
             rotation: SpatialVector::from([0.0, 0.0, 0.0]),
             translation: SpatialVector::from([0.0, 0.0, 0.0]),
+            force_calculation_settings: ForceCalculationSettings::default()
         }
     }
 
@@ -98,6 +102,7 @@ impl LineForceModelBuilder {
             line_force_model.local_wing_angles = self.local_wing_angles.clone();
         }
         
+        line_force_model.force_calculation_settings = self.force_calculation_settings.clone();
 
         line_force_model.rigid_body_motion.translation = self.translation;
         line_force_model.rigid_body_motion.rotation = self.rotation;

@@ -23,6 +23,7 @@ where T:
     sum / (x.len() as Float)
 }
 
+/// Computes the time averaged mean of the input x
 pub fn time_averaged_mean<T>(time: &[Float], x: &[T]) -> T
 where T:
     std::ops::Mul<Float, Output = T> + 

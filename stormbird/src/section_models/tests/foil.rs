@@ -25,7 +25,7 @@ fn default_lift_coefficent() {
 
     let angle_of_attack = Float::from(5.0).to_radians();
 
-    let cl_theory = TAU * angle_of_attack;
+    let cl_theory = TAU * angle_of_attack.sin();
     let cl_model = foil.lift_coefficient(angle_of_attack);
 
     let cl_error = (cl_model - cl_theory).abs();

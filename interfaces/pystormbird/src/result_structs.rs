@@ -10,7 +10,7 @@ use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalFor
 use stormbird::common_utils::forces_and_moments::IntegratedValues as IntegratedValuesRust;
 use stormbird::common_utils::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SectionalForcesInput {
     pub data: SectionalForcesInputRust
@@ -44,7 +44,7 @@ impl SectionalForcesInput {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SectionalForces {
     pub data: SectionalForcesRust
@@ -78,7 +78,7 @@ impl SectionalForces {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct IntegratedValues {
     pub data: IntegratedValuesRust
@@ -112,7 +112,7 @@ impl IntegratedValues {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SimulationResult {
     pub data: SimulationResultRust

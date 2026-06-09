@@ -1,6 +1,6 @@
 [package]
 name = "stormbird_lifting_line"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 
 [lib]
@@ -9,10 +9,10 @@ crate-type = ["cdylib"]
 [dependencies]
 fmu_from_struct = { version = "0.2.1" }
 
-stormbird = { version = "0.8.0"}
-stormath = { version = "0.2.0"}
-serde_json = "1.0.128"
-serde = { version = "1.0.215", features = ["derive"] }
+stormbird = { version = "0.9.0"}
+stormath = { version = "0.3.0"}
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
 
 [features]
 parallel = ["stormbird/parallel"]

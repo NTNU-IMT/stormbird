@@ -62,28 +62,24 @@ impl CompleteSailModel {
     /// based on the maximum delivered power
     pub fn simulate_condition_optimal_controller_loading(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         nr_loadings_to_test: usize,
-        time_step: Float,
-        nr_time_steps: usize,
     ) -> SimulationResult {
         
         let loadings_to_test = array_generation::linspace(0.1, 1.0, nr_loadings_to_test);
         
         let mut results: Vec<SimulationResult> = Vec::with_capacity(nr_loadings_to_test);
-        let mut effective_power: Vec<f64> = Vec::with_capacity(nr_loadings_to_test);
+        let mut effective_power: Vec<Float> = Vec::with_capacity(nr_loadings_to_test);
         
         let mut max_effective_power = Float::NEG_INFINITY;
         let mut best_index = 0;
         
         for i in 0..nr_loadings_to_test {
-            let result = self.simulate_condition(
+            let result = self.simulate_steady_state_condition(
                 wind_condition, 
                 ship_velocity, 
-                loadings_to_test[i], 
-                time_step, 
-                nr_time_steps
+                loadings_to_test[i]
             );
             
             // TODO: must find a way to define what the thrust direction is!
@@ -108,22 +104,29 @@ impl CompleteSailModel {
     
     pub fn simulate_steady_state_condition(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
-        self.simulate_condition(
+        self.apply_controller_based_on_wind_condition(
+            0.0, 
+            1.0, 
             wind_condition, 
             ship_velocity, 
-            controller_loading, 
-            1.0, 
-            1
+            controller_loading
+        );
+        
+        self.do_step(
+            0.0,
+            1.0,
+            wind_condition, 
+            ship_velocity
         )
     }
     
     pub fn simulate_steady_state_condition_simple_output(
         &mut self,
-        wind_condition: WindCondition,
+        wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> Vec<SingleSailResult> {
@@ -138,31 +141,33 @@ impl CompleteSailModel {
     
     /// Simulate a condition for the sail, specified by a wind condition, ship velocity, 
     /// and controller loading
-    pub fn simulate_condition(
+    pub fn do_multiple_steps(
         &mut self,
-        wind_condition: WindCondition,
-        ship_velocity: Float,
-        controller_loading: Float,
+        end_time: Float,
         time_step: Float,
-        nr_time_steps: usize,
-    ) -> SimulationResult {
-        let mut result = SimulationResult::default();
+        wind_condition: &WindCondition,
+        ship_velocity: Float,
+    ) -> Vec<SimulationResult> {
+        let mut results = Vec::new();
 
         self.lifting_line_simulation.first_time_step_completed = false; // Make sure the wake is re-initialized
 
-        for time_index in 0..nr_time_steps {
-            let current_time = (time_index as Float) * time_step;
-
-            result = self.do_step(
-                current_time,
-                time_step,
-                wind_condition,
-                ship_velocity,
-                controller_loading
+        let mut current_time = 0.0;
+        
+        while current_time < end_time {
+            results.push(
+                self.do_step(
+                    current_time,
+                    time_step,
+                    wind_condition,
+                    ship_velocity,
+                )
             );
+            
+            current_time += time_step;
         }
-
-        result
+        
+        results
     }
 
     /// Returns the forces on the sails for a single time step
@@ -170,20 +175,13 @@ impl CompleteSailModel {
         &mut self,
         current_time: Float,
         time_step: Float,
-        wind_condition: WindCondition,
-        ship_velocity: Float,
-        controller_loading: Float,
+        wind_condition: &WindCondition,
+        ship_velocity: Float
     ) -> SimulationResult {
         let freestream_velocity = self.freestream_velocity(
             wind_condition,
-            ship_velocity
-        );
-
-        self.apply_controller_based_on_freestream(
-            current_time,
-            time_step,
-            controller_loading,
-            &freestream_velocity
+            ship_velocity,
+            current_time
         );
 
         self.lifting_line_simulation.do_step(
@@ -193,21 +191,53 @@ impl CompleteSailModel {
         )
     }
     
+    pub fn apply_controller_based_on_wind_condition(
+        &mut self,
+        current_time: Float,
+        time_step: Float,
+        wind_condition: &WindCondition,
+        ship_velocity: Float,
+        controller_loading: Float,
+    ) {
+        let freestream_velocity = self.freestream_velocity(
+            wind_condition,
+            ship_velocity,
+            current_time
+        );
+
+        self.apply_controller_based_on_freestream(
+            current_time,
+            time_step,
+            controller_loading,
+            &freestream_velocity
+        );
+    }
+    
     pub fn freestream_velocity(
         &self,
-        wind_condition: WindCondition,
-        ship_velocity: Float
+        wind_condition: &WindCondition,
+        ship_velocity: Float,
+        time: Float
     ) -> Vec<SpatialVector> {
         let freestream_velocity_points = self.lifting_line_simulation
             .get_freestream_velocity_points();
 
         let linear_velocity = ship_velocity * self.wind_environment.zero_direction_vector;
         
-        let mut freestream_velocity = self.wind_environment.apparent_wind_velocity_vectors_at_locations(
-            wind_condition, 
-            &freestream_velocity_points, 
-            linear_velocity
-        );
+        let nr_points = freestream_velocity_points.len();
+        
+        let mut freestream_velocity = Vec::with_capacity(nr_points);
+        
+        for i in 0..nr_points {
+            freestream_velocity.push(
+                self.wind_environment.unsteady_apparent_wind_velocity_vector_at_location(
+                    wind_condition, 
+                    freestream_velocity_points[i], 
+                    linear_velocity, 
+                    time
+                )
+            );
+        }
         
         let reference_height = 10.0;
         
@@ -235,10 +265,14 @@ impl CompleteSailModel {
         loading: Float,
         freestream_velocity: &[SpatialVector]
     ) {
+        let nr_ctrl_points = self.lifting_line_simulation.line_force_model.nr_span_lines();
+        
+        let ctrl_points_velocity = &freestream_velocity[0..nr_ctrl_points];
+        
         let controller_input = ControllerInput::new_from_velocity(
             loading,
             &self.lifting_line_simulation.line_force_model,
-            freestream_velocity,
+            ctrl_points_velocity,
             &self.controller.flow_measurement_settings,
             &self.wind_environment,
         );
@@ -254,5 +288,47 @@ impl CompleteSailModel {
                 output
             );
         }
+    }
+
+    pub fn apply_controller_based_on_simulation_result(
+        &mut self,
+        current_time: Float,
+        time_step: Float,
+        loading: Float,
+        simulation_result: &SimulationResult
+    ) {
+        
+        let controller_input = ControllerInput::new_from_simulation_result(
+            loading,
+            &self.lifting_line_simulation.line_force_model,
+            simulation_result,
+            &self.controller.flow_measurement_settings,
+            &self.wind_environment,
+            self.controller.use_input_velocity_for_apparent_wind_direction
+        );
+
+        let controller_output = self.controller.update(
+            current_time,
+            time_step,
+            &controller_input
+        );
+
+        if let Some(output) = &controller_output {
+            self.lifting_line_simulation.line_force_model.set_controller_output(
+                output
+            );
+        }
+    }
+    
+    pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {
+        self.lifting_line_simulation
+            .line_force_model
+            .set_local_wing_angles(local_wing_angles);
+    }
+    
+    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
+        self.lifting_line_simulation
+            .line_force_model
+            .set_section_models_internal_state(internal_state);
     }
 }

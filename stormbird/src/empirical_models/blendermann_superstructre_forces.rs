@@ -55,7 +55,6 @@ impl BlendermannSuperstructureForces {
     }
 
     pub fn body_fixed_force(&self, body_fixed_velocity: SpatialVector) -> SpatialVector {
-
         let apparent_wind = WindCondition::from_velocity_vector_assuming_ned(
             body_fixed_velocity
         );
