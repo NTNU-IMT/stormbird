@@ -10,7 +10,7 @@ use stormbird::section_models::foil::Foil as FoilRust;
 use stormbird::section_models::SectionModel as SectionModelRust;
 use super::SectionModel;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct Foil {
     pub data: FoilRust

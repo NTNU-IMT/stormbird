@@ -11,7 +11,7 @@ pub mod varying_foil;
 
 use stormbird::section_models::SectionModel as SectionModelRust;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SectionModel{
     pub data: SectionModelRust,   

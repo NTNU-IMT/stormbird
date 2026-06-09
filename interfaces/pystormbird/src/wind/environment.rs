@@ -14,7 +14,7 @@ use std::ops::Range;
 
 use super::wind_condition::WindCondition;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct WindEnvironment {
     pub data: WindEnvironmentRust

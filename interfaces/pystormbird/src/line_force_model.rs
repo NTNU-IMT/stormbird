@@ -11,7 +11,7 @@ use stormbird::line_force_model::builder::LineForceModelBuilder;
 use stormbird::line_force_model::LineForceModel as LineForceModelRust;
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct LineForceModel {
     pub data: LineForceModelRust,

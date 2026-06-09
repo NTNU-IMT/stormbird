@@ -13,7 +13,7 @@ use stormbird::wind::wind_condition::velocity_variation::{
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct WindCondition {
     pub data: WindConditionRust

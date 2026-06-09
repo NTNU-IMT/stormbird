@@ -7,7 +7,7 @@ use pythonize::pythonize;
 
 use stormbird::section_models::varying_foil::VaryingFoil as VaryingFoilRust;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct VaryingFoil {
     pub data: VaryingFoilRust
