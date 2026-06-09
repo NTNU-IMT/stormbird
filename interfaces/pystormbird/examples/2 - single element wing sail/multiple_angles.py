@@ -18,7 +18,7 @@ if __name__ == "__main__":
     angles_of_attack_deg = np.arange(0.0, 20.5, 0.5)
     n_angles = len(angles_of_attack_deg)
 
-    dynamic = [False, False, False]
+    dynamic = [False, False, False, True]
     solver_types = [SolverType.Linearized, SolverType.SimpleIterative, 
                     SolverType.SimpleIterative, SolverType.SimpleIterative]
     smoothing_length = [0.0, 0.0, 0.1, 0.1]
@@ -52,6 +52,8 @@ if __name__ == "__main__":
                 dynamic = dyn,
                 smoothing_length = smoothing
             )
+
+            print("Number of iterations:", res["iterations"])
 
             cl[angle_index] = res['cl']
             cd[angle_index] = res['cd']

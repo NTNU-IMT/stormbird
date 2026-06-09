@@ -73,8 +73,9 @@ impl LineForceModel {
     /// The angle is defined as the rotation from the chord vector to the velocity vector, using the
     /// span line as the axis of rotation, with right handed positive rotation.
     ///
-    /// # Argument
+    /// # Arguments
     /// * `velocity` - the velocity vector at each control point
+    /// * `input_coordinate_system` - An enum defining which coordinate system to use for the output
     pub fn angles_of_attack(
         &self, 
         velocity: &[SpatialVector], 
@@ -107,7 +108,8 @@ impl LineForceModel {
 
     /// Returns the local lift coefficient on each line element.
     ///
-    /// # Argument
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients_total(
         &self, 
@@ -180,7 +182,8 @@ impl LineForceModel {
     /// Returns the local lift coefficient on each line element, but linearized. Primarily used when
     /// setting up equation systems for the lifting line theory
     ///
-    /// # Argument
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
     /// * `velocity` - the velocity vector at each control point
     pub fn lift_coefficients_linear(
         &self, 
@@ -228,7 +231,8 @@ impl LineForceModel {
     /// Returns the circulation strength, either directly or based on the prescribed shape,
     /// depending on the fields in self.
     ///
-    /// # Argument
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(
         &self, 
@@ -258,14 +262,21 @@ impl LineForceModel {
 
     /// Returns the circulation strength on each line based on the lifting line equation.
     ///
-    /// # Argument
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
     /// * `velocity` - the velocity vector at each control point
+    /// 
+    /// # Definitions
+    /// The circulation strength is defined to be negative with a positive cl
     pub fn circulation_strength_raw(
         &self, 
         angles_of_attack: &[Float],
         velocity: &[SpatialVector], 
     ) -> Vec<Float> {
-        let mut cl = self.lift_coefficients_pre_stall_with_stall_drop_off(angles_of_attack, velocity);
+        let mut cl = self.lift_coefficients_pre_stall_with_stall_drop_off(
+            angles_of_attack, 
+            velocity
+        ); // 
         
         if self.force_calculation_settings.include_viscous_lift_in_the_circulation {
             let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(angles_of_attack);
@@ -283,7 +294,8 @@ impl LineForceModel {
     /// Returns the viscous drag coefficient on each line element, based on the section model
     /// and the input velocity.
     ///
-    /// # Argument
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
     /// * `velocity` - the velocity vector at each control point
     pub fn viscous_drag_coefficients(
         &self, 
@@ -367,8 +379,19 @@ impl LineForceModel {
         sectional_forces
     }
 
-    /// Calculates the forces on each line element due to the circulatory forces (i.e., sectional lift)
-    pub fn sectional_circulatory_forces(&self, strength: &[Float], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
+    /// Calculates the forces on each line element due to the circulatory forces (i.e., 
+    /// sectional lift).
+    /// 
+    /// The magnitude of the force is the circulatory strength multiplied with the velocity,  
+    /// density, and line segment length. The direction is defined by cross product between the 
+    /// velocity and span lines. E.g., if the velocity is in the positive x direction, and the span 
+    /// lines points in the positive z direction, a positive circulation strength will give a force 
+    /// in the negative y-direction.
+    pub fn sectional_circulatory_forces(
+        &self, 
+        strength: &[Float], 
+        velocity: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
         let span_lines = match self.output_coordinate_system {
             CoordinateSystem::Global => &self.span_lines_global,
             CoordinateSystem::Body => &self.span_lines_local,
@@ -526,14 +549,27 @@ impl LineForceModel {
 
     /// Calculates the magnitude of the lift force on each line element based on the given
     /// circulation and velocity.
-    pub fn lift_from_circulation(
+    pub fn lift_coefficient_from_circulation(
         &self, 
         strength: &[Float], 
         velocity: &[SpatialVector]
     ) -> Vec<Float> {
+        // Calculate the actual forces
         let force = self.sectional_circulatory_forces(strength, velocity);
 
-        force.iter().map(|f| f.length()).collect()
+        (0..self.nr_span_lines()).map(|i_span| {
+            let sign = -1.0 * strength[i_span].signum();
+            
+            let lift_area = self.chord_lengths[i_span] * self.span_lines_local[i_span].length();
+
+            let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length_squared();
+
+            if force_factor == 0.0 {
+                return 0.0;
+            }
+
+            force[i_span].length() * sign / force_factor
+        }).collect()
     }
 
     /// Calculates the magnitude of the lift force on each line element based on the given
@@ -558,19 +594,15 @@ impl LineForceModel {
         angles_of_attack: &[Float],
         velocity: &[SpatialVector]
     ) -> Vec<Float> {
-        let circulation_lift = self.lift_from_circulation(strength, velocity);
-        let lift_coefficients = self.lift_coefficients_pre_stall_with_stall_drop_off(angles_of_attack, velocity);
+        let cl_gamma = self.lift_coefficient_from_circulation(strength, velocity);
+        
+        let cl_direct = self.lift_coefficients_pre_stall_with_stall_drop_off(
+            angles_of_attack, 
+            velocity
+        );
 
         (0..self.nr_span_lines()).map(|i_span| {
-            let lift_area = self.chord_lengths[i_span] * self.span_lines_local[i_span].length();
-
-            let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length_squared();
-
-            if force_factor == 0.0 {
-                return 0.0;
-            }
-
-            circulation_lift[i_span] / force_factor - lift_coefficients[i_span]
+            cl_gamma[i_span] - cl_direct[i_span]
         }).collect()
     }
 

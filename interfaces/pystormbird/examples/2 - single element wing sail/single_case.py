@@ -132,6 +132,7 @@ def simulate_single_case(
         "cd": cd,
         "circulation_strength": np.array(result_history[-1].force_input.circulation_strength),
         "angles_of_attack": np.array(result_history[-1].force_input.angles_of_attack),
+        "iterations": result_history[-1].iterations
     }
 
     return out

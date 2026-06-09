@@ -77,6 +77,11 @@ impl Linearized {
             ctrl_points_velocity[i] += frozen_wake.fixed_velocities[i];
         }
 
+        ctrl_points_velocity = line_force_model.remove_span_velocity(
+            &ctrl_points_velocity,
+            CoordinateSystem::Global
+        );
+
         // Compute relevant directions
         let mut velocity_dir = Vec::with_capacity(nr_unknowns);
         let mut normal_dir = Vec::with_capacity(nr_unknowns);
