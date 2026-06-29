@@ -93,12 +93,50 @@ class LogarithmicModel(StormbirdSetupBaseModel):
         cls,
         *,
         velocity: float,
-        netrual_velocity: float,
+        velocity_neutral: float,
         friction_velocity: float,
         reference_height: float = DEFAULT_REFERENCE_HEIGHT,
         von_karman_constant: float = DEFAULT_VON_KARMAN_CONSTANT
     ) -> "LogarithmicModel":
-        pass
+        delta_velocity = velocity_neutral - velocity
+
+        delta_velocity_ratio = np.abs(delta_velocity / velocity)
+
+        if delta_velocity_ratio <= DELTA_VELOCITY_RATIO_LIMIT:
+            return cls.new_neutral(
+                velocity = velocity,
+                friction_velocity = friction_velocity,
+                reference_height = reference_height,
+                von_karman_constant = von_karman_constant
+            )
+
+        out = cls.new_neutral(
+            velocity = velocity_neutral,
+            friction_velocity = friction_velocity,
+            reference_height = reference_height,
+            von_karman_constant = von_karman_constant
+        )
+
+        delta_velocity = velocity_neutral - velocity
+        
+        if delta_velocity > 0.0:
+            stable = False
+        else:
+            stable = True
+
+        if stable:
+            out.fit_obukhov_length_stable(
+                velocity_neutral=velocity_neutral,
+                velocity=velocity,
+                reference_height=reference_height
+            )
+        else:
+            height_values = [reference_height]
+            velocity_values = [velocity]
+            
+            out.fit_obukhov_length_unstable(height_values, velocity_values)
+
+        return out
 
     def fit_obukhov_length_stable(
         self,
@@ -131,7 +169,7 @@ class LogarithmicModel(StormbirdSetupBaseModel):
             
             return true_wind_velocity_at_heights(height)
             
-        bounds = ([-2000.0, -1.0])
+        bounds = (-2000.0, -1.0)
             
         popt, _pcov = curve_fit(
             f = obj_func, 
