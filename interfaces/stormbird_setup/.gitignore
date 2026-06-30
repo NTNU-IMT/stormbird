@@ -1,8 +1,8 @@
 /build
 /venv
+/dist
 __pycache__
 .mypy_cache
 .pytest_cache
 *.egg*
 .vscode
-.blend1

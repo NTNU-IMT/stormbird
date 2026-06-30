@@ -1,14 +1,13 @@
-'''
+"""
 Copyright (C) 2024, NTNU
 Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
-'''
+"""
 
 from typing import TypeVar, Type
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
-from pydantic.type_adapter import TypeAdapterT
 
 T = TypeVar('T', bound='StormbirdSetupBaseModel')
 
@@ -17,13 +16,12 @@ class StormbirdSetupBaseModel(BaseModel):
     Base class for the classes that define the setup of stormbird simulations.
     '''
     model_config = ConfigDict(
-        frozen = False,
-        validate_assignment = True,
-        extra = 'forbid',
-        populate_by_name = True,
-        use_enum_values = False,
-        validate_default = True,
-        ser_json_exclude_none=True,
+        frozen=False,
+        validate_assignment=True,
+        extra='forbid',
+        populate_by_name=True,
+        use_enum_values=False,
+        validate_default=True
     )
 
     @classmethod

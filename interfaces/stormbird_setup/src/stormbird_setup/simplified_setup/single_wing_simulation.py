@@ -1,4 +1,8 @@
-
+"""
+Copyright (C) 2024, NTNU
+Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
+License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
+"""
 
 from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
@@ -75,6 +79,8 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
 
         symmetry_condition = SymmetryCondition.Z if self.z_symmetry else SymmetryCondition.NoSymmetry
 
+        solver: Linearized | SimpleIterative
+        simulation_settings: DynamicSettings | QuasiSteadySettings
         if self.dynamic:
             match self.solver_type:
                 case SolverType.SimpleIterative:
@@ -84,16 +90,13 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
                     )
                 case SolverType.Linearized:
                     solver = Linearized()
+                case _:
+                    raise ValueError(f"Unknown solver type: {self.solver_type}")
 
-            wake = DynamicWakeBuilder(
-                symmetry_condition=symmetry_condition,
-            )
-
-            simulation_builder = SimulationBuilder(
-                line_force_model = line_force_model,
-                simulation_settings = DynamicSettings(
-                    solver = solver,
-                    wake = wake
+            simulation_settings = DynamicSettings(
+                solver = solver,
+                wake = DynamicWakeBuilder(
+                    symmetry_condition = symmetry_condition,
                 )
             )
         else:
@@ -106,17 +109,17 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
                     )
                 case SolverType.Linearized:
                     solver = Linearized()
+                case _:
+                    raise ValueError(f"Unknown solver type: {self.solver_type}")
 
-            wake = QuasiSteadyWakeSettings(
-                symmetry_condition=symmetry_condition,
-            )
-
-            simulation_builder = SimulationBuilder(
-                line_force_model = line_force_model,
-                simulation_settings = QuasiSteadySettings(
-                    solver = solver,
-                    wake = wake
+            simulation_settings = QuasiSteadySettings(
+                solver = solver,
+                wake = QuasiSteadyWakeSettings(
+                    symmetry_condition = symmetry_condition,
                 )
             )
 
-        return simulation_builder
+        return SimulationBuilder(
+            line_force_model = line_force_model,
+            simulation_settings = simulation_settings
+        )
