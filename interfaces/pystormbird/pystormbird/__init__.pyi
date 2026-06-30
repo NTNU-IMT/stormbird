@@ -1,3 +1,5 @@
+"""Type stubs for pystormbird."""
+
 
 class SectionalForcesInput:
     @property
@@ -10,23 +12,21 @@ class SectionalForcesInput:
     def acceleration(self) -> list[list[float]]: ...
     @property
     def rotation_velocity(self) -> list[float]: ...
-    
+
+
 class SectionalForces:
     @property
     def circulatory(self) -> list[list[float]]: ...
-
     @property
     def sectional_drag(self) -> list[list[float]]: ...
-
     @property
     def added_mass(self) -> list[list[float]]: ...
-
     @property
     def gyroscopic(self) -> list[list[float]]: ...
-
     @property
     def total(self) -> list[list[float]]: ...
-    
+
+
 class IntegratedValues:
     @property
     def circulatory(self) -> list[float]: ...
@@ -39,39 +39,32 @@ class IntegratedValues:
     @property
     def total(self) -> list[float]: ...
 
+
 class SimulationResult:
     @classmethod
     def from_json_file(cls, file_path: str) -> "SimulationResult": ...
-    
     @classmethod
     def result_history_from_file(cls, file_path: str) -> list["SimulationResult"]: ...
 
     @property
     def ctrl_points(self) -> list[list[float]]: ...
-
     @property
     def force_input(self) -> SectionalForcesInput: ...
-
     @property
     def sectional_forces(self) -> SectionalForces: ...
-
     @property
     def integrated_forces(self) -> list[IntegratedValues]: ...
-
     @property
     def integrated_moments(self) -> list[IntegratedValues]: ...
-
     @property
     def input_power(self) -> list[float]: ...
-
     @property
     def iterations(self) -> int: ...
-
     @property
     def residual(self) -> float: ...
-    
+    @property
+    def wing_indices(self) -> list[list[int]]: ...
+
     def integrated_forces_sum(self) -> list[float]: ...
-
     def integrated_moments_sum(self) -> list[float]: ...
-
     def input_power_sum(self) -> float: ...

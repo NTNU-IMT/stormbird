@@ -1,17 +1,38 @@
 [build-system]
-requires = ["maturin>=1.5"]
-build-backend = "maturin"
+requires = ["maturin>=1.14"]
+build-backend = "_build_backend"
+backend-path = ["."]
 
 [project]
 name = "pystormbird"
-requires-python = ">=3.10"
+dynamic = ["version"]
+description = "Python interface to the Stormbird library for simulating lifting surfaces."
+authors = [{ name = "Jarle Kramer", email = "jarle.kramer@gmail.com" }]
+readme = "README.md"
+license = "GPL-3.0-only"
+requires-python = ">=3.12"
+keywords = ["wind propulsion", "lifting line", "actuator line", "aerodynamics"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Scientific/Engineering",
 ]
+
+[project.urls]
+Homepage = "https://github.com/NTNU-IMT/stormbird"
+Repository = "https://github.com/NTNU-IMT/stormbird"
+Documentation = "https://jarlekramer.github.io/stormbird_book_pages/"
 
 [tool.maturin]
 module-name = "pystormbird._native"
-python-source = "." 
+python-source = "."
 features = ["pyo3/extension-module"]
+profile = "release"

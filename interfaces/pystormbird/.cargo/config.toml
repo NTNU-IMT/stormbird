@@ -1,0 +1,14 @@
+# Cargo configuration for pystormbird
+# These settings optimize the build for the user's specific CPU
+
+[build]
+# Use all available CPU cores for compilation
+jobs = -1
+
+[target.'cfg(target_arch = "x86_64")']
+# Enable native CPU optimizations (AVX, AVX2, etc. if available)
+rustflags = ["-C", "target-cpu=native"]
+
+[target.'cfg(target_arch = "aarch64")']
+# Enable native CPU optimizations for ARM64 (Apple Silicon, etc.)
+rustflags = ["-C", "target-cpu=native"]
