@@ -18,8 +18,6 @@ from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
 from pystormbird.lifting_line import Simulation
 
-
-
 if __name__ == "__main__":
     chord = 0.2 + 0.15
     start_height = 0.1

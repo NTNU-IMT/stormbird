@@ -7,12 +7,12 @@ https://www.researchgate.net/publication/374976524_Actuator_Line_for_Wind_Propul
 from dataclasses import dataclass
 import numpy as np
 
+from pystormbird import SimulationResult
 from pystormbird.lifting_line import Simulation
 from stormbird_setup import SpatialVector
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.section_models import SectionModel, Foil
-from stormbird_setup.lifting_line import (
-    SimpleIterative, 
+from stormbird_setup.lifting_line import ( 
     SymmetryCondition,
     QuasiSteadyWakeSettings,
     QuasiSteadySettings, 
@@ -38,7 +38,7 @@ class SimulationCase:
     def wind_angle(self) -> float:
         return np.radians(self.wind_angle_deg)
 
-    def get_line_force_model(self) -> dict:
+    def get_line_force_model(self) -> LineForceModelBuilder:
         chord_vector = SpatialVector(x=self.chord_length)
         
         line_force_model = LineForceModelBuilder(nr_sections=self.nr_sections)
@@ -72,7 +72,7 @@ class SimulationCase:
     def wing_angle(self):
         return np.radians(self.wind_angle_deg - self.angle_of_attack_deg)
     
-    def run(self):
+    def run(self) -> SimulationResult | None:
         freestream_velocity = self.free_stream_velocity()
 
         line_force_model = self.get_line_force_model()
@@ -105,6 +105,7 @@ class SimulationCase:
         simulation.set_local_wing_angles(wing_angles.tolist())
         simulation.set_rotation_only([0.0, 0.0, -self.wind_angle])
 
+        result = None
         for i in range(nr_time_steps):
             result = simulation.do_step(
                 time = i * dt,
