@@ -232,6 +232,4 @@ impl WindCondition {
             _ => {}
         }
     }
-    
-    
 }

@@ -1,3 +1,41 @@
 [build-system]
 requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "stormbird_setup"
+version = "0.1.0"
+authors = [
+  { name = "Jarle Kramer", email = "jarlekramer@pm.me" },
+]
+description = "A library for setting up Stormbird simulations using Python"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pydantic>=2.13",
+    "numpy>=2.5",
+    "scipy>=1.18",
+]
+
+[project.optional-dependencies]
+dev = ["mypy>=1.18"]
+
+[project.urls]
+Homepage = "https://github.com/NTNU-IMT/stormbird"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stormbird_setup = ["py.typed"]
+
+[tool.mypy]
+disallow_untyped_defs = true
+check_untyped_defs = true

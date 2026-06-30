@@ -279,7 +279,6 @@ impl FmuFunctions for StormbirdLiftingLine {
             self.iterations_completed >= self.parameters.number_of_iterations_before_building_model;
 
         if self.stormbird_model.is_some() && waiting_iterations_is_done {
-
             self.set_line_force_model_state(time_step);
 
             let freestream_velocity = self.freestream_velocity();
@@ -294,7 +293,7 @@ impl FmuFunctions for StormbirdLiftingLine {
             }
 
             let result = if let Some(model) = &mut self.stormbird_model {
-                if non_zero_input {
+                if non_zero_input {                    
                     Some(
                         model.do_step(current_time, time_step, &freestream_velocity)
                     )
@@ -564,7 +563,6 @@ impl StormbirdLiftingLine {
             parallel_gust: None,
             perpendicular_gust: None,
             vertical_gust: None
-            
         };
 
         // Apply the linear motion of the wings to the freestream if this option is activated

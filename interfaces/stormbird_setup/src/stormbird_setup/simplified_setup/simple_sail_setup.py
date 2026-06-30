@@ -1,8 +1,8 @@
-'''
+"""
 Copyright (C) 2024, NTNU
 Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
-'''
+"""
 
 from enum import Enum
 
@@ -40,21 +40,16 @@ class SailType(Enum):
                 value = 2.0
             )
             
-    def default_section_model(self, iterative_solver=False) -> SectionModel:
+    def default_section_model(self) -> SectionModel:
         match self:
             case SailType.WingSailSingleElement:
                 section_model = SectionModel.default_wing_sail_single_element()
-                
-                if iterative_solver:
-                    section_model.model.mean_positive_stall_angle += np.radians(1.5)
-                    section_model.model.mean_negative_stall_angle += np.radians(1.5)
-                
             case SailType.WingSailTwoElement:
                 section_model = SectionModel.default_wing_sail_two_element()
             case SailType.RotorSail:
                 section_model = SectionModel.rotor_sail_deybach_2024()
             case SailType.SuctionSail:
-                section_model = SectionModel.default_suction_sail_turbosail(scale_factor = 1.1)
+                section_model = SectionModel.default_suction_sail_turbosail()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
                 

@@ -68,7 +68,7 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 - Fix of bug and refactoring of the input power model
 - Small updates to the foil model
 
-## 0.9.0 - 2026-06-xx
+## 0.9.0 - 2026-06-09
 ### Highlights
 - New wind models, including different atmospheric boundary layer models and gust spectrums
 - Added the option to use "virtual line elements" to simulate end-plates and other similar mechanisms for reducing lift-induced velocities
