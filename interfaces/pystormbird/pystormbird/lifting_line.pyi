@@ -18,7 +18,7 @@ class Simulation:
 class CompleteSailModel:
     def __init__(self, setup_string: str) -> None: ...
     
-    def apply_controller(
+    def apply_controller_based_on_wind_condition(
         self,
         *,
         time: float, 

@@ -89,6 +89,27 @@ class LogarithmicModel(StormbirdSetupBaseModel):
         )
 
     @classmethod
+    def new_neutral_from_roughness(
+        cls,
+        *,
+        velocity: float,
+        surface_roughness: float,
+        reference_height: float = DEFAULT_REFERENCE_HEIGHT,
+        von_karman_constant: float = DEFAULT_VON_KARMAN_CONSTANT
+    ) -> "LogarithmicModel":
+        friction_velocity = (
+            velocity * von_karman_constant / 
+            np.log(reference_height / surface_roughness)
+        )
+
+        return cls(
+            friction_velocity = friction_velocity,
+            surface_roughness = surface_roughness,
+            von_karman_constant = von_karman_constant
+        )
+        
+
+    @classmethod
     def new_with_stability_correction(
         cls,
         *,
