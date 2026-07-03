@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stormbird_setup"
-version = "0.1.0"
+version = "0.10.0"
 authors = [
   { name = "Jarle Kramer", email = "jarlekramer@pm.me" },
 ]

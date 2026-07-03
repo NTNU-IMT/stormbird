@@ -19,7 +19,7 @@ class Linearized(StormbirdSetupBaseModel):
     induced_velocity_correction_method: InducedVelocityCorrectionMethod = InducedVelocityCorrectionMethod.FullCorrection
 
 
-class SimpleIterative(StormbirdSetupBaseModel):
+class Iterative(StormbirdSetupBaseModel):
     max_iterations_per_time_step: int = 20
     damping_factor: float = 0.1
     residual_tolerance_absolute: float = 1e-4

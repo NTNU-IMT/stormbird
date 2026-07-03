@@ -158,7 +158,7 @@ impl Simulation {
         // Run the solver with the frozen wake
 
         let solver_result = match &self.solver {
-            Solver::SimpleIterative(solver) => solver.solve(
+            Solver::Iterative(solver) => solver.solve(
                 &self.line_force_model,
                 &felt_ctrl_points_freestream,
                 &mut self.frozen_wake,
