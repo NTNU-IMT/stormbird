@@ -76,6 +76,8 @@ pub struct WakeSettings {
     pub shape_damping_factor: Float,
     /// A variable to determine whether the self-induced velocities should be neglected or not
     pub neglect_self_induced_velocities: bool,
+    /// Switch to set the strength update to be "steady-state"
+    pub steady_state_strength_update: bool,
     /// A variable to determine whether the wake geometry and data should be written to a file
     pub write_wake_data_to_file: bool,
     /// The path to the folder where the wake data should be written to

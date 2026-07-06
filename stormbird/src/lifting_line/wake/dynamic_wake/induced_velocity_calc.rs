@@ -20,9 +20,11 @@ impl DynamicWake {
         points: &[SpatialVector], 
     ) -> Vec<SpatialVector> {
         self.induced_velocities_local(
-            points, 0, 
+            points, 
+            0, 
             self.strengths.len(), 
-            false)
+            false
+        )
     }
 
     /// Calculates the induced velocity from the first panels in the stream wise direction only. This

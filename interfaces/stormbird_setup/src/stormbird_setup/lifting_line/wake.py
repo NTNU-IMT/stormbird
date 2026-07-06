@@ -129,7 +129,6 @@ class FirstWakePointsDirection(Enum):
     Freestream = "Freestream"
     ActualVelocity = "ActualVelocity"
 
-
 class DynamicWakeBuilder(StormbirdSetupBaseModel):
     nr_panels_per_line_element: int = 100
     viscous_core_length: ViscousCoreLength = ViscousCoreLength()
@@ -140,6 +139,8 @@ class DynamicWakeBuilder(StormbirdSetupBaseModel):
     first_wake_points_direction: FirstWakePointsDirection = FirstWakePointsDirection.Chord
     ratio_of_wake_affected_by_induced_velocities: float = 0.0
     shape_damping_factor: float = 0.0
+    neglect_self_induced_velocities: bool = False
+    steady_state_strength_update: bool = False
     write_wake_data_to_file: bool = False
     wake_files_folder_path: str = ""
     

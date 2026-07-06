@@ -13,7 +13,9 @@ use stormath::type_aliases::Float;
 
 use crate::line_force_model::LineForceModel;
 
-//use rayon::prelude::*;
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 use crate::lifting_line::wake::dynamic_wake::DynamicWake;
 
@@ -192,7 +194,25 @@ impl FrozenWake {
     }
 
     pub fn update_fixed_velocities(&mut self, ctrl_points: &[SpatialVector], wake: &DynamicWake) {
-        self.fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
+        if !wake.settings.steady_state_strength_update {
+            self.fixed_velocities = wake.induced_velocities_from_free_wake(&ctrl_points);
+        }
+    }
+
+    #[inline(always)]
+    fn induced_velocity_stream_strip(
+        ctrl_point: SpatialVector,
+        panel_index: usize,
+        stream_length: usize,
+        wake: &DynamicWake
+    ) -> SpatialVector {
+        (0..stream_length).into_iter().map(|stream_index| {
+            wake.unit_strength_induced_velocity_from_panel(
+                stream_index,
+                panel_index,
+                ctrl_point
+            )
+        }).sum()
     }
 
     fn update_variable_velocity_factors_full(
@@ -202,16 +222,23 @@ impl FrozenWake {
     ) {
         let [nr_ctrl_points, nr_panels] = self.variable_velocity_factors.shape;
 
+        let stream_length = if wake.settings.steady_state_strength_update {
+            wake.indices.nr_panels_per_line_element
+        } else {
+            1
+        };
+
         for panel_index in 0..nr_panels {
             for ctrl_point_index in 0..nr_ctrl_points {
                 let ctrl_point = ctrl_points[ctrl_point_index];
 
-                let induced_velocity = wake.unit_strength_induced_velocity_from_panel(
-                    0,
+                let induced_velocity = Self::induced_velocity_stream_strip(
+                    ctrl_point,
                     panel_index,
-                    ctrl_point
+                    stream_length,
+                    wake
                 );
-
+                
                 self.variable_velocity_factors[[ctrl_point_index, panel_index]] = induced_velocity;
             }
         }
@@ -224,6 +251,12 @@ impl FrozenWake {
     ) {
         let [nr_ctrl_points, nr_panels] = self.variable_velocity_factors.shape;
 
+        let stream_length = if wake.settings.steady_state_strength_update {
+            wake.indices.nr_panels_per_line_element
+        } else {
+            1
+        };
+
         for panel_index in 0..nr_panels {
             for ctrl_point_index in 0..nr_ctrl_points {
                 let ctrl_point = ctrl_points[ctrl_point_index];
@@ -235,10 +268,11 @@ impl FrozenWake {
                     self.variable_velocity_factors[[ctrl_point_index, panel_index]] =
                         SpatialVector::default();
                 } else {
-                    let induced_velocity = wake.unit_strength_induced_velocity_from_panel(
-                        0,
+                    let induced_velocity = Self::induced_velocity_stream_strip(
+                        ctrl_point,
                         panel_index,
-                        ctrl_point
+                        stream_length,
+                        wake
                     );
 
                     self.variable_velocity_factors[[ctrl_point_index, panel_index]] =
