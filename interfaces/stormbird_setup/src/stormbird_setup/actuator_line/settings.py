@@ -7,8 +7,8 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from ..base_model import StormbirdSetupBaseModel
 
 class Gaussian(StormbirdSetupBaseModel):
-    chord_factor: float = 0.25
-    thickness_factor: float = 0.25
+    chord_factor: float = 0.4
+    thickness_factor: float = 0.4
 
 class ProjectionSettings(StormbirdSetupBaseModel):
     projection_function: Gaussian = Gaussian()
