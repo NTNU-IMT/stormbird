@@ -64,10 +64,9 @@ impl VelocityBoundaryConditions {
 
         (0..nr_extended_cells).into_iter().map(|i_flat_extended| {
             let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
-            let interior_indices = grid.interior_indices_from_extended_indices(extended_indices);
 
             let mut velocity = SpatialVector::default();
-            let cell_center = grid.cell_center(interior_indices);
+            let cell_center = grid.cell_center_extended(extended_indices); 
 
             for axis_index in 0..3 {
                 let mut face_point = cell_center;
@@ -101,8 +100,8 @@ impl VelocityBoundaryConditions {
             };
             
             for face_index in 0..2 {
-                for i_1 in 0..n1 {
-                    for i_2 in 0..n2 {
+                for i_1 in 1..(n1-1) {
+                    for i_2 in 1..(n2-1) {
                         let mut indices_current = [0, 0, 0];
                         let mut indices_neighbor = [0, 0, 0];
                         
@@ -144,26 +143,18 @@ impl VelocityBoundaryConditions {
                                 // Check the direction of the flow in the neighbor cell
                                 let neighbor_axis_flow = velocity[flat_index_neighbor][axis_index];
 
-                                let inflow = if face_index == 1 {
-                                    if neighbor_axis_flow > 0.0 {
-                                        true
-                                    } else {
-                                        false
-                                    }
+                                let inflow = if face_index == 0 {
+                                    // Min boundary: positive flow (toward +axis) = inflow
+                                    neighbor_axis_flow > 0.0
                                 } else {
-                                    if neighbor_axis_flow < 0.0 {
-                                        true
-                                    } else {
-                                        false
-                                    }
+                                    // Max boundary: negative flow (toward -axis) = inflow  
+                                    neighbor_axis_flow < 0.0
                                 };
 
                                 // Set the values if inflow, otherwise assume zero gradient
                                 if inflow {
                                     for c in 0..3 {
-                                        let mut face_point = grid.cell_center(
-                                            grid.interior_indices_from_extended_indices(indices_current)
-                                        );
+                                        let mut face_point = grid.cell_center_extended(indices_current);
                                         
                                         face_point[c] += 0.5 * grid.cell_length[c]; // positive-face convention
                                         let v = self.velocity_at_point(face_point);

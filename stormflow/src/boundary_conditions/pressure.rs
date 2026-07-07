@@ -61,8 +61,8 @@ impl PressureBoundaryConditions {
     
                 let flat_current = (
                     boundary_face.axis_offset
-                    + i_inner * boundary_face.stride[0]
-                    + i_outer * boundary_face.stride[1]
+                    + i_outer * boundary_face.stride[0]
+                    + i_inner * boundary_face.stride[1]
                 ) as usize;
     
                 let flat_neighbor = (flat_current as i32 + boundary_face.neighbor_delta) as usize;
