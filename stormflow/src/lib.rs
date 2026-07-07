@@ -5,6 +5,4 @@ pub mod simulation;
 pub mod actuator_line_interface;
 pub mod geometry;
 pub mod gpu_interface;
-
-
 pub mod error;
