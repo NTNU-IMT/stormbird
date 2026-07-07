@@ -26,6 +26,7 @@ class SimulationCase:
     angle_of_attack_deg: float
     wind_angle_deg: float = 45.0
     wind_speed: float = 12.0
+    cl_zero_angle: float = 1.5
     chord_length: float = 6.0
     span: float = 24.0
     start_height: float = 8.1
@@ -34,6 +35,7 @@ class SimulationCase:
     dynamic: bool = False
     dynamic_shape: bool = False
     export_wake: bool = False
+    nr_panels_per_line_element: int = 50
 
     @property
     def force_factor(self) -> float:
@@ -60,6 +62,7 @@ class SimulationCase:
                 chord_vectors = [chord_vector, chord_vector],
                 section_model = SectionModel(
                     model = Foil(
+                        cl_zero_angle = self.cl_zero_angle,
                         cd_min = 0.01,
                         mean_positive_stall_angle = np.radians(45.0), # Set large value to 'turn off' stall
                         mean_negative_stall_angle = np.radians(45.0)
@@ -82,11 +85,10 @@ class SimulationCase:
 
         line_force_model = self.get_line_force_model()
 
-        
-
         if self.dynamic or self.dynamic_shape:
             wake = DynamicWakeBuilder(
-                symmetry_condition=SymmetryCondition.Z
+                symmetry_condition = SymmetryCondition.Z,
+                nr_panels_per_line_element = self.nr_panels_per_line_element
             )
 
             if not self.dynamic:
@@ -96,8 +98,8 @@ class SimulationCase:
                 wake.ratio_of_wake_affected_by_induced_velocities = 1.0
                 wake.shape_damping_factor = 0.0
                 wake.viscous_core_length_evolution = ViscousCoreLengthEvolution.new_sin_increase(
-                    last_panel_value_absolute=1.0 * self.chord_length,
-                    evolution_length_factor=1.0
+                    last_panel_value_absolute = 1.0 * self.chord_length,
+                    evolution_length_factor = 0.5
                 )
 
             if self.export_wake:
@@ -105,7 +107,7 @@ class SimulationCase:
                 wake.write_wake_data_to_file = True
 
             solver = Iterative(
-                max_iterations_per_time_step=10,
+                max_iterations_per_time_step = 10,
                 damping_factor=0.1
             )
             
@@ -132,12 +134,11 @@ class SimulationCase:
             simulation_settings = simulation_settings
         )
 
-        if self.dynamic:
-            dt = 0.25 * self.chord_length / self.wind_speed
-            nr_time_steps = 100
-        elif self.dynamic_shape:
-            dt = 0.25 * self.chord_length / self.wind_speed
-            nr_time_steps = 20
+        if self.dynamic or self.dynamic_shape:
+            wake_length = 25 * self.chord_length
+
+            dt = wake_length / (self.nr_panels_per_line_element * self.wind_speed)
+            nr_time_steps = 50
         else:
             dt = 1
             nr_time_steps = 1

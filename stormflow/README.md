@@ -6,6 +6,6 @@ Stormflow is a simple CFD solver specialized for actuator line simulations. That
 The choice of methods and features to implement are made such that the code becomes as straight forward as possible. This means, among other things, the following:
 - Structured cartesian grid with uniform cell size -> no spatial varying resolution!
 - Explicit time stepping -> need for relatively small time steps!
-- Solid walls through an immersed boundary method
+- Solid walls through an immersed boundary method, giving an approximate representation of a ship superstructure
 
 Other than that, the entire solver is designed around the Stormbird library and specifically to include actuator line simulations

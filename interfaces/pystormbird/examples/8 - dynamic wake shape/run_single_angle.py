@@ -18,27 +18,32 @@ if __name__ == '__main__':
     argument_parser.add_argument(
         "--wind-angle", type=float, default = 45.0, help="Wind angle in degrees"
     )
+    argument_parser.add_argument(
+        "--nr-panels-per-line-element", type=float, default=50, help="Number of panels per line element making up the wings"
+    )
 
     args = argument_parser.parse_args()
 
     w_plot = 12
-    fig = plt.figure(figsize=(w_plot, w_plot/3.0))
-    ax_circ = fig.add_subplot(131)
-    ax_alpha = fig.add_subplot(132)
-    ax_force = fig.add_subplot(133)
+    fig = plt.figure(figsize=(w_plot, w_plot/2.35))
+    ax_circ = fig.add_subplot(121)
+    ax_force = fig.add_subplot(122)
 
     dynamic_list = [True, True, False]
     dynamic_shape_list = [False, True, True]
     line_style = ["-", "--", "-."]
+    labels = ["Dynamic, fixed wake", "Dynamic, dynamic wake", "Steady, dynamic wake"]
     export_wake = [False, False, True]
 
     for case_index, (dynamic, dynamic_shape) in enumerate(zip(dynamic_list, dynamic_shape_list)):
+        print(labels[case_index])
         simulation = SimulationCase(
             angle_of_attack_deg = args.angle_of_attack,
             wind_angle_deg = args.wind_angle,
             dynamic = dynamic,
             dynamic_shape = dynamic_shape,
-            export_wake = export_wake[case_index]
+            export_wake = export_wake[case_index],
+            nr_panels_per_line_element=args.nr_panels_per_line_element
         )
 
         start_time = time.time()
@@ -67,8 +72,11 @@ if __name__ == '__main__':
 
             t_local += 1.0
 
-        ax_force.plot(t, cl1, line_style[case_index], color=DEFAULT_COLORS[0])
-        ax_force.plot(t, cl2, line_style[case_index], color=DEFAULT_COLORS[1])
+        ax_force.plot(t, cl1, line_style[case_index], color=DEFAULT_COLORS[0], label="CL1 " + labels[case_index])
+        ax_force.plot(t, cl2, line_style[case_index], color=DEFAULT_COLORS[1], label="CL2 " + labels[case_index])
+
+        print("Last CL1", cl1[-1])
+        print("Last CL2", cl2[-1])
 
         last_result = results[-1]
     
@@ -78,7 +86,6 @@ if __name__ == '__main__':
     
         ctrl_points_z = np.array(ctrl_points_z)
         circulation_strength = np.array(last_result.force_input.circulation_strength)
-        effective_angles_of_attack = last_result.force_input.angles_of_attack
     
         ctrl_points_z_1 = ctrl_points_z[0: len(ctrl_points_z) // 2]
         ctrl_points_z_2 = ctrl_points_z[len(ctrl_points_z) // 2:]
@@ -86,20 +93,24 @@ if __name__ == '__main__':
         circualtion_strength_1 = circulation_strength[0: len(circulation_strength) // 2]
         circualtion_strength_2 = circulation_strength[len(circulation_strength) // 2:]
     
-        angles_of_attack_1 = effective_angles_of_attack[0: len(effective_angles_of_attack) // 2]
-        angles_of_attack_2 = effective_angles_of_attack[len(effective_angles_of_attack) // 2:]
-    
         ctrl_points_list = [ctrl_points_z_1, ctrl_points_z_2]
         circulation_strength_list = [circualtion_strength_1, circualtion_strength_2]
-        angles_of_attack_list = [angles_of_attack_1, angles_of_attack_2]
     
-        for wing_index, (z, gamma, alpha) in enumerate(zip(
+        for wing_index, (z, gamma) in enumerate(zip(
             ctrl_points_list, 
             circulation_strength_list, 
-            angles_of_attack_list
         )):
             ax_circ.plot(z, -gamma, line_style[case_index], color=DEFAULT_COLORS[wing_index])
-            ax_alpha.plot(z, np.degrees(alpha), line_style[case_index], color=DEFAULT_COLORS[wing_index])
+
+        print()
+
+    ax_circ.set_xlabel("z coordinate")
+    ax_circ.set_ylabel("Circulation")
+
+    ax_force.set_xlabel("Iteration")
+    ax_force.set_ylabel("Lift coefficient")
+
+    ax_force.legend()
 
     plt.show()
 
