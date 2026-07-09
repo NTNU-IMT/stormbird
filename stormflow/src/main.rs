@@ -26,7 +26,15 @@ struct Args {
 
     /// Number of cores
     #[arg(short, long, default_value_t = 0)]
-    nr_of_cores: usize
+    nr_of_cores: usize,
+
+    /// New control variables
+    #[arg(short, long, allow_negative_numbers = true)]
+    section_models_internal_state: Vec<f32>,
+
+    /// New wind direction in degrees
+    #[arg(short, long, default_value_t = -9999.0, allow_negative_numbers = true)]
+    wind_direction_deg: f32
 }
 
 
@@ -40,11 +48,22 @@ pub fn main() -> Result<(), Error> {
             .unwrap();
     }
     
-    
-    let sim_builder = SimulationBuilder::from_json_file(&args.file_path)?;
+    let mut sim_builder = SimulationBuilder::from_json_file(&args.file_path)?;
+
+    if args.wind_direction_deg > -9999.0 {
+        sim_builder.wind_condition.direction_coming_from = args.wind_direction_deg.to_radians();
+    }
     
     let mut sim = sim_builder.build();
-    
+
+    if args.section_models_internal_state.len() > 0 {
+        if let Some(actuator_line) = &mut sim.actuator_line {
+            actuator_line.model.line_force_model.set_section_models_internal_state(
+                &args.section_models_internal_state
+            );
+        }
+    }
+
     sim.initialize_after_build();
     
     let mut time = 0.0;

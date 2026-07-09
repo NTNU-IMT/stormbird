@@ -9,3 +9,10 @@ The choice of methods and features to implement are made such that the code beco
 - Solid walls through an immersed boundary method, giving an approximate representation of a ship superstructure
 
 Other than that, the entire solver is designed around the Stormbird library and specifically to include actuator line simulations
+
+## Install instructions
+The main way to use Stormflow is, for now, a command line tool. Install it by running the following command, while inside this folder:
+
+```
+cargo install --path .
+```

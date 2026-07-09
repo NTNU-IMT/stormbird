@@ -1,22 +1,41 @@
 {
-  "domain_start_point": [-64.0, -64.0, 0.0],
-  "domain_end_point": [64.0, 64.0, 64.0],
-  "grid_interior_shape": [128, 128, 128],
+  "domain_start_point": [-128.0, -128.0, 0.0],
+  "domain_end_point": [128.0, 128.0, 64.0],
+  "grid_interior_shape": [256, 256, 128],
   "effective_viscosity": 0.00001,
   "wind_condition": {
-    "direction_coming_from": 0.0,
+    "direction_coming_from": 1.570796327,
     "velocity_variation": {
       "Constant": 10.0
     }
   },
-  "linear_velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+  "linear_velocity": { "x": 6.17333, "y": 0.0, "z": 0.0 },
   "actuator_line": {
     "line_force_model": {
       "wing_builders": [
         {
           "section_points": [
-            { "x": 0.0, "y": 0.0, "z": 1.875 },
-            { "x": 0.0, "y": 0.0, "z": 31.875 }
+            { "x": 30.0, "y": 13.0, "z": 9.875 },
+            { "x": 30.0, "y": 13.0, "z": 39.875 }
+          ],
+          "chord_vectors": [
+            { "x": 5.0, "y": 0.0, "z": 0.0 },
+            { "x": 5.0, "y": 0.0, "z": 0.0 }
+          ],
+          "section_model": {
+            "RotatingCylinder": {
+              "revolutions_per_second": -0.637,
+              "spin_ratio_data": [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
+              "cl_data": [0.0, 1.3484, 2.6596, 4.6177, 7.198, 7.9874, 8.0, 9.0, 9.0]
+            }
+          },
+          "non_zero_circulation_at_ends": [true, true],
+          "input_power_model": "NoPower"
+        },
+        {
+          "section_points": [
+            { "x": -30.0, "y": 13.0, "z": 9.875 },
+            { "x": -30.0, "y": 13.0, "z": 39.875 }
           ],
           "chord_vectors": [
             { "x": 5.0, "y": 0.0, "z": 0.0 },
@@ -35,7 +54,7 @@
       ],
       "nr_sections": 32,
       "density": 1.0,
-      "local_wing_angles": [0.0],
+      "local_wing_angles": [0.0, 0.0],
       "rotation": { "x": 0.0, "y": 0.0, "z": 0.0 },
       "translation": { "x": 0.0, "y": 0.0, "z": 0.0 },
       "circulation_correction": {
@@ -77,5 +96,12 @@
     },
     "write_iterations_full_result": 100,
     "start_time": 0.0
-  }
+  },
+  "geometries": [
+    {
+      "TriangleMesh": {
+        "file_path": "sobc1_superstructure.obj"
+      }
+    }
+  ]
 }
