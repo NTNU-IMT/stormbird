@@ -34,6 +34,11 @@ pub struct RotatingCylinder {
     #[serde(default)]
     /// Two-dimensional moment of inertia
     pub moment_of_inertia_2d: Float,
+    #[serde(default)]
+    /// factor that can be used to correct for numerical errors in the lift-induced drag. Set to a
+    /// positive value to increase the drag, and a negative value to decrease the drag. The
+    /// default is zero, which means no correction.
+    pub cdi_correction_factor: Float,
 }
 
 impl Default for RotatingCylinder {
@@ -46,6 +51,7 @@ impl Default for RotatingCylinder {
             wake_angle_data: None,
             added_mass_factor: 0.0,
             moment_of_inertia_2d: 0.0,
+            cdi_correction_factor: 0.0
         }
     }
 }
@@ -106,7 +112,17 @@ impl RotatingCylinder {
     pub fn drag_coefficient(&self, diameter: Float, velocity: Float) -> Float {
         let spin_ratio = self.spin_ratio(diameter, velocity);
 
-        self.drag_coefficient_from_spin_ratio(spin_ratio)
+        let mut cd = self.drag_coefficient_from_spin_ratio(spin_ratio);
+
+        if self.cdi_correction_factor != 0.0{
+            let cl = self.lift_coefficient_from_spin_ratio(spin_ratio);
+
+            let cdi_correction = self.cdi_correction_factor * cl.abs().powi(2);
+
+            cd += cdi_correction;
+        } 
+
+        cd
     }
 
     pub fn wake_angle(&self, diameter: Float, velocity: Float) -> Float {

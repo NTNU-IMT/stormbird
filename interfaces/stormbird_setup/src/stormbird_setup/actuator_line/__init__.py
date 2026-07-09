@@ -7,9 +7,11 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from .actuator_line_builder import ActuatorLineBuilder
 from .corrections import LiftingLineCorrectionBuilder, EmpiricalCirculationCorrection
 from .settings import Gaussian, ProjectionSettings, SamplingSettings, SolverSettings
+from ..lifting_line import SymmetryCondition
 
 __all__ = [
     "ActuatorLineBuilder",
     "LiftingLineCorrectionBuilder", "EmpiricalCirculationCorrection",
-    "Gaussian", "ProjectionSettings", "SamplingSettings", "SolverSettings"
+    "Gaussian", "ProjectionSettings", "SamplingSettings", "SolverSettings",
+    "SymmetryCondition"
 ]

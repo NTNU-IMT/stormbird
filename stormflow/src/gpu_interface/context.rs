@@ -83,7 +83,7 @@ impl GpuContext {
             }
         );
     
-        let result: Vec<f32> = bytemuck::cast_slice(&slice.get_mapped_range()).to_vec();
+        let result: Vec<f32> = bytemuck::cast_slice(&slice.get_mapped_range().unwrap()).to_vec();
 
         result
     }

@@ -41,6 +41,7 @@ class RotatingCylinder(StormbirdSetupBaseModel):
     cl_data: list[float]| None = None
     cd_data: list[float] | None = None
     added_mass_factor: float | None = None
+    cdi_correction_factor: float | None = None
     
 class EffectiveWindSensor(StormbirdSetupBaseModel):
     pass
@@ -49,15 +50,27 @@ class SectionModel(StormbirdSetupBaseModel):
     model: Foil | VaryingFoil | RotatingCylinder | EffectiveWindSensor
     
     @classmethod
-    def rotor_sail_deybach_2024(cls) -> "SectionModel":
+    def rotor_sail_deybach_2024(cls, linearized: bool = False) -> "SectionModel":
         """
         Model of a rotor sail that is tuned based on the data in: Deybach, 2024, Aerodynamics of the 
         Flettner rotor at high Reynolds number, RINA Wind propulsion conference
         """
+
+        spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0]
+        
+        if linearized:
+            cl_1 = 2.6596
+
+            cl_data = []
+            for sigma in spin_ratio_data:
+                cl_data.append(sigma * cl_1)
+        else:
+            cl_data = [0.0, 1.3484, 2.6596, 4.6177, 7.1980, 7.9874, 8.0, 9.0, 9.00]
+        
         return cls(
             model = RotatingCylinder(
-                spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
-                cl_data = [0.0, 1.3484, 2.6596, 4.6177, 7.1980, 7.9874, 8.0, 9.0, 9.00],
+                spin_ratio_data = spin_ratio_data,
+                cl_data = cl_data
             )
         )
         

@@ -21,3 +21,20 @@ def revolutions_per_second_from_spin_ratio(
     revolutions_per_second = -tangential_velocity / circumference 
 
     return revolutions_per_second
+
+def spin_ratio_from_revolutions_per_second(
+    *,
+    revolutions_per_second: float,
+    diameter: float,
+    velocity: float
+):
+    '''
+    Helper function to convert revolutions per second to spin ratio
+    '''
+    circumference = np.pi * diameter
+
+    tangential_velocity = -revolutions_per_second * circumference
+
+    spin_ratio = tangential_velocity / velocity
+    
+    return spin_ratio

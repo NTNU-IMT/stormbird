@@ -115,6 +115,6 @@ impl PressureSolverGPU {
             }
         );
     
-        self.solution = bytemuck::cast_slice(&slice.get_mapped_range()).to_vec();
+        self.solution = bytemuck::cast_slice(&slice.get_mapped_range().unwrap()).to_vec();
     }
 }
