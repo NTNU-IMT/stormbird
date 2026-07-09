@@ -39,7 +39,7 @@ pub struct ActuatorLineBuilder {
     pub start_time: Float,
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
-    #[serde(default="ActuatorLineBuilder::default_lifting_line_correction")]
+    #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
