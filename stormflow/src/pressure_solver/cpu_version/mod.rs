@@ -37,54 +37,27 @@ pub struct PressureSolverCPU {
     pub rhs_at_levels: Vec<Vec<Float>>,
 }
 
-const SMALLEST_NR_CELLS: usize = 2;
-
 impl PressureSolverCPU {
     pub fn new(
-        grid: &Grid, 
-        boundary_conditions: &PressureBoundaryConditions, 
+        grid: &Grid,
+        boundary_conditions: &PressureBoundaryConditions,
         solver_settings: PressureSolverSettings
     ) -> Self {
-        let mut grid_can_get_coarser = true;
+        let grids = grid.multigrid_hierarchy();
 
         let mut x_at_levels: Vec<Vec<Float>> = Vec::new();
         let mut rhs_at_levels: Vec<Vec<Float>> = Vec::new();
 
-        let mut current_grid = grid.clone();
-
-        let mut grids: Vec<Grid> = Vec::new();
-
-        while grid_can_get_coarser {
-            grids.push(current_grid.clone());
-
+        for level_grid in &grids {
             // x_at_levels uses extended grid (for ghost cells / boundary conditions)
             x_at_levels.push(
-                vec![0.0; current_grid.nr_extended_cells()]
+                vec![0.0; level_grid.nr_extended_cells()]
             );
 
             // rhs_at_levels uses interior grid (RHS is defined on interior only)
             rhs_at_levels.push(
-                vec![0.0; current_grid.nr_interior_cells()]
+                vec![0.0; level_grid.nr_interior_cells()]
             );
-
-            let interior_shape_current = current_grid.interior_shape;
-
-            if interior_shape_current[0] % 2 != 0 ||
-                interior_shape_current[1] % 2 != 0 ||
-                interior_shape_current[2] % 2 != 0 {
-                    grid_can_get_coarser = false
-            } else {
-                let coarser_grid = current_grid.coarsened();
-                let interior_shape = coarser_grid.interior_shape;
-    
-                if interior_shape[0] > SMALLEST_NR_CELLS && 
-                    interior_shape[1] > SMALLEST_NR_CELLS && 
-                    interior_shape[2] > SMALLEST_NR_CELLS {
-                    current_grid = coarser_grid
-                } else {
-                    grid_can_get_coarser = false
-                }
-            }            
         }
 
         let x_at_levels_work = x_at_levels.clone();

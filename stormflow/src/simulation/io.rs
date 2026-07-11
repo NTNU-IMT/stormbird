@@ -67,6 +67,9 @@ impl Simulation {
         let pressure = match &self.pressure_solver {
             PressureSolver::CPU(solver) => {
                 solver.x_at_levels[0].clone()
+            },
+            PressureSolver::GPU(solver) => {
+                solver.solution.clone()
             }
         };
 

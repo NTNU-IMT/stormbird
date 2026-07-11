@@ -6,6 +6,7 @@ use crate::grid::Grid;
 use super::{
     PressureSolver,
     cpu_version::PressureSolverCPU,
+    gpu_version::PressureSolverGPU,
     settings::PressureSolverSettings
 };
 
@@ -18,7 +19,9 @@ pub enum SolverPlatform {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PressureSolverBuilder {
+    #[serde(default)]
     pub settings: PressureSolverSettings,
+    #[serde(default)]
     pub solver_platform: SolverPlatform
 }
 
@@ -34,7 +37,12 @@ impl PressureSolverBuilder {
                 )
             },
             SolverPlatform::GPU => {
-                todo!()
+                PressureSolver::GPU(
+                    PressureSolverGPU::new(
+                        grid,
+                        boundary_conditions, self.settings.clone()
+                    )
+                )
             }
         }
         

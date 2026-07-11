@@ -31,9 +31,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 + ki;
 
     let off_diag =
-          grid.inv_dx2 * (current[idx + grid.extended_stride.x] + current[idx - grid.extended_stride.x])
-        + grid.inv_dy2 * (current[idx + grid.extended_stride.y] + current[idx - grid.extended_stride.y])
-        + grid.inv_dz2 * (current[idx + 1u]                     + current[idx - 1u]);
+          grid.inv_cell_length_squared.x * (current[idx + grid.extended_stride.x] + current[idx - grid.extended_stride.x])
+        + grid.inv_cell_length_squared.y * (current[idx + grid.extended_stride.y] + current[idx - grid.extended_stride.y])
+        + grid.inv_cell_length_squared.z * (current[idx + 1u]                     + current[idx - 1u]);
 
     let jacobi_update = (rhs[idx_int] - off_diag) * grid.poisson_inv_diagonal;
 

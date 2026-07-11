@@ -9,6 +9,10 @@ use gpu_version::GpuGrid;
 
 pub const INTERIOR_OFFSET: usize = 1;
 
+/// Coarsening stops once a coarsened grid's interior cell count in any dimension would drop
+/// to this value or below (used by geometric multigrid hierarchy construction).
+pub const SMALLEST_NR_CELLS_FOR_COARSENING: usize = 2;
+
 #[derive(Debug, Clone)]
 /// Structured grid definition
 pub struct Grid {
@@ -302,5 +306,40 @@ impl Grid {
         ];
 
         Self::new_direct(self.start_point, cell_length, interior_shape)
+    }
+
+    /// Builds the hierarchy of grids used by geometric multigrid solvers, from the finest grid
+    /// (index 0, identical to `self`) down to the coarsest grid that can still be reached by
+    /// repeated even-factor-of-2 coarsening.
+    pub fn multigrid_hierarchy(&self) -> Vec<Grid> {
+        let mut grids: Vec<Grid> = Vec::new();
+
+        let mut current_grid = self.clone();
+        let mut grid_can_get_coarser = true;
+
+        while grid_can_get_coarser {
+            grids.push(current_grid.clone());
+
+            let interior_shape_current = current_grid.interior_shape;
+
+            if interior_shape_current[0] % 2 != 0 ||
+                interior_shape_current[1] % 2 != 0 ||
+                interior_shape_current[2] % 2 != 0 {
+                    grid_can_get_coarser = false
+            } else {
+                let coarser_grid = current_grid.coarsened();
+                let interior_shape = coarser_grid.interior_shape;
+
+                if interior_shape[0] > SMALLEST_NR_CELLS_FOR_COARSENING &&
+                    interior_shape[1] > SMALLEST_NR_CELLS_FOR_COARSENING &&
+                    interior_shape[2] > SMALLEST_NR_CELLS_FOR_COARSENING {
+                    current_grid = coarser_grid
+                } else {
+                    grid_can_get_coarser = false
+                }
+            }
+        }
+
+        grids
     }
 }

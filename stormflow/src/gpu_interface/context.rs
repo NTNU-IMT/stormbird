@@ -41,7 +41,17 @@ impl GpuContext {
             &wgpu::util::BufferInitDescriptor {
                 label: None,
                 contents: bytemuck::cast_slice(content),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+            }
+        )
+    }
+
+    pub fn create_uniform_buffer_u32(&self, value: u32) -> wgpu::Buffer {
+        self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&value),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             }
         )
     }
@@ -84,6 +94,8 @@ impl GpuContext {
         );
     
         let result: Vec<f32> = bytemuck::cast_slice(&slice.get_mapped_range().unwrap()).to_vec();
+
+        staging_buffer.unmap();
 
         result
     }

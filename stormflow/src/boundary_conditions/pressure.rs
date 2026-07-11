@@ -16,6 +16,17 @@ pub enum PressureBoundaryCondition {
     ZeroGradient,
 }
 
+impl PressureBoundaryCondition {
+    /// GPU-side flag matching the `zero_value` uniform expected by `set_ghost_cells.wgsl`
+    /// (0 = ZeroGradient, 1 = ZeroValue).
+    pub fn as_gpu_flag(&self) -> u32 {
+        match self {
+            PressureBoundaryCondition::ZeroGradient => 0,
+            PressureBoundaryCondition::ZeroValue => 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PressureBoundaryConditions {
     face_conditions: [[PressureBoundaryCondition; 2]; 3]
@@ -42,6 +53,14 @@ impl PressureBoundaryConditions {
         Self {
             face_conditions
         }
+    }
+
+    /// Returns the boundary condition applied to the given axis/face combination.
+    ///
+    /// `axis_index` is 0/1/2 for x/y/z, `face_index` is 0 for the negative face and 1 for the
+    /// positive face.
+    pub fn condition(&self, axis_index: usize, face_index: usize) -> PressureBoundaryCondition {
+        self.face_conditions[axis_index][face_index]
     }
 
     pub fn set_ghost_cells_kernel(

@@ -93,5 +93,8 @@
         "radius": 7.5
       }
     }
-  ]
+  ],
+  "pressure_solver": {
+    "solver_platform": "CPU"
+  }
 }
