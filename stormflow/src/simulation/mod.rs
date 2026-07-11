@@ -32,6 +32,8 @@ pub struct Simulation {
     pub viscosity: Float,
     pub density: Float,
     pub signed_distance_function: Vec<Float>,
+    pub signed_distance_function_slip: Vec<Float>,
+    pub normals_slip_surfaces: Vec<SpatialVector>,
     pub actuator_line: Option<ActuatorLineInterface>,
 }
 
@@ -39,6 +41,7 @@ impl Simulation {
     pub fn initialize_after_build(&mut self) {
         println!("Initializing after build");
         self.correct_velocities_for_geometry();
+        self.correct_velocities_for_slip_geometry();
 
         println!();
     }
@@ -70,6 +73,7 @@ impl Simulation {
         );
 
         self.correct_velocities_for_geometry();
+        self.correct_velocities_for_slip_geometry();
 
         self.velocity_org.copy_from_slice(&self.velocity);
 
@@ -77,9 +81,11 @@ impl Simulation {
             println!("Prediction {}", iteration+1);
             self.convect_and_diffuse(time_step);
             self.correct_velocities_for_geometry();
+            self.correct_velocities_for_slip_geometry();
             self.project_pressure(time_step);
             self.update_velocity(time_step);
             self.correct_velocities_for_geometry();
+            self.correct_velocities_for_slip_geometry();
         }
         
         self.run_actuator_line_model(time, time_step);
@@ -165,7 +171,91 @@ impl Simulation {
 
         println!("Correct velocities for geometry time: {:.?}", start_time.elapsed());
     }
-    
+
+    pub fn correct_velocities_for_slip_geometry(&mut self) {
+        let start_time = Instant::now();
+        
+        let [nx, ny, nz] = self.grid.interior_shape;
+        
+        let mut max_dx = 0.0;
+        for axis_index in 0..3 {
+            if self.grid.cell_length[axis_index] > max_dx {
+                max_dx = self.grid.cell_length[axis_index];
+            }
+        }
+        
+        let epsilon = 4.0 * max_dx;
+        
+        let nr_cells_interior = nx * ny * nz;
+
+        let velocity_ptr = self.velocity.as_mut_ptr() as usize;
+        let velocity_star_ptr = self.velocity_star.as_mut_ptr() as usize;
+
+        (0..nr_cells_interior)
+            .into_par_iter()
+            .for_each(|i_flat_interior| {
+                let interior_indices = self.grid.interior_indices_from_flat_index(i_flat_interior);
+                let extended_indices = self.grid.extended_indices_from_interior_indices(interior_indices);
+                let i_0 = self.grid.flat_index_on_extended_grid(extended_indices);
+
+                let mut new_velocity = SpatialVector::default();
+                let mut new_velocity_star = SpatialVector::default();
+                
+                for axis_index in 0..3 {
+                    let mut extended_indices_p = extended_indices;
+                    extended_indices_p[axis_index] += 1;
+
+                    let i_p = self.grid.flat_index_on_extended_grid(extended_indices_p);
+                    
+                    let sdf = 0.5 * (
+                        self.signed_distance_function_slip[i_0] + 
+                        self.signed_distance_function_slip[i_p]
+                    );
+                    
+                    let mu = Geometry::blending_function(sdf, epsilon);
+                    
+                    // Get the surface normal at this face (average of neighboring cells)
+                    let normal = 0.5 * (
+                        self.normals_slip_surfaces[i_0] + 
+                        self.normals_slip_surfaces[i_p]
+                    );
+                    
+                    // Current velocity component
+                    let vel = self.velocity[i_0][axis_index];
+                    let vel_star = self.velocity_star[i_0][axis_index];
+                    
+                    // Normal component in this axis direction: (v · n) * n[axis]
+                    // For a staggered grid, we consider the normal component contribution to this axis
+                    let normal_component = normal[axis_index];
+                    
+                    // Compute the normal velocity contribution to remove
+                    // v_normal = (v · n) * n, but we only have one component here
+                    // For slip: v_new = v - (1 - mu) * (v · n) * n
+                    // Since we're working component-wise with staggered grid:
+                    // The velocity at face is scalar, and we blend out the normal contribution
+                    let vel_normal_contribution = vel * normal_component * normal_component;
+                    let vel_star_normal_contribution = vel_star * normal_component * normal_component;
+                    
+                    // Apply slip: keep tangential, blend normal to zero near surface
+                    // v_new = v - (1 - mu) * v_normal_contribution
+                    new_velocity[axis_index] = vel - (1.0 - mu) * vel_normal_contribution;
+                    new_velocity_star[axis_index] = vel_star - (1.0 - mu) * vel_star_normal_contribution;
+                }
+
+                unsafe {
+                    let ptr = velocity_ptr as *mut SpatialVector;
+                    *ptr.add(i_0) = new_velocity;
+                }
+
+                unsafe {
+                    let ptr = velocity_star_ptr as *mut SpatialVector;
+                    *ptr.add(i_0) = new_velocity_star;
+                }
+            });
+
+        println!("Correct velocities for slip geometry time: {:.?}", start_time.elapsed());
+    }
+
     pub fn actuator_line_ctrl_points_velocity(&self) -> Vec<SpatialVector> {
         if let Some(actuator_line) = &self.actuator_line {            
             let nr_cells_to_check = actuator_line.cell_indices_to_check.len();

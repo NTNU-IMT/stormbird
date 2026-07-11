@@ -1,0 +1,97 @@
+{
+  "domain_start_point": [-64.0, -64.0, 0.0],
+  "domain_end_point": [64.0, 64.0, 64.0],
+  "grid_interior_shape": [128, 128, 128],
+  "effective_viscosity": 0.001,
+  "wind_condition": {
+    "direction_coming_from": 0.0,
+    "velocity_variation": {
+      "Constant": 10.0
+    }
+  },
+  "linear_velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+  "actuator_line": {
+    "line_force_model": {
+      "wing_builders": [
+        {
+          "section_points": [
+            { "x": 0.0, "y": 0.0, "z": 1.875 },
+            { "x": 0.0, "y": 0.0, "z": 31.875 }
+          ],
+          "chord_vectors": [
+            { "x": 5.0, "y": 0.0, "z": 0.0 },
+            { "x": 5.0, "y": 0.0, "z": 0.0 }
+          ],
+          "section_model": {
+            "RotatingCylinder": {
+              "revolutions_per_second": -0.637,
+              "spin_ratio_data": [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
+              "cl_data": [0.0, 1.3484, 2.6596, 4.6177, 7.198, 7.9874, 8.0, 9.0, 9.0]
+            }
+          },
+          "non_zero_circulation_at_ends": [true, true],
+          "input_power_model": "NoPower"
+        }
+      ],
+      "nr_sections": 32,
+      "density": 1.0,
+      "local_wing_angles": [0.0],
+      "rotation": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "translation": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "circulation_correction": {
+        "Smoothing": {
+          "smoothing_type": {
+            "Gaussian": {
+              "smoothing_length_factor": 0.05
+            }
+          }
+        }
+      },
+      "output_coordinate_system": "Global",
+      "force_calculation_settings": {
+        "include_viscous_lift_in_the_circulation": false
+      }
+    },
+    "projection_settings": {
+      "projection_function": {
+        "chord_factor": 0.75,
+        "thickness_factor": 0.75
+      },
+      "realign_sectional_forces": true,
+      "realign_to_local_velocity_at_each_cell": false,
+      "project_sectional_drag": false
+    },
+    "solver_settings": {
+      "damping_factor": 0.05
+    },
+    "sampling_settings": {
+      "use_point_sampling": false,
+      "span_projection_factor": 0.5,
+      "neglect_span_projection": false,
+      "extrapolate_end_velocities": true,
+      "remove_span_velocity": true,
+      "correction_factor": 1.0
+    },
+    "lifting_line_correction": {
+      "symmetry_condition": "Z"
+    },
+    "write_iterations_full_result": 100,
+    "start_time": 0.0
+  },
+  "slip_geometries": [
+    {
+      "Disk": {
+        "center": { "x": 0.0, "y": 0.0, "z": 1.875 },
+        "normal": { "x": 0.0, "y": 0.0, "z": 1.0 },
+        "radius": 5.0
+      }
+    },
+    {
+      "Disk": {
+        "center": { "x": 0.0, "y": 0.0, "z": 31.875 },
+        "normal": { "x": 0.0, "y": 0.0, "z": 1.0 },
+        "radius": 7.5
+      }
+    }
+  ]
+}

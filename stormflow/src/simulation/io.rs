@@ -192,6 +192,60 @@ impl Simulation {
 
         if binary { write!(w, "\n").unwrap(); }
 
+        // --- Signed distance function for slip surfaces (scalar) ---
+        write!(w, "SCALARS sdf_slip double 1\n").unwrap();
+        write!(w, "LOOKUP_TABLE default\n").unwrap();
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let ex = ix + 1;
+                    let ey = iy + 1;
+                    let ez = iz + 1;
+
+                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let sdf_slip: f64 = self.signed_distance_function_slip[flat] as f64;
+
+                    if binary {
+                        w.write_all(&sdf_slip.to_be_bytes()).unwrap();
+                    } else {
+                        write!(w, "{}\n", sdf_slip).unwrap();
+                    }
+                }
+            }
+        }
+
+        if binary { write!(w, "\n").unwrap(); }
+
+        // --- Normals for slip surfaces (vector) ---
+        write!(w, "VECTORS normals_slip double\n").unwrap();
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let ex = ix + 1;
+                    let ey = iy + 1;
+                    let ez = iz + 1;
+
+                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+
+                    let nx_val: f64 = self.normals_slip_surfaces[flat][0] as f64;
+                    let ny_val: f64 = self.normals_slip_surfaces[flat][1] as f64;
+                    let nz_val: f64 = self.normals_slip_surfaces[flat][2] as f64;
+
+                    if binary {
+                        w.write_all(&nx_val.to_be_bytes()).unwrap();
+                        w.write_all(&ny_val.to_be_bytes()).unwrap();
+                        w.write_all(&nz_val.to_be_bytes()).unwrap();
+                    } else {
+                        write!(w, "{} {} {}\n", nx_val, ny_val, nz_val).unwrap();
+                    }
+                }
+            }
+        }
+
+        if binary { write!(w, "\n").unwrap(); }
+
         w.flush().expect("export_fields_as_vtk: failed to flush output");
     }
 }

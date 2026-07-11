@@ -44,6 +44,8 @@ pub struct SimulationBuilder {
     pub actuator_line: Option<ActuatorLineBuilder>,
     #[serde(default)]
     pub geometries: Vec<GeometryBuilder>,
+    #[serde(default)]
+    pub slip_geometries: Vec<GeometryBuilder>,
     #[serde(default="SimulationBuilder::default_effective_viscosity")]
     pub effective_viscosity: Float,
     #[serde(default)]
@@ -113,9 +115,25 @@ impl SimulationBuilder {
             )
         }
 
+        let mut slip_geometries: Vec<Geometry> = Vec::new();
+
+        for geo_builder in &self.slip_geometries {
+            slip_geometries.push(
+                geo_builder.build()
+            )
+        }
+
         println!("Calculating SDF");
         let signed_distance_function = Geometry::signed_distance_function_on_extended_grid(
             &geometries, &grid
+        );
+
+        let signed_distance_function_slip = Geometry::signed_distance_function_on_extended_grid(
+            &slip_geometries, &grid
+        );
+
+        let normals_slip_surfaces = Geometry::geometry_normals_on_extended_grid(
+            &slip_geometries, &grid, 0.1
         );
         
         Simulation {
@@ -129,7 +147,9 @@ impl SimulationBuilder {
             viscosity: self.effective_viscosity,
             density: 1.0,
             actuator_line,
-            signed_distance_function
+            signed_distance_function,
+            signed_distance_function_slip,
+            normals_slip_surfaces
         }
     }
 }
