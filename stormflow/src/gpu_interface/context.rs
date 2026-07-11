@@ -56,6 +56,19 @@ impl GpuContext {
         )
     }
 
+    /// Creates a read-only storage buffer initialized from an arbitrary POD slice (e.g. a packed
+    /// array of small descriptor structs), for shaders that need more structured input than a
+    /// flat `[Float]` buffer.
+    pub fn create_storage_buffer_init<T: bytemuck::Pod>(&self, content: &[T]) -> wgpu::Buffer {
+        self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(content),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            }
+        )
+    }
+
     pub fn write_buffer(&self, buffer: &wgpu::Buffer, data: &[Float]) {
         let offset = 0;
         self.queue.write_buffer(

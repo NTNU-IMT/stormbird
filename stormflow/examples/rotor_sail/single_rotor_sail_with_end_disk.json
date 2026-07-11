@@ -95,6 +95,6 @@
     }
   ],
   "pressure_solver": {
-    "solver_platform": "CPU"
+    "solver_platform": "GPU"
   }
 }

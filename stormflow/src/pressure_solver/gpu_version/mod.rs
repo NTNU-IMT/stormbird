@@ -5,8 +5,7 @@ use super::settings::PressureSolverSettings;
 
 use crate::{
     boundary_conditions::pressure::PressureBoundaryConditions,
-    grid::Grid,
-    grid::boundary_face::BoundaryFace
+    grid::Grid
 };
 
 pub mod kernels;
@@ -20,6 +19,7 @@ use kernels::jacobi_shader::{JacobiShader, WORKGROUP_SIZE as JACOBI_WORKGROUP_SI
 use kernels::ghost_cell_shader::{GhostCellShader, WORKGROUP_SIZE as GHOST_CELL_WORKGROUP_SIZE};
 use kernels::restrict_shader::{RestrictShader, WORKGROUP_SIZE as RESTRICT_WORKGROUP_SIZE};
 use kernels::prolongate_shader::{ProlongateShader, WORKGROUP_SIZE as PROLONGATE_WORKGROUP_SIZE};
+use kernels::coarse_solve_shader::CoarseSolveShader;
 
 use crate::pressure_solver::cpu_version::kernels as cpu_kernels;
 
@@ -31,21 +31,26 @@ struct GpuLevel {
     rhs_buffer: wgpu::Buffer,
     jacobi_bind_group_sol_to_work: wgpu::BindGroup,
     jacobi_bind_group_work_to_sol: wgpu::BindGroup,
-    /// Ghost cell bind groups, one per (axis, face, target buffer) combination. Flattened as
-    /// `(axis_index * 2 + face_index) * 2 + buffer_index`, where `buffer_index` is 0 for
-    /// `x_buffer` and 1 for `x_work_buffer`.
-    ghost_cell_bind_groups: Vec<wgpu::BindGroup>,
-    /// Number of cells on each boundary face, indexed by `axis_index * 2 + face_index`.
-    ghost_cell_dispatch_totals: [u32; 6],
+    /// Packed 6-face descriptor buffer for this level's ghost-cell shader (kept alive alongside
+    /// the bind groups that reference it).
+    #[allow(dead_code)]
+    ghost_cell_faces_buffer: wgpu::Buffer,
+    ghost_cell_bind_group_x: wgpu::BindGroup,
+    ghost_cell_bind_group_work: wgpu::BindGroup,
+    /// Total core cell count across all 6 boundary faces (i.e. the ghost-cell dispatch size).
+    ghost_cell_total: u32,
     /// Workgroup dispatch counts for the Jacobi/interior-sized kernels on this level.
     jacobi_dispatch: [u32; 3],
 }
 
 impl GpuLevel {
     #[inline]
-    fn ghost_cell_bind_group(&self, axis_index: usize, face_index: usize, buffer_index: usize) -> &wgpu::BindGroup {
-        let face_slot = axis_index * 2 + face_index;
-        &self.ghost_cell_bind_groups[face_slot * 2 + buffer_index]
+    fn ghost_cell_bind_group(&self, buffer_index: usize) -> &wgpu::BindGroup {
+        if buffer_index == 0 {
+            &self.ghost_cell_bind_group_x
+        } else {
+            &self.ghost_cell_bind_group_work
+        }
     }
 }
 
@@ -82,11 +87,10 @@ pub struct PressureSolverGPU {
     restrict_levels: Vec<RestrictLevel>,
     prolongate_levels: Vec<ProlongateLevel>,
 
-    /// Uniform buffers holding the GPU ghost-cell flag (0 = ZeroGradient, 1 = ZeroValue) for
-    /// each (axis, face). Shared across all levels since the boundary condition config doesn't
-    /// depend on grid resolution.
-    #[allow(dead_code)]
-    zero_value_buffers: [[wgpu::Buffer; 2]; 3],
+    /// Runs the entire bottom-of-V-cycle smoother for the coarsest level in a single dispatch.
+    /// `None` if the coarsest grid doesn't fit in one workgroup on this device, in which case the
+    /// coarsest level falls back to the regular per-iteration `poisson_jacobi_smoother_gpu` path.
+    coarse_solve: Option<CoarseSolveShader>,
 
     solution_staging_buffer: wgpu::Buffer,
 }
@@ -106,15 +110,6 @@ impl PressureSolverGPU {
         let ghost_cell_shader = GhostCellShader::new(&gpu_context);
         let restrict_shader = RestrictShader::new(&gpu_context);
         let prolongate_shader = ProlongateShader::new(&gpu_context);
-
-        // Zero-value uniform buffers only depend on the boundary condition configuration, not
-        // on grid resolution, so they're shared across all levels.
-        let zero_value_buffers: [[wgpu::Buffer; 2]; 3] = std::array::from_fn(|axis_index| {
-            std::array::from_fn(|face_index| {
-                let flag = boundary_conditions.condition(axis_index, face_index).as_gpu_flag();
-                gpu_context.create_uniform_buffer_u32(flag)
-            })
-        });
 
         let mut levels: Vec<GpuLevel> = Vec::with_capacity(nr_levels);
 
@@ -136,32 +131,14 @@ impl PressureSolverGPU {
                 &x_work_buffer
             );
 
-            let mut ghost_cell_bind_groups: Vec<wgpu::BindGroup> = Vec::with_capacity(12);
-            let mut ghost_cell_dispatch_totals = [0u32; 6];
+            let (ghost_cell_faces_buffer, ghost_cell_total) = GhostCellShader::build_faces_buffer(
+                &gpu_context,
+                level_grid,
+                boundary_conditions
+            );
 
-            for axis_index in 0..3 {
-                for face_index in 0..2 {
-                    let boundary_face = BoundaryFace::new(
-                        level_grid.extended_shape,
-                        level_grid.extended_stride,
-                        axis_index,
-                        face_index
-                    );
-
-                    let boundary_face_buffer = boundary_face.as_buffer(&gpu_context);
-                    ghost_cell_dispatch_totals[axis_index * 2 + face_index] =
-                        boundary_face.shape[0] * boundary_face.shape[1];
-
-                    let zero_value_buffer = &zero_value_buffers[axis_index][face_index];
-
-                    ghost_cell_bind_groups.push(
-                        ghost_cell_shader.create_bind_group(&gpu_context, &boundary_face_buffer, &x_buffer, zero_value_buffer)
-                    );
-                    ghost_cell_bind_groups.push(
-                        ghost_cell_shader.create_bind_group(&gpu_context, &boundary_face_buffer, &x_work_buffer, zero_value_buffer)
-                    );
-                }
-            }
+            let ghost_cell_bind_group_x = ghost_cell_shader.create_bind_group(&gpu_context, &ghost_cell_faces_buffer, &x_buffer);
+            let ghost_cell_bind_group_work = ghost_cell_shader.create_bind_group(&gpu_context, &ghost_cell_faces_buffer, &x_work_buffer);
 
             let jacobi_dispatch = [
                 gpu_utils::workgroup_count(level_grid.interior_shape[0], JACOBI_WORKGROUP_SIZE as usize),
@@ -176,8 +153,10 @@ impl PressureSolverGPU {
                 rhs_buffer,
                 jacobi_bind_group_sol_to_work,
                 jacobi_bind_group_work_to_sol,
-                ghost_cell_bind_groups,
-                ghost_cell_dispatch_totals,
+                ghost_cell_faces_buffer,
+                ghost_cell_bind_group_x,
+                ghost_cell_bind_group_work,
+                ghost_cell_total,
                 jacobi_dispatch,
             });
         }
@@ -230,6 +209,17 @@ impl PressureSolverGPU {
             });
         }
 
+        let coarsest_level = nr_levels - 1;
+        let coarse_solve = CoarseSolveShader::try_new(
+            &gpu_context,
+            &grids[coarsest_level],
+            boundary_conditions,
+            solver_settings.nr_smooth_iterations * 4,
+            &levels[coarsest_level].grid_buffer,
+            &levels[coarsest_level].rhs_buffer,
+            &levels[coarsest_level].x_buffer,
+        );
+
         let solution = vec![0.0 as Float; grids[0].nr_extended_cells()];
         let rhs = vec![0.0 as Float; grids[0].nr_interior_cells()];
         let solution_staging_buffer = gpu_context.create_staging_buffer(solution.len());
@@ -248,32 +238,26 @@ impl PressureSolverGPU {
             levels,
             restrict_levels,
             prolongate_levels,
-            zero_value_buffers,
+            coarse_solve,
             solution_staging_buffer,
         }
     }
 
     /// Sets the ghost cells of the given level's buffer (0 = solution, 1 = work) for all six
-    /// boundary faces, in the same axis/face order used by `PressureBoundaryConditions::set_ghost_cells`
-    /// on the CPU (so corner/edge cells that depend on a previously-updated face are consistent).
+    /// boundary faces in a single dispatch (see `GhostCellShader::build_faces_buffer` for why
+    /// this is safe to fuse into one pass).
     fn set_ghost_cells_gpu(&self, encoder: &mut wgpu::CommandEncoder, level: usize, buffer_index: usize) {
         let level_data = &self.levels[level];
+        let bind_group = level_data.ghost_cell_bind_group(buffer_index);
 
-        for axis_index in 0..3 {
-            for face_index in 0..2 {
-                let bind_group = level_data.ghost_cell_bind_group(axis_index, face_index, buffer_index);
-                let total = level_data.ghost_cell_dispatch_totals[axis_index * 2 + face_index];
-
-                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-                pass.set_pipeline(&self.ghost_cell_shader.pipeline);
-                pass.set_bind_group(0, bind_group, &[]);
-                pass.dispatch_workgroups(
-                    gpu_utils::workgroup_count(total as usize, GHOST_CELL_WORKGROUP_SIZE as usize),
-                    1,
-                    1
-                );
-            }
-        }
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+        pass.set_pipeline(&self.ghost_cell_shader.pipeline);
+        pass.set_bind_group(0, bind_group, &[]);
+        pass.dispatch_workgroups(
+            gpu_utils::workgroup_count(level_data.ghost_cell_total as usize, GHOST_CELL_WORKGROUP_SIZE as usize),
+            1,
+            1
+        );
     }
 
     fn poisson_jacobi_smoother_gpu(
@@ -358,7 +342,12 @@ impl PressureSolverGPU {
         }
 
         self.clear_level_solution(encoder, nr_levels - 1);
-        self.poisson_jacobi_smoother_gpu(encoder, nr_levels - 1, nr_iterations * 4);
+
+        if let Some(coarse_solve) = &self.coarse_solve {
+            coarse_solve.dispatch(encoder);
+        } else {
+            self.poisson_jacobi_smoother_gpu(encoder, nr_levels - 1, nr_iterations * 4);
+        }
 
         // Prolongate and smooth back up.
         for level in (0..nr_levels - 1).rev() {
