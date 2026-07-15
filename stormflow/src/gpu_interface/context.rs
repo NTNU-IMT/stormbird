@@ -17,12 +17,27 @@ impl GpuContext {
         let instance = wgpu::Instance::default();
 
         let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions::default())
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                ..Default::default()
+            })
             .await
             .unwrap();
 
+        let adapter_info = adapter.get_info();
+        println!(
+            "[gpu] using adapter '{}' ({:?}, backend={:?})",
+            adapter_info.name, adapter_info.device_type, adapter_info.backend
+        );
+
+        // Request the adapter's own limits instead of wgpu's conservative
+        // (WebGPU-guaranteed-minimum) defaults, so e.g. CoarseSolveShader's single-workgroup
+        // mega-kernel can cover larger grids on hardware that supports it.
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
+            .request_device(&wgpu::DeviceDescriptor {
+                required_limits: adapter.limits(),
+                ..Default::default()
+            })
             .await
             .unwrap();
 

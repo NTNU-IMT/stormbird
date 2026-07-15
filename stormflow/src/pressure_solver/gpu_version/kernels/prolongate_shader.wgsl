@@ -1,4 +1,5 @@
-// grid_struct.wgsl will be prepended before the rest of the source during loading
+// grid_struct.wgsl will be prepended before the rest of the source during loading.
+// `x_fine`/`x_coarse` are interior-sized (no ghost cells).
 
 @group(0) @binding(0) var<uniform> grid_fine: Grid;
 @group(0) @binding(1) var<uniform> grid_coarse: Grid;
@@ -17,9 +18,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
 
-    let idx_fine_extended = (i_f + 1u) * grid_fine.extended_stride.x
-                           + (j_f + 1u) * grid_fine.extended_stride.y
-                           + (k_f + 1u);
+    let idx_fine = i_f * grid_fine.interior_stride.x
+                 + j_f * grid_fine.interior_stride.y
+                 + k_f;
 
     let nx_c = grid_coarse.interior_shape.x;
     let ny_c = grid_coarse.interior_shape.y;
@@ -55,14 +56,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
                 let weight = wx[di] * wy[dj] * wz[dk];
 
-                let idx_coarse_extended = (i_c + 1u) * grid_coarse.extended_stride.x
-                                         + (j_c + 1u) * grid_coarse.extended_stride.y
-                                         + (k_c + 1u);
+                let idx_coarse = i_c * grid_coarse.interior_stride.x
+                                + j_c * grid_coarse.interior_stride.y
+                                + k_c;
 
-                correction_value = correction_value + weight * x_coarse[idx_coarse_extended];
+                correction_value = correction_value + weight * x_coarse[idx_coarse];
             }
         }
     }
 
-    x_fine[idx_fine_extended] = x_fine[idx_fine_extended] + correction_value;
+    x_fine[idx_fine] = x_fine[idx_fine] + correction_value;
 }

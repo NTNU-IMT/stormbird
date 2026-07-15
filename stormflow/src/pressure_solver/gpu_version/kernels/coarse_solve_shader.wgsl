@@ -1,84 +1,103 @@
-// grid.wgsl will be prepended before this source during loading. `N` (total extended cell count
-// for the coarsest level) and `NR_ITERATIONS` are injected as plain WGSL consts at
-// shader-generation time, since both are fixed for the lifetime of the solver.
+// grid.wgsl will be prepended before this source during loading. `N` (nr_interior_cells for the
+// coarsest level) and `NR_ITERATIONS` are injected as plain WGSL consts at shader-generation
+// time, since both are fixed for the lifetime of the solver. BC_X0..BC_Z1 are injected the same
+// way as jacobi_shader.wgsl (see there for the boundary-folded stencil technique).
 //
-// Runs the entire bottom-of-V-cycle smoother (seed work buffer, set ghost cells on both buffers,
-// then NR_ITERATIONS Jacobi+ghost sweeps) in a single dispatch of exactly one workgroup of size
-// N, using workgroup-shared memory to ping-pong between iterations instead of round-tripping
-// through the CPU for every iteration. This only runs when the coarsest grid is small enough to
-// fit in one workgroup (checked on the Rust side before this shader is ever built).
-//
-// Per-cell classification (interior vs. core-ghost vs. unused corner/edge, plus the ghost
-// neighbor offset/BC flag and interior RHS index) is precomputed on the CPU into `cells`, so this
-// shader only has to branch on `cell.kind` rather than re-deriving axis/face membership itself.
+// Runs the entire bottom-of-V-cycle smoother (NR_ITERATIONS Jacobi sweeps) in a single dispatch
+// of exactly one workgroup of size N, using workgroup-shared memory to ping-pong between
+// iterations instead of round-tripping through the CPU for every iteration. Only runs when the
+// coarsest grid is small enough to fit in one workgroup (checked on the Rust side before this
+// shader is ever built). With no ghost cells, every one of the N threads is a genuine interior
+// cell, so — unlike the padded-array version of this kernel — there's no separate cell
+// classification needed: every thread runs the same boundary-folded stencil as the regular
+// jacobi_shader.wgsl kernel, just reading/writing workgroup-shared memory instead of storage
+// buffers, and only one workgroupBarrier() per iteration instead of two.
 
 const JACOBI_WEIGHT: f32 = 0.6666666667;
 
-struct CellDescriptor {
-    kind: u32,           // 0 = unused, 1 = interior, 2 = core ghost
-    neighbor_delta: i32, // valid only when kind == 2
-    zero_value: u32,     // valid only when kind == 2 (0 = ZeroGradient, 1 = ZeroValue)
-    rhs_index: u32,      // valid only when kind == 1
-}
-
-@group(0) @binding(1) var<storage, read> cells: array<CellDescriptor, N>;
-@group(0) @binding(2) var<storage, read> rhs: array<f32>;
-@group(0) @binding(3) var<storage, read_write> x: array<f32>;
+@group(0) @binding(1) var<storage, read> rhs: array<f32>;
+@group(0) @binding(2) var<storage, read_write> x: array<f32>;
 
 var<workgroup> buf: array<array<f32, N>, 2>;
 
-fn jacobi_value(buf_idx: u32, idx: u32, rhs_index: u32) -> f32 {
-    let off_diag =
-          grid.inv_cell_length_squared.x * (buf[buf_idx][idx + grid.extended_stride.x] + buf[buf_idx][idx - grid.extended_stride.x])
-        + grid.inv_cell_length_squared.y * (buf[buf_idx][idx + grid.extended_stride.y] + buf[buf_idx][idx - grid.extended_stride.y])
-        + grid.inv_cell_length_squared.z * (buf[buf_idx][idx + 1u]                     + buf[buf_idx][idx - 1u]);
-
-    let jacobi_update = (rhs[rhs_index] - off_diag) * grid.poisson_inv_diagonal;
-
-    return (1.0 - JACOBI_WEIGHT) * buf[buf_idx][idx] + JACOBI_WEIGHT * jacobi_update;
+fn zero_value_flag(axis: u32, face: u32) -> u32 {
+    if axis == 0u {
+        return select(BC_X0, BC_X1, face == 1u);
+    } else if axis == 1u {
+        return select(BC_Y0, BC_Y1, face == 1u);
+    } else {
+        return select(BC_Z0, BC_Z1, face == 1u);
+    }
 }
 
-fn ghost_value(buf_idx: u32, idx: u32, neighbor_delta: i32, zero_value: u32) -> f32 {
-    let neighbor_idx = u32(i32(idx) + neighbor_delta);
-    let neighbor_val = buf[buf_idx][neighbor_idx];
+/// Off-diagonal stencil sum, mirroring jacobi_shader.wgsl's `off_diagonal_sum`: a missing
+/// neighbor on any axis is explicitly substituted by `buf[buf_idx][idx]` itself (signed per that
+/// face's boundary condition) rather than folded into the diagonal.
+fn off_diagonal_sum(buf_idx: u32, idx: u32, ii: u32, ji: u32, ki: u32) -> f32 {
+    let nx = grid.interior_shape.x;
+    let ny = grid.interior_shape.y;
+    let nz = grid.interior_shape.z;
 
-    return select(neighbor_val, -neighbor_val, zero_value == 1u);
+    var off_diag: f32 = 0.0;
+
+    if ii > 0u {
+        off_diag += grid.inv_cell_length_squared.x * buf[buf_idx][idx - grid.interior_stride.x];
+    } else {
+        off_diag += grid.inv_cell_length_squared.x * select(1.0, -1.0, zero_value_flag(0u, 0u) == 1u) * buf[buf_idx][idx];
+    }
+    if ii + 1u < nx {
+        off_diag += grid.inv_cell_length_squared.x * buf[buf_idx][idx + grid.interior_stride.x];
+    } else {
+        off_diag += grid.inv_cell_length_squared.x * select(1.0, -1.0, zero_value_flag(0u, 1u) == 1u) * buf[buf_idx][idx];
+    }
+
+    if ji > 0u {
+        off_diag += grid.inv_cell_length_squared.y * buf[buf_idx][idx - grid.interior_stride.y];
+    } else {
+        off_diag += grid.inv_cell_length_squared.y * select(1.0, -1.0, zero_value_flag(1u, 0u) == 1u) * buf[buf_idx][idx];
+    }
+    if ji + 1u < ny {
+        off_diag += grid.inv_cell_length_squared.y * buf[buf_idx][idx + grid.interior_stride.y];
+    } else {
+        off_diag += grid.inv_cell_length_squared.y * select(1.0, -1.0, zero_value_flag(1u, 1u) == 1u) * buf[buf_idx][idx];
+    }
+
+    if ki > 0u {
+        off_diag += grid.inv_cell_length_squared.z * buf[buf_idx][idx - 1u];
+    } else {
+        off_diag += grid.inv_cell_length_squared.z * select(1.0, -1.0, zero_value_flag(2u, 0u) == 1u) * buf[buf_idx][idx];
+    }
+    if ki + 1u < nz {
+        off_diag += grid.inv_cell_length_squared.z * buf[buf_idx][idx + 1u];
+    } else {
+        off_diag += grid.inv_cell_length_squared.z * select(1.0, -1.0, zero_value_flag(2u, 1u) == 1u) * buf[buf_idx][idx];
+    }
+
+    return off_diag;
+}
+
+fn jacobi_value(buf_idx: u32, idx: u32, ii: u32, ji: u32, ki: u32) -> f32 {
+    let off_diag = off_diagonal_sum(buf_idx, idx, ii, ji, ki);
+    let update = (rhs[idx] - off_diag) * grid.poisson_inv_diagonal;
+
+    return (1.0 - JACOBI_WEIGHT) * buf[buf_idx][idx] + JACOBI_WEIGHT * update;
 }
 
 @compute @workgroup_size(N)
 fn main(@builtin(local_invocation_index) idx: u32) {
-    let cell = cells[idx];
-    let is_interior = cell.kind == 1u;
-    let is_ghost = cell.kind == 2u;
+    // idx is exactly the interior flat index (0..N-1), matching Grid::flat_index_on_interior_grid.
+    let ii = idx / grid.interior_stride.x;
+    let ji = (idx % grid.interior_stride.x) / grid.interior_stride.y;
+    let ki = idx % grid.interior_stride.y;
 
     buf[0][idx] = x[idx];
-    workgroupBarrier();
-
-    buf[1][idx] = buf[0][idx];
-    workgroupBarrier();
-
-    if is_ghost {
-        buf[0][idx] = ghost_value(0u, idx, cell.neighbor_delta, cell.zero_value);
-    }
-    workgroupBarrier();
-
-    if is_ghost {
-        buf[1][idx] = ghost_value(1u, idx, cell.neighbor_delta, cell.zero_value);
-    }
     workgroupBarrier();
 
     for (var iteration = 0u; iteration < NR_ITERATIONS; iteration = iteration + 1u) {
         let cur = iteration % 2u;
         let nxt = 1u - cur;
 
-        if is_interior {
-            buf[nxt][idx] = jacobi_value(cur, idx, cell.rhs_index);
-        }
-        workgroupBarrier();
-
-        if is_ghost {
-            buf[nxt][idx] = ghost_value(nxt, idx, cell.neighbor_delta, cell.zero_value);
-        }
+        buf[nxt][idx] = jacobi_value(cur, idx, ii, ji, ki);
         workgroupBarrier();
     }
 

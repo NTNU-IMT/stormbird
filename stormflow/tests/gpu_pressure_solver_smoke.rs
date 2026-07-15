@@ -103,12 +103,14 @@ fn gpu_pressure_solver_matches_cpu_with_coarse_mega_kernel() {
 fn gpu_pressure_solver_matches_cpu_with_coarse_fallback() {
     // Anisotropic grid: coarsening stops immediately since two dimensions would drop below the
     // minimum (4 -> 2 is not > SMALLEST_NR_CELLS_FOR_COARSENING), leaving a single, large level
-    // (extended 6*66*6 = 2376 cells) that can't fit in one workgroup — exercises the fallback to
-    // the regular per-iteration dispatch path.
+    // (4*128*4 = 2048 interior cells) that can't fit in one workgroup even on hardware that
+    // grants the common 1024-thread max (GpuContext now requests the adapter's own limits rather
+    // than wgpu's conservative 256-thread default) — exercises the fallback to the regular
+    // per-iteration dispatch path.
     let grid = Grid::new(
         SpatialVector([0.0, 0.0, 0.0]),
-        SpatialVector([1.0, 4.0, 1.0]),
-        [4, 64, 4]
+        SpatialVector([1.0, 8.0, 1.0]),
+        [4, 128, 4]
     );
 
     assert_gpu_matches_cpu(&grid);

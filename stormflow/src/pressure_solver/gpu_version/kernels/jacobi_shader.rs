@@ -8,6 +8,9 @@ const GRID_SRC: &str = include_str!("../../../grid/gpu_version/grid.wgsl");
 const JACOBI_SRC: &str = include_str!("jacobi_shader.wgsl");
 
 use crate::grid::gpu_version::GpuGrid;
+use crate::boundary_conditions::pressure::PressureBoundaryConditions;
+
+use super::bc_consts_wgsl;
 
 pub const WORKGROUP_SIZE: u32 = 4;
 
@@ -26,8 +29,16 @@ impl JacobiShader {
         ]
     }
 
-    pub fn new(context: &GpuContext) -> Self {
-        let shader_src = format!("{}\n{}", GRID_SRC, JACOBI_SRC);
+    /// Boundary conditions are baked into the shader as consts (rather than passed via a buffer)
+    /// since they're fixed for the solver's lifetime and don't depend on grid resolution, so this
+    /// single pipeline is shared across every multigrid level's bind groups.
+    pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions) -> Self {
+        let shader_src = format!(
+            "{grid_src}\n{bc_consts}{jacobi_src}",
+            grid_src = GRID_SRC,
+            bc_consts = bc_consts_wgsl(boundary_conditions),
+            jacobi_src = JACOBI_SRC
+        );
 
         let shader = context.create_shader_module(&shader_src);
         let bind_group_layout = context.create_bind_group_layout(&Self::bind_group_layout_entries());
