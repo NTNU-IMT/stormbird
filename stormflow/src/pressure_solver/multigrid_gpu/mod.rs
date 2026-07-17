@@ -1,12 +1,12 @@
 
 use stormath::type_aliases::Float;
 
-use super::settings::PressureSolverSettings;
-
-use crate::{
-    boundary_conditions::pressure::PressureBoundaryConditions,
-    grid::Grid
+use super::{
+    settings::MultigridSettings,
+    boundary_conditions::PressureBoundaryConditions
 };
+
+use crate::grid::Grid;
 
 pub mod kernels;
 
@@ -21,7 +21,7 @@ use kernels::prolongate_shader::{ProlongateShader, WORKGROUP_SIZE as PROLONGATE_
 use kernels::coarse_solve_shader::CoarseSolveShader;
 use kernels::materialize_shader::MaterializeShader;
 
-use crate::pressure_solver::cpu_version::kernels as cpu_kernels;
+use crate::pressure_solver::multigrid_cpu::kernels as cpu_kernels;
 
 /// All GPU resources belonging to a single multigrid level. `x_buffer`/`x_work_buffer`/
 /// `rhs_buffer` are all sized to the **interior** grid — there are no ghost cells anywhere in the
@@ -49,18 +49,18 @@ struct ProlongateLevel {
     dispatch: [u32; 3],
 }
 
-pub struct PressureSolverGPU {
+pub struct MultigridGPU {
     pub grids: Vec<Grid>,
     pub boundary_conditions: PressureBoundaryConditions,
-    pub solver_settings: PressureSolverSettings,
+    pub solver_settings: MultigridSettings,
     pub gpu_context: GpuContext,
     /// Right-hand side for the finest level, on the **interior** grid. Written by the caller
     /// (e.g. `Simulation::pressure_projection_rhs`) and uploaded to the GPU at the start of `solve`.
     pub rhs: Vec<Float>,
-    /// Solution for the finest level, on the **extended** grid (matching `PressureSolverCPU`'s
-    /// `x_at_levels[0]`, since `Simulation::update_velocity` needs the boundary-extrapolated
-    /// pressure one cell past the domain edge). Materialized once at the end of `solve`, entirely
-    /// on the GPU — see `MaterializeShader`.
+    /// Solution for the finest level, on the **extended** grid (matching `MultigridCPU::solution`,
+    /// since `Simulation::update_velocity` needs the boundary-extrapolated pressure one cell past
+    /// the domain edge). Materialized once at the end of `solve`, entirely on the GPU — see
+    /// `MaterializeShader`.
     pub solution: Vec<Float>,
 
     jacobi_shader: JacobiShader,
@@ -87,11 +87,11 @@ pub struct PressureSolverGPU {
     solution_staging_buffer: wgpu::Buffer,
 }
 
-impl PressureSolverGPU {
+impl MultigridGPU {
     pub fn new(
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
-        solver_settings: PressureSolverSettings
+        solver_settings: MultigridSettings
     ) -> Self {
         let grids = grid.multigrid_hierarchy();
         let nr_levels = grids.len();
@@ -325,7 +325,7 @@ impl PressureSolverGPU {
     /// # Note
     /// The caller is responsible for populating `self.rhs` (finest-level RHS on the interior
     /// grid) before calling this. On return, `self.solution` holds the finest-level solution on
-    /// the extended grid, matching `PressureSolverCPU::x_at_levels[0]`'s layout.
+    /// the extended grid, matching `MultigridCPU::solution`'s layout.
     pub fn solve(&mut self) {
         self.gpu_context.write_buffer(&self.levels[0].rhs_buffer, &self.rhs);
 

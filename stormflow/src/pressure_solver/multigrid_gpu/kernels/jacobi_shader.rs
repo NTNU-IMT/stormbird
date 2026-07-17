@@ -8,7 +8,7 @@ const GRID_SRC: &str = include_str!("../../../grid/gpu_version/grid.wgsl");
 const JACOBI_SRC: &str = include_str!("jacobi_shader.wgsl");
 
 use crate::grid::gpu_version::GpuGrid;
-use crate::boundary_conditions::pressure::PressureBoundaryConditions;
+use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 
 use super::bc_consts_wgsl;
 

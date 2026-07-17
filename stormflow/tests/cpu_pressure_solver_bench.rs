@@ -5,11 +5,11 @@ use stormath::type_aliases::Float;
 
 use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
-use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
+use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
 use stormflow::pressure_solver::settings::MultigridSettings;
 
 #[test]
-fn gpu_pressure_solver_bench() {
+fn cpu_pressure_solver_bench() {
     let grid = Grid::new(
         SpatialVector([0.0, 0.0, 0.0]),
         SpatialVector([1.0, 1.0, 1.0]),
@@ -19,7 +19,7 @@ fn gpu_pressure_solver_bench() {
     let boundary_conditions = PressureBoundaryConditions::new_from_up_direction(SpatialVector([0.0, 1.0, 0.0]));
     let settings = MultigridSettings::default();
 
-    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings);
+    let mut cpu_solver = MultigridCPU::new(&grid, &boundary_conditions, settings);
 
     let n = grid.nr_interior_cells();
     let mut rhs = vec![0.0 as Float; n];
@@ -27,15 +27,14 @@ fn gpu_pressure_solver_bench() {
         let [i, j, k] = grid.interior_indices_from_flat_index(flat);
         rhs[flat] = ((i + 1) as Float).sin() + ((j + 1) as Float).cos() * 0.5 - ((k + 1) as Float) * 0.01;
     }
-    gpu_solver.rhs.copy_from_slice(&rhs);
+    cpu_solver.rhs_at_levels[0].copy_from_slice(&rhs);
 
-    // warm-up (pipeline creation etc. already happened in `new`, but first solve may still pay
-    // one-off driver costs)
-    gpu_solver.solve();
+    // warm-up
+    cpu_solver.solve();
 
     let start = Instant::now();
     for _ in 0..5 {
-        gpu_solver.solve();
+        cpu_solver.solve();
     }
     println!("[timing] avg solve() over 5 calls: {:?}", start.elapsed() / 5);
 }

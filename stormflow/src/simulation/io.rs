@@ -65,10 +65,13 @@ impl Simulation {
         write!(w, "LOOKUP_TABLE default\n").unwrap();
 
         let pressure = match &self.pressure_solver {
-            PressureSolver::CPU(solver) => {
-                solver.x_at_levels[0].clone()
+            PressureSolver::MultigridCPU(solver) => {
+                solver.solution.clone()
             },
-            PressureSolver::GPU(solver) => {
+            PressureSolver::MultigridGPU(solver) => {
+                solver.solution.clone()
+            },
+            PressureSolver::FftCPU(solver) => {
                 solver.solution.clone()
             }
         };

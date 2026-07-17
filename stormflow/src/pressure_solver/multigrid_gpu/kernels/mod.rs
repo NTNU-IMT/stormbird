@@ -4,7 +4,7 @@ pub mod prolongate_shader;
 pub mod coarse_solve_shader;
 pub mod materialize_shader;
 
-use crate::boundary_conditions::pressure::PressureBoundaryConditions;
+use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 
 /// Generates the `BC_X0`/`BC_X1`/`BC_Y0`/`BC_Y1`/`BC_Z0`/`BC_Z1` WGSL consts (0 = ZeroGradient,
 /// 1 = ZeroValue) shared by every shader that folds boundary conditions directly into its

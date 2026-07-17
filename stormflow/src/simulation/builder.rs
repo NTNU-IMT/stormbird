@@ -17,9 +17,9 @@ use stormbird::{
 use crate::actuator_line_interface::ActuatorLineInterface;
 
 use crate::boundary_conditions::{
-    pressure::PressureBoundaryConditions,
     velocity::VelocityBoundaryConditions
 };
+
 use crate::grid::Grid;
 use crate::simulation::Simulation;
 use crate::geometry::{
@@ -27,7 +27,8 @@ use crate::geometry::{
     GeometryBuilder
 };
 use crate::pressure_solver::{
-    builder::PressureSolverBuilder
+    builder::PressureSolverBuilder,
+    boundary_conditions::PressureBoundaryConditions
 };
 
 use crate::error::Error;

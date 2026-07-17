@@ -1,50 +1,54 @@
 use serde::{Serialize, Deserialize};
 
-use crate::boundary_conditions::pressure::PressureBoundaryConditions;
+use super::boundary_conditions::PressureBoundaryConditions;
 use crate::grid::Grid;
 
 use super::{
     PressureSolver,
-    cpu_version::PressureSolverCPU,
-    gpu_version::PressureSolverGPU,
-    settings::PressureSolverSettings
+    multigrid_cpu::MultigridCPU,
+    multigrid_gpu::MultigridGPU,
+    fft::FftCPU,
+    settings::MultigridSettings
 };
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub enum SolverPlatform {
-    #[default]
-    CPU,
-    GPU
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PressureSolverBuilder {
+    MultigridCPU(MultigridSettings),
+    MultigrdiGPU(MultigridSettings),
+    FftCPU
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PressureSolverBuilder {
-    #[serde(default)]
-    pub settings: PressureSolverSettings,
-    #[serde(default)]
-    pub solver_platform: SolverPlatform
+impl Default for PressureSolverBuilder {
+    fn default() -> Self {
+        Self::MultigridCPU(MultigridSettings::default())
+    }
 }
 
 impl PressureSolverBuilder {
     pub fn build(&self, grid: &Grid, boundary_conditions: &PressureBoundaryConditions) -> PressureSolver {
-        match self.solver_platform {
-            SolverPlatform::CPU => {
-                PressureSolver::CPU(
-                    PressureSolverCPU::new(
+        match self {
+            Self::MultigridCPU(settings) => {
+                PressureSolver::MultigridCPU(
+                    MultigridCPU::new(
                         grid, 
-                        boundary_conditions, self.settings.clone()
+                        boundary_conditions, settings.clone()
                     )
                 )
             },
-            SolverPlatform::GPU => {
-                PressureSolver::GPU(
-                    PressureSolverGPU::new(
+            Self::MultigrdiGPU(settings) => {
+                PressureSolver::MultigridGPU(
+                    MultigridGPU::new(
                         grid,
-                        boundary_conditions, self.settings.clone()
+                        boundary_conditions, settings.clone()
                     )
+                )
+            },
+            Self::FftCPU => {
+                PressureSolver::FftCPU(
+                    FftCPU::new(grid, boundary_conditions)
                 )
             }
         }
-        
+
     }
 }

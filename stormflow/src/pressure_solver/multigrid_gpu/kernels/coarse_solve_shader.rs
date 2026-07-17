@@ -6,7 +6,7 @@ use crate::gpu_interface::{
 
 use crate::grid::Grid;
 use crate::grid::gpu_version::GpuGrid;
-use crate::boundary_conditions::pressure::PressureBoundaryConditions;
+use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 
 use super::bc_consts_wgsl;
 

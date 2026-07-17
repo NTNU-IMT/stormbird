@@ -1,11 +1,11 @@
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 
-use stormflow::boundary_conditions::pressure::PressureBoundaryConditions;
+use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
-use stormflow::pressure_solver::cpu_version::PressureSolverCPU;
-use stormflow::pressure_solver::gpu_version::PressureSolverGPU;
-use stormflow::pressure_solver::settings::PressureSolverSettings;
+use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
+use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
+use stormflow::pressure_solver::settings::MultigridSettings;
 
 /// Builds a synthetic RHS (not physically meaningful, just varied enough to exercise the
 /// restrict/prolongate/smoother chain across every multigrid level, including the coarsest one
@@ -25,19 +25,19 @@ fn synthetic_rhs(grid: &Grid) -> Vec<Float> {
 
 fn assert_gpu_matches_cpu(grid: &Grid) {
     let boundary_conditions = PressureBoundaryConditions::new_from_up_direction(SpatialVector([0.0, 1.0, 0.0]));
-    let settings = PressureSolverSettings::default();
+    let settings = MultigridSettings::default();
 
     let rhs = synthetic_rhs(&grid);
 
-    let mut cpu_solver = PressureSolverCPU::new(&grid, &boundary_conditions, settings.clone());
+    let mut cpu_solver = MultigridCPU::new(&grid, &boundary_conditions, settings.clone());
     cpu_solver.rhs_at_levels[0].copy_from_slice(&rhs);
     cpu_solver.solve();
 
-    let mut gpu_solver = PressureSolverGPU::new(&grid, &boundary_conditions, settings);
+    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings);
     gpu_solver.rhs.copy_from_slice(&rhs);
     gpu_solver.solve();
 
-    assert_eq!(cpu_solver.x_at_levels[0].len(), gpu_solver.solution.len());
+    assert_eq!(cpu_solver.solution.len(), gpu_solver.solution.len());
 
     let [nx, ny, nz] = grid.interior_shape;
 
@@ -48,7 +48,7 @@ fn assert_gpu_matches_cpu(grid: &Grid) {
     let mut max_abs_diff_core: Float = 0.0;
     let mut max_abs_diff_core_flat = 0usize;
 
-    for (flat, (a, b)) in cpu_solver.x_at_levels[0].iter().zip(gpu_solver.solution.iter()).enumerate() {
+    for (flat, (a, b)) in cpu_solver.solution.iter().zip(gpu_solver.solution.iter()).enumerate() {
         assert!(a.is_finite(), "CPU solution contains a non-finite value: {a}");
         assert!(b.is_finite(), "GPU solution contains a non-finite value: {b}");
 

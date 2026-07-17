@@ -1,21 +1,26 @@
 pub mod builder;
 pub mod settings;
-pub mod cpu_version;
-pub mod gpu_version;
+pub mod boundary_conditions;
+pub mod multigrid_cpu;
+pub mod multigrid_gpu;
+pub mod fft;
 
-use cpu_version::PressureSolverCPU;
-use gpu_version::PressureSolverGPU;
+use multigrid_cpu::MultigridCPU;
+use multigrid_gpu::MultigridGPU;
+use fft::FftCPU;
 
 pub enum PressureSolver {
-    CPU(PressureSolverCPU),
-    GPU(PressureSolverGPU)
+    MultigridCPU(MultigridCPU),
+    MultigridGPU(MultigridGPU),
+    FftCPU(FftCPU)
 }
 
 impl PressureSolver {
     pub fn solve(&mut self) {
         match self {
-            PressureSolver::CPU(solver) => solver.solve(),
-            PressureSolver::GPU(solver) => solver.solve()
+            PressureSolver::MultigridCPU(solver) => solver.solve(),
+            PressureSolver::MultigridGPU(solver) => solver.solve(),
+            PressureSolver::FftCPU(solver) => solver.solve()
         }
     }
 }

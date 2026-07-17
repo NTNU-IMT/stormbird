@@ -403,8 +403,9 @@ impl Simulation {
             });
 
         match self.pressure_solver {
-            PressureSolver::CPU(ref mut solver) => solver.rhs_at_levels[0].copy_from_slice(&rhs),
-            PressureSolver::GPU(ref mut solver) => solver.rhs.copy_from_slice(&rhs)
+            PressureSolver::MultigridCPU(ref mut solver) => solver.rhs_at_levels[0].copy_from_slice(&rhs),
+            PressureSolver::MultigridGPU(ref mut solver) => solver.rhs.copy_from_slice(&rhs),
+            PressureSolver::FftCPU(ref mut solver) => solver.rhs.copy_from_slice(&rhs)
         }
 
         println!("Pressure projection rhs time: {:.?}", start_time.elapsed());
@@ -490,8 +491,9 @@ impl Simulation {
         let data_ptr = self.velocity.as_mut_ptr() as usize;
 
         let pressure = match &self.pressure_solver {
-            PressureSolver::CPU(solver) => solver.x_at_levels[0].clone(),
-            PressureSolver::GPU(solver) => solver.solution.clone()
+            PressureSolver::MultigridCPU(solver) => solver.solution.clone(),
+            PressureSolver::MultigridGPU(solver) => solver.solution.clone(),
+            PressureSolver::FftCPU(solver) => solver.solution.clone()
         };
 
         (0..nr_interior_cells)
