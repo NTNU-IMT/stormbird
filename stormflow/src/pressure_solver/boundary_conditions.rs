@@ -82,7 +82,7 @@ impl PressureBoundaryConditions {
     
         (0..outer_len * inner_len)
             .into_par_iter()
-            .with_min_len(2048)
+            .with_min_len(512)
             .for_each(|idx| {
                 let i_outer = idx / inner_len;
                 let i_inner = idx % inner_len;

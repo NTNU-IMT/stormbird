@@ -1,5 +1,4 @@
 pub mod builder;
-pub mod settings;
 pub mod boundary_conditions;
 pub mod multigrid_cpu;
 pub mod multigrid_gpu;

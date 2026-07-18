@@ -1,7 +1,10 @@
-use stormath::type_aliases::Float;
-use super::settings::MultigridSettings;
-
 pub mod kernels;
+pub mod settings;
+
+use stormath::type_aliases::Float;
+use settings::MultigridSettings;
+
+
 
 use kernels::{
     jacobi::jacobi_iteration_step,
@@ -89,10 +92,10 @@ impl MultigridCPU {
     pub fn compute_residual_and_restrict(&mut self, fine_level: usize) {
         let coarse_level = fine_level + 1;
 
-        let fine_grid = &self.grids[fine_level];
-        let coarse_grid = &self.grids[coarse_level];
+        let grid_fine = &self.grids[fine_level];
+        let grid_coarse = &self.grids[coarse_level];
 
-        let nr_coarse_interior_cells = coarse_grid.nr_interior_cells();
+        let nr_coarse_interior_cells = grid_coarse.nr_interior_cells();
 
         let rhs_coarse_ptr = self.rhs_at_levels[coarse_level].as_mut_ptr() as usize;
         let x_fine = &self.x_at_levels[fine_level];
@@ -103,12 +106,12 @@ impl MultigridCPU {
             .into_par_iter()
             .for_each(|flat_index_coarse_interior| {
                 let restricted_value = compute_residual_and_restrict_kernel(
-                    fine_grid,
-                    coarse_grid,
-                    boundary_conditions,
+                    flat_index_coarse_interior,
+                    grid_fine,
+                    grid_coarse,
                     x_fine,
                     rhs_fine,
-                    flat_index_coarse_interior
+                    boundary_conditions
                 );
 
                 // Write result using unsafe pointer access

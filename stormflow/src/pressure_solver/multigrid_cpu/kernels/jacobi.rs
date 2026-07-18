@@ -100,7 +100,16 @@ pub fn jacobi_iteration_step(
                 for ki in 0..nz {
                     let idx = ii * grid.interior_stride[0] + row_base + ki;
 
-                    let off_diag = off_diagonal_sum(grid, boundary_conditions, current, idx, ii, ji, ki);
+                    let off_diag = off_diagonal_sum(
+                        grid, 
+                        boundary_conditions, 
+                        current, 
+                        idx, 
+                        ii, 
+                        ji, 
+                        ki
+                    );
+                    
                     let jacobi_update = (rhs[idx] - off_diag) * grid.poisson_inv_diagonal;
 
                     out_row[ki] = (1.0 - JACOBI_WEIGHT) * current[idx] + JACOBI_WEIGHT * jacobi_update;

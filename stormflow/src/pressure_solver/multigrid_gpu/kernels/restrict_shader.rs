@@ -62,7 +62,13 @@ impl RestrictShader {
         rhs_coarse_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         context.create_bind_group(
-            &[grid_fine_buffer, grid_coarse_buffer, x_fine_buffer, rhs_fine_buffer, rhs_coarse_buffer],
+            &[
+                grid_fine_buffer, 
+                grid_coarse_buffer, 
+                x_fine_buffer, 
+                rhs_fine_buffer, 
+                rhs_coarse_buffer
+            ],
             &self.bind_group_layout
         )
     }

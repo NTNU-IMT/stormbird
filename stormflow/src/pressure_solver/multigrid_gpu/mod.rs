@@ -2,7 +2,7 @@
 use stormath::type_aliases::Float;
 
 use super::{
-    settings::MultigridSettings,
+    multigrid_cpu::settings::MultigridSettings,
     boundary_conditions::PressureBoundaryConditions
 };
 

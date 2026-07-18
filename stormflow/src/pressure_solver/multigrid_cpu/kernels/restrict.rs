@@ -5,7 +5,7 @@ use crate::{
     grid::Grid
 };
 
-const RESTRICT_WEIGHT: Float = 1.0 / 8.0;
+const RESTRICT_WEIGHT: Float = 0.125;
 
 const RESTRICT_CHILD_OFFSETS: [(usize, usize, usize); 8] = [
     (0, 0, 0),
@@ -60,15 +60,15 @@ pub fn residual_at_interior(
 /// Uses unsafe pointer access to enable parallel writes. This is safe because each
 /// coarse cell index is processed exactly once, so there are no data races.
 pub fn compute_residual_and_restrict_kernel(
-    fine_grid: &Grid,
-    coarse_grid: &Grid,
-    boundary_conditions: &PressureBoundaryConditions,
+    flat_index_coarse_interior: usize,
+    grid_fine: &Grid,
+    grid_coarse: &Grid,
     x_fine: &[Float],
     rhs_fine: &[Float],
-    flat_index_coarse_interior: usize,
+    boundary_conditions: &PressureBoundaryConditions,
 ) -> Float {
     // Get coarse interior indices
-    let [i_c, j_c, k_c] = coarse_grid.interior_indices_from_flat_index(flat_index_coarse_interior);
+    let [i_c, j_c, k_c] = grid_coarse.interior_indices_from_flat_index(flat_index_coarse_interior);
 
     // Base fine interior indices (each coarse cell maps to 2x2x2 fine cells)
     let base_i_f = 2 * i_c;
@@ -83,13 +83,13 @@ pub fn compute_residual_and_restrict_kernel(
         let j_f = base_j_f + dj;
         let k_f = base_k_f + dk;
 
-        let idx_fine = fine_grid.flat_index_on_interior_grid([i_f, j_f, k_f]);
+        let idx_fine = grid_fine.flat_index_on_interior_grid([i_f, j_f, k_f]);
 
-        let residual_i = residual_at_interior(
-            fine_grid, boundary_conditions, x_fine, rhs_fine, idx_fine, i_f, j_f, k_f
+        let residual = residual_at_interior(
+            grid_fine, boundary_conditions, x_fine, rhs_fine, idx_fine, i_f, j_f, k_f
         );
 
-        restricted_value += RESTRICT_WEIGHT * residual_i;
+        restricted_value += RESTRICT_WEIGHT * residual;
     }
 
     restricted_value   
