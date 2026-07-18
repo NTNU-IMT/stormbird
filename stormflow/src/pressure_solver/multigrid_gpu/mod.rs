@@ -359,7 +359,10 @@ impl MultigridGPU {
 
         self.solution = self.gpu_context.read_from_staging_buffer(&self.solution_staging_buffer, submission_index);
 
-        let avg_residual = cpu_kernels::compute_residual(&self.grids[0], &self.solution, &self.rhs);
-        println!("Residual sum: {}", avg_residual);
+        if self.solver_settings.compute_residual_after_solve {
+            let avg_residual = cpu_kernels::compute_residual(&self.grids[0], &self.solution, &self.rhs);
+            println!("Residual sum: {}", avg_residual);
+        }
+        
     }
 }

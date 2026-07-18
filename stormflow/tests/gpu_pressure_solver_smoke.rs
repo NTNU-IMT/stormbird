@@ -5,7 +5,7 @@ use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
 use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
 use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
-use stormflow::pressure_solver::settings::MultigridSettings;
+use stormflow::pressure_solver::multigrid_cpu::settings::MultigridSettings;
 
 /// Builds a synthetic RHS (not physically meaningful, just varied enough to exercise the
 /// restrict/prolongate/smoother chain across every multigrid level, including the coarsest one
@@ -25,7 +25,11 @@ fn synthetic_rhs(grid: &Grid) -> Vec<Float> {
 
 fn assert_gpu_matches_cpu(grid: &Grid) {
     let boundary_conditions = PressureBoundaryConditions::new_from_up_direction(SpatialVector([0.0, 1.0, 0.0]));
-    let settings = MultigridSettings::default();
+    let settings = MultigridSettings{
+        nr_smooth_iterations: 4,
+        nr_v_cycles: 2,
+        compute_residual_after_solve: true
+    };
 
     let rhs = synthetic_rhs(&grid);
 

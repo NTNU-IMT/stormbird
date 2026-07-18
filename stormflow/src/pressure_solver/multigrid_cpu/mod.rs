@@ -264,13 +264,15 @@ impl MultigridCPU {
 
         self.boundary_conditions.set_ghost_cells(&self.grids[0], &mut self.solution);
 
-        // Compute residual using stencil-based approach
-        let avg_residual = kernels::compute_residual(
-            &self.grids[0],
-            &self.solution,
-            &self.rhs_at_levels[0]
-        );
-
-        println!("Residual sum: {}", avg_residual);
+        if self.solver_settings.compute_residual_after_solve {
+            // Compute residual using stencil-based approach
+            let avg_residual = kernels::compute_residual(
+                &self.grids[0],
+                &self.solution,
+                &self.rhs_at_levels[0]
+            );
+    
+            println!("Residual sum: {}", avg_residual);
+        }
     }
 }

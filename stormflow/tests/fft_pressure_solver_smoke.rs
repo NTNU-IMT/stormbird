@@ -5,7 +5,7 @@ use stormflow::pressure_solver::boundary_conditions::{PressureBoundaryCondition,
 use stormflow::grid::Grid;
 use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
 use stormflow::pressure_solver::fft::FftCPU;
-use stormflow::pressure_solver::settings::MultigridSettings;
+use stormflow::pressure_solver::multigrid_cpu::settings::MultigridSettings;
 
 /// Builds a synthetic RHS (not physically meaningful, just varied enough to exercise every mode
 /// of the solve), mirroring `tests/gpu_pressure_solver_smoke.rs`'s `synthetic_rhs`.
@@ -29,7 +29,8 @@ fn synthetic_rhs(grid: &Grid) -> Vec<Float> {
 fn converged_multigrid_settings() -> MultigridSettings {
     MultigridSettings {
         nr_v_cycles: 100,
-        nr_smooth_iterations: 4
+        nr_smooth_iterations: 4,
+        compute_residual_after_solve: true
     }
 }
 

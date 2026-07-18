@@ -97,7 +97,7 @@
   "pressure_solver": {
     "Multigrid": {
       "nr_v_cycles": 2,
-      "compute_platform": "CPU"
+      "compute_platform": "GPU"
     }
   }
 }

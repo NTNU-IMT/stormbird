@@ -23,7 +23,7 @@ fn zero_value_flag(axis: u32, face: u32) -> u32 {
     }
 }
 
-@compute @workgroup_size(4, 4, 4)
+@compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let ii = gid.x;
     let ji = gid.y;

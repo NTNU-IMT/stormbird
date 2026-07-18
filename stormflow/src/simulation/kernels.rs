@@ -6,19 +6,13 @@ use stormath::spatial_vector::SpatialVector;
 
 #[inline(always)]
 pub fn convect_and_diffuse(
-    i_flat_interior: usize,
+    i_0: usize,
     grid: &Grid,
     velocity: &[SpatialVector],
     body_force: &[SpatialVector],
     viscosity: Float,
-    density: Float
+    inv_density: Float
 ) -> SpatialVector {
-    let interior_indices = grid.interior_indices_from_flat_index(i_flat_interior);
-    
-    let [i, j, k] = grid.extended_indices_from_interior_indices(interior_indices);
-    
-    let i_0 = grid.flat_index_on_extended_grid([i, j, k]);
-
     let i_p = [i_0 + grid.extended_stride[0], i_0 + grid.extended_stride[1], i_0 + grid.extended_stride[2]];
     let i_n = [i_0 - grid.extended_stride[0], i_0 - grid.extended_stride[1], i_0 - grid.extended_stride[2]];
 
@@ -26,15 +20,10 @@ pub fn convect_and_diffuse(
 
     let v0 = velocity[i_0];
 
-    let inv_density = 1.0 / density;
-
     // ---------------- Convective term --------------
     for vel_comp in 0..3 {
-        let mut indices_p_i = [i, j, k];
-        indices_p_i[vel_comp] += 1; // Indices to neighbor cell relative to u_i
-        
-        let i_p_i = grid.flat_index_on_extended_grid(indices_p_i);
-        
+        let i_p_i = i_p[vel_comp]; // Neighbor cell relative to u_i, in the +vel_comp direction
+
         for deriv_dir in 0..3 {
             let u_i = v0[vel_comp];
             

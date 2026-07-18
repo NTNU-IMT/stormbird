@@ -70,7 +70,7 @@ fn residual_at(idx: u32, ii: u32, ji: u32, ki: u32) -> f32 {
     return rhs_fine[idx] - ax;
 }
 
-@compute @workgroup_size(4, 4, 4)
+@compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i_c = gid.x;
     let j_c = gid.y;

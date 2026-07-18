@@ -7,6 +7,9 @@ use stormbird::wind::{
 };
 
 use crate::grid::Grid;
+use crate::grid::boundary_face::BoundaryFace;
+
+use rayon::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum VelocityBoundaryCondition {
@@ -53,6 +56,7 @@ impl VelocityBoundaryConditions {
         }
     }
 
+    #[inline(always)]
     pub fn velocity_at_point(&self, point: SpatialVector) -> SpatialVector {
         self.wind_environment.steady_apparent_wind_velocity_vector_at_location(
             &self.wind_condition, point, self.linear_velocity
@@ -81,106 +85,95 @@ impl VelocityBoundaryConditions {
         }).collect()
     }
     
-    pub fn set_ghost_cells(&self, grid: &Grid, velocity: &mut [SpatialVector]) {
-        let [nx, ny, nz] = grid.extended_shape.clone();
-        
-        for axis_index in 0..3 {
-            let axis_length = match axis_index {
-                0 => nx,
-                1 => ny,
-                2 => nz,
-                _ => panic!("Axis index larger than 2")
-            };
-            
-            let (n1, n2) = match axis_index {
-                0 => (ny, nz),
-                1 => (nx, nz),
-                2 => (nx, ny),
-                _ => panic!("Axis index larger than 2")
-            };
-            
-            for face_index in 0..2 {
-                for i_1 in 1..(n1-1) {
-                    for i_2 in 1..(n2-1) {
-                        let mut indices_current = [0, 0, 0];
-                        let mut indices_neighbor = [0, 0, 0];
-                        
-                        if face_index == 0 {
-                            indices_current[axis_index] = 0;
-                            indices_neighbor[axis_index] = 1;
+    /// Updates the ghost cells on one face (`axis_index`/`face_index`), in parallel over the
+    /// face's cells. Mirrors `PressureBoundaryConditions::set_ghost_cells_kernel`: a raw pointer
+    /// lets the closure write `flat_current` while reads of `flat_neighbor` go through the
+    /// ordinary slice, which is sound because `flat_current`/`flat_neighbor` are always on
+    /// different layers along `axis_index` and this kernel only ever runs for one face at a time.
+    fn set_ghost_cells_kernel(
+        &self,
+        axis_index: usize,
+        condition: VelocityBoundaryCondition,
+        boundary_face: &BoundaryFace,
+        grid: &Grid,
+        velocity: &mut [SpatialVector],
+    ) {
+        let velocity_ptr = velocity.as_mut_ptr() as usize;
+        let [outer_len, inner_len] = boundary_face.shape;
+
+        (0..outer_len * inner_len)
+            .into_par_iter()
+            .with_min_len(2048)
+            .for_each(|idx| {
+                let i_outer = idx / inner_len;
+                let i_inner = idx % inner_len;
+
+                let flat_current = (
+                    boundary_face.axis_offset
+                    + i_outer * boundary_face.stride[0]
+                    + i_inner * boundary_face.stride[1]
+                ) as usize;
+
+                let flat_neighbor = (flat_current as i32 + boundary_face.neighbor_delta) as usize;
+
+                let new_value = match condition {
+                    VelocityBoundaryCondition::InletOutlet => {
+                        // Check the direction of the flow in the neighbor cell. `neighbor_delta`
+                        // is positive on the min-boundary face (neighbor is toward +axis) and
+                        // negative on the max-boundary face, so its sign alone tells us which
+                        // flow direction counts as inflow, without needing `face_index` here.
+                        let neighbor_axis_flow = velocity[flat_neighbor][axis_index];
+
+                        let inflow = if boundary_face.neighbor_delta > 0 {
+                            neighbor_axis_flow > 0.0
                         } else {
-                            indices_current[axis_index] = axis_length-1;
-                            indices_neighbor[axis_index] = axis_length-2;
-                        }
-                        
-                        match axis_index {
-                            0 => {     
-                                indices_current[1] = i_1;
-                                indices_neighbor[1] = i_1;
-                                indices_current[2] = i_2;
-                                indices_neighbor[2] = i_2;
-                            },
-                            1 => {
-                                indices_current[0] = i_1;
-                                indices_neighbor[0] = i_1;
-                                indices_current[2] = i_2;
-                                indices_neighbor[2] = i_2;
-                            },
-                            2 => {
-                                indices_current[0] = i_1;
-                                indices_neighbor[0] = i_1;
-                                indices_current[1] = i_2;
-                                indices_neighbor[1] = i_2;
-                            },
-                            _ => panic!("Axis index larger than 2")
-                        }
-                        
-                        let flat_index_current = grid.flat_index_on_extended_grid(indices_current);
-                        let flat_index_neighbor = grid.flat_index_on_extended_grid(indices_neighbor);
-                        
-                        match self.face_conditions[axis_index][face_index] {
-                            VelocityBoundaryCondition::InletOutlet => {
-                                // Check the direction of the flow in the neighbor cell
-                                let neighbor_axis_flow = velocity[flat_index_neighbor][axis_index];
+                            neighbor_axis_flow < 0.0
+                        };
 
-                                let inflow = if face_index == 0 {
-                                    // Min boundary: positive flow (toward +axis) = inflow
-                                    neighbor_axis_flow > 0.0
-                                } else {
-                                    // Max boundary: negative flow (toward -axis) = inflow  
-                                    neighbor_axis_flow < 0.0
-                                };
+                        if inflow {
+                            let extended_indices = grid.extended_indices_from_flat_index(flat_current);
+                            let cell_center = grid.cell_center_extended(extended_indices);
 
-                                // Set the values if inflow, otherwise assume zero gradient
-                                if inflow {
-                                    for c in 0..3 {
-                                        let mut face_point = grid.cell_center_extended(indices_current);
-                                        
-                                        face_point[c] += 0.5 * grid.cell_length[c]; // positive-face convention
-                                        let v = self.velocity_at_point(face_point);
-                                        velocity[flat_index_current][c] = v[c];
-                                    }
-                                } else {
-                                    velocity[flat_index_current][0] = velocity[flat_index_neighbor][0];
-                                    velocity[flat_index_current][1] = velocity[flat_index_neighbor][1];
-                                    velocity[flat_index_current][2] = velocity[flat_index_neighbor][2];
-                                }
-                            },
-                            VelocityBoundaryCondition::ZeroGradient => {
-                                velocity[flat_index_current][0] = velocity[flat_index_neighbor][0];
-                                velocity[flat_index_current][1] = velocity[flat_index_neighbor][1];
-                                velocity[flat_index_current][2] = velocity[flat_index_neighbor][2];
-                            },
-                            VelocityBoundaryCondition::SlipWall => {
-                                velocity[flat_index_current][0] = velocity[flat_index_neighbor][0];
-                                velocity[flat_index_current][1] = velocity[flat_index_neighbor][1];
-                                velocity[flat_index_current][2] = velocity[flat_index_neighbor][2];
-
-                                velocity[flat_index_current][axis_index] = 0.0;
+                            let mut new_value = SpatialVector::default();
+                            for c in 0..3 {
+                                let mut face_point = cell_center;
+                                face_point[c] += 0.5 * grid.cell_length[c]; // positive-face convention
+                                new_value[c] = self.velocity_at_point(face_point)[c];
                             }
+                            new_value
+                        } else {
+                            velocity[flat_neighbor]
                         }
+                    },
+                    VelocityBoundaryCondition::ZeroGradient => velocity[flat_neighbor],
+                    VelocityBoundaryCondition::SlipWall => {
+                        let mut v = velocity[flat_neighbor];
+                        v[axis_index] = 0.0;
+                        v
                     }
+                };
+
+                unsafe {
+                    *(velocity_ptr as *mut SpatialVector).add(flat_current) = new_value;
                 }
+            });
+    }
+
+    /// Updates the ghost cells on the velocity, using the boundary conditions in self and the
+    /// supplied grid for the indexing logic.
+    pub fn set_ghost_cells(&self, grid: &Grid, velocity: &mut [SpatialVector]) {
+        for axis_index in 0..3 {
+            for face_index in 0..2 {
+                let boundary_face = BoundaryFace::new(
+                    grid.extended_shape,
+                    grid.extended_stride,
+                    axis_index,
+                    face_index
+                );
+
+                let condition = self.face_conditions[axis_index][face_index];
+
+                self.set_ghost_cells_kernel(axis_index, condition, &boundary_face, grid, velocity);
             }
         }
     }

@@ -17,6 +17,8 @@ pub struct MultigridSettingsBuilder {
     #[serde(default="MultigridSettingsBuilder::default_nr_smooth_iterations")]
     pub nr_smooth_iterations: usize,
     #[serde(default)]
+    pub compute_residual_after_solve: bool,
+    #[serde(default)]
     pub compute_platform: ComputePlatform
 }
 
@@ -27,7 +29,8 @@ impl MultigridSettingsBuilder {
     pub fn build_settings(&self) -> MultigridSettings {
         MultigridSettings{
             nr_v_cycles: self.nr_v_cycles,
-            nr_smooth_iterations: self.nr_smooth_iterations
+            nr_smooth_iterations: self.nr_smooth_iterations,
+            compute_residual_after_solve: self.compute_residual_after_solve
         }
     }
 }
@@ -37,6 +40,7 @@ impl Default for MultigridSettingsBuilder {
         Self {
             nr_v_cycles: Self::default_nr_v_cycles(),
             nr_smooth_iterations: Self::default_nr_smooth_iterations(),
+            compute_residual_after_solve: false,
             compute_platform: ComputePlatform::default()
         }
     }

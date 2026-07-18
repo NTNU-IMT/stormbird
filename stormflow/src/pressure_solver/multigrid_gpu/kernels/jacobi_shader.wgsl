@@ -18,7 +18,7 @@
 @group(0) @binding(2) var<storage, read> rhs: array<f32>;
 @group(0) @binding(3) var<storage, read_write> new_sol: array<f32>;
 
-const WG: u32 = 4u;
+const WG: u32 = 8u;
 const JACOBI_WEIGHT: f32 = 0.6666666667;
 
 fn zero_value_flag(axis: u32, face: u32) -> u32 {

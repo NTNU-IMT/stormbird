@@ -6,7 +6,7 @@ use stormath::type_aliases::Float;
 use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
 use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
-use stormflow::pressure_solver::settings::MultigridSettings;
+use stormflow::pressure_solver::multigrid_cpu::settings::MultigridSettings;
 
 #[test]
 fn gpu_pressure_solver_bench() {
@@ -17,7 +17,11 @@ fn gpu_pressure_solver_bench() {
     );
 
     let boundary_conditions = PressureBoundaryConditions::new_from_up_direction(SpatialVector([0.0, 1.0, 0.0]));
-    let settings = MultigridSettings::default();
+    let settings = MultigridSettings{
+        nr_smooth_iterations: 4,
+        nr_v_cycles: 2,
+        compute_residual_after_solve: true
+    };
 
     let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings);
 

@@ -364,12 +364,19 @@ impl Simulation {
     
     pub fn pressure_projection_rhs(&mut self, time_step: Float) {
         let start_time = Instant::now();
-        
+
         let nr_interior_cells = self.grid.nr_interior_cells();
 
-        let mut rhs = vec![0.0; nr_interior_cells];
+        let inv_time_step = 1.0 / time_step;
 
-        let data_ptr =  rhs.as_mut_ptr() as usize;//self.pressure_solver.rhs_at_levels[0].as_mut_ptr() as usize;
+        // Write straight into the selected solver's rhs buffer instead of a scratch `Vec`
+        // copied over afterwards; this only borrows `self.pressure_solver`, which is disjoint
+        // from the `self.grid`/`self.velocity_star`/`self.density` fields the closure below reads.
+        let data_ptr: usize = match self.pressure_solver {
+            PressureSolver::MultigridCPU(ref mut solver) => solver.rhs_at_levels[0].as_mut_ptr() as usize,
+            PressureSolver::MultigridGPU(ref mut solver) => solver.rhs.as_mut_ptr() as usize,
+            PressureSolver::FftCPU(ref mut solver) => solver.rhs.as_mut_ptr() as usize,
+        };
 
         (0..nr_interior_cells)
             .into_par_iter()
@@ -390,10 +397,10 @@ impl Simulation {
                     new_value += (
                         self.velocity_star[i_0][axis_index] - 
                         self.velocity_star[i_n][axis_index]
-                    ) / self.grid.cell_length[axis_index];
+                    ) * self.grid.inv_cell_length[axis_index];
                 }
 
-                new_value *= self.density / time_step;
+                new_value *= self.density * inv_time_step;
 
                 unsafe {
                     let ptr = data_ptr as *mut Float;
@@ -401,12 +408,6 @@ impl Simulation {
                 }
                 
             });
-
-        match self.pressure_solver {
-            PressureSolver::MultigridCPU(ref mut solver) => solver.rhs_at_levels[0].copy_from_slice(&rhs),
-            PressureSolver::MultigridGPU(ref mut solver) => solver.rhs.copy_from_slice(&rhs),
-            PressureSolver::FftCPU(ref mut solver) => solver.rhs.copy_from_slice(&rhs)
-        }
 
         println!("Pressure projection rhs time: {:.?}", start_time.elapsed());
     }
@@ -431,7 +432,7 @@ impl Simulation {
         let velocity_org = &self.velocity_org;
         let body_force = &self.body_force;
         let viscosity = self.viscosity;
-        let density = self.density;
+        let inv_density = 1.0 / self.density;
         let velocity_star = &mut self.velocity_star;
     
         let [nxi, nyi, nzi] = grid.interior_shape;
@@ -447,29 +448,25 @@ impl Simulation {
             .skip(1)
             .take(nxi)
             .for_each(|(i, star_plane)| {
-                let ii = i - 1; // interior i index
                 for ji in 0..nyi {
                     let j = ji + 1;
-                    // Interior flat index for (ii, ji, 0); advanced by +1 per k.
-                    let mut i_interior = grid.flat_index_on_interior_grid([ii, ji, 0]);
                     let mut i_extended = grid.flat_index_on_extended_grid([i, j, 1]);
-    
+
                     for _k in 0..nzi {
                         let new_value = kernels::convect_and_diffuse(
-                            i_interior, 
-                            grid, 
+                            i_extended,
+                            grid,
                             velocity,
                             body_force,
                             viscosity,
-                            density
+                            inv_density
                         );
-    
+
                         let new_velocity = velocity_org[i_extended] + time_step * new_value;
-    
+
                         // i_extended lies in plane `i`; index within the chunk.
                         star_plane[i_extended - i * plane] = new_velocity;
-    
-                        i_interior += 1;
+
                         i_extended += 1;
                     }
                 }
@@ -491,9 +488,9 @@ impl Simulation {
         let data_ptr = self.velocity.as_mut_ptr() as usize;
 
         let pressure = match &self.pressure_solver {
-            PressureSolver::MultigridCPU(solver) => solver.solution.clone(),
-            PressureSolver::MultigridGPU(solver) => solver.solution.clone(),
-            PressureSolver::FftCPU(solver) => solver.solution.clone()
+            PressureSolver::MultigridCPU(solver) => &solver.solution,
+            PressureSolver::MultigridGPU(solver) => &solver.solution,
+            PressureSolver::FftCPU(solver) => &solver.solution
         };
 
         (0..nr_interior_cells)
@@ -515,7 +512,7 @@ impl Simulation {
                     dp_dx[axis_index] = (
                         pressure[i_p] - 
                         pressure[i_0]
-                    ) / self.grid.cell_length[axis_index];
+                    ) * self.grid.inv_cell_length[axis_index];
                 }
                 
                 let new_velocity = self.velocity_star[i_0] - (time_step / self.density) * dp_dx;
