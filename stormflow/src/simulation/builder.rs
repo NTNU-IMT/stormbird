@@ -16,10 +16,6 @@ use stormbird::{
 
 use crate::actuator_line_interface::ActuatorLineInterface;
 
-use crate::boundary_conditions::{
-    velocity::VelocityBoundaryConditions
-};
-
 use crate::grid::Grid;
 use crate::simulation::Simulation;
 use crate::geometry::{
@@ -29,6 +25,10 @@ use crate::geometry::{
 use crate::pressure_solver::{
     builder::PressureSolverBuilder,
     boundary_conditions::PressureBoundaryConditions
+};
+
+use crate::velocity_solver::{
+    VelocitySolver, boundary_condisitions::VelocityBoundaryConditions
 };
 
 use crate::error::Error;
@@ -99,7 +99,14 @@ impl SimulationBuilder {
             &grid,
             &pressure_boundary_conditions
         );
-        
+
+        let mut max_dx = 0.0;
+        for axis_index in 0..3 {
+            if grid.cell_length[axis_index] > max_dx {
+                max_dx = grid.cell_length[axis_index];
+            }
+        }
+
         let actuator_line = if let Some(builder) = &self.actuator_line {
             Some(
                 ActuatorLineInterface::new(builder.build(), &grid)
@@ -136,21 +143,27 @@ impl SimulationBuilder {
         let normals_slip_surfaces = Geometry::geometry_normals_on_extended_grid(
             &slip_geometries, &grid, 0.1
         );
-        
-        Simulation {
+
+        let velocity_solver = VelocitySolver {
             velocity,
             velocity_org,
             velocity_star,
-            velocity_boundary_conditions,
             body_force,
-            pressure_solver,
-            grid,
-            viscosity: self.effective_viscosity,
-            density: 1.0,
-            actuator_line,
             signed_distance_function,
             signed_distance_function_slip,
-            normals_slip_surfaces
+            normals_slip_surfaces,
+            boundary_conditions: velocity_boundary_conditions,
+            no_slip_epsilon: 2.0 * max_dx,
+            slip_epsilon: 2.0 * max_dx,
+            viscosity: self.effective_viscosity,
+            density: 1.0,
+        };
+        
+        Simulation {
+            grid,
+            velocity_solver,
+            pressure_solver,
+            actuator_line,
         }
     }
 }

@@ -77,5 +77,11 @@
     },
     "write_iterations_full_result": 100,
     "start_time": 0.0
+  },
+  "pressure_solver": {
+    "Multigrid": {
+      "nr_v_cycles": 2,
+      "compute_platform": "GPU"
+    }
   }
 }

@@ -117,6 +117,8 @@ impl Simulation {
         //
         write!(w, "VECTORS velocity double\n").unwrap();
 
+        let velocity = &self.velocity_solver.velocity;
+
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
@@ -129,9 +131,9 @@ impl Simulation {
                     let flat_y_bot  = self.grid.flat_index_on_extended_grid([ex,     ey - 1, ez    ]);
                     let flat_z_back = self.grid.flat_index_on_extended_grid([ex,     ey,     ez - 1]);
 
-                    let u: f64 = (0.5 * (self.velocity[flat_x_left][0] + self.velocity[flat_c][0])) as f64;
-                    let v: f64 = (0.5 * (self.velocity[flat_y_bot][1]  + self.velocity[flat_c][1])) as f64;
-                    let ww: f64 = (0.5 * (self.velocity[flat_z_back][2] + self.velocity[flat_c][2])) as f64;
+                    let u: f64 = (0.5 * (velocity[flat_x_left][0] + velocity[flat_c][0])) as f64;
+                    let v: f64 = (0.5 * (velocity[flat_y_bot][1]  + velocity[flat_c][1])) as f64;
+                    let ww: f64 = (0.5 * (velocity[flat_z_back][2] + velocity[flat_c][2])) as f64;
 
                     if binary {
                         w.write_all(&u.to_be_bytes()).unwrap();
@@ -148,6 +150,8 @@ impl Simulation {
 
         write!(w, "VECTORS body_force double\n").unwrap();
 
+        let body_force = &self.velocity_solver.body_force;
+
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
@@ -155,9 +159,9 @@ impl Simulation {
                         [ix, iy, iz]
                     );
                     
-                    let fx = self.body_force[i_flat][0] as f64;
-                    let fy = self.body_force[i_flat][1] as f64;
-                    let fz = self.body_force[i_flat][2] as f64;
+                    let fx = body_force[i_flat][0] as f64;
+                    let fy = body_force[i_flat][1] as f64;
+                    let fz = body_force[i_flat][2] as f64;
 
                     if binary {
                         w.write_all(&fx.to_be_bytes()).unwrap();
@@ -176,6 +180,8 @@ impl Simulation {
         write!(w, "SCALARS sdf double 1\n").unwrap();
         write!(w, "LOOKUP_TABLE default\n").unwrap();
 
+        let signed_distance_function = &self.velocity_solver.signed_distance_function;
+
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
@@ -185,7 +191,7 @@ impl Simulation {
                     let ez = iz + 1;
 
                     let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
-                    let sdf: f64 = self.signed_distance_function[flat] as f64;
+                    let sdf: f64 = signed_distance_function[flat] as f64;
 
                     if binary {
                         w.write_all(&sdf.to_be_bytes()).unwrap();
@@ -202,6 +208,8 @@ impl Simulation {
         write!(w, "SCALARS sdf_slip double 1\n").unwrap();
         write!(w, "LOOKUP_TABLE default\n").unwrap();
 
+        let signed_distance_function_slip = &self.velocity_solver.signed_distance_function_slip;
+
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
@@ -210,7 +218,7 @@ impl Simulation {
                     let ez = iz + 1;
 
                     let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
-                    let sdf_slip: f64 = self.signed_distance_function_slip[flat] as f64;
+                    let sdf_slip: f64 = signed_distance_function_slip[flat] as f64;
 
                     if binary {
                         w.write_all(&sdf_slip.to_be_bytes()).unwrap();
@@ -226,6 +234,8 @@ impl Simulation {
         // --- Normals for slip surfaces (vector) ---
         write!(w, "VECTORS normals_slip double\n").unwrap();
 
+        let normals_slip_surfaces = &self.velocity_solver.normals_slip_surfaces;
+
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
@@ -235,9 +245,9 @@ impl Simulation {
 
                     let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
 
-                    let nx_val: f64 = self.normals_slip_surfaces[flat][0] as f64;
-                    let ny_val: f64 = self.normals_slip_surfaces[flat][1] as f64;
-                    let nz_val: f64 = self.normals_slip_surfaces[flat][2] as f64;
+                    let nx_val: f64 = normals_slip_surfaces[flat][0] as f64;
+                    let ny_val: f64 = normals_slip_surfaces[flat][1] as f64;
+                    let nz_val: f64 = normals_slip_surfaces[flat][2] as f64;
 
                     if binary {
                         w.write_all(&nx_val.to_be_bytes()).unwrap();

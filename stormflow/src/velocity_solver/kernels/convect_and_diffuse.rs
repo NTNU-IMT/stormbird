@@ -1,22 +1,23 @@
+use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use crate::grid::Grid;
 
-use stormath::type_aliases::Float;
-use stormath::spatial_vector::SpatialVector;
-
 #[inline(always)]
-pub fn convect_and_diffuse(
+pub fn convect_and_diffuse_kernel(
     i_0: usize,
     grid: &Grid,
+    velocity_org: &[SpatialVector],
     velocity: &[SpatialVector],
     body_force: &[SpatialVector],
     viscosity: Float,
-    inv_density: Float
+    inv_density: Float,
+    time_step: Float
 ) -> SpatialVector {
     let i_p = [i_0 + grid.extended_stride[0], i_0 + grid.extended_stride[1], i_0 + grid.extended_stride[2]];
     let i_n = [i_0 - grid.extended_stride[0], i_0 - grid.extended_stride[1], i_0 - grid.extended_stride[2]];
 
-    let mut out = SpatialVector::default();
+    let mut new_value = SpatialVector::default();
 
     let v0 = velocity[i_0];
 
@@ -50,19 +51,21 @@ pub fn convect_and_diffuse(
                 (u_i_p - u_i) * grid.inv_cell_length[deriv_dir]
             };
                 
-            out[vel_comp] -= u_j * dui_dxj; 
+            new_value[vel_comp] -= u_j * dui_dxj; 
 
-            out[vel_comp] += viscosity * (
+            new_value[vel_comp] += viscosity * (
                 velocity[i_p[deriv_dir]][vel_comp] - 
                 2.0 * u_i + 
                 velocity[i_n[deriv_dir]][vel_comp]
             ) * grid.inv_cell_length_squared[deriv_dir];
         }
 
-        out[vel_comp] += 0.5 * (
+        new_value[vel_comp] += 0.5 * (
             body_force[i_0][vel_comp] + body_force[i_p[vel_comp]][vel_comp]
         ) * inv_density;
     }
 
-    out
+    let new_velocity = velocity_org[i_0] + time_step * new_value;
+
+    new_velocity
 }

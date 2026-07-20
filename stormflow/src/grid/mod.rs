@@ -342,4 +342,26 @@ impl Grid {
 
         grids
     }
+
+    pub fn cell_centered_value_from_face_staggered(
+        &self,
+        interior_indices: [usize; 3],
+        staggered_value: &[SpatialVector]
+    ) -> SpatialVector {
+        let [i, j, k] = self.extended_indices_from_interior_indices(interior_indices);
+        
+        let i_0 = self.flat_index_on_extended_grid([i, j, k]);
+        
+        let i_n = [
+            self.flat_index_on_extended_grid([i-1, j, k]),
+            self.flat_index_on_extended_grid([i, j-1, k]),
+            self.flat_index_on_extended_grid([i, j, k-1])
+        ];
+        
+        let u = 0.5 * (staggered_value[i_0][0] + staggered_value[i_n[0]][0]);
+        let v = 0.5 * (staggered_value[i_0][1] + staggered_value[i_n[1]][1]);
+        let w = 0.5 * (staggered_value[i_0][2] + staggered_value[i_n[2]][2]);
+        
+        SpatialVector([u, v, w])
+    }
 }

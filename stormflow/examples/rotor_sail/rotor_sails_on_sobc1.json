@@ -103,5 +103,11 @@
         "file_path": "sobc1_superstructure.obj"
       }
     }
-  ]
+  ],
+  "pressure_solver": {
+    "Multigrid": {
+      "nr_v_cycles": 2,
+      "compute_platform": "GPU"
+    }
+  }
 }
