@@ -14,21 +14,22 @@ pub fn add_pressure_gradient_kernel(
 ) -> SpatialVector {
     let mut dp_dx = SpatialVector::default();
 
-    let extended_indices = grid.extended_indices_from_flat_index(i_0);
-
+    // 4th order accurate pressure gradient onto u_i's face: the same symmetric 4-point
+    // staggered derivative as `PressureSolver::calculate_rhs`'s divergence, in the opposite
+    // staggering direction (cell-centered pressure -> face gradient instead of face-centered
+    // velocity -> cell-center divergence).
     for axis_index in 0..3 {
-        let mut extended_indices_p = extended_indices;
-        extended_indices_p[axis_index] += 1;
+        let stride = grid.extended_stride[axis_index];
 
-        let i_p = grid.flat_index_on_extended_grid(extended_indices_p);
+        let i_n = i_0 - stride;
+        let i_p = i_0 + stride;
+        let i_p2 = i_p + stride;
 
         dp_dx[axis_index] = (
-            pressure[i_p] - 
-            pressure[i_0]
-        ) * grid.inv_cell_length[axis_index];
+            27.0 * (pressure[i_p] - pressure[i_0]) -
+            (pressure[i_p2] - pressure[i_n])
+        ) * grid.inv_cell_length[axis_index] * (1.0 / 24.0);
     }
-    
-    let new_velocity = velocity_star[i_0] - time_step * inv_density * dp_dx;
 
-    new_velocity
+    velocity_star[i_0] - time_step * inv_density * dp_dx
 }

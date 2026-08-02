@@ -7,6 +7,7 @@ use stormbird::wind::{
 };
 
 use crate::grid::Grid;
+use crate::grid::INTERIOR_OFFSET;
 use crate::grid::boundary_face::BoundaryFace;
 
 use rayon::prelude::*;
@@ -164,16 +165,19 @@ impl VelocityBoundaryConditions {
     pub fn set_ghost_cells(&self, grid: &Grid, velocity: &mut [SpatialVector]) {
         for axis_index in 0..3 {
             for face_index in 0..2 {
-                let boundary_face = BoundaryFace::new(
-                    grid.extended_shape,
-                    grid.extended_stride,
-                    axis_index,
-                    face_index
-                );
-
                 let condition = self.face_conditions[axis_index][face_index];
 
-                self.set_ghost_cells_kernel(axis_index, condition, &boundary_face, grid, velocity);
+                for ghost_layer in 0..INTERIOR_OFFSET {
+                    let boundary_face = BoundaryFace::new(
+                        grid.extended_shape,
+                        grid.extended_stride,
+                        axis_index,
+                        face_index,
+                        ghost_layer
+                    );
+
+                    self.set_ghost_cells_kernel(axis_index, condition, &boundary_face, grid, velocity);
+                }
             }
         }
     }

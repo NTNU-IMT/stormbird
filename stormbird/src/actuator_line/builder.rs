@@ -16,6 +16,8 @@ use super::sampling::SamplingSettings;
 use super::solver::SolverSettings;
 use super::ActuatorLine;
 
+use super::spanflow_damper::SpanflowDamper;
+
 use super::corrections::{
     lifting_line::LiftingLineCorrectionBuilder,
     empirical_circulation::EmpiricalCirculationCorrection,
@@ -43,6 +45,8 @@ pub struct ActuatorLineBuilder {
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    #[serde(default)]
+    pub spanflow_damper: Option<SpanflowDamper>
 }
 
 impl ActuatorLineBuilder {
@@ -64,6 +68,7 @@ impl ActuatorLineBuilder {
             start_time: 0.0,
             lifting_line_correction: None,
             empirical_circulation_correction: None,
+            spanflow_damper: None,
         }
     }
 
@@ -107,6 +112,7 @@ impl ActuatorLineBuilder {
             sectional_drag_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             lifting_line_correction,
             empirical_circulation_correction: self.empirical_circulation_correction.clone(),
+            spanflow_damper: self.spanflow_damper.clone()
         }
     }
 }

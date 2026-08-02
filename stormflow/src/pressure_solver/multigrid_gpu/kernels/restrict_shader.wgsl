@@ -21,51 +21,65 @@ fn zero_value_flag(axis: u32, face: u32) -> u32 {
     }
 }
 
-/// Residual r = rhs - A*x at fine interior cell (ii,ji,ki)/idx, with a missing neighbor on any
-/// axis explicitly substituted by `x_fine[idx]` itself (signed per that face's boundary
-/// condition) rather than folded into the diagonal — see jacobi_shader.wgsl's
-/// `off_diagonal_sum` for why this has to be an explicit substitution, not an implicit one.
+/// One axis' contribution to the 4th order accurate off-diagonal stencil sum — mirrors
+/// jacobi_shader.wgsl's `axis_off_diagonal` (see there for the boundary substitution rule),
+/// reading from `x_fine` instead of `current`. Must stay in sync with both that and
+/// `multigrid_cpu::kernels::jacobi::axis_off_diagonal_sum`.
+fn axis_off_diagonal(idx: u32, stride: u32, position: u32, count: u32, sign_min: f32, sign_max: f32, inv_dx2: f32) -> f32 {
+    var u_m1: f32;
+    if position >= 1u {
+        u_m1 = x_fine[idx - stride];
+    } else {
+        u_m1 = sign_min * x_fine[idx];
+    }
+
+    var u_m2: f32;
+    if position >= 2u {
+        u_m2 = x_fine[idx - 2u * stride];
+    } else if position == 1u {
+        u_m2 = sign_min * x_fine[idx - stride];
+    } else {
+        u_m2 = sign_min * x_fine[idx + stride];
+    }
+
+    var u_p1: f32;
+    if position + 1u < count {
+        u_p1 = x_fine[idx + stride];
+    } else {
+        u_p1 = sign_max * x_fine[idx];
+    }
+
+    var u_p2: f32;
+    if position + 2u < count {
+        u_p2 = x_fine[idx + 2u * stride];
+    } else if position + 1u < count {
+        u_p2 = sign_max * x_fine[idx + stride];
+    } else {
+        u_p2 = sign_max * x_fine[idx - stride];
+    }
+
+    return inv_dx2 * ((4.0 / 3.0) * (u_m1 + u_p1) - (1.0 / 12.0) * (u_m2 + u_p2));
+}
+
+/// Residual r = rhs - A*x at fine interior cell (ii,ji,ki)/idx, using the same 4th order
+/// boundary-folded stencil as jacobi_shader.wgsl's `off_diagonal_sum`.
 fn residual_at(idx: u32, ii: u32, ji: u32, ki: u32) -> f32 {
     let nx = grid_fine.interior_shape.x;
     let ny = grid_fine.interior_shape.y;
     let nz = grid_fine.interior_shape.z;
 
-    var off_diag: f32 = 0.0;
+    let sign_x0 = select(1.0, -1.0, zero_value_flag(0u, 0u) == 1u);
+    let sign_x1 = select(1.0, -1.0, zero_value_flag(0u, 1u) == 1u);
+    let sign_y0 = select(1.0, -1.0, zero_value_flag(1u, 0u) == 1u);
+    let sign_y1 = select(1.0, -1.0, zero_value_flag(1u, 1u) == 1u);
+    let sign_z0 = select(1.0, -1.0, zero_value_flag(2u, 0u) == 1u);
+    let sign_z1 = select(1.0, -1.0, zero_value_flag(2u, 1u) == 1u);
 
-    if ii > 0u {
-        off_diag += grid_fine.inv_cell_length_squared.x * x_fine[idx - grid_fine.interior_stride.x];
-    } else {
-        off_diag += grid_fine.inv_cell_length_squared.x * select(1.0, -1.0, zero_value_flag(0u, 0u) == 1u) * x_fine[idx];
-    }
-    if ii + 1u < nx {
-        off_diag += grid_fine.inv_cell_length_squared.x * x_fine[idx + grid_fine.interior_stride.x];
-    } else {
-        off_diag += grid_fine.inv_cell_length_squared.x * select(1.0, -1.0, zero_value_flag(0u, 1u) == 1u) * x_fine[idx];
-    }
+    let off_diag = axis_off_diagonal(idx, grid_fine.interior_stride.x, ii, nx, sign_x0, sign_x1, grid_fine.inv_cell_length_squared.x)
+                 + axis_off_diagonal(idx, grid_fine.interior_stride.y, ji, ny, sign_y0, sign_y1, grid_fine.inv_cell_length_squared.y)
+                 + axis_off_diagonal(idx, 1u, ki, nz, sign_z0, sign_z1, grid_fine.inv_cell_length_squared.z);
 
-    if ji > 0u {
-        off_diag += grid_fine.inv_cell_length_squared.y * x_fine[idx - grid_fine.interior_stride.y];
-    } else {
-        off_diag += grid_fine.inv_cell_length_squared.y * select(1.0, -1.0, zero_value_flag(1u, 0u) == 1u) * x_fine[idx];
-    }
-    if ji + 1u < ny {
-        off_diag += grid_fine.inv_cell_length_squared.y * x_fine[idx + grid_fine.interior_stride.y];
-    } else {
-        off_diag += grid_fine.inv_cell_length_squared.y * select(1.0, -1.0, zero_value_flag(1u, 1u) == 1u) * x_fine[idx];
-    }
-
-    if ki > 0u {
-        off_diag += grid_fine.inv_cell_length_squared.z * x_fine[idx - 1u];
-    } else {
-        off_diag += grid_fine.inv_cell_length_squared.z * select(1.0, -1.0, zero_value_flag(2u, 0u) == 1u) * x_fine[idx];
-    }
-    if ki + 1u < nz {
-        off_diag += grid_fine.inv_cell_length_squared.z * x_fine[idx + 1u];
-    } else {
-        off_diag += grid_fine.inv_cell_length_squared.z * select(1.0, -1.0, zero_value_flag(2u, 1u) == 1u) * x_fine[idx];
-    }
-
-    let ax = grid_fine.poisson_diagonal * x_fine[idx] + off_diag;
+    let ax = grid_fine.poisson_diagonal4 * x_fine[idx] + off_diag;
 
     return rhs_fine[idx] - ax;
 }

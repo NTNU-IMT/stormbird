@@ -14,13 +14,11 @@ use super::{
     PressureSolver,
     multigrid_cpu::MultigridCPU,
     multigrid_gpu::MultigridGPU,
-    fft::FftCPU,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PressureSolverBuilder {
     Multigrid(MultigridSettingsBuilder),
-    FFT
 }
 
 impl Default for PressureSolverBuilder {
@@ -54,11 +52,6 @@ impl PressureSolverBuilder {
                     }
                 }
             },
-            Self::FFT => {
-                PressureSolver::FftCPU(
-                    FftCPU::new(grid, boundary_conditions)
-                )
-            }
         }
 
     }

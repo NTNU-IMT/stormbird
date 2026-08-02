@@ -6,7 +6,7 @@ use stormath::type_aliases::Float;
 use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
 use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
-use stormflow::pressure_solver::multigrid_cpu::settings::MultigridSettings;
+use stormflow::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
 
 #[test]
 fn cpu_pressure_solver_bench() {
@@ -20,7 +20,8 @@ fn cpu_pressure_solver_bench() {
     let settings = MultigridSettings{
         nr_smooth_iterations: 4,
         nr_v_cycles: 2,
-        compute_residual_after_solve: true
+        compute_residual_after_solve: true,
+        coarsest_level_solver: CoarsestLevelSolver::Exact
     };
 
     let mut cpu_solver = MultigridCPU::new(&grid, &boundary_conditions, settings);

@@ -4,6 +4,7 @@ use crate::gpu_interface::{
     utils as gpu_utils
 };
 
+use crate::grid::INTERIOR_OFFSET;
 use crate::grid::gpu_version::GpuGrid;
 use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 
@@ -35,8 +36,9 @@ impl MaterializeShader {
 
     pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions) -> Self {
         let shader_src = format!(
-            "{grid_src}\n{bc_consts}{materialize_src}",
+            "{grid_src}\nconst INTERIOR_OFFSET: u32 = {interior_offset}u;\n{bc_consts}{materialize_src}",
             grid_src = GRID_SRC,
+            interior_offset = INTERIOR_OFFSET,
             bc_consts = bc_consts_wgsl(boundary_conditions),
             materialize_src = MATERIALIZE_SRC
         );

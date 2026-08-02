@@ -1,8 +1,9 @@
 
 use stormath::type_aliases::Float;
+use stormath::matrix::Matrix;
 
 use super::{
-    multigrid_cpu::settings::MultigridSettings,
+    multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver},
     boundary_conditions::PressureBoundaryConditions
 };
 
@@ -18,10 +19,10 @@ use crate::gpu_interface::{
 use kernels::jacobi_shader::{JacobiShader, WORKGROUP_SIZE as JACOBI_WORKGROUP_SIZE};
 use kernels::restrict_shader::{RestrictShader, WORKGROUP_SIZE as RESTRICT_WORKGROUP_SIZE};
 use kernels::prolongate_shader::{ProlongateShader, WORKGROUP_SIZE as PROLONGATE_WORKGROUP_SIZE};
-use kernels::coarse_solve_shader::CoarseSolveShader;
 use kernels::materialize_shader::MaterializeShader;
 
 use crate::pressure_solver::multigrid_cpu::kernels as cpu_kernels;
+use cpu_kernels::coarse_matrix::build_poisson_matrix4;
 
 /// All GPU resources belonging to a single multigrid level. `x_buffer`/`x_work_buffer`/
 /// `rhs_buffer` are all sized to the **interior** grid — there are no ghost cells anywhere in the
@@ -72,10 +73,15 @@ pub struct MultigridGPU {
     restrict_levels: Vec<RestrictLevel>,
     prolongate_levels: Vec<ProlongateLevel>,
 
-    /// Runs the entire bottom-of-V-cycle smoother for the coarsest level in a single dispatch.
-    /// `None` if the coarsest grid doesn't fit in one workgroup on this device, in which case the
-    /// coarsest level falls back to the regular per-iteration `poisson_jacobi_smoother_gpu` path.
-    coarse_solve: Option<CoarseSolveShader>,
+    /// Dense matrix for the coarsest level's Poisson equation, built once here in `new` via the
+    /// same `multigrid_cpu::kernels::coarse_matrix::build_poisson_matrix4` that `MultigridCPU`
+    /// uses, and reused for every V-cycle when `solver_settings.coarsest_level_solver` is
+    /// `CoarsestLevelSolver::Exact` (see `solve_coarsest_level_exact`).
+    coarse_matrix: Matrix<Float>,
+    /// Host-readable staging buffer for reading the coarsest level's restricted RHS back from the
+    /// GPU when solving that level exactly on the CPU. Sized to the coarsest grid's interior cell
+    /// count, matching `levels[coarsest_level].rhs_buffer`.
+    coarse_rhs_staging_buffer: wgpu::Buffer,
 
     /// Bind group for `materialize_shader`, reading the finest level's converged `x_buffer` and
     /// writing into `solution_buffer`.
@@ -187,15 +193,8 @@ impl MultigridGPU {
         }
 
         let coarsest_level = nr_levels - 1;
-        let coarse_solve = CoarseSolveShader::try_new(
-            &gpu_context,
-            &grids[coarsest_level],
-            boundary_conditions,
-            solver_settings.nr_smooth_iterations * 4,
-            &levels[coarsest_level].grid_buffer,
-            &levels[coarsest_level].rhs_buffer,
-            &levels[coarsest_level].x_buffer,
-        );
+        let coarse_matrix = build_poisson_matrix4(&grids[coarsest_level], boundary_conditions);
+        let coarse_rhs_staging_buffer = gpu_context.create_staging_buffer(grids[coarsest_level].nr_interior_cells());
 
         let materialize_shader = MaterializeShader::new(&gpu_context, boundary_conditions);
         let solution_host = vec![0.0 as Float; grids[0].nr_extended_cells()];
@@ -225,7 +224,8 @@ impl MultigridGPU {
             levels,
             restrict_levels,
             prolongate_levels,
-            coarse_solve,
+            coarse_matrix,
+            coarse_rhs_staging_buffer,
             materialize_bind_group,
             solution_buffer,
             solution_staging_buffer,
@@ -291,33 +291,73 @@ impl MultigridGPU {
         encoder.clear_buffer(&self.levels[level].x_buffer, 0, None);
     }
 
-    fn perform_v_cycle(&self, encoder: &mut wgpu::CommandEncoder) {
+    /// Solves the coarsest level's Poisson equation exactly on the CPU, reusing
+    /// `multigrid_cpu::kernels::coarse_matrix::build_poisson_matrix4` and
+    /// `Matrix::solve_gaussian_elimination` — the same machinery `MultigridCPU` uses for its own
+    /// coarsest level (see `MultigridCPU::coarse_matrix`/`solve_coarsest_level`) — instead of
+    /// duplicating a GPU-side direct solver.
+    ///
+    /// `encoder` must already contain the down-sweep through the coarsest level's restricted RHS.
+    /// This submits it, blocks on reading that RHS back to the host, solves on the CPU, and writes
+    /// the solution back into the coarsest level's `x_buffer`, returning a fresh encoder for the
+    /// caller to record the up-sweep into. This host round-trip is the unavoidable cost of an
+    /// exact coarsest-level solve; `CoarsestLevelSolver::Jacobi` avoids it by staying on the GPU.
+    fn solve_coarsest_level_exact(&self, mut encoder: wgpu::CommandEncoder) -> wgpu::CommandEncoder {
+        let coarsest_level = self.levels.len() - 1;
+
+        let byte_len = GpuContext::byte_length_from_length(self.grids[coarsest_level].nr_interior_cells());
+        encoder.copy_buffer_to_buffer(
+            &self.levels[coarsest_level].rhs_buffer, 0,
+            &self.coarse_rhs_staging_buffer, 0,
+            byte_len
+        );
+
+        let submission_index = self.gpu_context.queue.submit([encoder.finish()]);
+        let rhs_host = self.gpu_context.read_from_staging_buffer(&self.coarse_rhs_staging_buffer, submission_index);
+
+        let x_host = self.coarse_matrix.solve_gaussian_elimination(&rhs_host)
+            .expect("Coarsest multigrid level's Poisson matrix should be non-singular");
+
+        self.gpu_context.write_buffer(&self.levels[coarsest_level].x_buffer, &x_host);
+
+        self.gpu_context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default())
+    }
+
+    /// Records (and, when the coarsest level is solved exactly, submits) one V-cycle. Takes
+    /// ownership of `encoder` rather than borrowing it, since `CoarsestLevelSolver::Exact` needs
+    /// to submit/finish the down-sweep's encoder and hand back a new one for the up-sweep — see
+    /// `solve_coarsest_level_exact`.
+    fn perform_v_cycle(&self, mut encoder: wgpu::CommandEncoder) -> wgpu::CommandEncoder {
         let nr_levels = self.levels.len();
         let nr_iterations = self.solver_settings.nr_smooth_iterations;
 
         // Smooth and restrict down to the coarsest level.
         for level in 0..nr_levels - 1 {
             if level > 0 {
-                self.clear_level_solution(encoder, level);
+                self.clear_level_solution(&mut encoder, level);
             }
 
-            self.poisson_jacobi_smoother_gpu(encoder, level, nr_iterations);
-            self.compute_residual_and_restrict_gpu(encoder, level);
+            self.poisson_jacobi_smoother_gpu(&mut encoder, level, nr_iterations);
+            self.compute_residual_and_restrict_gpu(&mut encoder, level);
         }
 
-        self.clear_level_solution(encoder, nr_levels - 1);
+        self.clear_level_solution(&mut encoder, nr_levels - 1);
 
-        if let Some(coarse_solve) = &self.coarse_solve {
-            coarse_solve.dispatch(encoder);
-        } else {
-            self.poisson_jacobi_smoother_gpu(encoder, nr_levels - 1, nr_iterations * 4);
-        }
+        encoder = match self.solver_settings.coarsest_level_solver {
+            CoarsestLevelSolver::Exact => self.solve_coarsest_level_exact(encoder),
+            CoarsestLevelSolver::Jacobi => {
+                self.poisson_jacobi_smoother_gpu(&mut encoder, nr_levels - 1, nr_iterations*4);
+                encoder
+            }
+        };
 
         // Prolongate and smooth back up.
         for level in (0..nr_levels - 1).rev() {
-            self.prolongate_and_correct_gpu(encoder, level);
-            self.poisson_jacobi_smoother_gpu(encoder, level, nr_iterations);
+            self.prolongate_and_correct_gpu(&mut encoder, level);
+            self.poisson_jacobi_smoother_gpu(&mut encoder, level, nr_iterations);
         }
+
+        encoder
     }
 
     /// Solves the Poisson equation using multigrid V-cycles on the GPU.
@@ -334,13 +374,16 @@ impl MultigridGPU {
         );
 
         for _ in 0..self.solver_settings.nr_v_cycles {
-            self.perform_v_cycle(&mut encoder);
+            encoder = self.perform_v_cycle(encoder);
         }
 
         // Materialize the extended layout `update_velocity`/`export_fields_as_vtk` expect
-        // (interior values plus boundary-extrapolated ghost values) as one more dispatch in the
-        // same command buffer, instead of a CPU pass that could only start after the GPU work and
-        // its readback had already finished.
+        // (interior values plus boundary-extrapolated ghost values) as one more dispatch in
+        // whichever encoder the last V-cycle handed back, instead of a separate CPU pass that
+        // could only start after the GPU work and its readback had already finished. With
+        // `CoarsestLevelSolver::Jacobi` that's the same single command buffer spanning the whole
+        // solve; with `CoarsestLevelSolver::Exact` it's just the up-sweep of the final V-cycle,
+        // since each V-cycle's coarsest-level readback already forced its own submission.
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
             pass.set_pipeline(&self.materialize_shader.pipeline);
@@ -360,7 +403,7 @@ impl MultigridGPU {
         self.solution = self.gpu_context.read_from_staging_buffer(&self.solution_staging_buffer, submission_index);
 
         if self.solver_settings.compute_residual_after_solve {
-            let avg_residual = cpu_kernels::compute_residual(&self.grids[0], &self.solution, &self.rhs);
+            let avg_residual = cpu_kernels::compute_residual4(&self.grids[0], &self.solution, &self.rhs);
             println!("Residual sum: {}", avg_residual);
         }
         

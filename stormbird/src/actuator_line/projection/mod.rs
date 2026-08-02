@@ -46,13 +46,14 @@ impl ProjectionSettings {
     fn default_weight_limit() -> Float {0.001}
 
     pub fn projection_value_at_point(
-        &self, 
-        point: SpatialVector, 
-        chord_vector: SpatialVector, 
-        span_line: &SpanLine
+        &self,
+        point: SpatialVector,
+        chord_vector: SpatialVector,
+        span_line: &SpanLine,
+        extended_span_falloff: [bool; 2],
     ) -> Float {
         self.projection_function.projection_value_at_point(
-            point, chord_vector, span_line
+            point, chord_vector, span_line, extended_span_falloff
         )
     }
 }

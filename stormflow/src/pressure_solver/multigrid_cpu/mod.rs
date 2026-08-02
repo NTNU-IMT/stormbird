@@ -2,17 +2,15 @@ pub mod kernels;
 pub mod settings;
 
 use stormath::type_aliases::Float;
-use settings::MultigridSettings;
-
-
+use stormath::matrix::Matrix;
+use settings::{MultigridSettings, CoarsestLevelSolver};
 
 use kernels::{
-    jacobi::jacobi_iteration_step,
+    jacobi::jacobi_kernel,
     restrict::compute_residual_and_restrict_kernel,
-    prolongate::prolongate_and_correct_kernel
+    prolongate::prolongate_and_correct_kernel,
+    coarse_matrix::build_poisson_matrix4
 };
-
-use rayon::prelude::*;
 
 use crate::{
     pressure_solver::boundary_conditions::PressureBoundaryConditions,
@@ -36,6 +34,11 @@ pub struct MultigridCPU {
     /// the domain edge). Materialized once at the end of `solve`, from `x_at_levels[0]` — see
     /// `solve` for details.
     pub solution: Vec<Float>,
+    /// Dense matrix for the coarsest level's Poisson equation (same equation
+    /// `poisson_jacobi_smoother` iterates towards, see `kernels::coarse_matrix`), built once here
+    /// in `new` and reused for every V-cycle to solve that level exactly via Gaussian elimination
+    /// instead of approximating it with extra Jacobi iterations.
+    pub coarse_matrix: Matrix<Float>,
 }
 
 impl MultigridCPU {
@@ -62,6 +65,11 @@ impl MultigridCPU {
         let x_at_levels_work = x_at_levels.clone();
         let solution = vec![0.0; grids[0].nr_extended_cells()];
 
+        let coarse_matrix = build_poisson_matrix4(
+            grids.last().expect("grid hierarchy must have at least one level"),
+            boundary_conditions
+        );
+
         Self {
             grids,
             boundary_conditions: boundary_conditions.clone(),
@@ -70,6 +78,7 @@ impl MultigridCPU {
             x_at_levels_work,
             rhs_at_levels,
             solution,
+            coarse_matrix,
         }
     }
 
@@ -86,41 +95,32 @@ impl MultigridCPU {
     /// - `x_fine`/`rhs_fine` are on the **interior** grid
     /// - `rhs_coarse` (output) is on the **interior** grid
     ///
-    /// # Safety
-    /// Uses unsafe pointer access to enable parallel writes. This is safe because each
-    /// coarse cell index is processed exactly once, so there are no data races.
     pub fn compute_residual_and_restrict(&mut self, fine_level: usize) {
         let coarse_level = fine_level + 1;
 
         let grid_fine = &self.grids[fine_level];
         let grid_coarse = &self.grids[coarse_level];
-
-        let nr_coarse_interior_cells = grid_coarse.nr_interior_cells();
-
-        let rhs_coarse_ptr = self.rhs_at_levels[coarse_level].as_mut_ptr() as usize;
         let x_fine = &self.x_at_levels[fine_level];
-        let rhs_fine = &self.rhs_at_levels[fine_level];
         let boundary_conditions = &self.boundary_conditions;
 
-        (0..nr_coarse_interior_cells)
-            .into_par_iter()
-            .for_each(|flat_index_coarse_interior| {
-                let restricted_value = compute_residual_and_restrict_kernel(
-                    flat_index_coarse_interior,
+        // `rhs_at_levels[fine_level]` (read) and `rhs_at_levels[coarse_level]` (written below)
+        // alias the same Vec; split_at_mut borrows both disjointly without unsafe.
+        let (rhs_below_coarse, rhs_from_coarse) = self.rhs_at_levels.split_at_mut(coarse_level);
+        let rhs_fine = &rhs_below_coarse[fine_level];
+        let rhs_coarse = &mut rhs_from_coarse[0];
+
+        grid_coarse.parallel_interior_update(
+            rhs_coarse,
+            |_idx_coarse, indices_coarse, _current| {
+                compute_residual_and_restrict_kernel(
+                    indices_coarse,
                     grid_fine,
-                    grid_coarse,
                     x_fine,
                     rhs_fine,
                     boundary_conditions
-                );
-
-                // Write result using unsafe pointer access
-                // Safety: Each flat_index_coarse_interior is unique, so no data races occur
-                unsafe {
-                    let ptr = rhs_coarse_ptr as *mut Float;
-                    *ptr.add(flat_index_coarse_interior) = restricted_value;
-                }
-            });
+                )
+            }
+        );
     }
 
     /// Prolongates (interpolates) the correction from a coarser grid level to a finer level
@@ -134,39 +134,30 @@ impl MultigridCPU {
     /// # Grid layout
     /// - `x_fine`/`x_coarse` are on the **interior** grid
     ///
-    /// # Safety
-    /// Uses unsafe pointer access to enable parallel read-modify-write. This is safe because
-    /// each fine cell index is processed exactly once, so there are no data races.
     pub fn prolongate_and_correct(&mut self, fine_level: usize) {
         let coarse_level = fine_level + 1;
 
         let fine_grid = &self.grids[fine_level];
         let coarse_grid = &self.grids[coarse_level];
 
-        let [nx_f, ny_f, nz_f] = fine_grid.interior_shape;
+        // `x_at_levels[fine_level]` (written below) and `x_at_levels[coarse_level]` (read) alias
+        // the same Vec; split_at_mut borrows both disjointly without unsafe.
+        let (x_below_coarse, x_from_coarse) = self.x_at_levels.split_at_mut(coarse_level);
+        let x_fine = &mut x_below_coarse[fine_level];
+        let coarse_values = &x_from_coarse[0];
 
-        // Get raw pointers for parallel access
-        let x_fine_ptr = self.x_at_levels[fine_level].as_mut_ptr() as usize;
-        let coarse_values = &self.x_at_levels[coarse_level];
+        fine_grid.parallel_interior_update(
+            x_fine,
+            |_idx_fine, indices_fine, current| {
+                let correction_value = prolongate_and_correct_kernel(
+                    indices_fine,
+                    coarse_grid,
+                    coarse_values
+                );
 
-        (0..nx_f).into_par_iter().for_each(|i_f| {
-            for j_f in 0..ny_f {
-                for k_f in 0..nz_f {
-                    let idx_fine = fine_grid.flat_index_on_interior_grid([i_f, j_f, k_f]);
-
-                    let correction_value = prolongate_and_correct_kernel(
-                        [i_f, j_f, k_f],
-                        coarse_grid,
-                        coarse_values
-                    );
-
-                    unsafe {
-                        let ptr = x_fine_ptr as *mut Float;
-                        *ptr.add(idx_fine) += correction_value;
-                    }
-                }
+                current + correction_value
             }
-        });
+        );
     }
 
     /// No ghost cells means no seeding step: every cell's new value only ever depends on
@@ -175,25 +166,31 @@ impl MultigridCPU {
     /// layer. So the very first iteration is always well-defined from whatever `current` already
     /// holds — after a clear, after prolongation, or carried over from a previous smoother call.
     pub fn poisson_jacobi_smoother(&mut self, i_g: usize, nr_iterations: usize) {
+        let grid = &self.grids[i_g];
+        let boundary_conditions = &self.boundary_conditions;
+        let rhs = &self.rhs_at_levels[i_g];
+
         for iteration in 0..nr_iterations {
             // Swap buffers: read from current, write to new
             // Even iterations: read from solution, write to work
             // Odd iterations: read from work, write to solution
             if iteration % 2 == 0 {
-                jacobi_iteration_step(
-                    &self.grids[i_g],
-                    &self.boundary_conditions,
-                    &self.rhs_at_levels[i_g],
-                    &self.x_at_levels[i_g],
-                    &mut self.x_at_levels_work[i_g]
+                let current = &self.x_at_levels[i_g];
+
+                grid.parallel_interior_update(
+                    &mut self.x_at_levels_work[i_g],
+                    |idx, indices, _current_out| {
+                        jacobi_kernel(grid, boundary_conditions, rhs, current, idx, indices)
+                    }
                 );
             } else {
-                jacobi_iteration_step(
-                    &self.grids[i_g],
-                    &self.boundary_conditions,
-                    &self.rhs_at_levels[i_g],
-                    &self.x_at_levels_work[i_g],
-                    &mut self.x_at_levels[i_g]
+                let current = &self.x_at_levels_work[i_g];
+
+                grid.parallel_interior_update(
+                    &mut self.x_at_levels[i_g],
+                    |idx, indices, _current_out| {
+                        jacobi_kernel(grid, boundary_conditions, rhs, current, idx, indices)
+                    }
                 );
             }
         }
@@ -202,6 +199,19 @@ impl MultigridCPU {
         if nr_iterations % 2 == 1 {
             self.x_at_levels[i_g].copy_from_slice(&self.x_at_levels_work[i_g]);
         }
+    }
+
+    /// Solves the coarsest level's Poisson equation exactly via Gaussian elimination, using
+    /// `coarse_matrix` (built once in `new` and reused across every V-cycle) instead of smoothing
+    /// it approximately.
+    pub fn solve_coarsest_level(&mut self) {
+        let coarsest_level = self.grids.len() - 1;
+        let rhs = &self.rhs_at_levels[coarsest_level];
+
+        let solution = self.coarse_matrix.solve_gaussian_elimination(rhs)
+            .expect("Coarsest multigrid level's Poisson matrix should be non-singular");
+
+        self.x_at_levels[coarsest_level].copy_from_slice(&solution);
     }
 
     pub fn perform_v_cycle(&mut self) {
@@ -219,9 +229,13 @@ impl MultigridCPU {
             self.compute_residual_and_restrict(i_g);
         }
 
-        self.x_at_levels[nr_grids - 1].fill(0.0);
-
-        self.poisson_jacobi_smoother(nr_grids-1, nr_iterations * 4);
+        match self.solver_settings.coarsest_level_solver {
+            CoarsestLevelSolver::Exact => self.solve_coarsest_level(),
+            CoarsestLevelSolver::Jacobi => {
+                self.x_at_levels[nr_grids - 1].fill(0.0);
+                self.poisson_jacobi_smoother(nr_grids - 1, nr_iterations * 4);
+            }
+        }
 
         // Prolongate and smooth back up
         for i_g in (0..nr_grids-1).rev() {
@@ -244,29 +258,18 @@ impl MultigridCPU {
         // The solve never touches ghost cells (boundary conditions are folded into the
         // stencils), so materialize the extended layout `update_velocity`/`export_fields_as_vtk`
         // expect from the interior result.
-        let grid = &self.grids[0];
         let x_interior = &self.x_at_levels[0];
-        let solution_ptr = self.solution.as_mut_ptr() as usize;
 
-        (0..x_interior.len())
-            .into_par_iter()
-            .for_each(|flat_interior| {
-                let interior_indices = grid.interior_indices_from_flat_index(flat_interior);
-                let flat_extended = grid.flat_index_on_extended_grid_from_interior_indices(interior_indices);
-
-                // Safety: flat_extended is unique per flat_interior (bijective interior <->
-                // extended mapping), so each thread writes a distinct index.
-                unsafe {
-                    let ptr = solution_ptr as *mut Float;
-                    *ptr.add(flat_extended) = x_interior[flat_interior];
-                }
-            });
+        self.grids[0].parallel_interior_to_extended(
+            &mut self.solution,
+            |flat_interior| x_interior[flat_interior]
+        );
 
         self.boundary_conditions.set_ghost_cells(&self.grids[0], &mut self.solution);
 
         if self.solver_settings.compute_residual_after_solve {
             // Compute residual using stencil-based approach
-            let avg_residual = kernels::compute_residual(
+            let avg_residual = kernels::compute_residual4(
                 &self.grids[0],
                 &self.solution,
                 &self.rhs_at_levels[0]

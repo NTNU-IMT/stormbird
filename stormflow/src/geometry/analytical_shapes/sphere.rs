@@ -4,6 +4,7 @@ use stormath::type_aliases::Float;
 use stormath::spatial_vector::SpatialVector;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Sphere {
     pub center: SpatialVector,
     pub radius: Float,

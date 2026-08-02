@@ -130,11 +130,12 @@ impl FrozenWake {
         }
     }
 
-    /// Function to create a steady frozen wake from a set of span lines, a wake direction and a
-    /// wake length.
-    pub fn steady_wake_for_single_wing_from_span_lines_and_direction(
+    /// Function to create a steady frozen wake from a set of span lines and velocity vectors for
+    /// each end points of the span lines. 
+    pub fn new_for_single_wing_from_span_lines_and_velocities(
         span_lines: &[SpanLine],
-        wake_vector: SpatialVector,
+        velocities: &[SpatialVector],
+        wake_length: Float,
         viscous_core_length: Float,
         symmetry_condition: SymmetryCondition
     ) -> Self {
@@ -149,7 +150,9 @@ impl FrozenWake {
             [nr_span_lines, nr_span_lines]
         );
 
-        let wake_vectors = vec![wake_vector; nr_span_lines + 1];
+        let wake_vectors: Vec<SpatialVector> = velocities.iter().map(|v| {
+            wake_length * v.normalize()
+        }).collect();
 
         let horseshoe_vortices = HorseshoeVortex::vortices_for_single_wing_from_span_lines_and_wake_vectors(
             &span_lines,
@@ -185,7 +188,27 @@ impl FrozenWake {
             variable_velocity_factors,
             induced_velocities_at_control_points,
         }
+    }
 
+    /// Function to create a steady frozen wake from a set of span lines, a wake direction and a
+    /// wake length.
+    pub fn new_for_single_wing_from_span_lines_and_direction(
+        span_lines: &[SpanLine],
+        wake_vector: SpatialVector,
+        viscous_core_length: Float,
+        symmetry_condition: SymmetryCondition
+    ) -> Self {
+        let nr_span_lines = span_lines.len();
+
+        let velocities = vec![wake_vector.normalize(); nr_span_lines + 1];
+
+        Self::new_for_single_wing_from_span_lines_and_velocities(
+            span_lines, 
+            &velocities, 
+            wake_vector.length(), 
+            viscous_core_length, 
+            symmetry_condition
+        )
     }
 
     pub fn update_from_full_wake(&mut self, ctrl_points: &[SpatialVector], wake: &DynamicWake) {

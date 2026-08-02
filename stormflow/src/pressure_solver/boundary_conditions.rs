@@ -1,6 +1,7 @@
 use stormath::type_aliases::Float;
 
 use crate::grid::Grid;
+use crate::grid::INTERIOR_OFFSET;
 use crate::grid::boundary_face::BoundaryFace;
 
 use stormath::spatial_vector::SpatialVector;
@@ -109,25 +110,27 @@ impl PressureBoundaryConditions {
     #[inline]
     /// Updates the ghost cells on the pressure, p, using the boundary conditions in self and the 
     /// supplied grid for the indexing logic
-    pub fn set_ghost_cells(&self, grid: &Grid, p: &mut [Float]) {  
+    pub fn set_ghost_cells(&self, grid: &Grid, p: &mut [Float]) {
         for axis_index in 0..3 {
             for face_index in 0..2 {
-                // Constant offsets for this layer, computed once per face.
-                let boundary_face = BoundaryFace::new(
-                    grid.extended_shape,
-                    grid.extended_stride,
-                    axis_index,
-                    face_index
-                );
-    
                 // Pick the operation once — it's constant across the whole face.
                 let condition = self.face_conditions[axis_index][face_index];
 
-                Self::set_ghost_cells_kernel(
-                    &condition, 
-                    &boundary_face, 
-                    p
-                );
+                for ghost_layer in 0..INTERIOR_OFFSET {
+                    let boundary_face = BoundaryFace::new(
+                        grid.extended_shape,
+                        grid.extended_stride,
+                        axis_index,
+                        face_index,
+                        ghost_layer
+                    );
+
+                    Self::set_ghost_cells_kernel(
+                        &condition,
+                        &boundary_face,
+                        p
+                    );
+                }
             }
         }
     }

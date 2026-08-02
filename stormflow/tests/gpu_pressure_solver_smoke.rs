@@ -3,13 +3,13 @@ use stormath::type_aliases::Float;
 
 use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
+use stormflow::grid::INTERIOR_OFFSET;
 use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
 use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
-use stormflow::pressure_solver::multigrid_cpu::settings::MultigridSettings;
+use stormflow::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
 
 /// Builds a synthetic RHS (not physically meaningful, just varied enough to exercise the
-/// restrict/prolongate/smoother chain across every multigrid level, including the coarsest one
-/// which is small enough here to trigger the single-workgroup mega-kernel).
+/// restrict/prolongate/smoother chain across every multigrid level, including the coarsest one).
 fn synthetic_rhs(grid: &Grid) -> Vec<Float> {
     let n = grid.nr_interior_cells();
     let mut rhs = vec![0.0 as Float; n];
@@ -23,12 +23,19 @@ fn synthetic_rhs(grid: &Grid) -> Vec<Float> {
     rhs
 }
 
-fn assert_gpu_matches_cpu(grid: &Grid) {
+/// Runs both solvers with the *same* `coarsest_level_solver`, so this checks that the GPU
+/// solver's numerics reproduce the CPU solver's numerics for that algorithm — not that either one
+/// converges to the "true" solution. `CoarsestLevelSolver::Jacobi` is only an approximation of the
+/// coarsest level, so it does not necessarily agree with `CoarsestLevelSolver::Exact` (see
+/// `gpu_pressure_solver_matches_cpu_with_jacobi_coarse_solve`'s single-level grid, where Jacobi's
+/// limited iteration count can't converge at all).
+fn assert_gpu_matches_cpu(grid: &Grid, coarsest_level_solver: CoarsestLevelSolver) {
     let boundary_conditions = PressureBoundaryConditions::new_from_up_direction(SpatialVector([0.0, 1.0, 0.0]));
     let settings = MultigridSettings{
         nr_smooth_iterations: 4,
         nr_v_cycles: 2,
-        compute_residual_after_solve: true
+        compute_residual_after_solve: true,
+        coarsest_level_solver
     };
 
     let rhs = synthetic_rhs(&grid);
@@ -65,9 +72,9 @@ fn assert_gpu_matches_cpu(grid: &Grid) {
 
         let [i, j, k] = grid.extended_indices_from_flat_index(flat);
         let ghost_count = [
-            i == 0 || i == nx + 1,
-            j == 0 || j == ny + 1,
-            k == 0 || k == nz + 1,
+            i < INTERIOR_OFFSET || i >= INTERIOR_OFFSET + nx,
+            j < INTERIOR_OFFSET || j >= INTERIOR_OFFSET + ny,
+            k < INTERIOR_OFFSET || k >= INTERIOR_OFFSET + nz,
         ].iter().filter(|&&b| b).count();
 
         if flat == max_abs_diff_flat {
@@ -90,32 +97,33 @@ fn assert_gpu_matches_cpu(grid: &Grid) {
 }
 
 #[test]
-fn gpu_pressure_solver_matches_cpu_with_coarse_mega_kernel() {
-    // Coarsens 16 -> 8 -> 4 (extended 6^3 = 216 cells for the coarsest level), which fits in a
-    // single workgroup (min guaranteed limit is 256), so this exercises the single-dispatch
-    // coarse mega-kernel path.
+fn gpu_pressure_solver_matches_cpu_with_exact_coarse_solve() {
+    // Coarsens 16 -> 8 -> 4. Exercises `CoarsestLevelSolver::Exact` on the GPU solver: the
+    // coarsest level's restricted RHS is read back to the CPU, solved exactly via
+    // `build_poisson_matrix4`/`solve_gaussian_elimination` (the same machinery `MultigridCPU`
+    // uses), and written back before prolongation.
     let grid = Grid::new(
         SpatialVector([0.0, 0.0, 0.0]),
         SpatialVector([1.0, 1.0, 1.0]),
         [16, 16, 16]
     );
 
-    assert_gpu_matches_cpu(&grid);
+    assert_gpu_matches_cpu(&grid, CoarsestLevelSolver::Exact);
 }
 
 #[test]
-fn gpu_pressure_solver_matches_cpu_with_coarse_fallback() {
+fn gpu_pressure_solver_matches_cpu_with_jacobi_coarse_solve() {
     // Anisotropic grid: coarsening stops immediately since two dimensions would drop below the
     // minimum (4 -> 2 is not > SMALLEST_NR_CELLS_FOR_COARSENING), leaving a single, large level
-    // (4*128*4 = 2048 interior cells) that can't fit in one workgroup even on hardware that
-    // grants the common 1024-thread max (GpuContext now requests the adapter's own limits rather
-    // than wgpu's conservative 256-thread default) — exercises the fallback to the regular
-    // per-iteration dispatch path.
+    // (4*128*4 = 2048 interior cells). Both solvers use `CoarsestLevelSolver::Jacobi` here, so
+    // this checks that the GPU's per-iteration dispatch loop reproduces the CPU's Jacobi sweeps
+    // bit-for-bit-ish — not that either one actually converges (16 iterations can't propagate
+    // information across this grid's 128-cell axis, see `assert_gpu_matches_cpu`'s doc comment).
     let grid = Grid::new(
         SpatialVector([0.0, 0.0, 0.0]),
         SpatialVector([1.0, 8.0, 1.0]),
         [4, 128, 4]
     );
 
-    assert_gpu_matches_cpu(&grid);
+    assert_gpu_matches_cpu(&grid, CoarsestLevelSolver::Jacobi);
 }

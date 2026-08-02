@@ -1,7 +1,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::pressure_solver::multigrid_cpu::settings::MultigridSettings;
+use crate::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum ComputePlatform {
@@ -19,7 +19,9 @@ pub struct MultigridSettingsBuilder {
     #[serde(default)]
     pub compute_residual_after_solve: bool,
     #[serde(default)]
-    pub compute_platform: ComputePlatform
+    pub compute_platform: ComputePlatform,
+    #[serde(default)]
+    pub coarsest_level_solver: CoarsestLevelSolver
 }
 
 impl MultigridSettingsBuilder {
@@ -30,7 +32,8 @@ impl MultigridSettingsBuilder {
         MultigridSettings{
             nr_v_cycles: self.nr_v_cycles,
             nr_smooth_iterations: self.nr_smooth_iterations,
-            compute_residual_after_solve: self.compute_residual_after_solve
+            compute_residual_after_solve: self.compute_residual_after_solve,
+            coarsest_level_solver: self.coarsest_level_solver
         }
     }
 }
@@ -41,7 +44,8 @@ impl Default for MultigridSettingsBuilder {
             nr_v_cycles: Self::default_nr_v_cycles(),
             nr_smooth_iterations: Self::default_nr_smooth_iterations(),
             compute_residual_after_solve: false,
-            compute_platform: ComputePlatform::default()
+            compute_platform: ComputePlatform::default(),
+            coarsest_level_solver: CoarsestLevelSolver::default()
         }
     }
 }

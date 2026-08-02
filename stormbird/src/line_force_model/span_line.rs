@@ -70,7 +70,11 @@ impl SpanLine {
     /// 
     /// The chord and span direction is given directly by Self and the input. The thickness 
     /// direction is assumed to be normal to the two other directions.
-    pub fn line_coordinates(&self, point: SpatialVector, chord_vector: SpatialVector) -> LineCoordinates {
+    pub fn line_coordinates(
+        &self, 
+        point: SpatialVector, 
+        chord_vector: SpatialVector
+    ) -> LineCoordinates {
         let translated_point = point - self.ctrl_point();
 
         let span_direction      = self.relative_vector().normalize();

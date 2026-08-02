@@ -38,14 +38,14 @@ pub fn prolongate_and_correct_kernel(
 
     let mut correction_value: Float = 0.0;
 
-    for di in 0..2 {
-        for dj in 0..2 {
-            for dk in 0..2 {
+    for (di, wx_v) in wx.iter().enumerate() {
+        for (dj, wy_v) in wy.iter().enumerate() {
+            for (dk, wz_v) in wz.iter().enumerate() {
                 let i_c = (i_c_base + di).min(nx_c - 1);
                 let j_c = (j_c_base + dj).min(ny_c - 1);
                 let k_c = (k_c_base + dk).min(nz_c - 1);
 
-                let weight = wx[di] * wy[dj] * wz[dk];
+                let weight = wx_v * wy_v * wz_v;
 
                 let idx_coarse = coarse_grid.flat_index_on_interior_grid([i_c, j_c, k_c]);
 

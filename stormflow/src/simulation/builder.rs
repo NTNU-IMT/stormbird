@@ -17,7 +17,7 @@ use stormbird::{
 use crate::actuator_line_interface::ActuatorLineInterface;
 
 use crate::grid::Grid;
-use crate::simulation::Simulation;
+use crate::simulation::{Simulation, SolverSettings};
 use crate::geometry::{
     Geometry,
     GeometryBuilder
@@ -53,6 +53,8 @@ pub struct SimulationBuilder {
     pub wind_environment: WindEnvironment,
     #[serde(default)]
     pub pressure_solver: PressureSolverBuilder,
+    #[serde(default)]
+    pub solver_settings: SolverSettings,
 }
 
 impl SimulationBuilder {
@@ -107,13 +109,9 @@ impl SimulationBuilder {
             }
         }
 
-        let actuator_line = if let Some(builder) = &self.actuator_line {
-            Some(
-                ActuatorLineInterface::new(builder.build(), &grid)
-            )
-        } else {
-            None
-        };
+        let actuator_line = self.actuator_line.as_ref().map(
+            |builder| ActuatorLineInterface::new(builder.build(), &grid)
+        );
 
         let mut geometries: Vec<Geometry> = Vec::new();
 
@@ -154,7 +152,7 @@ impl SimulationBuilder {
             normals_slip_surfaces,
             boundary_conditions: velocity_boundary_conditions,
             no_slip_epsilon: 2.0 * max_dx,
-            slip_epsilon: 2.0 * max_dx,
+            slip_epsilon: 4.0 * max_dx,
             viscosity: self.effective_viscosity,
             density: 1.0,
         };
@@ -164,6 +162,7 @@ impl SimulationBuilder {
             velocity_solver,
             pressure_solver,
             actuator_line,
+            solver_settings: self.solver_settings.clone()
         }
     }
 }

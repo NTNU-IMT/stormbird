@@ -1,5 +1,4 @@
 pub mod boundary_condisitions;
-pub mod parallel_interface;
 pub mod kernels;
 
 use stormath::spatial_vector::SpatialVector;
@@ -8,12 +7,10 @@ use stormath::type_aliases::Float;
 use crate::grid::Grid;
 use boundary_condisitions::VelocityBoundaryConditions;
 
-use parallel_interface::parallel_spatial_vector_update;
-
 use kernels::{
     correct_velocities_for_geometry::{
         correct_velocities_for_no_slip_geometry_kernel,
-        correct_velocities_for_slip_geometry_kernel
+        correct_velocities_for_slip_geometry_mirror_kernel
     },
     convect_and_diffuse::convect_and_diffuse_kernel,
     add_pressure_gradient::add_pressure_gradient_kernel
@@ -83,9 +80,8 @@ impl VelocitySolver {
     ) {
         let inv_density = 1.0 / self.density;
         
-        parallel_spatial_vector_update(
+        grid.parallel_spatial_vector_update(
             &mut self.velocity_star,
-            grid,
             |i, _current| convect_and_diffuse_kernel(
                 i, 
                 grid, 
@@ -124,9 +120,8 @@ impl VelocitySolver {
     ) {
         let inv_density = 1.0 / self.density;
         
-        parallel_spatial_vector_update(
-            &mut self.velocity, 
-            grid, 
+        grid.parallel_spatial_vector_update(
+            &mut self.velocity,
             |i, _current| add_pressure_gradient_kernel(
                 i,
                 grid,
@@ -161,9 +156,8 @@ impl VelocitySolver {
         epsilon: Float,
         velocity: &mut [SpatialVector]
     ) {
-        parallel_spatial_vector_update(
-            velocity, 
-            grid, 
+        grid.parallel_spatial_vector_update(
+            velocity,
             |i, current| correct_velocities_for_no_slip_geometry_kernel(
                 i, 
                 grid, 
@@ -174,6 +168,10 @@ impl VelocitySolver {
         );
     }
 
+    /// Mirror/ghost-cell variant of `correct_velocities_for_slip_geometry`. Since the mirror
+    /// construction samples the velocity field at an interpolated image point rather than only
+    /// at the current cell, it needs a read-only snapshot of `velocity` to sample from while
+    /// `velocity` itself is being written.
     pub fn correct_velocities_for_slip_geometry(
         grid: &Grid,
         signed_distance_function: &[Float],
@@ -181,14 +179,16 @@ impl VelocitySolver {
         epsilon: Float,
         velocity: &mut [SpatialVector]
     ) {
-        parallel_spatial_vector_update(
-            velocity, 
-            grid, 
-            |i, current| correct_velocities_for_slip_geometry_kernel(
-                i, 
-                grid, 
-                current, 
-                signed_distance_function, 
+        let velocity_snapshot = velocity.to_vec();
+
+        grid.parallel_spatial_vector_update(
+            velocity,
+            |i, current| correct_velocities_for_slip_geometry_mirror_kernel(
+                i,
+                grid,
+                current,
+                &velocity_snapshot,
+                signed_distance_function,
                 normals,
                 epsilon
             )

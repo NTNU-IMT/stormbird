@@ -540,7 +540,7 @@ impl LineForceModel {
                         let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
 
                         angular_momentum.cross(rotation_velocity)
-                    }
+                    },
                 }
 
             }

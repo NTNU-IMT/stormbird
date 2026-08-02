@@ -8,6 +8,7 @@ pub struct GpuContext {
     pub queue: wgpu::Queue
 }
 
+
 impl GpuContext {
     pub fn new() -> Self {
         pollster::block_on(Self::async_new())
@@ -31,8 +32,8 @@ impl GpuContext {
         );
 
         // Request the adapter's own limits instead of wgpu's conservative
-        // (WebGPU-guaranteed-minimum) defaults, so e.g. CoarseSolveShader's single-workgroup
-        // mega-kernel can cover larger grids on hardware that supports it.
+        // (WebGPU-guaranteed-minimum) defaults, so e.g. larger per-level dispatches can cover
+        // bigger grids on hardware that supports it.
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 required_limits: adapter.limits(),
@@ -128,11 +129,14 @@ impl GpuContext {
         result
     }
 
-    pub fn create_bind_group_layout(&self, entries: &[wgpu::BindGroupLayoutEntry]) -> wgpu::BindGroupLayout {
+    pub fn create_bind_group_layout(
+        &self, 
+        entries: &[wgpu::BindGroupLayoutEntry]
+    ) -> wgpu::BindGroupLayout {
         self.device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
                 label: None,
-                entries: &entries,
+                entries,
             }
         )
     }
@@ -158,7 +162,7 @@ impl GpuContext {
         self.device.create_bind_group(
             &wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &bind_group_layout,
+                layout: bind_group_layout,
                 entries: &entries,
             }
         )
@@ -182,8 +186,8 @@ impl GpuContext {
             &wgpu::ComputePipelineDescriptor {
                 label: None,
                 layout: Some(&pipeline_layout),
-                module: &shader,
-                entry_point: Some(entry_point.into()),
+                module: shader,
+                entry_point: Some(entry_point),
                 compilation_options: Default::default(),
                 cache: None,
             }
@@ -197,5 +201,11 @@ impl GpuContext {
                 source: wgpu::ShaderSource::Wgsl(shader_src.into())
             }
         )
+    }
+}
+
+impl Default for GpuContext {
+    fn default() -> Self {
+        Self::new()
     }
 }

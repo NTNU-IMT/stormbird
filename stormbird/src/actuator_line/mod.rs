@@ -12,6 +12,7 @@ pub mod sampling;
 pub mod builder;
 pub mod solver;
 pub mod corrections;
+pub mod spanflow_damper;
 
 use stormath::smoothing::gaussian::gaussian_kernel;
 
@@ -29,6 +30,8 @@ use projection::ProjectionSettings;
 use sampling::SamplingSettings;
 use builder::ActuatorLineBuilder;
 use solver::SolverSettings;
+
+use spanflow_damper::SpanflowDamper;
 
 use corrections::{
     lifting_line::LiftingLineCorrection,
@@ -68,6 +71,8 @@ pub struct ActuatorLine {
     pub lifting_line_correction: Option<LiftingLineCorrection>,
     /// Empirical correction for the circulation strength, also known as a tip loss factor
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    /// Optional model to dampen spanwise flow at the control points
+    pub spanflow_damper: Option<SpanflowDamper> 
 }
 
 impl ActuatorLine {
@@ -100,7 +105,7 @@ impl ActuatorLine {
         let chord_vector = self.line_force_model.chord_vectors_global[line_index];
 
         let projection_value_org = self.projection_settings.projection_value_at_point(
-            cell_center, chord_vector, &span_line
+            cell_center, chord_vector, &span_line, [false, false]
         );
 
         let projection_value = if projection_value_org > 0.0 {
@@ -222,7 +227,7 @@ impl ActuatorLine {
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
-                &self.ctrl_points_velocity,
+                &corrected_velocity,
                 &last_circulation_strength,
                 time - self.start_time
             );
@@ -393,7 +398,6 @@ impl ActuatorLine {
                 
                 self.sectional_lift_forces_to_project[line_index] = lift_force;
                 self.sectional_drag_forces_to_project[line_index] = drag_force;
-                
             }
         } else {
             self.sectional_lift_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
@@ -431,6 +435,23 @@ impl ActuatorLine {
         }
     }
 
+    pub fn spanwise_damping_flow(
+        &self,
+        line_index: usize,
+        velocity: SpatialVector
+    ) -> SpatialVector {
+        if let Some(spanflow_damper) = &self.spanflow_damper {
+            spanflow_damper.get_sectional_force(
+                self.line_force_model.chord_lengths[line_index], 
+                self.line_force_model.span_lines_global[line_index], 
+                velocity, 
+                self.line_force_model.density
+            )
+        } else {
+            SpatialVector::default()
+        }
+    }
+
     /// Computes the body force weights for each line element at a given point in space.
     pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector) -> Vec<Float> {
         let span_lines = &self.line_force_model.span_lines_global;
@@ -439,11 +460,18 @@ impl ActuatorLine {
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 
         for i in 0..self.line_force_model.nr_span_lines() {
+            let wing_index = self.line_force_model.wing_index_from_global(i);
+            let wing_range = &self.line_force_model.wing_indices[wing_index];
+
+            let is_at_wing_start = i == wing_range.start;
+            let is_at_wing_end   = i == wing_range.end - 1;
+
             projection_values.push(
                 self.projection_settings.projection_value_at_point(
                     point,
                     chord_vectors[i],
-                    &span_lines[i]
+                    &span_lines[i],
+                    [is_at_wing_start, is_at_wing_end]
                 )
             );
         }

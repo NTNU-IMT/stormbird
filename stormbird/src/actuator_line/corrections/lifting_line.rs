@@ -107,21 +107,36 @@ impl LiftingLineCorrection {
                 wind_indices.clone()
             ];
 
-            let averaged_ctrl_points_velocity = wing_ctrl_points_velocity.iter().sum::<SpatialVector>()
-                / wing_ctrl_points_velocity.len() as Float;
+            let mut wing_span_point_velocities = Vec::with_capacity(nr_span_lines + 1);
 
-            let wake_vector = averaged_ctrl_points_velocity.normalize() * self.wake_length_factor;
+            wing_span_point_velocities.push(wing_ctrl_points_velocity[0]);
 
-            let mut frozen_wake_viscous = FrozenWake::steady_wake_for_single_wing_from_span_lines_and_direction(
-                wing_span_lines,
-                wake_vector,
+            for i in 0..nr_span_lines-1 {
+                wing_span_point_velocities.push(
+                    0.5 * (wing_ctrl_points_velocity[i] + wing_ctrl_points_velocity[i+1])
+                )
+            }
+
+            wing_span_point_velocities.push(wing_ctrl_points_velocity[nr_span_lines-1]);
+
+            let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() / 
+                line_force_model.chord_lengths.len() as Float;
+
+            let wake_length = average_chord_length * self.wake_length_factor;
+
+
+            let mut frozen_wake_viscous = FrozenWake::new_for_single_wing_from_span_lines_and_velocities(
+                wing_span_lines, 
+                &wing_span_point_velocities, 
+                wake_length, 
                 self.viscous_core_length,
                 self.symmetry_condition
             );
 
-            let mut frozen_wake_default = FrozenWake::steady_wake_for_single_wing_from_span_lines_and_direction(
-                wing_span_lines,
-                wake_vector,
+            let mut frozen_wake_default = FrozenWake::new_for_single_wing_from_span_lines_and_velocities(
+                wing_span_lines, 
+                &wing_span_point_velocities, 
+                wake_length, 
                 self.viscous_core_length / 100.0,
                 self.symmetry_condition
             );

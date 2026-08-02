@@ -2,11 +2,9 @@ pub mod builder;
 pub mod boundary_conditions;
 pub mod multigrid_cpu;
 pub mod multigrid_gpu;
-pub mod fft;
 
 use multigrid_cpu::MultigridCPU;
 use multigrid_gpu::MultigridGPU;
-use fft::FftCPU;
 
 use stormath::type_aliases::Float;
 use stormath::spatial_vector::SpatialVector;
@@ -17,7 +15,6 @@ use rayon::prelude::*;
 pub enum PressureSolver {
     MultigridCPU(MultigridCPU),
     MultigridGPU(MultigridGPU),
-    FftCPU(FftCPU)
 }
 
 impl PressureSolver {
@@ -25,7 +22,6 @@ impl PressureSolver {
         match self {
             PressureSolver::MultigridCPU(solver) => solver.solve(),
             PressureSolver::MultigridGPU(solver) => solver.solve(),
-            PressureSolver::FftCPU(solver) => solver.solve()
         }
     }
 
@@ -33,7 +29,6 @@ impl PressureSolver {
         match self {
             PressureSolver::MultigridCPU(solver) => &solver.solution,
             PressureSolver::MultigridGPU(solver) => &solver.solution,
-            PressureSolver::FftCPU(solver) => &solver.solution
         }
     }
  
@@ -54,7 +49,6 @@ impl PressureSolver {
         let data_ptr: usize = match self {
             PressureSolver::MultigridCPU(solver) => solver.rhs_at_levels[0].as_mut_ptr() as usize,
             PressureSolver::MultigridGPU(solver) => solver.rhs.as_mut_ptr() as usize,
-            PressureSolver::FftCPU(solver) => solver.rhs.as_mut_ptr() as usize,
         };
 
         (0..nr_interior_cells)
@@ -65,18 +59,21 @@ impl PressureSolver {
                 let i_0 = grid.flat_index_on_extended_grid(extended_indices);
 
                 let mut new_value = 0.0;
-                
-                for axis_index in 0..3 {
-                    let mut extended_indices_n = extended_indices;
 
-                    extended_indices_n[axis_index] -= 1;
-                    
-                    let i_n = grid.flat_index_on_extended_grid(extended_indices_n);
+                // 4th order accurate divergence: the standard symmetric 4-point staggered
+                // derivative (see `add_pressure_gradient_kernel`, which uses the same formula in
+                // the opposite staggering direction).
+                for axis_index in 0..3 {
+                    let stride = grid.extended_stride[axis_index];
+
+                    let i_n = i_0 - stride;
+                    let i_p = i_0 + stride;
+                    let i_n2 = i_n - stride;
 
                     new_value += (
-                        velocity_star[i_0][axis_index] - 
-                        velocity_star[i_n][axis_index]
-                    ) * grid.inv_cell_length[axis_index];
+                        27.0 * (velocity_star[i_0][axis_index] - velocity_star[i_n][axis_index]) -
+                        (velocity_star[i_p][axis_index] - velocity_star[i_n2][axis_index])
+                    ) * grid.inv_cell_length[axis_index] * (1.0 / 24.0);
                 }
 
                 new_value *= density * inv_time_step;

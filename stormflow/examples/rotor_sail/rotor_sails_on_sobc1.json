@@ -25,11 +25,11 @@
           "section_model": {
             "RotatingCylinder": {
               "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
-              "cl_data": [0.0, 1.3484, 2.6596, 4.6177, 7.198, 7.9874, 8.0, 9.0, 9.0]
+              "spin_ratio_data": [0.0, 1.0],
+              "cl_data": [0.0, 2.8]
             }
           },
-          "non_zero_circulation_at_ends": [true, true],
+          "non_zero_circulation_at_ends": [false, false],
           "input_power_model": "NoPower"
         },
         {
@@ -44,11 +44,11 @@
           "section_model": {
             "RotatingCylinder": {
               "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
-              "cl_data": [0.0, 1.3484, 2.6596, 4.6177, 7.198, 7.9874, 8.0, 9.0, 9.0]
+              "spin_ratio_data": [0.0, 1.0],
+              "cl_data": [0.0, 2.8]
             }
           },
-          "non_zero_circulation_at_ends": [true, true],
+          "non_zero_circulation_at_ends": [false, false],
           "input_power_model": "NoPower"
         }
       ],
@@ -66,30 +66,21 @@
           }
         }
       },
-      "output_coordinate_system": "Global",
-      "force_calculation_settings": {
-        "include_viscous_lift_in_the_circulation": false
-      }
+      "output_coordinate_system": "Global"
     },
     "projection_settings": {
       "projection_function": {
         "chord_factor": 0.75,
         "thickness_factor": 0.75
       },
-      "realign_sectional_forces": true,
-      "realign_to_local_velocity_at_each_cell": false,
-      "project_sectional_drag": false
+      "realign_sectional_forces": true
     },
     "solver_settings": {
       "damping_factor": 0.05
     },
     "sampling_settings": {
-      "use_point_sampling": false,
-      "span_projection_factor": 0.5,
-      "neglect_span_projection": false,
-      "extrapolate_end_velocities": true,
-      "remove_span_velocity": true,
-      "correction_factor": 1.0
+      "extrapolate_end_velocities": false,
+      "remove_span_velocity": true
     },
     "lifting_line_correction": {
       "symmetry_condition": "Z"
@@ -107,7 +98,12 @@
   "pressure_solver": {
     "Multigrid": {
       "nr_v_cycles": 2,
-      "compute_platform": "GPU"
+      "compute_platform": "GPU",
+      "compute_residual_after_solve": true
     }
+  },
+  "solver_settings": {
+    "nr_inner_iterations": 2,
+    "solve_pressure_on_first_iteration": true
   }
 }

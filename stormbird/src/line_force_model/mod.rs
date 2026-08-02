@@ -251,26 +251,7 @@ impl LineForceModel {
                 *vel - span_velocity
             })
             .collect()
-    }
-
-    /// Calculates the wake angle behind each line element.
-    pub fn wake_angles(&self, velocity: &[SpatialVector]) -> Vec<Float> {
-        (0..self.nr_span_lines())
-            .map(|index| {
-                let wing_index = self.wing_index_from_global(index);
-
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(_) => 0.0,
-                    SectionModel::VaryingFoil(_) => 0.0,
-                    SectionModel::RotatingCylinder(cylinder) => cylinder.wake_angle(
-                        self.chord_lengths[index],
-                        velocity[index].length(),
-                    ),
-                    SectionModel::EffectiveWindSensor => 0.0,
-                }
-            })
-            .collect()
-    }    
+    } 
     
     /// Shorthand for quickly calculating the typical force factor used when presenting
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)

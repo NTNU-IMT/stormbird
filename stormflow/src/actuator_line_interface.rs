@@ -85,7 +85,7 @@ impl ActuatorLineInterface {
             
             let velocity = grid.cell_centered_value_from_face_staggered(
                 interior_indices, 
-                &velocity
+                velocity
             );
             
             let line_index = self.dominating_line_indices[i];
@@ -139,10 +139,17 @@ impl ActuatorLineInterface {
                 
                 let body_force_weight = self.summed_projection_weights[i];
                 
-                let force_to_project = self.model.force_to_project_at_cell(
+                let line_force_force = self.model.force_to_project_at_cell(
                     line_index, 
                     cell_velocity
                 );
+
+                let spanwise_damping_force = self.model.spanwise_damping_flow(
+                    line_index,
+                    cell_velocity
+                );
+
+                let force_to_project = line_force_force + spanwise_damping_force;
             
                 (i_flat_extended, body_force_weight * force_to_project / density)
             }).collect();

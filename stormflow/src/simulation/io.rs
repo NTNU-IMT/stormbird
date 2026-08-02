@@ -1,5 +1,4 @@
 use super::Simulation;
-use crate::pressure_solver::PressureSolver;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -19,12 +18,12 @@ impl Simulation {
         // ------------------------------------------------------------------ //
         // ASCII file header (always ASCII in the VTK legacy format)           //
         // ------------------------------------------------------------------ //
-        write!(w, "# vtk DataFile Version 3.0\n").unwrap();
-        write!(w, "Sveve CFD Simulation\n").unwrap();
-        write!(w, "{}\n", if binary { "BINARY" } else { "ASCII" }).unwrap();
-        write!(w, "DATASET STRUCTURED_GRID\n").unwrap();
-        write!(w, "DIMENSIONS {} {} {}\n", nx + 1, ny + 1, nz + 1).unwrap();
-        write!(w, "POINTS {} double\n", n_points).unwrap();
+        writeln!(w, "# vtk DataFile Version 3.0").unwrap();
+        writeln!(w, "Stormflow CFD Simulation").unwrap();
+        writeln!(w, "{}", if binary { "BINARY" } else { "ASCII" }).unwrap();
+        writeln!(w, "DATASET STRUCTURED_GRID").unwrap();
+        writeln!(w, "DIMENSIONS {} {} {}", nx + 1, ny + 1, nz + 1).unwrap();
+        writeln!(w, "POINTS {} double", n_points).unwrap();
 
         // ------------------------------------------------------------------ //
         // Cell-corner coordinates                                              //
@@ -46,58 +45,43 @@ impl Simulation {
                         w.write_all(&y.to_be_bytes()).unwrap();
                         w.write_all(&z.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", x, y, z).unwrap();
+                        writeln!(w, "{} {} {}", x, y, z).unwrap();
                     }
                 }
             }
         }
 
         // Newline separator required before the next ASCII keyword in binary mode.
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // ------------------------------------------------------------------ //
         // Cell data                                                            //
         // ------------------------------------------------------------------ //
-        write!(w, "CELL_DATA {}\n", n_cells).unwrap();
+        writeln!(w, "CELL_DATA {}", n_cells).unwrap();
 
         // --- Pressure (scalar, stored at cell centers on the extended grid) ---
-        write!(w, "SCALARS pressure double 1\n").unwrap();
-        write!(w, "LOOKUP_TABLE default\n").unwrap();
+        writeln!(w, "SCALARS pressure double 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
 
-        let pressure = match &self.pressure_solver {
-            PressureSolver::MultigridCPU(solver) => {
-                solver.solution.clone()
-            },
-            PressureSolver::MultigridGPU(solver) => {
-                solver.solution.clone()
-            },
-            PressureSolver::FftCPU(solver) => {
-                solver.solution.clone()
-            }
-        };
+        let pressure = self.pressure_solver.pressure_ref();
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    // Convert interior indices to extended indices (offset by 1 ghost layer).
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
-
-                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
 
                     let p: f64 = pressure[flat] as f64;
 
                     if binary {
                         w.write_all(&p.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{}\n", p).unwrap();
+                        writeln!(w, "{}", p).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // --- Velocity (interpolated from staggered faces to cell centers) ---
         //
@@ -115,16 +99,14 @@ impl Simulation {
         //   v_c = 0.5 * (velocity_y[ex, ey-1, ez] + velocity_y[ex, ey, ez])
         //   w_c = 0.5 * (velocity_z[ex, ey, ez-1] + velocity_z[ex, ey, ez])
         //
-        write!(w, "VECTORS velocity double\n").unwrap();
+        writeln!(w, "VECTORS velocity double").unwrap();
 
         let velocity = &self.velocity_solver.velocity;
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
+                    let [ex, ey, ez] = self.grid.extended_indices_from_interior_indices([ix, iy, iz]);
 
                     let flat_c      = self.grid.flat_index_on_extended_grid([ex,     ey,     ez    ]);
                     let flat_x_left = self.grid.flat_index_on_extended_grid([ex - 1, ey,     ez    ]);
@@ -140,15 +122,15 @@ impl Simulation {
                         w.write_all(&v.to_be_bytes()).unwrap();
                         w.write_all(&ww.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", u, v, ww).unwrap();
+                        writeln!(w, "{} {} {}", u, v, ww).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
-        write!(w, "VECTORS body_force double\n").unwrap();
+        writeln!(w, "VECTORS body_force double").unwrap();
 
         let body_force = &self.velocity_solver.body_force;
 
@@ -168,82 +150,69 @@ impl Simulation {
                         w.write_all(&fy.to_be_bytes()).unwrap();
                         w.write_all(&fz.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", fx, fy, fz).unwrap();
+                        writeln!(w, "{} {} {}", fx, fy, fz).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // --- Pressure (scalar, stored at cell centers on the extended grid) ---
-        write!(w, "SCALARS sdf double 1\n").unwrap();
-        write!(w, "LOOKUP_TABLE default\n").unwrap();
+        writeln!(w, "SCALARS sdf double 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
 
         let signed_distance_function = &self.velocity_solver.signed_distance_function;
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    // Convert interior indices to extended indices (offset by 1 ghost layer).
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
-
-                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
                     let sdf: f64 = signed_distance_function[flat] as f64;
 
                     if binary {
                         w.write_all(&sdf.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{}\n", sdf).unwrap();
+                        writeln!(w, "{}", sdf).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // --- Signed distance function for slip surfaces (scalar) ---
-        write!(w, "SCALARS sdf_slip double 1\n").unwrap();
-        write!(w, "LOOKUP_TABLE default\n").unwrap();
+        writeln!(w, "SCALARS sdf_slip double 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
 
         let signed_distance_function_slip = &self.velocity_solver.signed_distance_function_slip;
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
-
-                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
                     let sdf_slip: f64 = signed_distance_function_slip[flat] as f64;
 
                     if binary {
                         w.write_all(&sdf_slip.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{}\n", sdf_slip).unwrap();
+                        writeln!(w, "{}", sdf_slip).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // --- Normals for slip surfaces (vector) ---
-        write!(w, "VECTORS normals_slip double\n").unwrap();
+        writeln!(w, "VECTORS normals_slip double").unwrap();
 
         let normals_slip_surfaces = &self.velocity_solver.normals_slip_surfaces;
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
-
-                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
 
                     let nx_val: f64 = normals_slip_surfaces[flat][0] as f64;
                     let ny_val: f64 = normals_slip_surfaces[flat][1] as f64;
@@ -254,13 +223,13 @@ impl Simulation {
                         w.write_all(&ny_val.to_be_bytes()).unwrap();
                         w.write_all(&nz_val.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", nx_val, ny_val, nz_val).unwrap();
+                        writeln!(w, "{} {} {}", nx_val, ny_val, nz_val).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         w.flush().expect("export_fields_as_vtk: failed to flush output");
     }

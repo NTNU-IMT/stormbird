@@ -32,12 +32,10 @@ pub fn residual_at_interior(
     x: &[Float],
     rhs: &[Float],
     idx: usize,
-    ii: usize,
-    ji: usize,
-    ki: usize
+    indices: [usize; 3]
 ) -> Float {
-    let off_diag = off_diagonal_sum(grid, boundary_conditions, x, idx, ii, ji, ki);
-    let ax = grid.poisson_diagonal * x[idx] + off_diag;
+    let off_diag = off_diagonal_sum(grid, boundary_conditions, x, idx, indices);
+    let ax = grid.poisson_diagonal4 * x[idx] + off_diag;
 
     rhs[idx] - ax
 }
@@ -56,41 +54,33 @@ pub fn residual_at_interior(
 /// - `x_fine`/`rhs_fine` are on the **interior** grid
 /// - `rhs_coarse` (output) is on the **interior** grid
 ///
-/// # Safety
-/// Uses unsafe pointer access to enable parallel writes. This is safe because each
-/// coarse cell index is processed exactly once, so there are no data races.
 pub fn compute_residual_and_restrict_kernel(
-    flat_index_coarse_interior: usize,
+    indices_coarse: [usize; 3],
     grid_fine: &Grid,
-    grid_coarse: &Grid,
     x_fine: &[Float],
     rhs_fine: &[Float],
     boundary_conditions: &PressureBoundaryConditions,
 ) -> Float {
-    // Get coarse interior indices
-    let [i_c, j_c, k_c] = grid_coarse.interior_indices_from_flat_index(flat_index_coarse_interior);
+    let [i_c, j_c, k_c] = indices_coarse;
 
     // Base fine interior indices (each coarse cell maps to 2x2x2 fine cells)
     let base_i_f = 2 * i_c;
     let base_j_f = 2 * j_c;
     let base_k_f = 2 * k_c;
 
-    let mut restricted_value: Float = 0.0;
-
-    // For each of the 8 fine children, compute residual and accumulate
-    for &(di, dj, dk) in &RESTRICT_CHILD_OFFSETS {
-        let i_f = base_i_f + di;
-        let j_f = base_j_f + dj;
-        let k_f = base_k_f + dk;
-
-        let idx_fine = grid_fine.flat_index_on_interior_grid([i_f, j_f, k_f]);
-
-        let residual = residual_at_interior(
-            grid_fine, boundary_conditions, x_fine, rhs_fine, idx_fine, i_f, j_f, k_f
-        );
-
-        restricted_value += RESTRICT_WEIGHT * residual;
-    }
-
-    restricted_value   
+    RESTRICT_CHILD_OFFSETS.iter().map(
+        |(di, dj, dk)| {
+            let i_f = base_i_f + di;
+            let j_f = base_j_f + dj;
+            let k_f = base_k_f + dk;
+    
+            let idx_fine = grid_fine.flat_index_on_interior_grid([i_f, j_f, k_f]);
+    
+            let residual = residual_at_interior(
+                grid_fine, boundary_conditions, x_fine, rhs_fine, idx_fine, [i_f, j_f, k_f]
+            );
+    
+            RESTRICT_WEIGHT * residual
+        }
+    ).sum::<Float>()
 }
