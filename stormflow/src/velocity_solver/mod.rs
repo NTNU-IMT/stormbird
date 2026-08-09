@@ -82,8 +82,9 @@ impl VelocitySolver {
         
         grid.parallel_spatial_vector_update(
             &mut self.velocity_star,
-            |i, _current| convect_and_diffuse_kernel(
+            |i, extended_indices, _current| convect_and_diffuse_kernel(
                 i, 
+                extended_indices,
                 grid, 
                 &self.velocity_org, 
                 &self.velocity, 
@@ -122,8 +123,9 @@ impl VelocitySolver {
         
         grid.parallel_spatial_vector_update(
             &mut self.velocity,
-            |i, _current| add_pressure_gradient_kernel(
+            |i, extended_indices, _current| add_pressure_gradient_kernel(
                 i,
+                extended_indices,
                 grid,
                 pressure,
                 &self.velocity_star,
@@ -158,8 +160,9 @@ impl VelocitySolver {
     ) {
         grid.parallel_spatial_vector_update(
             velocity,
-            |i, current| correct_velocities_for_no_slip_geometry_kernel(
+            |i, extended_indices, current| correct_velocities_for_no_slip_geometry_kernel(
                 i, 
+                extended_indices,
                 grid, 
                 current, 
                 signed_distance_function, 
@@ -183,8 +186,9 @@ impl VelocitySolver {
 
         grid.parallel_spatial_vector_update(
             velocity,
-            |i, current| correct_velocities_for_slip_geometry_mirror_kernel(
+            |i, extended_indices, current| correct_velocities_for_slip_geometry_mirror_kernel(
                 i,
+                extended_indices,
                 grid,
                 current,
                 &velocity_snapshot,

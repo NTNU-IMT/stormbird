@@ -60,9 +60,11 @@ impl PressureSolver {
 
                 let mut new_value = 0.0;
 
-                // 4th order accurate divergence: the standard symmetric 4-point staggered
-                // derivative (see `add_pressure_gradient_kernel`, which uses the same formula in
-                // the opposite staggering direction).
+                // 4th order accurate divergence: the staggered 4-point derivative that takes face
+                // samples back to the cell center (see `add_pressure_gradient_kernel`, which uses
+                // the same stencil family in the opposite staggering direction). The weights come
+                // from the grid's stencil tables so that a varying cell length is accounted for;
+                // on a uniform grid they reduce to the familiar `27/24, -1/24` coefficients.
                 for axis_index in 0..3 {
                     let stride = grid.extended_stride[axis_index];
 
@@ -70,10 +72,14 @@ impl PressureSolver {
                     let i_p = i_0 + stride;
                     let i_n2 = i_n - stride;
 
-                    new_value += (
-                        27.0 * (velocity_star[i_0][axis_index] - velocity_star[i_n][axis_index]) -
-                        (velocity_star[i_p][axis_index] - velocity_star[i_n2][axis_index])
-                    ) * grid.inv_cell_length[axis_index] * (1.0 / 24.0);
+                    let weights = &grid.stencils[axis_index]
+                        .divergence_face_to_center[extended_indices[axis_index]];
+
+                    new_value +=
+                        weights[0] * velocity_star[i_n2][axis_index] +
+                        weights[1] * velocity_star[i_n][axis_index] +
+                        weights[2] * velocity_star[i_0][axis_index] +
+                        weights[3] * velocity_star[i_p][axis_index];
                 }
 
                 new_value *= density * inv_time_step;

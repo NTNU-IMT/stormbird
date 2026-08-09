@@ -73,8 +73,6 @@ impl ActuatorLineInterface {
         let mut numerator = vec![SpatialVector::default(); nr_span_lines];
         let mut denominator = vec![0.0; nr_span_lines];
 
-        let cell_volume = grid.cell_length[0] * grid.cell_length[1] * grid.cell_length[2];
-        
         for i in 0..nr_cells_to_check {
             let i_flat_extended = self.cell_indices_to_check[i];
             
@@ -82,6 +80,7 @@ impl ActuatorLineInterface {
             let interior_indices = grid.interior_indices_from_extended_indices(extended_indices);
             
             let cell_center = grid.cell_center(interior_indices);
+            let cell_volume = grid.cell_volume(interior_indices);
             
             let velocity = grid.cell_centered_value_from_face_staggered(
                 interior_indices, 

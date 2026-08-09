@@ -8,13 +8,12 @@ use crate::geometry::Geometry;
 #[inline(always)]
 pub fn correct_velocities_for_no_slip_geometry_kernel(
     i_0: usize,
+    extended_indices: [usize; 3],
     grid: &Grid,
     current_velocity: SpatialVector,
     signed_distance_function: &[Float],
     epsilon: Float
 ) -> SpatialVector {
-    let extended_indices = grid.extended_indices_from_flat_index(i_0);
-
     let mut new_velocity = SpatialVector::default();
     
     for axis_index in 0..3 {
@@ -48,6 +47,7 @@ pub fn correct_velocities_for_no_slip_geometry_kernel(
 /// leaving it free inside the body.
 pub fn correct_velocities_for_slip_geometry_mirror_kernel(
     i_0: usize,
+    extended_indices: [usize; 3],
     grid: &Grid,
     current_velocity: SpatialVector,
     velocity_snapshot: &[SpatialVector],
@@ -55,8 +55,6 @@ pub fn correct_velocities_for_slip_geometry_mirror_kernel(
     normals: &[SpatialVector],
     epsilon: Float
 ) -> SpatialVector {
-    let extended_indices = grid.extended_indices_from_flat_index(i_0);
-
     let mut new_velocity = SpatialVector::default();
 
     for axis_index in 0..3 {
@@ -85,8 +83,7 @@ pub fn correct_velocities_for_slip_geometry_mirror_kernel(
         };
 
         if mu < 1.0 {
-            let mut face_center = grid.cell_center_extended(extended_indices);
-            face_center[axis_index] += 0.5 * grid.cell_length[axis_index];
+            let face_center = grid.positive_face_center_extended(extended_indices, axis_index);
     
             // Reflect the face location across the (locally linear) interface to get the image
             // point on the fluid side: `sdf` is negative inside the body, so this moves outward.

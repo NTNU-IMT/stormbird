@@ -16,7 +16,10 @@ use stormbird::{
 
 use crate::actuator_line_interface::ActuatorLineInterface;
 
-use crate::grid::Grid;
+use crate::grid::{
+    builder::GridBuilder,
+    Grid
+};
 use crate::simulation::{Simulation, SolverSettings};
 use crate::geometry::{
     Geometry,
@@ -36,11 +39,9 @@ use crate::error::Error;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SimulationBuilder {
-    pub domain_start_point: SpatialVector,
-    pub domain_end_point: SpatialVector,
+    pub grid: GridBuilder, 
     pub wind_condition: WindCondition,
     pub linear_velocity: SpatialVector,
-    pub grid_interior_shape: [usize; 3],
     #[serde(default)]
     pub actuator_line: Option<ActuatorLineBuilder>,
     #[serde(default)]
@@ -71,13 +72,23 @@ impl SimulationBuilder {
         
         Self::from_json_str(&file_content)
     }
+
+    pub fn get_grid(&self) -> Grid {
+        if let Some(actuator_line_builder) = &self.actuator_line {
+            let actuator_line = actuator_line_builder.build();
+
+            let line_force_model = &actuator_line.line_force_model;
+            
+            self.grid.build_from_line_force_model(&line_force_model)
+        } else {
+            self.grid.build_constant_from_background()
+        }
+    }
     
     pub fn build(&self) -> Simulation {
-        let grid = Grid::new(
-            self.domain_start_point, 
-            self.domain_end_point, 
-            self.grid_interior_shape
-        );
+        let grid = self.get_grid();
+
+        println!("Interior shape of grid: {:?}", &grid.interior_shape);
         
         let total_nr_cells = grid.nr_extended_cells();
 
@@ -102,12 +113,7 @@ impl SimulationBuilder {
             &pressure_boundary_conditions
         );
 
-        let mut max_dx = 0.0;
-        for axis_index in 0..3 {
-            if grid.cell_length[axis_index] > max_dx {
-                max_dx = grid.cell_length[axis_index];
-            }
-        }
+        let max_dx = grid.max_cell_length();
 
         let actuator_line = self.actuator_line.as_ref().map(
             |builder| ActuatorLineInterface::new(builder.build(), &grid)

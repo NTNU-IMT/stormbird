@@ -4,55 +4,47 @@ use stormath::type_aliases::Float;
 use crate::grid::Grid;
 
 #[inline(always)]
-/// 4th order accurate interpolation of a 1D sequence of samples spaced by a constant `h` onto
-/// the midpoint between `f_0` and `f_1`, given the two flanking samples `f_m1` (one `h` before
-/// `f_0`) and `f_2` (one `h` after `f_1`).
-fn interp4(f_m1: Float, f_0: Float, f_1: Float, f_2: Float) -> Float {
-    (9.0 * (f_0 + f_1) - (f_m1 + f_2)) * (1.0 / 16.0)
+/// Contracts a 4-node stencil with the four samples it applies to.
+fn apply4(weights: &[Float; 4], f: [Float; 4]) -> Float {
+    weights[0] * f[0] + weights[1] * f[1] + weights[2] * f[2] + weights[3] * f[3]
 }
 
 #[inline(always)]
-/// 4th order accurate upwind-biased first derivative at `x0`, for the case the transport
-/// velocity points in the `+` direction (so the stencil leans 3 points upwind, 1 point
-/// downwind): samples at `x0 - 3h, x0 - 2h, x0 - h, x0, x0 + h`. Caller still has to scale the
-/// result by `1 / h`. Central differencing here is unconditionally unstable for advection under
-/// this solver's explicit time stepping (central space + Euler-type time integration has no
-/// stability region on the imaginary axis), so this upwind bias is what actually provides the
-/// numerical dissipation needed for stability — same role the old 1st order upwind switch played.
-fn upwind_derivative4_plus(f_m3: Float, f_m2: Float, f_m1: Float, f_0: Float, f_p1: Float) -> Float {
-    (-f_m3 + 6.0 * f_m2 - 18.0 * f_m1 + 10.0 * f_0 + 3.0 * f_p1) * (1.0 / 12.0)
-}
-
-#[inline(always)]
-/// Mirror image of [`upwind_derivative4_plus`], for the transport velocity pointing in the `-`
-/// direction: samples at `x0 - h, x0, x0 + h, x0 + 2h, x0 + 3h`.
-fn upwind_derivative4_minus(f_m1: Float, f_0: Float, f_p1: Float, f_p2: Float, f_p3: Float) -> Float {
-    (-3.0 * f_m1 - 10.0 * f_0 + 18.0 * f_p1 - 6.0 * f_p2 + f_p3) * (1.0 / 12.0)
-}
-
-#[inline(always)]
-/// 4th order accurate central second derivative at `x0`, given samples at `x0`, `x0 - 2h`,
-/// `x0 - h`, `x0 + h` and `x0 + 2h`. Caller still has to scale the result by `1 / h^2`.
-fn laplacian4(f_m2: Float, f_m1: Float, f_0: Float, f_p1: Float, f_p2: Float) -> Float {
-    (16.0 * (f_m1 + f_p1) - (f_m2 + f_p2) - 30.0 * f_0) * (1.0 / 12.0)
+/// Contracts a 5-node stencil with the five samples it applies to.
+fn apply5(weights: &[Float; 5], f: [Float; 5]) -> Float {
+    weights[0] * f[0] + weights[1] * f[1] + weights[2] * f[2] + weights[3] * f[3] + weights[4] * f[4]
 }
 
 #[inline(always)]
 /// 4th order accurate interpolation of the `component` velocity field (stored on `component`-
 /// faces, i.e. naturally sampled at cell centers along every other axis) onto the center of cell
 /// `col` along `stride`'s axis — the midpoint between that cell's two bounding faces.
-fn face_to_cell_center(velocity: &[SpatialVector], col: usize, stride: usize, component: usize) -> Float {
-    interp4(
-        velocity[col - 2 * stride][component],
-        velocity[col - stride][component],
-        velocity[col][component],
-        velocity[col + stride][component],
+///
+/// `weights` comes from `AxisStencils::interpolate_face_to_center` for that axis, so the stencil
+/// accounts for the local cell lengths instead of assuming they are all equal. All four columns
+/// this is called for share the same index along `stride`'s axis, hence the same weights.
+fn face_to_cell_center(
+    velocity: &[SpatialVector],
+    weights: &[Float; 4],
+    col: usize,
+    stride: usize,
+    component: usize
+) -> Float {
+    apply4(
+        weights,
+        [
+            velocity[col - 2 * stride][component],
+            velocity[col - stride][component],
+            velocity[col][component],
+            velocity[col + stride][component],
+        ]
     )
 }
 
 #[inline(always)]
 pub fn convect_and_diffuse_kernel(
     i_0: usize,
+    extended_indices: [usize; 3],
     grid: &Grid,
     velocity_org: &[SpatialVector],
     velocity: &[SpatialVector],
@@ -76,9 +68,21 @@ pub fn convect_and_diffuse_kernel(
     for vel_comp in 0..3 {
         let u_i = v0[vel_comp];
 
+        // `u_vel_comp` sits on cell `i_0`'s positive face along `vel_comp`. Along that axis its
+        // samples are therefore face-staggered, while along the other two axes they sit at cell
+        // centers — which is why every stencil below is picked from the "face" family when
+        // `deriv_dir == vel_comp` and from the "center" family otherwise.
+        let stencils_vel_comp = &grid.stencils[vel_comp];
+        let index_vel_comp = extended_indices[vel_comp];
+
         for deriv_dir in 0..3 {
+            let staggered = deriv_dir == vel_comp;
+
+            let stencils_deriv = &grid.stencils[deriv_dir];
+            let index_deriv = extended_indices[deriv_dir];
+
             // -------------- Convection ------------------------
-            let u_j = if vel_comp == deriv_dir {
+            let u_j = if staggered {
                 // u_vel_comp interpolated onto its own location is exact, not an approximation.
                 v0[deriv_dir]
             } else {
@@ -87,12 +91,17 @@ pub fn convect_and_diffuse_kernel(
                 // deriv_dir) at 4 columns spanning u_i's stencil in the vel_comp direction, then
                 // interpolate those cell-center values onto u_i's face (along vel_comp).
                 let stride_deriv = grid.extended_stride[deriv_dir];
+                let to_center = &stencils_deriv.interpolate_face_to_center[index_deriv];
+                let to_face = &stencils_vel_comp.interpolate_center_to_face[index_vel_comp];
 
-                interp4(
-                    face_to_cell_center(velocity, i_n[vel_comp], stride_deriv, deriv_dir),
-                    face_to_cell_center(velocity, i_0, stride_deriv, deriv_dir),
-                    face_to_cell_center(velocity, i_p[vel_comp], stride_deriv, deriv_dir),
-                    face_to_cell_center(velocity, i_p2[vel_comp], stride_deriv, deriv_dir),
+                apply4(
+                    to_face,
+                    [
+                        face_to_cell_center(velocity, to_center, i_n[vel_comp], stride_deriv, deriv_dir),
+                        face_to_cell_center(velocity, to_center, i_0, stride_deriv, deriv_dir),
+                        face_to_cell_center(velocity, to_center, i_p[vel_comp], stride_deriv, deriv_dir),
+                        face_to_cell_center(velocity, to_center, i_p2[vel_comp], stride_deriv, deriv_dir),
+                    ]
                 )
             };
 
@@ -101,22 +110,44 @@ pub fn convect_and_diffuse_kernel(
             let f_p1 = velocity[i_p[deriv_dir]][vel_comp];
             let f_p2 = velocity[i_p2[deriv_dir]][vel_comp];
 
+            // The upwind bias is what provides the numerical dissipation this solver's explicit
+            // time stepping needs; see the stencil tables for the coefficients, which reduce to
+            // the classical `[-1, 6, -18, 10, 3]/(12h)` on a uniform grid.
             let dui_dxj = if u_j > 0.0 {
                 let f_m3 = velocity[i_n3[deriv_dir]][vel_comp];
 
-                upwind_derivative4_plus(f_m3, f_m2, f_m1, u_i, f_p1) * grid.inv_cell_length[deriv_dir]
+                let weights = if staggered {
+                    &stencils_deriv.upwind_plus_face[index_deriv]
+                } else {
+                    &stencils_deriv.upwind_plus_center[index_deriv]
+                };
+
+                apply5(weights, [f_m3, f_m2, f_m1, u_i, f_p1])
             } else {
                 let f_p3 = velocity[i_p3[deriv_dir]][vel_comp];
 
-                upwind_derivative4_minus(f_m1, u_i, f_p1, f_p2, f_p3) * grid.inv_cell_length[deriv_dir]
+                let weights = if staggered {
+                    &stencils_deriv.upwind_minus_face[index_deriv]
+                } else {
+                    &stencils_deriv.upwind_minus_center[index_deriv]
+                };
+
+                apply5(weights, [f_m1, u_i, f_p1, f_p2, f_p3])
             };
 
             new_value[vel_comp] -= u_j * dui_dxj;
 
             // ------------- Diffusion ------------------------
-            new_value[vel_comp] += viscosity *
-                laplacian4(f_m2, f_m1, u_i, f_p1, f_p2) *
-                grid.inv_cell_length_squared[deriv_dir];
+            let second_derivative_weights = if staggered {
+                &stencils_deriv.second_derivative_face[index_deriv]
+            } else {
+                &stencils_deriv.second_derivative_center[index_deriv]
+            };
+
+            new_value[vel_comp] += viscosity * apply5(
+                second_derivative_weights,
+                [f_m2, f_m1, u_i, f_p1, f_p2]
+            );
         }
 
         // ------------- Body force ------------------------
@@ -124,11 +155,14 @@ pub fn convect_and_diffuse_kernel(
         // face between i_0 and i_p[vel_comp]. The ghost layers on every side guarantee this
         // 4-point stencil is available for every interior cell, so no boundary fallback is
         // needed.
-        new_value[vel_comp] += interp4(
-            body_force[i_n[vel_comp]][vel_comp],
-            body_force[i_0][vel_comp],
-            body_force[i_p[vel_comp]][vel_comp],
-            body_force[i_p2[vel_comp]][vel_comp],
+        new_value[vel_comp] += apply4(
+            &stencils_vel_comp.interpolate_center_to_face[index_vel_comp],
+            [
+                body_force[i_n[vel_comp]][vel_comp],
+                body_force[i_0][vel_comp],
+                body_force[i_p[vel_comp]][vel_comp],
+                body_force[i_p2[vel_comp]][vel_comp],
+            ]
         ) * inv_density;
     }
 

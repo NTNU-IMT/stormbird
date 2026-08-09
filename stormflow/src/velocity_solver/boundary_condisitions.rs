@@ -71,11 +71,11 @@ impl VelocityBoundaryConditions {
             let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
 
             let mut velocity = SpatialVector::default();
-            let cell_center = grid.cell_center_extended(extended_indices); 
 
             for axis_index in 0..3 {
-                let mut face_point = cell_center;
-                face_point[axis_index] += 0.5 * grid.cell_length[axis_index]; // TODO: check if this is consistent over all the code...
+                // The staggered layout stores `velocity[i][axis]` on cell `i`'s positive face
+                // along `axis`, so that is where the boundary velocity is sampled.
+                let face_point = grid.positive_face_center_extended(extended_indices, axis_index);
 
                 let face_velocity = self.velocity_at_point(face_point);
 
@@ -133,12 +133,11 @@ impl VelocityBoundaryConditions {
 
                         if inflow {
                             let extended_indices = grid.extended_indices_from_flat_index(flat_current);
-                            let cell_center = grid.cell_center_extended(extended_indices);
 
                             let mut new_value = SpatialVector::default();
                             for c in 0..3 {
-                                let mut face_point = cell_center;
-                                face_point[c] += 0.5 * grid.cell_length[c]; // positive-face convention
+                                // positive-face convention
+                                let face_point = grid.positive_face_center_extended(extended_indices, c);
                                 new_value[c] = self.velocity_at_point(face_point)[c];
                             }
                             new_value

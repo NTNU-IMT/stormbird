@@ -114,6 +114,7 @@ impl MultigridCPU {
             |_idx_coarse, indices_coarse, _current| {
                 compute_residual_and_restrict_kernel(
                     indices_coarse,
+                    grid_coarse,
                     grid_fine,
                     x_fine,
                     rhs_fine,
@@ -151,6 +152,7 @@ impl MultigridCPU {
             |_idx_fine, indices_fine, current| {
                 let correction_value = prolongate_and_correct_kernel(
                     indices_fine,
+                    fine_grid,
                     coarse_grid,
                     coarse_values
                 );

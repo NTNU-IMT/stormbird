@@ -98,14 +98,16 @@ impl Geometry {
         grid: &Grid, 
         delta_factor: Float
     ) -> Vec<SpatialVector> {
-        let delta = delta_factor * grid.cell_length;
-        
         let nr_extended_cells = grid.nr_extended_cells();
 
         (0..nr_extended_cells).into_par_iter()
             .map(|i_flat_extended| {
                 let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
                 let cell_center = grid.cell_center_extended(extended_indices);
+
+                // The finite difference step follows the local cell size, so the gradient is
+                // sampled at the same relative offset everywhere on a grid whose cells vary.
+                let delta = delta_factor * grid.cell_length_extended(extended_indices);
 
                 // Compute gradient using central finite differences
                 let dx = Geometry::signed_distance_function_union(

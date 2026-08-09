@@ -6,8 +6,10 @@ use std::io::{BufWriter, Write};
 impl Simulation {
     pub fn export_fields_as_vtk(&self, file_path: &str, binary: bool) {
         let [nx, ny, nz] = self.grid.interior_shape;
-        let [x0, y0, z0] = self.grid.start_point.0;
-        let [dx, dy, dz] = self.grid.cell_length.0;
+
+        let points_x = &self.grid.interior_points[0];
+        let points_y = &self.grid.interior_points[1];
+        let points_z = &self.grid.interior_points[2];
 
         let n_points = (nx + 1) * (ny + 1) * (nz + 1);
         let n_cells  = nx * ny * nz;
@@ -28,17 +30,18 @@ impl Simulation {
         // ------------------------------------------------------------------ //
         // Cell-corner coordinates                                              //
         //                                                                      //
-        // Corner (px, py, pz) sits at:                                        //
-        //   (x0 + px*dx,  y0 + py*dy,  z0 + pz*dz)                           //
+        // Corner (px, py, pz) sits at the stored interior grid points, which   //
+        // are the cell vertices and therefore already carry any variation in   //
+        // the cell length.                                                     //
         //                                                                      //
         // VTK ordering: x varies fastest, z varies slowest.                   //
         // ------------------------------------------------------------------ //
         for pz in 0..=(nz) {
             for py in 0..=(ny) {
                 for px in 0..=(nx) {
-                    let x: f64 = x0 as f64 + px as f64 * dx as f64;
-                    let y: f64 = y0 as f64 + py as f64 * dy as f64;
-                    let z: f64 = z0 as f64 + pz as f64 * dz as f64;
+                    let x: f64 = points_x[px] as f64;
+                    let y: f64 = points_y[py] as f64;
+                    let z: f64 = points_z[pz] as f64;
 
                     if binary {
                         w.write_all(&x.to_be_bytes()).unwrap();

@@ -16,6 +16,11 @@ pub(crate) fn boundary_sign(boundary_conditions: &PressureBoundaryConditions, ax
 /// interior cell at `position` (0-indexed from this axis' `0`-face) out of `count` interior
 /// cells, `stride` apart in `current`.
 ///
+/// `weights` holds this cell's second-derivative coefficients for the neighbour offsets `-2..=2`
+/// (entry `2`, the diagonal, is not used here — it goes into `Grid::poisson_diagonal4`). On a
+/// non-uniform grid the four off-diagonal coefficients are all different, which is exactly why
+/// they are looked up per cell instead of being reconstructed from one `1/h²`.
+///
 /// The 5-point stencil `[-1, 16, -30, 16, -1]/(12h²)` needs 2 neighbors on each side, so cells
 /// within 2 of a boundary are missing one or both of them. Each missing read is substituted by
 /// the interior value it mirrors across that boundary face (signed per the face's boundary
@@ -40,7 +45,7 @@ fn axis_off_diagonal_sum(
     count: usize,
     sign_min: Float,
     sign_max: Float,
-    inv_cell_length_squared: Float,
+    weights: &[Float; 5],
 ) -> Float {
     let u_m1 = if position >= 1 {
         current[idx - stride]
@@ -70,7 +75,7 @@ fn axis_off_diagonal_sum(
         sign_max * current[idx - stride]
     };
 
-    inv_cell_length_squared * ((4.0 / 3.0) * (u_m1 + u_p1) - (1.0 / 12.0) * (u_m2 + u_p2))
+    weights[0] * u_m2 + weights[1] * u_m1 + weights[3] * u_p1 + weights[4] * u_p2
 }
 
 /// Off-diagonal stencil sum for the interior cell at (ii,ji,ki)/idx — see
@@ -90,17 +95,17 @@ pub fn off_diagonal_sum(
     axis_off_diagonal_sum(
         current, idx, sx, ii, nx,
         boundary_sign(boundary_conditions, 0, 0), boundary_sign(boundary_conditions, 0, 1),
-        grid.inv_cell_length_squared[0]
+        grid.poisson_axis_stencil_interior(0, ii)
     ) +
     axis_off_diagonal_sum(
         current, idx, sy, ji, ny,
         boundary_sign(boundary_conditions, 1, 0), boundary_sign(boundary_conditions, 1, 1),
-        grid.inv_cell_length_squared[1]
+        grid.poisson_axis_stencil_interior(1, ji)
     ) +
     axis_off_diagonal_sum(
         current, idx, sz, ki, nz,
         boundary_sign(boundary_conditions, 2, 0), boundary_sign(boundary_conditions, 2, 1),
-        grid.inv_cell_length_squared[2]
+        grid.poisson_axis_stencil_interior(2, ki)
     )
 }
 
@@ -121,7 +126,7 @@ pub fn jacobi_kernel(
     indices: [usize; 3]
 ) -> Float {
     let off_diag = off_diagonal_sum(grid, boundary_conditions, current, idx, indices);
-    let jacobi_update = (rhs[idx] - off_diag) * grid.poisson_inv_diagonal4;
+    let jacobi_update = (rhs[idx] - off_diag) * grid.poisson_inv_diagonal4(indices);
 
     (1.0 - JACOBI_WEIGHT) * current[idx] + JACOBI_WEIGHT * jacobi_update
 }

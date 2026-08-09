@@ -99,15 +99,21 @@ impl Grid {
     }
 
     /// Iterates over the interior indices of `self` in parallel and executes a kernel closure for
-    /// each index. The input to the kernel is both the index on the extended grid and the
-    /// current value of the out vector, in case it is needed for the update.
+    /// each index. The input to the kernel is the index on the extended grid, the `[i, j, k]`
+    /// indices on the extended grid, and the current value of the out vector, in case it is
+    /// needed for the update.
+    ///
+    /// The `[i, j, k]` indices are handed over because they fall out of the loop nest for free,
+    /// sparing kernels the div/mod of `extended_indices_from_flat_index` per cell — which every
+    /// kernel now needs, since the grid metrics (cell length and everything derived from it) vary
+    /// from cell to cell and are looked up by index.
     pub fn parallel_spatial_vector_update<F>(
         &self,
         out: &mut [SpatialVector],
         kernel: F
     )
     where
-        F: Fn(usize, SpatialVector) -> SpatialVector + Sync,
+        F: Fn(usize, [usize; 3], SpatialVector) -> SpatialVector + Sync,
     {
         let [nxi, nyi, nzi] = self.interior_shape;
         let [_nx, ny, nz] = self.extended_shape;
@@ -122,10 +128,11 @@ impl Grid {
                     let j = ji + INTERIOR_OFFSET;
                     let mut i_extended = self.flat_index_on_extended_grid([i, j, INTERIOR_OFFSET]);
 
-                    for _k in 0..nzi {
+                    for ki in 0..nzi {
+                        let k = ki + INTERIOR_OFFSET;
                         let local = i_extended - i * plane;
 
-                        out_plane[local] = kernel(i_extended, out_plane[local]);
+                        out_plane[local] = kernel(i_extended, [i, j, k], out_plane[local]);
 
                         i_extended += 1;
                     }

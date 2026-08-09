@@ -1,7 +1,9 @@
 {
-  "domain_start_point": [-64.0, -64.0, 0.0],
-  "domain_end_point": [64.0, 64.0, 64.0],
-  "grid_interior_shape": [128, 128, 128],
+  "grid": {
+    "start_point": [-64.0, -64.0, 0.0],
+    "end_point": [64.0, 64.0, 64.0],
+    "cells_per_length_background": [8, 8, 8]
+  },
   "effective_viscosity": 0.00001,
   "wind_condition": {
     "direction_coming_from": 0.0,

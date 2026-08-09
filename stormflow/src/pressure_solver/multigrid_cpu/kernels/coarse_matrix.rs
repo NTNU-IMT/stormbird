@@ -8,10 +8,10 @@ use super::jacobi::boundary_sign;
 
 /// One axis' contribution to a matrix row for the interior cell at `position` (0-indexed from
 /// this axis' `0`-face) out of `count` interior cells, `stride` apart. Mirrors
-/// `jacobi::axis_off_diagonal_sum` term for term — including its boundary-folded substitutions —
-/// so the assembled matrix represents exactly the same equation the Jacobi smoother iterates
-/// towards, just solved directly. See that function's doc comment for the boundary-folding
-/// rationale.
+/// `jacobi::axis_off_diagonal_sum` term for term — including its boundary-folded substitutions and
+/// its per-cell, per-offset second-derivative `weights` — so the assembled matrix represents
+/// exactly the same equation the Jacobi smoother iterates towards, just solved directly. See that
+/// function's doc comment for the boundary-folding rationale.
 #[inline]
 fn add_axis_off_diagonal_entries(
     matrix: &mut Matrix<Float>,
@@ -21,37 +21,39 @@ fn add_axis_off_diagonal_entries(
     count: usize,
     sign_min: Float,
     sign_max: Float,
-    inv_cell_length_squared: Float,
+    weights: &[Float; 5],
 ) {
-    let c1 = inv_cell_length_squared * (4.0 / 3.0);
-    let c2 = inv_cell_length_squared * (-1.0 / 12.0);
+    let weight_m2 = weights[0];
+    let weight_m1 = weights[1];
+    let weight_p1 = weights[3];
+    let weight_p2 = weights[4];
 
     if position >= 1 {
-        matrix[[idx, idx - stride]] += c1;
+        matrix[[idx, idx - stride]] += weight_m1;
     } else {
-        matrix[[idx, idx]] += c1 * sign_min;
+        matrix[[idx, idx]] += weight_m1 * sign_min;
     }
 
     if position >= 2 {
-        matrix[[idx, idx - 2 * stride]] += c2;
+        matrix[[idx, idx - 2 * stride]] += weight_m2;
     } else if position == 1 {
-        matrix[[idx, idx - stride]] += c2 * sign_min;
+        matrix[[idx, idx - stride]] += weight_m2 * sign_min;
     } else {
-        matrix[[idx, idx + stride]] += c2 * sign_min;
+        matrix[[idx, idx + stride]] += weight_m2 * sign_min;
     }
 
     if position + 1 < count {
-        matrix[[idx, idx + stride]] += c1;
+        matrix[[idx, idx + stride]] += weight_p1;
     } else {
-        matrix[[idx, idx]] += c1 * sign_max;
+        matrix[[idx, idx]] += weight_p1 * sign_max;
     }
 
     if position + 2 < count {
-        matrix[[idx, idx + 2 * stride]] += c2;
+        matrix[[idx, idx + 2 * stride]] += weight_p2;
     } else if position + 1 < count {
-        matrix[[idx, idx + stride]] += c2 * sign_max;
+        matrix[[idx, idx + stride]] += weight_p2 * sign_max;
     } else {
-        matrix[[idx, idx - stride]] += c2 * sign_max;
+        matrix[[idx, idx - stride]] += weight_p2 * sign_max;
     }
 }
 
@@ -74,24 +76,25 @@ pub fn build_poisson_matrix4(
     let [sx, sy, sz] = grid.interior_stride;
 
     for idx in 0..n {
-        matrix[[idx, idx]] += grid.poisson_diagonal4;
+        let indices = grid.interior_indices_from_flat_index(idx);
+        let [ii, ji, ki] = indices;
 
-        let [ii, ji, ki] = grid.interior_indices_from_flat_index(idx);
+        matrix[[idx, idx]] += grid.poisson_diagonal4(indices);
 
         add_axis_off_diagonal_entries(
             &mut matrix, idx, sx, ii, nx,
             boundary_sign(boundary_conditions, 0, 0), boundary_sign(boundary_conditions, 0, 1),
-            grid.inv_cell_length_squared[0]
+            grid.poisson_axis_stencil_interior(0, ii)
         );
         add_axis_off_diagonal_entries(
             &mut matrix, idx, sy, ji, ny,
             boundary_sign(boundary_conditions, 1, 0), boundary_sign(boundary_conditions, 1, 1),
-            grid.inv_cell_length_squared[1]
+            grid.poisson_axis_stencil_interior(1, ji)
         );
         add_axis_off_diagonal_entries(
             &mut matrix, idx, sz, ki, nz,
             boundary_sign(boundary_conditions, 2, 0), boundary_sign(boundary_conditions, 2, 1),
-            grid.inv_cell_length_squared[2]
+            grid.poisson_axis_stencil_interior(2, ki)
         );
     }
 
@@ -133,7 +136,7 @@ mod tests {
 
         for idx in 0..n {
             let indices = grid.interior_indices_from_flat_index(idx);
-            let expected = grid.poisson_diagonal4 * x[idx]
+            let expected = grid.poisson_diagonal4(indices) * x[idx]
                 + off_diagonal_sum(&grid, &boundary_conditions, &x, idx, indices);
 
             assert!(

@@ -5,8 +5,6 @@ use crate::{
     grid::Grid
 };
 
-const RESTRICT_WEIGHT: Float = 0.125;
-
 const RESTRICT_CHILD_OFFSETS: [(usize, usize, usize); 8] = [
     (0, 0, 0),
     (0, 0, 1),
@@ -35,7 +33,7 @@ pub fn residual_at_interior(
     indices: [usize; 3]
 ) -> Float {
     let off_diag = off_diagonal_sum(grid, boundary_conditions, x, idx, indices);
-    let ax = grid.poisson_diagonal4 * x[idx] + off_diag;
+    let ax = grid.poisson_diagonal4(indices) * x[idx] + off_diag;
 
     rhs[idx] - ax
 }
@@ -50,12 +48,19 @@ pub fn residual_at_interior(
 /// where A is the discrete Laplacian (Poisson matrix), with boundary conditions folded
 /// directly into the stencil for fine cells missing a real neighbor.
 ///
+/// The 8 children are combined by **volume weighting** rather than a flat `1/8` average: a coarse
+/// cell is exactly the union of its children (coarsening merges cell pairs), so weighting each
+/// child by `V_fine / V_coarse` is the restriction that conserves the volume-integrated residual
+/// on a grid whose cells differ in size. The weights factor per axis, and on a uniform grid every
+/// one of them is `1/8` again.
+///
 /// # Grid layout
 /// - `x_fine`/`rhs_fine` are on the **interior** grid
 /// - `rhs_coarse` (output) is on the **interior** grid
 ///
 pub fn compute_residual_and_restrict_kernel(
     indices_coarse: [usize; 3],
+    grid_coarse: &Grid,
     grid_fine: &Grid,
     x_fine: &[Float],
     rhs_fine: &[Float],
@@ -68,6 +73,10 @@ pub fn compute_residual_and_restrict_kernel(
     let base_j_f = 2 * j_c;
     let base_k_f = 2 * k_c;
 
+    let inverse_coarse_length: [Float; 3] = std::array::from_fn(|axis| {
+        1.0 / grid_coarse.cell_length_on_axis(axis, indices_coarse[axis])
+    });
+
     RESTRICT_CHILD_OFFSETS.iter().map(
         |(di, dj, dk)| {
             let i_f = base_i_f + di;
@@ -79,8 +88,13 @@ pub fn compute_residual_and_restrict_kernel(
             let residual = residual_at_interior(
                 grid_fine, boundary_conditions, x_fine, rhs_fine, idx_fine, [i_f, j_f, k_f]
             );
+
+            let volume_fraction =
+                grid_fine.cell_length_on_axis(0, i_f) * inverse_coarse_length[0] *
+                grid_fine.cell_length_on_axis(1, j_f) * inverse_coarse_length[1] *
+                grid_fine.cell_length_on_axis(2, k_f) * inverse_coarse_length[2];
     
-            RESTRICT_WEIGHT * residual
+            volume_fraction * residual
         }
     ).sum::<Float>()
 }

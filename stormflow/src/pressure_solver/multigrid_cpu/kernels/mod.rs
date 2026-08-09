@@ -27,7 +27,8 @@ pub mod coarse_matrix;
 pub fn laplacian_stencil(
     grid: &Grid,
     x: &[Float],
-    idx_extended: usize
+    idx_extended: usize,
+    extended_indices: [usize; 3]
 ) -> Float {
     let idx_xp = idx_extended + grid.extended_stride[0];
     let idx_xm = idx_extended - grid.extended_stride[0];
@@ -36,11 +37,17 @@ pub fn laplacian_stencil(
     let idx_zp = idx_extended + 1;
     let idx_zm = idx_extended - 1;
 
-    let off_diag = grid.inv_cell_length_squared[0] * (x[idx_xp] + x[idx_xm])
-                 + grid.inv_cell_length_squared[1] * (x[idx_yp] + x[idx_ym])
-                 + grid.inv_cell_length_squared[2] * (x[idx_zp] + x[idx_zm]);
+    // 3-point second-derivative weights per axis, for the neighbour offsets -1..=1. On a uniform
+    // grid the two off-diagonal entries are both `1/h^2`.
+    let weights: [&[Float; 3]; 3] = std::array::from_fn(|axis| {
+        &grid.stencils[axis].second_derivative_center_low_order[extended_indices[axis]]
+    });
 
-    grid.poisson_diagonal * x[idx_extended] + off_diag
+    let off_diag = weights[0][0] * x[idx_xm] + weights[0][2] * x[idx_xp]
+                 + weights[1][0] * x[idx_ym] + weights[1][2] * x[idx_yp]
+                 + weights[2][0] * x[idx_zm] + weights[2][2] * x[idx_zp];
+
+    grid.poisson_diagonal_extended(extended_indices) * x[idx_extended] + off_diag
 }
 
 /// Computes the residual r = rhs - A*x for the Poisson equation.
@@ -67,7 +74,7 @@ pub fn compute_residual(
             let flat_extended = grid.flat_index_on_extended_grid(extended_indices);
 
             // Compute A*x at this cell
-            let ax = laplacian_stencil(grid, x, flat_extended);
+            let ax = laplacian_stencil(grid, x, flat_extended, extended_indices);
 
             // r = rhs - A*x
             let res = rhs[flat_interior] - ax;
@@ -85,20 +92,21 @@ pub fn compute_residual(
 pub fn laplacian_stencil4(
     grid: &Grid,
     x: &[Float],
-    idx_extended: usize
+    idx_extended: usize,
+    extended_indices: [usize; 3]
 ) -> Float {
-    let mut result = grid.poisson_diagonal4 * x[idx_extended];
+    let mut result = grid.poisson_diagonal4_extended(extended_indices) * x[idx_extended];
 
     for axis in 0..3 {
         let stride = grid.extended_stride[axis];
-        let inv_dx2 = grid.inv_cell_length_squared[axis];
+        let weights = grid.poisson_axis_stencil(axis, extended_indices[axis]);
 
         let u_m2 = x[idx_extended - 2 * stride];
         let u_m1 = x[idx_extended - stride];
         let u_p1 = x[idx_extended + stride];
         let u_p2 = x[idx_extended + 2 * stride];
 
-        result += inv_dx2 * ((4.0 / 3.0) * (u_m1 + u_p1) - (1.0 / 12.0) * (u_m2 + u_p2));
+        result += weights[0] * u_m2 + weights[1] * u_m1 + weights[3] * u_p1 + weights[4] * u_p2;
     }
 
     result
@@ -119,7 +127,7 @@ pub fn compute_residual4(
             let extended_indices = grid.extended_indices_from_interior_indices(interior_indices);
             let flat_extended = grid.flat_index_on_extended_grid(extended_indices);
 
-            let ax = laplacian_stencil4(grid, x, flat_extended);
+            let ax = laplacian_stencil4(grid, x, flat_extended, extended_indices);
             let res = rhs[flat_interior] - ax;
 
             res.abs()

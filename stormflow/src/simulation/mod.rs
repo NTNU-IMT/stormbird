@@ -61,14 +61,7 @@ impl Simulation {
             }
         }
 
-        let cell_length = self.grid.cell_length;
-
-        let mut min_cell_length = Float::INFINITY;
-        for i in 0..3 {
-            if cell_length[i] < min_cell_length {
-                min_cell_length = cell_length[i];
-            }
-        }
+        let min_cell_length = self.grid.min_cell_length();
 
         courant_number * min_cell_length / max_velocity
     }
