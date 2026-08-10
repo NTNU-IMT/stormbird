@@ -1,4 +1,4 @@
-// grid.wgsl will be prepended before this source during loading.
+// gpu_grid.wgsl will be prepended before this source during loading.
 // BC_X0/BC_X1/BC_Y0/BC_Y1/BC_Z0/BC_Z1 (0 = ZeroGradient, 1 = ZeroValue) are injected as plain
 // WGSL consts, same as jacobi_shader.wgsl.
 //
@@ -11,6 +11,7 @@
 // face's boundary condition. Corner/edge cells of the extended array (where two or more indices
 // are out of range) are left untouched, since nothing ever reads them.
 
+@group(0) @binding(0) var<uniform> grid: Grid;
 @group(0) @binding(1) var<storage, read> x: array<f32>;
 @group(0) @binding(2) var<storage, read_write> solution: array<f32>;
 

@@ -10,7 +10,7 @@ use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 
 use super::bc_consts_wgsl;
 
-const GRID_SRC: &str = include_str!("../../../grid/gpu_version/grid.wgsl");
+const GPU_GRID_SRC: &str = include_str!("../../../grid/gpu_version/gpu_grid.wgsl");
 const MATERIALIZE_SRC: &str = include_str!("materialize_shader.wgsl");
 
 pub const WORKGROUP_SIZE: u32 = 4;
@@ -37,7 +37,7 @@ impl MaterializeShader {
     pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions) -> Self {
         let shader_src = format!(
             "{grid_src}\nconst INTERIOR_OFFSET: u32 = {interior_offset}u;\n{bc_consts}{materialize_src}",
-            grid_src = GRID_SRC,
+            grid_src = GPU_GRID_SRC,
             interior_offset = INTERIOR_OFFSET,
             bc_consts = bc_consts_wgsl(boundary_conditions),
             materialize_src = MATERIALIZE_SRC

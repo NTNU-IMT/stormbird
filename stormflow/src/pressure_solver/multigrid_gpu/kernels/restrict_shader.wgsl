@@ -1,4 +1,4 @@
-// grid_struct.wgsl will be prepended before the rest of the source during loading.
+// gpu_grid.wgsl will be prepended before the rest of the source during loading.
 // BC_X0/BC_X1/BC_Y0/BC_Y1/BC_Z0/BC_Z1 (0 = ZeroGradient, 1 = ZeroValue) are injected as plain
 // WGSL consts at shader-generation time (see jacobi_shader.wgsl for why this boundary-folded
 // approach replaces ghost cells). `x_fine`/`rhs_fine` are interior-sized.

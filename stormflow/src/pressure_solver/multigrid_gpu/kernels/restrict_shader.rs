@@ -8,7 +8,7 @@ use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 
 use super::bc_consts_wgsl;
 
-const GRID_STRUCT_SRC: &str = include_str!("../../../grid/gpu_version/grid_struct.wgsl");
+const GPU_GRID_SRC: &str = include_str!("../../../grid/gpu_version/gpu_grid.wgsl");
 const RESTRICT_SRC: &str = include_str!("restrict_shader.wgsl");
 
 pub const WORKGROUP_SIZE: u32 = 4;
@@ -37,7 +37,7 @@ impl RestrictShader {
     pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions) -> Self {
         let shader_src = format!(
             "{grid_src}\n{bc_consts}{restrict_src}",
-            grid_src = GRID_STRUCT_SRC,
+            grid_src = GPU_GRID_SRC,
             bc_consts = bc_consts_wgsl(boundary_conditions),
             restrict_src = RESTRICT_SRC
         );

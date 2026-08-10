@@ -15,22 +15,28 @@ pub const INTERIOR_OFFSET: usize = 3;
 pub const SMALLEST_NR_CELLS_FOR_COARSENING: usize = 2;
 
 #[derive(Debug, Clone)]
-/// Structured grid definition
+/// A structured cartesian grid to be used for finite difference, staggered, CFD simulations
 pub struct Grid {
+    /// The corner with minimum values in x, y, z direction
     pub start_point: SpatialVector,
+    /// Fixed cell length that defines the spatial resolution
     pub cell_length: SpatialVector,
+    /// Stores the inverse cell length, to avoid having to recalculate it in kernels
     pub inv_cell_length: SpatialVector,
+    /// Stores the inverse cell length squared, to avoid having to recalculate it in kernels
     pub inv_cell_length_squared: SpatialVector,
-    pub poisson_diagonal: Float,
-    pub poisson_inv_diagonal: Float,
-    /// Diagonal coefficient of the 4th order accurate (5-point-per-axis) discrete Laplacian, used
-    /// by `MultigridCPU`/`MultigridGPU`. Kept separate from `poisson_diagonal` (the 2nd order
-    /// value) since `FftCPU` still relies on the 2nd order stencil's diagonalization by DCT/DST.
+    /// Diagonal coefficient of the 4th order accurate (5-point-per-axis) discrete Laplacian
     pub poisson_diagonal4: Float,
+    /// Inverse of the poisson_diagonal4
     pub poisson_inv_diagonal4: Float,
+    /// The shape of the extended grid, i.e., the number of cells
     pub extended_shape: [usize; 3],
+    /// The stride of the extended grid, i.e., values that can be used to jump to the next point in
+    /// a flat array in x, y, or z direction
     pub extended_stride: [usize; 3],
+    /// As "extended_shape", but for the interior grid
     pub interior_shape: [usize; 3],
+    /// As "extended_stride", but for the interior grid
     pub interior_stride: [usize; 3]
 }
 
@@ -51,14 +57,6 @@ impl Grid {
             inv_cell_length[1].powi(2),
             inv_cell_length[2].powi(2),
         ]);
-
-        let poisson_diagonal = -2.0 * (
-            inv_cell_length_squared[0] + 
-            inv_cell_length_squared[1] + 
-            inv_cell_length_squared[2]
-        );
-
-        let poisson_inv_diagonal = 1.0 / poisson_diagonal;
 
         let poisson_diagonal4 = -2.5 * (
             inv_cell_length_squared[0] +
@@ -91,8 +89,6 @@ impl Grid {
             cell_length,
             inv_cell_length,
             inv_cell_length_squared,
-            poisson_diagonal,
-            poisson_inv_diagonal,
             poisson_diagonal4,
             poisson_inv_diagonal4,
             extended_shape,
@@ -143,15 +139,15 @@ impl Grid {
                 self.inv_cell_length_squared[1], 
                 self.inv_cell_length_squared[2], 
                 0.0
-            ], 
-            poisson_diagonal: self.poisson_diagonal,
-            poisson_inv_diagonal: self.poisson_inv_diagonal,
+            ],
             _pad0: 0,
             _pad1: 0,
             poisson_diagonal4: self.poisson_diagonal4,
             poisson_inv_diagonal4: self.poisson_inv_diagonal4,
             _pad2: 0,
             _pad3: 0,
+            _pad4: 0,
+            _pad5: 0,
             extended_shape: [
                 self.extended_shape[0] as u32, 
                 self.extended_shape[1] as u32, 

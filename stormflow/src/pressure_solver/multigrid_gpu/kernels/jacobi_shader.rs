@@ -4,7 +4,7 @@ use crate::gpu_interface::{
     utils as gpu_utils
 };
 
-const GRID_SRC: &str = include_str!("../../../grid/gpu_version/grid.wgsl");
+const GPU_GRID_SRC: &str = include_str!("../../../grid/gpu_version/gpu_grid.wgsl");
 const JACOBI_SRC: &str = include_str!("jacobi_shader.wgsl");
 
 use crate::grid::gpu_version::GpuGrid;
@@ -35,7 +35,7 @@ impl JacobiShader {
     pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions) -> Self {
         let shader_src = format!(
             "{grid_src}\n{bc_consts}{jacobi_src}",
-            grid_src = GRID_SRC,
+            grid_src = GPU_GRID_SRC,
             bc_consts = bc_consts_wgsl(boundary_conditions),
             jacobi_src = JACOBI_SRC
         );

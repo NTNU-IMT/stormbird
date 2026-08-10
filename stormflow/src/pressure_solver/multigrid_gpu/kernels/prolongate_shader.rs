@@ -4,7 +4,7 @@ use crate::gpu_interface::{
     utils as gpu_utils
 };
 
-const GRID_STRUCT_SRC: &str = include_str!("../../../grid/gpu_version/grid_struct.wgsl");
+const GPU_GRID_SRC: &str = include_str!("../../../grid/gpu_version/gpu_grid.wgsl");
 const PROLONGATE_SRC: &str = include_str!("prolongate_shader.wgsl");
 
 pub const WORKGROUP_SIZE: u32 = 4;
@@ -27,7 +27,7 @@ impl ProlongateShader {
     }
 
     pub fn new(context: &GpuContext) -> Self {
-        let shader_src = format!("{}\n{}", GRID_STRUCT_SRC, PROLONGATE_SRC);
+        let shader_src = format!("{}\n{}", GPU_GRID_SRC, PROLONGATE_SRC);
 
         let shader = context.create_shader_module(&shader_src);
         let bind_group_layout = context.create_bind_group_layout(&Self::bind_group_layout_entries());

@@ -1,4 +1,4 @@
-// grid_struct.wgsl will be prepended before the rest of the source during loading.
+// gpu_grid.wgsl will be prepended before the rest of the source during loading.
 // `x_fine`/`x_coarse` are interior-sized (no ghost cells).
 
 @group(0) @binding(0) var<uniform> grid_fine: Grid;
