@@ -38,7 +38,6 @@ pub struct RotatingCylinder {
     /// The spin ratio where the low drag is used
     pub cd_spin_ratio_low_drag: Float,
     
-    
     #[serde(default)]
     /// Added mass factor for the cylinder
     pub added_mass_factor: Float,
@@ -102,8 +101,10 @@ impl RotatingCylinder {
         let len_data = self.spin_ratio_data.len();
 
         let spin_ratio_abs = spin_ratio.abs();
-
+        
         let cl = if spin_ratio_abs > self.spin_ratio_data[len_data-1] {
+            // Linearly extrapolate from the last available data point if input spin ratio is larger 
+            // than what the model specifies directly
             let delta_s = self.spin_ratio_data[len_data-1] - self.spin_ratio_data[len_data-2];
             let delta_cl = self.cl_data[len_data-1] - self.cl_data[len_data-2];
 
@@ -114,6 +115,7 @@ impl RotatingCylinder {
 
             self.cl_data[len_data-1] + extrapolate
         } else {
+            // Linear interpolation on the specified data
             interpolation::linear_interpolation(
                 spin_ratio_abs,
                 &self.spin_ratio_data, 

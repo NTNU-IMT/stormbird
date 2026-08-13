@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 
 use super::boundary_conditions::PressureBoundaryConditions;
 use crate::grid::Grid;
+use crate::geometry::Geometry;
 
 pub mod settings;
 
@@ -28,16 +29,22 @@ impl Default for PressureSolverBuilder {
 }
 
 impl PressureSolverBuilder {
-    pub fn build(&self, grid: &Grid, boundary_conditions: &PressureBoundaryConditions) -> PressureSolver {
+    pub fn build(
+        &self,
+        grid: &Grid,
+        boundary_conditions: &PressureBoundaryConditions,
+        slip_geometries: &[Geometry]
+    ) -> PressureSolver {
         match self {
             Self::Multigrid(settings) => {
                 match settings.compute_platform {
                     ComputePlatform::CPU => {
                         PressureSolver::MultigridCPU(
                             MultigridCPU::new(
-                                grid, 
-                                boundary_conditions, 
-                                settings.build_settings()
+                                grid,
+                                boundary_conditions,
+                                settings.build_settings(),
+                                slip_geometries
                             )
                         )
                     },

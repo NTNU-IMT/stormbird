@@ -2,6 +2,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
+use crate::pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureInterpolationOrder;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum ComputePlatform {
@@ -21,7 +22,16 @@ pub struct MultigridSettingsBuilder {
     #[serde(default)]
     pub compute_platform: ComputePlatform,
     #[serde(default)]
-    pub coarsest_level_solver: CoarsestLevelSolver
+    pub coarsest_level_solver: CoarsestLevelSolver,
+    /// Experimental: applies a pressure zero-gradient (Neumann) correction near slip walls during
+    /// each V-cycle. Off by default; only has an effect on `ComputePlatform::CPU`.
+    #[serde(default)]
+    pub enable_slip_pressure_correction: bool,
+    /// Interpolation order for the slip-wall pressure correction specifically (ignored when
+    /// `enable_slip_pressure_correction` is false) — does not affect the rest of the pressure
+    /// solve, which always uses 4th order stencils.
+    #[serde(default)]
+    pub slip_pressure_interpolation_order: SlipPressureInterpolationOrder
 }
 
 impl MultigridSettingsBuilder {
@@ -33,7 +43,9 @@ impl MultigridSettingsBuilder {
             nr_v_cycles: self.nr_v_cycles,
             nr_smooth_iterations: self.nr_smooth_iterations,
             compute_residual_after_solve: self.compute_residual_after_solve,
-            coarsest_level_solver: self.coarsest_level_solver
+            coarsest_level_solver: self.coarsest_level_solver,
+            enable_slip_pressure_correction: self.enable_slip_pressure_correction,
+            slip_pressure_interpolation_order: self.slip_pressure_interpolation_order
         }
     }
 }
@@ -45,7 +57,9 @@ impl Default for MultigridSettingsBuilder {
             nr_smooth_iterations: Self::default_nr_smooth_iterations(),
             compute_residual_after_solve: false,
             compute_platform: ComputePlatform::default(),
-            coarsest_level_solver: CoarsestLevelSolver::default()
+            coarsest_level_solver: CoarsestLevelSolver::default(),
+            enable_slip_pressure_correction: false,
+            slip_pressure_interpolation_order: SlipPressureInterpolationOrder::default()
         }
     }
 }

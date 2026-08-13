@@ -28,7 +28,8 @@ use crate::pressure_solver::{
 };
 
 use crate::velocity_solver::{
-    VelocitySolver, boundary_condisitions::VelocityBoundaryConditions
+    VelocitySolver, boundary_condisitions::VelocityBoundaryConditions,
+    slip_mirror_stencils::{SlipMirrorStencils, SLIP_MIRROR_REACH_CELLS}
 };
 
 use crate::error::Error;
@@ -96,11 +97,6 @@ impl SimulationBuilder {
         let velocity_org = velocity.clone();
         let velocity_star = velocity.clone();
         let body_force = vec![SpatialVector::default(); total_nr_cells];
-        
-        let pressure_solver = self.pressure_solver.build(
-            &grid,
-            &pressure_boundary_conditions
-        );
 
         let mut max_dx = 0.0;
         for axis_index in 0..3 {
@@ -129,6 +125,12 @@ impl SimulationBuilder {
             )
         }
 
+        let pressure_solver = self.pressure_solver.build(
+            &grid,
+            &pressure_boundary_conditions,
+            &slip_geometries
+        );
+
         println!("Calculating SDF");
         let signed_distance_function = Geometry::signed_distance_function_on_extended_grid(
             &geometries, &grid
@@ -142,6 +144,17 @@ impl SimulationBuilder {
             &slip_geometries, &grid, 0.1
         );
 
+        let slip_epsilon = 4.0 * max_dx;
+
+        println!("Building slip-mirror stencils");
+        let slip_mirror_stencils = SlipMirrorStencils::build(
+            &grid,
+            &signed_distance_function_slip,
+            &normals_slip_surfaces,
+            slip_epsilon,
+            SLIP_MIRROR_REACH_CELLS * max_dx,
+        );
+
         let velocity_solver = VelocitySolver {
             velocity,
             velocity_org,
@@ -150,9 +163,9 @@ impl SimulationBuilder {
             signed_distance_function,
             signed_distance_function_slip,
             normals_slip_surfaces,
+            slip_mirror_stencils,
             boundary_conditions: velocity_boundary_conditions,
             no_slip_epsilon: 2.0 * max_dx,
-            slip_epsilon: 4.0 * max_dx,
             viscosity: self.effective_viscosity,
             density: 1.0,
         };

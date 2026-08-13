@@ -7,6 +7,7 @@ use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
 use stormflow::grid::Grid;
 use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
 use stormflow::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
+use stormflow::pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureInterpolationOrder;
 
 #[test]
 fn gpu_pressure_solver_bench() {
@@ -21,7 +22,9 @@ fn gpu_pressure_solver_bench() {
         nr_smooth_iterations: 4,
         nr_v_cycles: 2,
         compute_residual_after_solve: true,
-        coarsest_level_solver: CoarsestLevelSolver::Exact
+        coarsest_level_solver: CoarsestLevelSolver::Exact,
+        enable_slip_pressure_correction: false,
+        slip_pressure_interpolation_order: SlipPressureInterpolationOrder::default()
     };
 
     let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings);

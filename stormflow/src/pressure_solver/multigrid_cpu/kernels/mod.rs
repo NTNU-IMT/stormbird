@@ -39,13 +39,31 @@ pub fn laplacian_stencil4(
 /// 4th order accurate counterpart to `compute_residual`, used by `MultigridCPU`/`MultigridGPU`
 /// (both now solving with the 4th order stencil) instead of the 2nd order `compute_residual`,
 /// which remains as-is for `FftCPU`.
+///
+/// `exclude` marks interior cells (by flat interior index) to leave out of the average — meant for
+/// cells whose pressure value is blended with a mirrored image point rather than purely solved for
+/// (e.g. `jacobi::jacobi_kernel_with_slip_correction`'s slip-wall zero-gradient correction). Such
+/// cells don't satisfy `Ax = rhs` by construction, so including them would report a permanently
+/// nonzero "residual" that reflects the deliberate boundary correction rather than how well the
+/// solve actually converged elsewhere. Pass `&[]` (as
+/// `MultigridGPU` does, since it has no such correction) to include every cell, matching the
+/// previous unconditional behavior.
 pub fn compute_residual4(
     grid: &Grid,
     x: &[Float],
     rhs: &[Float],
+    exclude: &[bool],
 ) -> Float {
+    let nr_excluded = exclude.iter().filter(|&&excluded| excluded).count();
+    let nr_included = rhs.len() - nr_excluded;
+
+    if nr_included == 0 {
+        return 0.0;
+    }
+
     (0..rhs.len())
         .into_par_iter()
+        .filter(|&flat_interior| !exclude.get(flat_interior).copied().unwrap_or(false))
         .map(|flat_interior| {
             let interior_indices = grid.interior_indices_from_flat_index(flat_interior);
             let extended_indices = grid.extended_indices_from_interior_indices(interior_indices);
@@ -55,5 +73,5 @@ pub fn compute_residual4(
             let res = rhs[flat_interior] - ax;
 
             res.abs()
-        }).sum::<Float>() / rhs.len() as Float
+        }).sum::<Float>() / nr_included as Float
 }
