@@ -47,7 +47,7 @@ fn assert_gpu_matches_cpu(grid: &Grid, coarsest_level_solver: CoarsestLevelSolve
     cpu_solver.rhs_at_levels[0].copy_from_slice(&rhs);
     cpu_solver.solve();
 
-    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings);
+    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &[]);
     gpu_solver.rhs.copy_from_slice(&rhs);
     gpu_solver.solve();
 

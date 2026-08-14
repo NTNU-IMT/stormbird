@@ -5,6 +5,7 @@ use crate::gpu_interface::{
 };
 
 const GPU_GRID_SRC: &str = include_str!("../../../grid/gpu_version/gpu_grid.wgsl");
+const JACOBI_COMMON_SRC: &str = include_str!("jacobi_common.wgsl");
 const JACOBI_SRC: &str = include_str!("jacobi_shader.wgsl");
 
 use crate::grid::gpu_version::GpuGrid;
@@ -34,10 +35,11 @@ impl JacobiShader {
     /// single pipeline is shared across every multigrid level's bind groups.
     pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions) -> Self {
         let shader_src = format!(
-            "{grid_src}\n{bc_consts}{jacobi_src}",
+            "{grid_src}\n{bc_consts}{jacobi_src}\n{jacobi_common_src}",
             grid_src = GPU_GRID_SRC,
             bc_consts = bc_consts_wgsl(boundary_conditions),
-            jacobi_src = JACOBI_SRC
+            jacobi_src = JACOBI_SRC,
+            jacobi_common_src = JACOBI_COMMON_SRC
         );
 
         let shader = context.create_shader_module(&shader_src);

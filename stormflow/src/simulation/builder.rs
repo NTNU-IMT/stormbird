@@ -29,7 +29,7 @@ use crate::pressure_solver::{
 
 use crate::velocity_solver::{
     VelocitySolver, boundary_condisitions::VelocityBoundaryConditions,
-    slip_mirror_stencils::{SlipMirrorStencils, SLIP_MIRROR_REACH_CELLS}
+    slip_mirror_stencils::{SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS}
 };
 
 use crate::error::Error;
@@ -56,6 +56,15 @@ pub struct SimulationBuilder {
     pub pressure_solver: PressureSolverBuilder,
     #[serde(default)]
     pub solver_settings: SolverSettings,
+    /// Interpolation order for the slip-wall *velocity* mirror correction specifically (see
+    /// `SlipMirrorInterpolationOrder`) — independent of `pressure_solver`'s equivalent pressure
+    /// setting, though you'll usually want to set both to the same order for matching accuracy at
+    /// the slip wall on both fields. Defaults to 4th order (`Tricubic`, matching the rest of the
+    /// solver); switch to `Trilinear` (2nd order) for thin walls, where the tricubic stencil's
+    /// wider reach is more likely to pull an image point in from the wrong side of a nearby
+    /// second surface.
+    #[serde(default)]
+    pub slip_velocity_interpolation_order: SlipMirrorInterpolationOrder,
 }
 
 impl SimulationBuilder {
@@ -153,6 +162,7 @@ impl SimulationBuilder {
             &normals_slip_surfaces,
             slip_epsilon,
             SLIP_MIRROR_REACH_CELLS * max_dx,
+            self.slip_velocity_interpolation_order,
         );
 
         let velocity_solver = VelocitySolver {

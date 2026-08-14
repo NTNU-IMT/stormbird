@@ -49,8 +49,8 @@
     },
     "projection_settings": {
       "projection_function": {
-        "chord_factor": 0.75,
-        "thickness_factor": 0.75,
+        "chord_factor": 0.5,
+        "thickness_factor": 0.5,
         "span_falloff_factor": 0.0
       },
       "realign_sectional_forces": true,
@@ -76,9 +76,9 @@
       "Disk": {
         "center": { "x": 0.0, "y": 0.0, "z": 31.875 },
         "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
-        "radius": 7.5,
-        "thickness": 1.5,
-        "fillet_radius": 0.75
+        "radius": 5.0,
+        "thickness": 1.0,
+        "fillet_radius": 0.5
       }
     },
     {
@@ -94,9 +94,11 @@
   "pressure_solver": {
     "Multigrid": {
       "nr_v_cycles": 2,
-      "compute_platform": "CPU",
+      "compute_platform": "GPU",
       "compute_residual_after_solve": true,
-      "enable_slip_pressure_correction": true
+      "enable_slip_pressure_correction": true,
+      "slip_pressure_interpolation_order": "Trilinear"
     }
-  }
+  },
+  "slip_velocity_interpolation_order": "Trilinear"
 }

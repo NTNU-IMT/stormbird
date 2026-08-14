@@ -5,10 +5,10 @@ pub mod slip_pressure_stencils;
 use stormath::type_aliases::Float;
 use stormath::matrix::Matrix;
 use settings::{MultigridSettings, CoarsestLevelSolver};
-use slip_pressure_stencils::SlipPressureStencils;
+use slip_pressure_stencils::{SlipPressureStencils, apply_relaxed_correction, dilate_exclusion_mask};
 
 use kernels::{
-    jacobi::{jacobi_kernel, jacobi_kernel_with_slip_correction, SLIP_CORRECTION_RELAXATION},
+    jacobi::{jacobi_kernel, jacobi_kernel_with_slip_correction},
     restrict::compute_residual_and_restrict_kernel,
     prolongate::prolongate_and_correct_kernel,
     coarse_matrix::build_poisson_matrix4
@@ -104,32 +104,17 @@ impl MultigridCPU {
     /// elimination) solve. That solve isn't iterative, so there's nothing to fold the correction
     /// into the way `jacobi_kernel_with_slip_correction` does for the smoother — this reproduces
     /// the same blend directly, in place, sequentially (the coarsest level is small enough, by
-    /// construction of the multigrid hierarchy, for that to be negligible).
+    /// construction of the multigrid hierarchy, for that to be negligible). Shared with
+    /// `MultigridGPU`'s equivalent via `slip_pressure_stencils::apply_relaxed_correction`.
     fn correct_coarsest_level_pressure_for_slip_geometry(&mut self) {
         let coarsest_level = self.grids.len() - 1;
-        let stencils = &self.slip_pressure_stencils[coarsest_level];
+        let stride = self.grids[coarsest_level].interior_stride;
 
-        if stencils.entries.is_empty() {
-            return;
-        }
-
-        let grid = &self.grids[coarsest_level];
-        let stride = grid.interior_stride;
-        let x_snapshot = self.x_at_levels[coarsest_level].clone();
-
-        for (idx, &lookup_index) in stencils.cell_lookup.iter().enumerate() {
-            if lookup_index < 0 {
-                continue;
-            }
-
-            let entry = &stencils.entries[lookup_index as usize];
-            let p_image = entry.stencil.sample_scalar(&x_snapshot, stride);
-            let corrected_target = entry.mu * x_snapshot[idx] + (1.0 - entry.mu) * p_image;
-
-            // Same under-relaxation as `jacobi_kernel_with_slip_correction`, for consistency.
-            self.x_at_levels[coarsest_level][idx] = (1.0 - SLIP_CORRECTION_RELAXATION) * x_snapshot[idx]
-                + SLIP_CORRECTION_RELAXATION * corrected_target;
-        }
+        apply_relaxed_correction(
+            &mut self.x_at_levels[coarsest_level],
+            &self.slip_pressure_stencils[coarsest_level],
+            stride
+        );
     }
 
     /// Computes residuals at the fine level and restricts them to the coarse level in a single fused pass.
@@ -361,40 +346,6 @@ impl MultigridCPU {
             );
 
             println!("Residual sum: {} ({} slip-boundary cells excluded)", avg_residual, nr_excluded);
-        }
-    }
-}
-
-/// How many cells `laplacian_stencil4` (the residual check's operator) reads on each side of a
-/// cell along each axis. Kept in sync with that function by hand, since it's a diagnostic-only
-/// concern, not part of the solve itself.
-const RESIDUAL_STENCIL_REACH_CELLS: usize = 2;
-
-/// Extends `mask` (already `true` at every directly slip-corrected interior cell) to also mark
-/// every *uncorrected* cell whose own `laplacian_stencil4` residual stencil reads one of those
-/// corrected cells — i.e. every cell within `RESIDUAL_STENCIL_REACH_CELLS` steps along a single
-/// axis (matching the stencil's axis-aligned, non-diagonal reach) of a corrected cell.
-fn dilate_exclusion_mask(grid: &Grid, mask: &mut [bool], cell_lookup: &[i32]) {
-    let [nx, ny, nz] = grid.interior_shape;
-    let [sx, sy, sz] = grid.interior_stride;
-
-    for (cell_index, &lookup_index) in cell_lookup.iter().enumerate() {
-        if lookup_index < 0 {
-            continue;
-        }
-
-        let indices = grid.interior_indices_from_flat_index(cell_index);
-
-        for (position, count, stride) in [(indices[0], nx, sx), (indices[1], ny, sy), (indices[2], nz, sz)] {
-            for offset in 1..=RESIDUAL_STENCIL_REACH_CELLS {
-                if position >= offset {
-                    mask[cell_index - offset * stride] = true;
-                }
-
-                if position + offset < count {
-                    mask[cell_index + offset * stride] = true;
-                }
-            }
         }
     }
 }

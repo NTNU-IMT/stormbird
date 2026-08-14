@@ -6,6 +6,8 @@ use crate::grid::Grid;
 use crate::grid::interpolation::{TrilinearStencil, TricubicStencil};
 use crate::geometry::Geometry;
 
+use super::kernels::jacobi::SLIP_CORRECTION_RELAXATION;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 /// Which interpolation order is used to sample the mirrored image point for the slip-wall pressure
 /// correction specifically — independent of the rest of the pressure solve, which always uses the
@@ -160,5 +162,67 @@ impl SlipPressureStencils {
         }
 
         Self { entries, cell_lookup }
+    }
+}
+
+/// Applies the slip-wall pressure correction to `x` once, in place, sequentially — for solve paths
+/// that aren't the per-sweep fused Jacobi kernel: `MultigridCPU`'s coarsest-level exact (Gaussian
+/// elimination) solve, and `MultigridGPU`'s equivalent (which already round-trips that level's
+/// solution through the host to run the same Gaussian elimination on the CPU). Under-relaxed by
+/// `SLIP_CORRECTION_RELAXATION`, matching `jacobi_kernel_with_slip_correction`, for consistency —
+/// though a single one-shot application is far less exposed to the compounding-amplification issue
+/// that relaxation was actually introduced to fix.
+pub(crate) fn apply_relaxed_correction(x: &mut [Float], stencils: &SlipPressureStencils, stride: [usize; 3]) {
+    if stencils.entries.is_empty() {
+        return;
+    }
+
+    let x_snapshot = x.to_vec();
+
+    for (idx, &lookup_index) in stencils.cell_lookup.iter().enumerate() {
+        if lookup_index < 0 {
+            continue;
+        }
+
+        let entry = &stencils.entries[lookup_index as usize];
+        let p_image = entry.stencil.sample_scalar(&x_snapshot, stride);
+        let corrected_target = entry.mu * x_snapshot[idx] + (1.0 - entry.mu) * p_image;
+
+        x[idx] = (1.0 - SLIP_CORRECTION_RELAXATION) * x_snapshot[idx] + SLIP_CORRECTION_RELAXATION * corrected_target;
+    }
+}
+
+/// How many cells `laplacian_stencil4` (the residual check's operator) reads on each side of a
+/// cell along each axis. Kept in sync with that function by hand, since it's a diagnostic-only
+/// concern, not part of the solve itself.
+pub(crate) const RESIDUAL_STENCIL_REACH_CELLS: usize = 2;
+
+/// Extends `mask` (already `true` at every directly slip-corrected interior cell) to also mark
+/// every *uncorrected* cell whose own `laplacian_stencil4` residual stencil reads one of those
+/// corrected cells — i.e. every cell within `RESIDUAL_STENCIL_REACH_CELLS` steps along a single
+/// axis (matching the stencil's axis-aligned, non-diagonal reach) of a corrected cell. Shared by
+/// `MultigridCPU`/`MultigridGPU`'s residual diagnostics.
+pub(crate) fn dilate_exclusion_mask(grid: &Grid, mask: &mut [bool], cell_lookup: &[i32]) {
+    let [nx, ny, nz] = grid.interior_shape;
+    let [sx, sy, sz] = grid.interior_stride;
+
+    for (cell_index, &lookup_index) in cell_lookup.iter().enumerate() {
+        if lookup_index < 0 {
+            continue;
+        }
+
+        let indices = grid.interior_indices_from_flat_index(cell_index);
+
+        for (position, count, stride) in [(indices[0], nx, sx), (indices[1], ny, sy), (indices[2], nz, sz)] {
+            for offset in 1..=RESIDUAL_STENCIL_REACH_CELLS {
+                if position >= offset {
+                    mask[cell_index - offset * stride] = true;
+                }
+
+                if position + offset < count {
+                    mask[cell_index + offset * stride] = true;
+                }
+            }
+        }
     }
 }

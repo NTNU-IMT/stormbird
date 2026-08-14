@@ -27,7 +27,7 @@ fn gpu_pressure_solver_bench() {
         slip_pressure_interpolation_order: SlipPressureInterpolationOrder::default()
     };
 
-    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings);
+    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &[]);
 
     let n = grid.nr_interior_cells();
     let mut rhs = vec![0.0 as Float; n];

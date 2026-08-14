@@ -51,9 +51,10 @@ impl PressureSolverBuilder {
                     ComputePlatform::GPU => {
                         PressureSolver::MultigridGPU(
                             MultigridGPU::new(
-                                grid, 
-                                boundary_conditions, 
-                                settings.build_settings()
+                                grid,
+                                boundary_conditions,
+                                settings.build_settings(),
+                                slip_geometries
                             )
                         )
                     }
