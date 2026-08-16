@@ -87,6 +87,7 @@ impl LiftingLineCorrection {
         time: Float,
     ) -> Vec<SpatialVector> {
         let span_lines = &line_force_model.span_lines_global;
+        let chord_lengths = &line_force_model.chord_lengths;
 
         let mut u_i_correction: Vec<SpatialVector> = Vec::with_capacity(span_lines.len());
 
@@ -94,6 +95,10 @@ impl LiftingLineCorrection {
             let wind_indices = line_force_model.wing_indices[wing_index].clone();
 
             let wing_span_lines = &span_lines[
+                wind_indices.clone()
+            ];
+
+            let wing_chord_lengths = &chord_lengths[
                 wind_indices.clone()
             ];
 
@@ -127,6 +132,7 @@ impl LiftingLineCorrection {
 
             let mut frozen_wake_viscous = FrozenWake::new_for_single_wing_from_span_lines_and_velocities(
                 wing_span_lines, 
+                wing_chord_lengths,
                 &wing_span_point_velocities, 
                 wake_length, 
                 self.viscous_core_length,
@@ -135,6 +141,7 @@ impl LiftingLineCorrection {
 
             let mut frozen_wake_default = FrozenWake::new_for_single_wing_from_span_lines_and_velocities(
                 wing_span_lines, 
+                wing_chord_lengths,
                 &wing_span_point_velocities, 
                 wake_length, 
                 self.viscous_core_length / 100.0,

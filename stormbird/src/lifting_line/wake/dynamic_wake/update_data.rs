@@ -157,22 +157,28 @@ impl DynamicWake {
         let nr_first_wake_points = self.indices.nr_points_along_span;
         
         let mut direction_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_first_wake_points);
-        
+
+        // Calculate the directions depending on what settings is used
         match self.settings.first_wake_points_direction {
+            // Follow the chord direction
             FirstWakePointsDirection::Chord => {
-                for i in 0..nr_first_wake_points{
+                for i in 0..nr_first_wake_points{                    
                     direction_vectors.push(
-                        line_force_model.chord_vectors_global_at_span_points[i].normalize()
+                        line_force_model.chord_vectors_global_at_span_points[i]
+                            .normalize()
                     )
                 }
             },
+            // Follow the freestream direction
             FirstWakePointsDirection::Freestream => {
                 for i in 0..nr_first_wake_points {
                     direction_vectors.push(
-                        felt_span_points_freestream[i].normalize()
+                        felt_span_points_freestream[i]
+                            .normalize()
                     )
                 }
             },
+            // Follow the freestream + induced velocity
             FirstWakePointsDirection::ActualVelocity => {
                 if self.number_of_time_steps_completed > 2 {
                     for i in 0..nr_first_wake_points {
@@ -194,6 +200,17 @@ impl DynamicWake {
                 }
             }
         }
+
+        // Enforce the direction to be normal to the bound vortex at all points for stability 
+        // reasons. Commented out for now because it makes the tests fails for reasons not entirely
+        // understood
+        /*for i in 0..direction_vectors.len() {
+            let line_index = i.min(line_force_model.nr_span_lines()); Not correct. Need to find the right way
+
+            let line_direction = line_force_model.span_lines_global[line_index].relative_vector().normalize();
+
+            direction_vectors[i] = direction_vectors[i].project_on_plane(line_direction).normalize();
+        }*/
         
         direction_vectors
     }

@@ -69,8 +69,6 @@ fn normal_distance_squared(
     let line_length = line_length_sq.sqrt();
     let line_direction = relative_line / line_length;
 
-    //let line_direction = relative_line.normalize();
-
     let parallel_distance_from_start = relative_point.dot(line_direction);
 
     if parallel_distance_from_start < 0.0 {

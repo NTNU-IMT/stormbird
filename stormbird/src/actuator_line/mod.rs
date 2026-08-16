@@ -227,7 +227,7 @@ impl ActuatorLine {
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
-                &corrected_velocity,
+                &self.ctrl_points_velocity,
                 &last_circulation_strength,
                 time - self.start_time
             );

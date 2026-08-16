@@ -134,6 +134,7 @@ impl FrozenWake {
     /// each end points of the span lines. 
     pub fn new_for_single_wing_from_span_lines_and_velocities(
         span_lines: &[SpanLine],
+        chord_lengths: &[Float],
         velocities: &[SpatialVector],
         wake_length: Float,
         viscous_core_length: Float,
@@ -155,7 +156,8 @@ impl FrozenWake {
         }).collect();
 
         let horseshoe_vortices = HorseshoeVortex::vortices_for_single_wing_from_span_lines_and_wake_vectors(
-            &span_lines,
+            span_lines,
+            chord_lengths,
             &wake_vectors,
             viscous_core_length
         );
@@ -194,6 +196,7 @@ impl FrozenWake {
     /// wake length.
     pub fn new_for_single_wing_from_span_lines_and_direction(
         span_lines: &[SpanLine],
+        chord_lengths: &[Float],
         wake_vector: SpatialVector,
         viscous_core_length: Float,
         symmetry_condition: SymmetryCondition
@@ -204,6 +207,7 @@ impl FrozenWake {
 
         Self::new_for_single_wing_from_span_lines_and_velocities(
             span_lines, 
+            chord_lengths,
             &velocities, 
             wake_vector.length(), 
             viscous_core_length, 

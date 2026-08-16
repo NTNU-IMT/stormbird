@@ -27,8 +27,9 @@
           "section_model": {
             "RotatingCylinder": {
               "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 1.0, 2.0],
-              "cl_data": [0.0, 2.8, 5.93],
+              "spin_ratio_data": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+              "cl_data": [0.0, 1.45, 4.75, 8.77, 10.38, 11.0],
+              "cd_start": 0.686,
               "cd_end": 0.1
             }
           },
@@ -52,8 +53,8 @@
     },
     "projection_settings": {
       "projection_function": {
-        "chord_factor": 0.5,
-        "thickness_factor": 0.5,
+        "chord_factor": 0.6,
+        "thickness_factor": 0.6,
         "span_falloff_factor": 0.0
       },
       "realign_sectional_forces": true,
@@ -78,7 +79,7 @@
         "center": { "x": 0.0, "y": 0.0, "z": 31.875 },
         "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
         "radius": 3.75,
-        "thickness": 1.5,
+        "thickness": 1.0,
         "fillet_radius": 0.5
       }
     },
