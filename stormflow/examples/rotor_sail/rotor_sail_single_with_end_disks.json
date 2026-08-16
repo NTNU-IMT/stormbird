@@ -1,7 +1,9 @@
 {
-  "domain_start_point": [-32.0, -32.0, 0.0],
-  "domain_end_point": [64.0, 32.0, 64.0],
-  "grid_interior_shape": [192, 128, 128],
+  "grid": {
+    "start_point": [-30.0, -31.25, 0.0],
+    "end_point": [60.0, 31.25, 45.0],
+    "cells_per_representative_length": [10, 10, 10]
+  },
   "effective_viscosity": 0.00001,
   "wind_condition": {
     "direction_coming_from": 0.0,
@@ -25,8 +27,9 @@
           "section_model": {
             "RotatingCylinder": {
               "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 1.0],
-              "cl_data": [0.0, 2.8]
+              "spin_ratio_data": [0.0, 1.0, 2.0],
+              "cl_data": [0.0, 2.8, 5.93],
+              "cd_end": 0.1
             }
           },
           "non_zero_circulation_at_ends": [false, false],
@@ -60,8 +63,6 @@
       "damping_factor": 0.05
     },
     "sampling_settings": {
-      "span_projection_factor": 0.5,
-      "extrapolate_end_velocities": false,
       "remove_span_velocity": true
     },
     "lifting_line_correction": {
@@ -76,18 +77,15 @@
       "Disk": {
         "center": { "x": 0.0, "y": 0.0, "z": 31.875 },
         "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
-        "radius": 5.0,
-        "thickness": 1.0,
+        "radius": 3.75,
+        "thickness": 1.5,
         "fillet_radius": 0.5
       }
     },
     {
-      "Disk": {
-        "center": { "x": 0.0, "y": 0.0, "z": 1.875 },
-        "normal": {"x": 0.0, "y": 0.0, "z": -1.0},
-        "radius": 5.0,
-        "thickness": 5.0,
-        "fillet_radius": 0.5
+      "Cuboid": {
+        "center": { "x": 0.0, "y": 0.0, "z": 0.0 },
+        "half_extents": {"x": 2.5, "y": 2.5, "z": 1.875}
       }
     }
   ],

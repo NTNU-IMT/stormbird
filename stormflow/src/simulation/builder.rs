@@ -16,7 +16,9 @@ use stormbird::{
 
 use crate::actuator_line_interface::ActuatorLineInterface;
 
-use crate::grid::Grid;
+use crate::grid::{
+    builder::GridBuilder,
+};
 use crate::simulation::{Simulation, SolverSettings};
 use crate::geometry::{
     Geometry,
@@ -37,11 +39,9 @@ use crate::error::Error;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SimulationBuilder {
-    pub domain_start_point: SpatialVector,
-    pub domain_end_point: SpatialVector,
+    pub grid: GridBuilder,
     pub wind_condition: WindCondition,
     pub linear_velocity: SpatialVector,
-    pub grid_interior_shape: [usize; 3],
     #[serde(default)]
     pub actuator_line: Option<ActuatorLineBuilder>,
     #[serde(default)]
@@ -83,11 +83,16 @@ impl SimulationBuilder {
     }
     
     pub fn build(&self) -> Simulation {
-        let grid = Grid::new(
-            self.domain_start_point, 
-            self.domain_end_point, 
-            self.grid_interior_shape
-        );
+        let grid = if let Some(actuator_line_builder) = &self.actuator_line {
+            self.grid.build_from_line_force_model_builder(
+                &actuator_line_builder.line_force_model
+            )
+        } else {
+            self.grid.build_from_internal_length()
+                .unwrap_or_else(|err| panic!("{}", err))
+        };
+
+        println!("Interior shape of the grid: {:?}", &grid.interior_shape);
         
         let total_nr_cells = grid.nr_extended_cells();
 
