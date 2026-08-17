@@ -14,9 +14,6 @@ use stormath::type_aliases::Float;
 use crate::line_force_model::LineForceModel;
 
 
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
-
 use crate::lifting_line::wake::dynamic_wake::DynamicWake;
 
 #[derive(Debug, Clone)]

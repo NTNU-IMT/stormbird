@@ -139,10 +139,14 @@ impl DynamicWakeBuilder {
             }
         }
 
-        let end_index_induced_velocities_on_wake = (
-            self.ratio_of_wake_affected_by_induced_velocities *
-            (indices.nr_points() - 1) as Float
-        ).ceil() as usize;
+        // The number of points in the streamwise direction that are affected by induced velocities
+        let ui_affected_stream_index = (self.ratio_of_wake_affected_by_induced_velocities.min(1.0) * 
+            (indices.nr_points_per_line_element - 1) as Float).ceil() as usize;
+
+        let end_index_induced_velocities_on_wake = indices.point_index(
+            ui_affected_stream_index, 
+            indices.nr_points_along_span - 1 
+        );
 
         let settings = WakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,

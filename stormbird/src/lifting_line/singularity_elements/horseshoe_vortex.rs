@@ -9,7 +9,7 @@ use stormath::type_aliases::Float;
 use crate::line_force_model::LineForceModel;
 use crate::line_force_model::span_line::SpanLine;
 
-use super::vortex_line;
+use super::vortex_line::VortexLine;
 
 const ELBOW_VORTEX_LENGTH_FACTOR: Float = 0.15; // TODO: evaluate the need to have this as a parameter
 
@@ -36,7 +36,7 @@ pub struct HorseshoeVortex {
     /// free vortex in a direction normal to the bound vortex.
     /// 5) The fifth and last line is the second free vortex, going from the end of the second elbow
     /// vortex in the direction of the free stream
-    vortex_lines: [[SpatialVector; 2]; 5],
+    vortex_lines: [VortexLine; 5],
     /// The viscous core length used to limit the induced velocity close to the vortices. The main 
     /// point is to avoid singularities.
     viscous_core_length: Float,
@@ -51,36 +51,36 @@ impl HorseshoeVortex {
         elbow_length: Float,
         viscous_core_length: Float
     ) -> Self {    
-        let bound_vortex = [
+        let bound_vortex = VortexLine::new([
             span_line.start_point, 
             span_line.end_point
-        ];
+        ]);
 
         let span_direction = span_line.relative_vector().normalize();
         let bound_normal_direction = wake_vectors[0].project_on_plane(span_direction);
 
         let elbow_vector = elbow_length * bound_normal_direction;
 
-        let first_elbow_vortex = [
+        let first_elbow_vortex = VortexLine::new([
             span_line.start_point + elbow_vector,
             span_line.start_point
-        ];
+        ]);
         
-        let first_trailing_vortex = [
-            first_elbow_vortex[0] + wake_vectors[0], 
-            first_elbow_vortex[0]
-        ];
+        let first_trailing_vortex =  VortexLine::new([
+            first_elbow_vortex.points[0] + wake_vectors[0], 
+            first_elbow_vortex.points[0]
+        ]);
 
-        let second_elbow_vortex = [
+        let second_elbow_vortex = VortexLine::new([
             span_line.end_point, 
             span_line.end_point + elbow_vector
-        ];
+        ]);
 
         // From the end of the bound vector to the end of the last free vortex
-        let second_trailing_vortex = [
-            second_elbow_vortex[1], 
-            second_elbow_vortex[1] + wake_vectors[1]
-        ];
+        let second_trailing_vortex = VortexLine::new([
+            second_elbow_vortex.points[1], 
+            second_elbow_vortex.points[1] + wake_vectors[1]
+        ]);
 
         Self {
             vortex_lines: [
@@ -98,8 +98,7 @@ impl HorseshoeVortex {
     pub fn induced_velocity_with_unit_strength(&self, ctrl_point: SpatialVector) -> SpatialVector {
         self.vortex_lines.iter().map(
             |line| {
-                vortex_line::induced_velocity_from_line_with_unit_strength(
-                    line,
+                line.induced_velocity_from_line_with_unit_strength(
                     ctrl_point,
                     self.viscous_core_length,
                 )

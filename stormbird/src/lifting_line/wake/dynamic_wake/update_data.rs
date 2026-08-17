@@ -335,12 +335,14 @@ impl DynamicWake {
     /// Shifts the strength of the panels downstream.
     pub fn stream_strength_values_downstream(&mut self) {
         if self.settings.steady_state_strength_update {
-            for i_stream in (1..self.indices.nr_panels_per_line_element).rev() {
-                for i_span in 0..self.indices.nr_panels_along_span {
+            for i_span in 0..self.indices.nr_panels_along_span {
+                let previous_index = self.indices.panel_index(0, i_span);
+                let previous_strength = self.strengths[previous_index];
+                
+                for i_stream in 1..self.indices.nr_panels_per_line_element {
                     let current_index  = self.indices.panel_index(i_stream, i_span);
-                    let previous_index = self.indices.panel_index(0, i_span);
-    
-                    self.strengths[current_index] = self.strengths[previous_index];
+                    
+                    self.strengths[current_index] = previous_strength;
                 }
             }
         } else {

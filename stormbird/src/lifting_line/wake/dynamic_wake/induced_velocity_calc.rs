@@ -95,7 +95,7 @@ impl DynamicWake {
         points: &[SpatialVector], 
         start_index: usize, 
         end_index: usize
-    ) -> Vec<SpatialVector> {
+    ) -> Vec<SpatialVector> {        
         // Pre-collect active panels once (avoids repeated zero-checks per point)
         let active_panels: Vec<(usize, f64)> = (start_index..end_index)
             .filter_map(|i| {
@@ -108,7 +108,11 @@ impl DynamicWake {
             .map(|&point| {
                 active_panels.iter()
                     .map(|&(panel_index, strength)| {
-                        strength * self.unit_strength_induced_velocity_from_panel_flat_index(panel_index, point)
+                        strength * 
+                        self.unit_strength_induced_velocity_from_panel_flat_index(
+                            panel_index, 
+                            point
+                        )
                     })
                     .fold(SpatialVector::default(), |acc, v| acc + v)
             })
