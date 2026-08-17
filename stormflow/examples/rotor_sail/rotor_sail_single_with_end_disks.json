@@ -26,7 +26,7 @@
           ],
           "section_model": {
             "RotatingCylinder": {
-              "revolutions_per_second": -0.637,
+              "revolutions_per_second": -1.273,
               "spin_ratio_data": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
               "cl_data": [0.0, 1.45, 4.75, 8.77, 10.38, 11.0],
               "cd_start": 0.686,
@@ -96,8 +96,8 @@
       "compute_platform": "GPU",
       "compute_residual_after_solve": true,
       "enable_slip_pressure_correction": true,
-      "slip_pressure_interpolation_order": "Trilinear"
+      "slip_pressure_interpolation_order": "Tricubic"
     }
   },
-  "slip_velocity_interpolation_order": "Trilinear"
+  "slip_velocity_interpolation_order": "Tricubic"
 }

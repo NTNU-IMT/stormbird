@@ -1,7 +1,9 @@
 {
-  "domain_start_point": [-128.0, -128.0, 0.0],
-  "domain_end_point": [128.0, 128.0, 64.0],
-  "grid_interior_shape": [256, 256, 128],
+  "grid": {
+    "start_point": [-120.0, -50.0, 0.0],
+    "end_point": [120.0, 50.0, 50.0],
+    "cells_per_representative_length": [8, 8, 8]
+  },
   "effective_viscosity": 0.00001,
   "wind_condition": {
     "direction_coming_from": 1.570796327,
@@ -24,9 +26,11 @@
           ],
           "section_model": {
             "RotatingCylinder": {
-              "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 1.0],
-              "cl_data": [0.0, 2.8]
+              "revolutions_per_second": -1.273,
+              "spin_ratio_data": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+              "cl_data": [0.0, 1.45, 4.75, 8.77, 10.38, 11.0],
+              "cd_start": 0.686,
+              "cd_end": 0.1
             }
           },
           "non_zero_circulation_at_ends": [false, false],
@@ -43,9 +47,11 @@
           ],
           "section_model": {
             "RotatingCylinder": {
-              "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 1.0],
-              "cl_data": [0.0, 2.8]
+              "revolutions_per_second": -1.273,
+              "spin_ratio_data": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+              "cl_data": [0.0, 1.45, 4.75, 8.77, 10.38, 11.0],
+              "cd_start": 0.686,
+              "cd_end": 0.1
             }
           },
           "non_zero_circulation_at_ends": [false, false],
@@ -70,8 +76,8 @@
     },
     "projection_settings": {
       "projection_function": {
-        "chord_factor": 0.75,
-        "thickness_factor": 0.75
+        "chord_factor": 0.6,
+        "thickness_factor": 0.6
       },
       "realign_sectional_forces": true
     },
@@ -88,7 +94,7 @@
     "write_iterations_full_result": 100,
     "start_time": 0.0
   },
-  "geometries": [
+  "slip_geometries": [
     {
       "TriangleMesh": {
         "file_path": "sobc1_superstructure.obj"
@@ -99,7 +105,8 @@
     "Multigrid": {
       "nr_v_cycles": 2,
       "compute_platform": "GPU",
-      "compute_residual_after_solve": true
+      "compute_residual_after_solve": true,
+      "coarsest_level_solver": "Jacobi"
     }
   },
   "solver_settings": {
