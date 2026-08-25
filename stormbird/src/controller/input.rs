@@ -24,8 +24,7 @@ use stormath::{spatial_vector::SpatialVector, type_aliases::Float};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 /// Structure containing input values that is used by the controllers to set the local wing angles
-/// and the section models' internal state. Each member variable contains vectors with data. The
-/// length of each vector should equal the number of wings in the simulation
+/// and the section models' internal state.
 pub struct ControllerInput {
     /// How much of the max value that should be used
     pub loading: Float,
