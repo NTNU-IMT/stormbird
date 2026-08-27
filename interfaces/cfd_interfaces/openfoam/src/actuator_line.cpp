@@ -154,7 +154,7 @@ void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<
     if (Pstream::master()) {
         this->need_update = model->update_controller(time, time_step);
 
-        this->need_update = true;
+        this->need_update = false; // TODO: figure out how to use this...
 
         this->model->write_results("postProcessing");
     }
