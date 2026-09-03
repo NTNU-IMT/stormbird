@@ -203,6 +203,23 @@ impl Simulation {
     }
 
 
+    /// Serialize the current dynamic wake as a legacy VTK PolyData buffer.
+    ///
+    /// Returns `Some(bytes)` when the simulation uses a dynamic wake, so the wake
+    /// geometry and strengths can be obtained in memory (e.g. for visualization in
+    /// pyvista) without touching the disk. The `binary` switch selects between the
+    /// ASCII and BINARY variants of the VTK legacy format.
+    ///
+    /// Returns `None` for quasi-steady (static) wakes, which have no explicit wake
+    /// geometry to export.
+    pub fn dynamic_wake_as_vtk(&self, binary: bool) -> Option<Vec<u8>> {
+        if let WakeData::Dynamic(wake) = &self.wake_data {
+            Some(wake.wake_as_vtk(binary))
+        } else {
+            None
+        }
+    }
+
     /// Interface function to calculate the induced velocities from the wake at the given points.
     pub fn induced_velocities(
         &self,

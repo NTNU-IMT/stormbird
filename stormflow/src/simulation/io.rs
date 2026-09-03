@@ -4,7 +4,15 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 
 impl Simulation {
-    pub fn export_fields_as_vtk(&self, file_path: &str, binary: bool) {
+    /// Compute the VTK legacy file content for the current simulation fields.
+    ///
+    /// The `binary` switch selects between the ASCII and BINARY variants of the
+    /// VTK legacy format, exactly as in [`Simulation::export_fields_as_vtk`].
+    /// The content is returned as raw bytes: in ASCII mode these bytes are valid
+    /// UTF-8 text, while in binary mode they contain the big-endian binary data
+    /// blocks mandated by the format. `Vec<u8>` covers both cases uniformly and
+    /// lets callers obtain the VTK data without ever touching the disk.
+    pub fn fields_as_vtk(&self, binary: bool) -> Vec<u8> {
         let [nx, ny, nz] = self.grid.interior_shape;
         let [x0, y0, z0] = self.grid.start_point.0;
         let [dx, dy, dz] = self.grid.cell_length.0;
@@ -12,8 +20,7 @@ impl Simulation {
         let n_points = (nx + 1) * (ny + 1) * (nz + 1);
         let n_cells  = nx * ny * nz;
 
-        let file = File::create(file_path).expect("export_fields_as_vtk: could not create file");
-        let mut w = BufWriter::new(file);
+        let mut w: Vec<u8> = Vec::new();
 
         // ------------------------------------------------------------------ //
         // ASCII file header (always ASCII in the VTK legacy format)           //
@@ -231,6 +238,20 @@ impl Simulation {
 
         if binary { writeln!(w).unwrap(); }
 
+        w
+    }
+
+    /// Export the current simulation fields to a VTK legacy file.
+    ///
+    /// This is a thin wrapper around [`Simulation::fields_as_vtk`]: it computes
+    /// the file content in memory and then writes it to `file_path`.
+    pub fn export_fields_as_vtk(&self, file_path: &str, binary: bool) {
+        let content = self.fields_as_vtk(binary);
+
+        let file = File::create(file_path).expect("export_fields_as_vtk: could not create file");
+        let mut w = BufWriter::new(file);
+
+        w.write_all(&content).expect("export_fields_as_vtk: failed to write output");
         w.flush().expect("export_fields_as_vtk: failed to flush output");
     }
 }

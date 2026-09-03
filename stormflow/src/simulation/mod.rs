@@ -9,11 +9,13 @@ use crate::actuator_line_interface::ActuatorLineInterface;
 
 use crate::pressure_solver::PressureSolver;
 use crate::velocity_solver::VelocitySolver;
+use builder::SimulationBuilder;
 
 use serde::{Serialize, Deserialize};
 
+use crate::error::Error;
 
-use std::time::Instant;
+//use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolverSettings {
@@ -46,6 +48,16 @@ pub struct Simulation {
 }
 
 impl Simulation {
+    pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
+        let builder = SimulationBuilder::new_from_string(setup_string)?;
+
+        let mut sim = builder.build();
+
+        sim.initialize_after_build();
+
+        Ok(sim)
+    }
+    
     pub fn initialize_after_build(&mut self) {
         println!("Initializing after build");
         self.velocity_solver.initialize_after_build(&self.grid);
@@ -73,46 +85,58 @@ impl Simulation {
         courant_number * min_cell_length / max_velocity
     }
 
+    pub fn do_steps_until_end_time(&mut self, end_time: Float, courant_number: Float) {
+        let mut time = 0.0;
+
+        while time < end_time {
+            let time_step = self.time_step_from_courant_number(courant_number);
+
+            self.do_step(time, time_step);
+
+            time += time_step
+        }
+    }
+
     pub fn do_step(&mut self, time: Float, time_step: Float) {      
         self.velocity_solver.initialize_before_step(&self.grid);
 
         for iteration in 0..self.solver_settings.nr_inner_iterations {
-            println!("Prediction {}", iteration+1);
-            let start_time = Instant::now();
+            //println!("Prediction {}", iteration+1);
+            //let start_time = Instant::now();
             self.velocity_solver.update_velocity_star(&self.grid, time_step);
-            println!("Update velocity star time: {:.?}", start_time.elapsed());
+            //println!("Update velocity star time: {:.?}", start_time.elapsed());
 
             if iteration > 0 || 
                 self.solver_settings.solve_pressure_on_first_iteration ||
                 self.solver_settings.nr_inner_iterations == 1 {
-                let start_time = Instant::now();
+                //let start_time = Instant::now();
                 self.pressure_solver.calculate_rhs(
                     &self.grid, 
                     &self.velocity_solver.velocity_star, 
                     self.velocity_solver.density, 
                     time_step
                 );
-                println!("Pressure rhs time: {:.?}", start_time.elapsed());
+                //println!("Pressure rhs time: {:.?}", start_time.elapsed());
                 
-                let start_time = Instant::now();
+                //let start_time = Instant::now();
                 self.pressure_solver.solve();
-                println!("Project pressure time: {:.?}", start_time.elapsed());
+                //println!("Project pressure time: {:.?}", start_time.elapsed());
             }
  
-            let start_time = Instant::now();
+            //let start_time = Instant::now();
             self.velocity_solver.update_velocity(
                 &self.grid, 
                 self.pressure_solver.pressure_ref(), 
                 time_step
             );
-            println!("Update velocity time: {:.?}", start_time.elapsed());
+            //println!("Update velocity time: {:.?}", start_time.elapsed());
         }
 
-        let start_time = Instant::now();
+        //let start_time = Instant::now();
         self.run_actuator_line_model(time, time_step);
-        println!("Running actuator line model time: {:.?}", start_time.elapsed());
+        //println!("Running actuator line model time: {:.?}", start_time.elapsed());
         
-        println!();
+        //println!();
     }
 
     pub fn run_actuator_line_model(&mut self, time: Float, time_step: Float) {        
@@ -136,10 +160,6 @@ impl Simulation {
 
         if let Some(actuator_line) = self.actuator_line.as_mut() {
             let _need_update = actuator_line.model.update_controller(time, time_step);
-        }
-
-        if let Some(actuator_line) = &self.actuator_line {
-            actuator_line.model.write_results("postProcessing");
         }
     }
 }

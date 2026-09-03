@@ -7,9 +7,11 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from .wind_environment import WindEnvironment
 from .inflow_corrections import InflowCorrectionsSingleDirection, InflowCorrections
 from .velocity_variation import PowerModel, LogarithmicModel
+from .wind_condition import WindCondition
 
 __all__ = [
     "WindEnvironment",
     "InflowCorrectionsSingleDirection", "InflowCorrections",
-    "PowerModel", "LogarithmicModel"
+    "PowerModel", "LogarithmicModel",
+    "WindCondition"
 ]

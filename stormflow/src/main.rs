@@ -102,8 +102,6 @@ pub fn main() -> Result<(), Error> {
             &args.section_models_internal_state
         );
     }
-
-    sim.initialize_after_build();
     
     let mut time = 0.0;
 

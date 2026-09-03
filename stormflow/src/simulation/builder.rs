@@ -70,7 +70,7 @@ pub struct SimulationBuilder {
 impl SimulationBuilder {
     pub fn default_effective_viscosity() -> Float {0.0001}
     
-    pub fn from_json_str(input: &str) -> Result<Self, Error> {
+    pub fn new_from_string(input: &str) -> Result<Self, Error> {
         let out = serde_json::from_str(input)?;
         
         Ok(out)
@@ -79,7 +79,7 @@ impl SimulationBuilder {
     pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
         let file_content = fs::read_to_string(file_path)?;
         
-        Self::from_json_str(&file_content)
+        Self::new_from_string(&file_content)
     }
     
     pub fn build(&self) -> Simulation {

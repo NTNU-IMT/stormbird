@@ -162,6 +162,108 @@ impl DynamicWake {
         Ok(())
     }
 
+    /// Serialize the wake geometry and strengths as a legacy VTK PolyData buffer.
+    ///
+    /// Unlike [`DynamicWake::write_wake_to_vtk_file`], which writes an XML `.vtp`
+    /// file to disk, this returns the data in memory as raw bytes so it can be
+    /// consumed directly (e.g. fed into a VTK reader in pyvista) without touching
+    /// the disk.
+    ///
+    /// The `binary` switch selects between the ASCII and BINARY variants of the
+    /// VTK legacy format. In ASCII mode the returned bytes are valid UTF-8 text,
+    /// while in binary mode they contain the big-endian binary data blocks
+    /// mandated by the format. `Vec<u8>` covers both cases uniformly.
+    pub fn wake_as_vtk(&self, binary: bool) -> Vec<u8> {
+        let mut w: Vec<u8> = Vec::new();
+
+        let nr_points = self.points.len();
+        let nr_faces  = self.strengths.len();
+
+        // ------------------------------------------------------------------ //
+        // Header (always ASCII in the VTK legacy format)                       //
+        // ------------------------------------------------------------------ //
+        writeln!(w, "# vtk DataFile Version 3.0").unwrap();
+        writeln!(w, "Stormbird dynamic wake").unwrap();
+        writeln!(w, "{}", if binary { "BINARY" } else { "ASCII" }).unwrap();
+        writeln!(w, "DATASET POLYDATA").unwrap();
+
+        // ------------------------------------------------------------------ //
+        // Points                                                               //
+        // ------------------------------------------------------------------ //
+        writeln!(w, "POINTS {} float", nr_points).unwrap();
+        for i in 0..nr_points {
+            let x = self.points[i][0] as f32;
+            let y = self.points[i][1] as f32;
+            let z = self.points[i][2] as f32;
+
+            if binary {
+                w.write_all(&x.to_be_bytes()).unwrap();
+                w.write_all(&y.to_be_bytes()).unwrap();
+                w.write_all(&z.to_be_bytes()).unwrap();
+            } else {
+                writeln!(w, "{} {} {}", x, y, z).unwrap();
+            }
+        }
+        if binary { writeln!(w).unwrap(); }
+
+        // ------------------------------------------------------------------ //
+        // Polygons (one quad per panel)                                        //
+        //                                                                      //
+        // The legacy POLYGONS section is `POLYGONS n_cells connectivity_size`,  //
+        // where each cell is stored as `n_points i0 i1 ...`. With `n_points`    //
+        // fixed at 4, the total connectivity size is `n_cells * (4 + 1)`.       //
+        // ------------------------------------------------------------------ //
+        writeln!(w, "POLYGONS {} {}", nr_faces, nr_faces * 5).unwrap();
+        for panel_index in 0..nr_faces {
+            let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
+            let indices = self.panel_point_indices(stream_index, span_index);
+
+            if binary {
+                w.write_all(&(4_i32).to_be_bytes()).unwrap();
+                w.write_all(&(indices[0] as i32).to_be_bytes()).unwrap();
+                w.write_all(&(indices[1] as i32).to_be_bytes()).unwrap();
+                w.write_all(&(indices[2] as i32).to_be_bytes()).unwrap();
+                w.write_all(&(indices[3] as i32).to_be_bytes()).unwrap();
+            } else {
+                writeln!(w, "4 {} {} {} {}", indices[0], indices[1], indices[2], indices[3]).unwrap();
+            }
+        }
+        if binary { writeln!(w).unwrap(); }
+
+        // ------------------------------------------------------------------ //
+        // Cell data                                                            //
+        // ------------------------------------------------------------------ //
+        writeln!(w, "CELL_DATA {}", nr_faces).unwrap();
+
+        // --- Panel strength (scalar) ---
+        writeln!(w, "SCALARS strength float 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
+        for i in 0..nr_faces {
+            let s = self.strengths[i] as f32;
+            if binary {
+                w.write_all(&s.to_be_bytes()).unwrap();
+            } else {
+                writeln!(w, "{}", s).unwrap();
+            }
+        }
+        if binary { writeln!(w).unwrap(); }
+
+        // --- Viscous core length (scalar) ---
+        writeln!(w, "SCALARS viscous_core_length float 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
+        for i in 0..nr_faces {
+            let v = self.panels_viscous_core_length[i] as f32;
+            if binary {
+                w.write_all(&v.to_be_bytes()).unwrap();
+            } else {
+                writeln!(w, "{}", v).unwrap();
+            }
+        }
+        if binary { writeln!(w).unwrap(); }
+
+        w
+    }
+
     /// Exports the wake structure to a hashmap with the necessary fields for plotting the mesh 
     /// using the Plotly library. 
     pub fn export_to_plotly_mesh(&self) -> HashMap<String, Vec<Float>> {
