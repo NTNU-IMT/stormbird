@@ -25,3 +25,4 @@ class SimulationBuilder(StormbirdSetupBaseModel):
     slip_velocity_interpolation_order: SlipMirrorInterpolationOrder = (
         SlipMirrorInterpolationOrder.Tricubic
     )
+    slip_wall_boundary_override: list[list[bool]] | None = None

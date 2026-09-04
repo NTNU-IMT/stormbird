@@ -65,6 +65,9 @@ pub struct SimulationBuilder {
     /// second surface.
     #[serde(default)]
     pub slip_velocity_interpolation_order: SlipMirrorInterpolationOrder,
+    /// Optional "override" of the boundary conditions, to be able to set some to slip walls
+    #[serde(default)]
+    pub slip_wall_boundary_override: [[bool; 2]; 3]
 }
 
 impl SimulationBuilder {
@@ -104,7 +107,8 @@ impl SimulationBuilder {
             &self.wind_environment,
             &self.wind_condition,
             self.linear_velocity,
-            self.wind_environment.up_direction
+            self.wind_environment.up_direction,
+            self.slip_wall_boundary_override
         );
 
         let velocity = velocity_boundary_conditions.initial_velocity(&grid);

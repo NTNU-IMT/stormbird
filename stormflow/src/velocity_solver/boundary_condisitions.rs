@@ -32,7 +32,8 @@ impl VelocityBoundaryConditions {
         wind_environment: &WindEnvironment, 
         wind_condition: &WindCondition, 
         linear_velocity: SpatialVector, 
-        up_direction: SpatialVector
+        up_direction: SpatialVector,
+        slip_wall_boundary_override: [[bool; 2]; 3]
     ) -> Self {
         let mut face_conditions = [[VelocityBoundaryCondition::InletOutlet; 2]; 3];
 
@@ -48,6 +49,15 @@ impl VelocityBoundaryConditions {
 
         face_conditions[up_axis][0] = VelocityBoundaryCondition::SlipWall;
         face_conditions[up_axis][1] = VelocityBoundaryCondition::ZeroGradient;
+
+        // A bit of a hacky way to apply override the BC to slip walls if the user has set to so
+        for axis_index in 0..3 {
+            for face_index in 0..2 {
+                if slip_wall_boundary_override[axis_index][face_index] {
+                    face_conditions[axis_index][face_index] = VelocityBoundaryCondition::SlipWall;
+                }
+            }
+        }
 
         Self {
             wind_environment: wind_environment.clone(),
