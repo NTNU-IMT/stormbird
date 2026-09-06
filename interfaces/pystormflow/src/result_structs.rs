@@ -204,4 +204,8 @@ impl SimulationResult {
     pub fn input_power_sum(&self) -> Float {
         self.data.input_power.iter().sum()
     }
+
+    pub fn write_to_file(&self, file_path: String) {
+        self.data.write_to_file(&file_path).expect("Error from write to file")
+    }
 }
