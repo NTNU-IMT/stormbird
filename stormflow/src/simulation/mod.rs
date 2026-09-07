@@ -140,26 +140,34 @@ impl Simulation {
     }
 
     pub fn run_actuator_line_model(&mut self, time: Float, time_step: Float) {        
-        if let Some(actuator_line) = self.actuator_line.as_mut() {
-            actuator_line.step_model(
-                time, 
-                time_step, 
-                &self.grid, 
-                &self.velocity_solver.velocity
-            );
-        }
+        let time_to_start = if let Some(actuator_line) = &self.actuator_line {
+            time >= actuator_line.model.start_time
+        } else {
+            false
+        };
 
-        if let Some(actuator_line) = &self.actuator_line {
-            actuator_line.compute_body_force(
-                &self.grid, 
-                &self.velocity_solver.velocity, 
-                self.velocity_solver.density, 
-                &mut self.velocity_solver.body_force
-            );
-        }
-
-        if let Some(actuator_line) = self.actuator_line.as_mut() {
-            let _need_update = actuator_line.model.update_controller(time, time_step);
+        if time_to_start {
+            if let Some(actuator_line) = self.actuator_line.as_mut() {
+                actuator_line.step_model(
+                    time, 
+                    time_step, 
+                    &self.grid, 
+                    &self.velocity_solver.velocity
+                );
+            }
+    
+            if let Some(actuator_line) = &self.actuator_line {
+                actuator_line.compute_body_force(
+                    &self.grid, 
+                    &self.velocity_solver.velocity, 
+                    self.velocity_solver.density, 
+                    &mut self.velocity_solver.body_force
+                );
+            }
+    
+            if let Some(actuator_line) = self.actuator_line.as_mut() {
+                let _need_update = actuator_line.model.update_controller(time, time_step);
+            }
         }
     }
 }
