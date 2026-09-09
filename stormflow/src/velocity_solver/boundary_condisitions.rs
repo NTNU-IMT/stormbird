@@ -129,22 +129,25 @@ impl VelocityBoundaryConditions {
 
                 let new_value = match condition {
                     VelocityBoundaryCondition::InletOutlet => {
-                        // Check the direction of the flow in the neighbor cell. `neighbor_delta`
-                        // is positive on the min-boundary face (neighbor is toward +axis) and
-                        // negative on the max-boundary face, so its sign alone tells us which
-                        // flow direction counts as inflow, without needing `face_index` here.
-                        let neighbor_axis_flow = velocity[flat_neighbor][axis_index];
+                        // Check the direction of the domain flow at the cell center. 
+                        // `neighbor_delta`is positive on the min-boundary face (neighbor is toward 
+                        // +axis) and negative on the max-boundary face, so its sign alone tells us 
+                        // which flow direction counts as inflow, without needing `face_index` here.
+                        let at_the_min_boundary_face = boundary_face.neighbor_delta > 0;
 
-                        let inflow = if boundary_face.neighbor_delta > 0 {
-                            neighbor_axis_flow > 0.0
+                        //let neighbor_axis_flow = velocity[flat_neighbor][axis_index];
+
+                        let extended_indices = grid.extended_indices_from_flat_index(flat_current);
+                        let cell_center = grid.cell_center_extended(extended_indices);
+                        let domain_flow = self.velocity_at_point(cell_center)[axis_index];
+
+                        let inflow = if at_the_min_boundary_face{
+                            domain_flow > 0.0
                         } else {
-                            neighbor_axis_flow < 0.0
+                            domain_flow < 0.0
                         };
 
                         if inflow {
-                            let extended_indices = grid.extended_indices_from_flat_index(flat_current);
-                            let cell_center = grid.cell_center_extended(extended_indices);
-
                             let mut new_value = SpatialVector::default();
                             for c in 0..3 {
                                 let mut face_point = cell_center;
