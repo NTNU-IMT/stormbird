@@ -31,7 +31,7 @@ impl Default for Gaussian {
 }
 
 impl Gaussian {
-    fn default_span_falloff_factor() -> Float {0.25}
+    fn default_span_falloff_factor() -> Float {0.0}
 
     /// Computes the projection value at a given point in space.
     ///
