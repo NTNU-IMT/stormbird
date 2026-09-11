@@ -484,9 +484,15 @@ impl ActuatorLine {
         self.line_segments_projection_weights_at_point(point).iter().sum()
     }
 
-    /// Checks which line element is dominating at a given point in space by comparing the
-    /// projection weights of each line element.
-    pub fn dominating_line_element_index_at_point(&self, point: SpatialVector) -> usize {
+    /// Checks which line element is dominating at a given point in space, together with its own
+    /// projection weight, by comparing the projection weights of each line element.
+    ///
+    /// Only the dominating element's own weight is returned (not the sum over all line
+    /// elements), since only that element's force is ever projected at this point. Near a kink
+    /// between two line elements, both may have a non-negligible weight there; using the sum
+    /// would scale the dominating element's force by weight that actually belongs to its
+    /// neighbor.
+    pub fn dominating_line_element_and_weight_at_point(&self, point: SpatialVector) -> (usize, Float) {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
         let mut max_weight = -1.0;
@@ -503,6 +509,12 @@ impl ActuatorLine {
             panic!("No dominating line element found!");
         }
 
-        max_index
+        (max_index, max_weight)
+    }
+
+    /// Checks which line element is dominating at a given point in space by comparing the
+    /// projection weights of each line element.
+    pub fn dominating_line_element_index_at_point(&self, point: SpatialVector) -> usize {
+        self.dominating_line_element_and_weight_at_point(point).0
     }
 }
