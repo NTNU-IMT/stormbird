@@ -57,7 +57,7 @@ impl HorseshoeVortex {
         ]);
 
         let span_direction = span_line.relative_vector().normalize();
-        let bound_normal_direction = wake_vectors[0].project_on_plane(span_direction);
+        let bound_normal_direction = wake_vectors[0].project_on_plane(span_direction).normalize();
 
         let elbow_vector = elbow_length * bound_normal_direction;
 

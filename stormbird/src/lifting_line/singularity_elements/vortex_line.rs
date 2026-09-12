@@ -10,6 +10,10 @@ use stormath::consts::PI;
 
 const FOUR_PI_INVERSE: Float = 1.0 / (4.0 * PI);
 
+#[cfg(feature = "single_precision")]
+const CLOSENESS_ERROR: Float = 1.0e-6;
+
+#[cfg(not(feature = "single_precision"))]
 const CLOSENESS_ERROR: Float = 1.0e-10;
 
 #[derive(Clone, Debug, Default)]

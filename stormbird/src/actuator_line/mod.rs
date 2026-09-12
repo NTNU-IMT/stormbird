@@ -227,7 +227,7 @@ impl ActuatorLine {
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
-                &self.ctrl_points_velocity,
+                &corrected_velocity,
                 &last_circulation_strength,
                 time - self.start_time
             );
@@ -386,11 +386,7 @@ impl ActuatorLine {
 
                     let lift_dot = lift_direction.dot(lift_force);
 
-                    let lift_sign = if lift_dot >= 0.0 {
-                        1.0
-                    } else {
-                        -1.0
-                    };
+                    let lift_sign = if lift_dot >= 0.0 {1.0} else {-1.0};
                     
                     lift_force = lift_force.length() * lift_direction * lift_sign;
                     drag_force = drag_force.length() * drag_direction;

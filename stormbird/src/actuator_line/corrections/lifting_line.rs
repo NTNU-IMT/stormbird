@@ -23,7 +23,9 @@ pub struct LiftingLineCorrectionBuilder {
     #[serde(default)]
     pub symmetry_condition: SymmetryCondition,
     #[serde(default)]
-    pub initialization_time: Option<Float>
+    pub initialization_time: Option<Float>,
+    #[serde(default="LiftingLineCorrectionBuilder::default_reference_core_length_factor")]
+    pub reference_core_length_factor: Float
 }
 
 impl Default for LiftingLineCorrectionBuilder {
@@ -31,13 +33,15 @@ impl Default for LiftingLineCorrectionBuilder {
         Self {
             wake_length_factor: Self::default_wake_length_factor(),
             symmetry_condition: SymmetryCondition::NoSymmetry,
-            initialization_time: None
+            initialization_time: None,
+            reference_core_length_factor: Self::default_reference_core_length_factor()
         }
     }
 }
 
 impl LiftingLineCorrectionBuilder {
     fn default_wake_length_factor() -> Float {100.0}
+    fn default_reference_core_length_factor() -> Float {10.0}
 
     pub fn build(
         &self,
@@ -52,6 +56,7 @@ impl LiftingLineCorrectionBuilder {
 
         LiftingLineCorrection {
             viscous_core_length,
+            viscous_core_length_reference: viscous_core_length / self.reference_core_length_factor,
             wake_length_factor: self.wake_length_factor,
             symmetry_condition: self.symmetry_condition,
             initialization_time: self.initialization_time,
@@ -69,6 +74,7 @@ impl LiftingLineCorrectionBuilder {
 /// velocities
 pub struct LiftingLineCorrection {
     pub viscous_core_length: Float,
+    pub viscous_core_length_reference: Float,
     pub wake_length_factor: Float,
     pub symmetry_condition: SymmetryCondition,
     pub initialization_time: Option<Float>,
@@ -144,7 +150,7 @@ impl LiftingLineCorrection {
                 wing_chord_lengths,
                 &wing_span_point_velocities, 
                 wake_length, 
-                self.viscous_core_length / 100.0,
+                self.viscous_core_length_reference,
                 self.symmetry_condition
             );
 
