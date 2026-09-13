@@ -159,8 +159,7 @@ impl Simulation {
             if let Some(actuator_line) = &self.actuator_line {
                 actuator_line.compute_body_force(
                     &self.grid, 
-                    &self.velocity_solver.velocity, 
-                    self.velocity_solver.density, 
+                    &self.velocity_solver.velocity,
                     &mut self.velocity_solver.body_force
                 );
             }

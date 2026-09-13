@@ -33,13 +33,15 @@ void Foam::fv::ActuatorLine::set_projection_data() {
             cell_centers[cell_id][2]
         };
 
-        double body_force_weight = this->model->summed_projection_weights_at_point(cell_center);
+        auto dominating_line = this->model->dominating_line_element_and_weight_at_point(cell_center);
+
+        double body_force_weight = dominating_line.weight;
 
         if (body_force_weight > weight_limit) {
             this->relevant_cells_for_projection.append(cell_id);
 
             this->dominating_line_element_index_projection.append(
-                this->model->dominating_line_element_index_at_point(cell_center)
+                dominating_line.line_index
             );
 
             this->body_force_field_weight[0][cell_id] = body_force_weight;

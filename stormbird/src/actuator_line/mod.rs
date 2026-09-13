@@ -159,7 +159,7 @@ impl ActuatorLine {
 
             self.simulation_result = Some(simulation_result);
             
-            self.update_sectional_forces_to_project();
+            self.update_sectional_forces_to_project(time);
         }
 
         self.current_iteration += 1;
@@ -361,8 +361,9 @@ impl ActuatorLine {
     }
     
     /// Function 
-    pub fn update_sectional_forces_to_project(&mut self) {
+    pub fn update_sectional_forces_to_project(&mut self, time: Float) {
         let nr_span_lines = self.line_force_model.nr_span_lines();
+        let ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
         
         if let Some(simulation_result) = &self.simulation_result {
             for line_index in 0..nr_span_lines {
@@ -375,7 +376,9 @@ impl ActuatorLine {
                 
                 if self.projection_settings.realign_sectional_forces {
                     let line = self.line_force_model.span_lines_global[line_index];
-                    let velocity = self.ctrl_points_velocity[line_index];
+                    
+                    
+                    let velocity = ctrl_points_velocity[line_index];
     
                     let lift_direction = line
                         .relative_vector()

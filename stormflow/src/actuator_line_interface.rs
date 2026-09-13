@@ -116,8 +116,7 @@ impl ActuatorLineInterface {
     pub fn compute_body_force(
         &self, 
         grid: &Grid, 
-        velocity: &[SpatialVector], 
-        density: Float,
+        velocity: &[SpatialVector],
         body_force: &mut [SpatialVector]
     ) {
         let nr_cells_to_check = self.cell_indices_to_check.len();
@@ -150,7 +149,7 @@ impl ActuatorLineInterface {
 
                 let force_to_project = line_force_force + spanwise_damping_force;
             
-                (i_flat_extended, body_force_weight * force_to_project / density)
+                (i_flat_extended, body_force_weight * force_to_project)
             }).collect();
         
         for (i_flat_extended, force) in new_body_forces {
