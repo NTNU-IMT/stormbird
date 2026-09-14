@@ -227,7 +227,7 @@ impl ActuatorLine {
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
-                &corrected_velocity,
+                &self.ctrl_points_velocity,
                 &last_circulation_strength,
                 time - self.start_time
             );
@@ -363,7 +363,7 @@ impl ActuatorLine {
     /// Function 
     pub fn update_sectional_forces_to_project(&mut self, time: Float) {
         let nr_span_lines = self.line_force_model.nr_span_lines();
-        let ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
+        let ctrl_points_velocity = &self.ctrl_points_velocity; //self.corrected_ctrl_points_velocity(time);
         
         if let Some(simulation_result) = &self.simulation_result {
             for line_index in 0..nr_span_lines {
