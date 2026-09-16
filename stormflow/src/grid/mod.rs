@@ -14,7 +14,7 @@ pub const INTERIOR_OFFSET: usize = 3;
 
 /// Coarsening stops once a coarsened grid's interior cell count in any dimension would drop
 /// to this value or below (used by geometric multigrid hierarchy construction).
-pub const SMALLEST_NR_CELLS_FOR_COARSENING: usize = 2;
+pub const SMALLEST_NR_CELLS_FOR_COARSENING: usize = 4;
 
 #[derive(Debug, Clone)]
 /// A structured cartesian grid to be used for finite difference, staggered, CFD simulations
