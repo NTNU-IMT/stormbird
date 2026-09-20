@@ -40,13 +40,11 @@ class WingBuilderSettings(StormbirdSetupBaseModel):
         non_zero_circulation_at_ends = (False, False)
 
         if self.virtual_span_bot > 0.0:
-            
-            
             section_points.append(
                 SpatialVector(
                     x=x_pos, 
                     y=y_pos, 
-                    z=max(deck_height, deck_height + foundation_height - self.virtual_span_top)
+                    z=max(deck_height, deck_height + foundation_height - self.virtual_span_bot)
                 )
             )
             line_segment_is_virtual.append(True)
