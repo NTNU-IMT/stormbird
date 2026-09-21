@@ -6,6 +6,8 @@ from ..spatial_vector import SpatialVector
 from ..section_models import SectionModel
 from ..line_force_model import WingBuilder
 
+from .sail_type import SailType
+
 class WingBuilderSettings(StormbirdSetupBaseModel):
     """
     Helper class for storing all the basic, reusable settings, for a sail, so it can be quick to 
@@ -18,6 +20,7 @@ class WingBuilderSettings(StormbirdSetupBaseModel):
     chord_length: float
     height: float
     section_model: SectionModel
+    sail_type: SailType
     virtual_span_top: float = 0.0
     virtual_span_bot: float = 0.0
 
@@ -40,13 +43,11 @@ class WingBuilderSettings(StormbirdSetupBaseModel):
         non_zero_circulation_at_ends = (False, False)
 
         if self.virtual_span_bot > 0.0:
-            
-            
             section_points.append(
                 SpatialVector(
                     x=x_pos, 
                     y=y_pos, 
-                    z=max(deck_height, deck_height + foundation_height - self.virtual_span_top)
+                    z=max(deck_height, deck_height + foundation_height - self.virtual_span_bot)
                 )
             )
             line_segment_is_virtual.append(True)
