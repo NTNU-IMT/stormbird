@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use stormbird::common_utils::results::simulation::SimulationResult as SimulationResultRust;
+use stormbird::common_utils::results::simplfied::SingleSailResult as SingleSailResultRust;
 use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalForcesRust;
 use stormbird::common_utils::forces_and_moments::IntegratedValues as IntegratedValuesRust;
 use stormbird::common_utils::forces_and_moments::SectionalForcesInput as SectionalForcesInputRust;
@@ -201,5 +202,34 @@ impl SimulationResult {
 
     pub fn input_power_sum(&self) -> f64 {
         self.data.input_power.iter().sum()
+    }
+}
+
+/// Simplified result for a single sail: the total force and moment, and the input power
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct SingleSailResult {
+    pub data: SingleSailResultRust
+}
+
+#[pymethods]
+impl SingleSailResult {
+    #[getter]
+    pub fn force(&self) -> [f64; 3] {
+        self.data.force.0
+    }
+
+    #[getter]
+    pub fn moment(&self) -> [f64; 3] {
+        self.data.moment.0
+    }
+
+    #[getter]
+    pub fn input_power(&self) -> f64 {
+        self.data.input_power
+    }
+
+    fn __str__(&self) -> String {
+        format!("{:?}", self.data)
     }
 }

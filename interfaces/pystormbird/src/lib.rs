@@ -20,6 +20,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<result_structs::SectionalForces>()?;
     m.add_class::<result_structs::IntegratedValues>()?;
     m.add_class::<result_structs::SimulationResult>()?;
+    m.add_class::<result_structs::SingleSailResult>()?;
     
     m.add_wrapped(wrap_pymodule!(section_models::section_models))?;
     m.add_wrapped(wrap_pymodule!(line_force_model::line_force_model))?;
