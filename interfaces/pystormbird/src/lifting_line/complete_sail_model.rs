@@ -40,23 +40,21 @@ impl CompleteSailModel {
 
     /// Runs multiple steady state simulations with different controller loadings, and returns the
     /// result with the highest effective power. That is, the power delivered by the thrust, minus
-    /// the power that is used by the sails.
+    /// the power that is used by the sails. The number of loadings that are tested is defined by
+    /// the model settings.
     #[pyo3(signature=(
         *,
         wind_condition,
-        ship_velocity,
-        nr_loadings_to_test
+        ship_velocity
     ))]
-    pub fn simulate_condition_optimal_controller_loading(
+    pub fn simulate_optimal_steady_state_condition(
         &mut self,
         wind_condition: WindCondition,
-        ship_velocity: f64,
-        nr_loadings_to_test: usize
+        ship_velocity: f64
     ) -> SimulationResult {
-        let result_rs = self.data.simulate_condition_optimal_controller_loading(
+        let result_rs = self.data.simulate_optimal_steady_state_condition(
             &wind_condition.data,
-            ship_velocity,
-            nr_loadings_to_test
+            ship_velocity
         );
 
         SimulationResult {
@@ -106,6 +104,28 @@ impl CompleteSailModel {
             &wind_condition.data,
             ship_velocity,
             controller_loading
+        );
+
+        results_rs.into_iter().map(
+            |result| SingleSailResult { data: result }
+        ).collect()
+    }
+
+    /// Same as `simulate_optimal_steady_state_condition`, but the result is simplified to the
+    /// total force and moment and the input power for each sail.
+    #[pyo3(signature=(
+        *,
+        wind_condition,
+        ship_velocity
+    ))]
+    pub fn simulate_optimal_steady_state_condition_simple_output(
+        &mut self,
+        wind_condition: WindCondition,
+        ship_velocity: f64
+    ) -> Vec<SingleSailResult> {
+        let results_rs = self.data.simulate_optimal_steady_state_condition_simple_output(
+            &wind_condition.data,
+            ship_velocity
         );
 
         results_rs.into_iter().map(

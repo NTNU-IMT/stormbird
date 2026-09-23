@@ -51,17 +51,17 @@ class CompleteSailModel:
         """The number of sails in the model."""
         ...
 
-    def simulate_condition_optimal_controller_loading(
+    def simulate_optimal_steady_state_condition(
         self,
         *,
         wind_condition: WindCondition,
-        ship_velocity: float,
-        nr_loadings_to_test: int
+        ship_velocity: float
     ) -> SimulationResult:
         """
         Runs multiple steady state simulations with different controller loadings, and returns the
         result with the highest effective power. That is, the power delivered by the thrust, minus
-        the power that is used by the sails.
+        the power that is used by the sails. The number of loadings that are tested is defined by
+        the model settings.
         """
         ...
 
@@ -85,6 +85,18 @@ class CompleteSailModel:
         """
         Same as `simulate_steady_state_condition`, but the result is simplified to the total force
         and moment and the input power for each sail.
+        """
+        ...
+
+    def simulate_optimal_steady_state_condition_simple_output(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity: float
+    ) -> list[SingleSailResult]:
+        """
+        Same as `simulate_optimal_steady_state_condition`, but the result is simplified to the
+        total force and moment and the input power for each sail.
         """
         ...
 

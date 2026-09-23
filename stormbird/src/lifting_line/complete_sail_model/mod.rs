@@ -60,8 +60,8 @@ impl CompleteSailModel {
         self.lifting_line_simulation.line_force_model.nr_wings()
     }
     
-    /// Runs multiple `simulate_condition` calls with different loadings, and chooses the best one
-    /// based on the maximum delivered power
+    /// Runs multiple `simulate_steady_state_condition` calls with different loadings, and chooses 
+    /// the best one based on the maximum delivered power
     pub fn simulate_optimal_steady_state_condition(
         &mut self,
         wind_condition: &WindCondition,
@@ -131,13 +131,15 @@ impl CompleteSailModel {
             loading_used
         );
 
+        // Extract variables to assess convergence of the local wing angles
         let mut current_wing_angles = self.lifting_line_simulation
             .line_force_model.local_wing_angles.clone();
 
         let mut max_change_in_wing_angles = 999.0;
         let mut iteration = 0;
         let mut result: SimulationResult = SimulationResult::default();
-        
+
+        // Iterate until the local wing angles converge
         while iteration < self.settings.max_controller_iterations && max_change_in_wing_angles > self.settings.allowed_angle_error {
             result = self.do_step(
                 iteration as f64,
@@ -187,6 +189,19 @@ impl CompleteSailModel {
             wind_condition, 
             ship_velocity, 
             controller_loading
+        );
+        
+        full_results.as_simplified()
+    }
+
+    pub fn simulate_optimal_steady_state_condition_simple_output(
+        &mut self,
+        wind_condition: &WindCondition,
+        ship_velocity: Float,
+    ) -> Vec<SingleSailResult> {
+        let full_results = self.simulate_optimal_steady_state_condition(
+            wind_condition, 
+            ship_velocity
         );
         
         full_results.as_simplified()

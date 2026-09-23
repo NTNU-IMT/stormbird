@@ -159,7 +159,7 @@ impl ActuatorLine {
 
             self.simulation_result = Some(simulation_result);
             
-            self.update_sectional_forces_to_project(time);
+            self.update_sectional_forces_to_project();
         }
 
         self.current_iteration += 1;
@@ -361,7 +361,7 @@ impl ActuatorLine {
     }
     
     /// Function 
-    pub fn update_sectional_forces_to_project(&mut self, time: Float) {
+    pub fn update_sectional_forces_to_project(&mut self) {
         let nr_span_lines = self.line_force_model.nr_span_lines();
         let ctrl_points_velocity = &self.ctrl_points_velocity; //self.corrected_ctrl_points_velocity(time);
         
