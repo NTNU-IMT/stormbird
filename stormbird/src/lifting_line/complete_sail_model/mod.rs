@@ -2,11 +2,11 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-/// The simple sail model is a handy way to use the Stormbird library when the goal is to model
-/// sails in a simple and straightforward way. For instance, it can be to quickly set up a model of
-/// a generic sail type, where the exact details are not that important.
+/// The complete sail model combines a lifting line simulation with other functionality necessary 
+/// for modeling a sail as a *complete unit*. 
 
 pub mod builder;
+pub mod settings;
 
 use crate::lifting_line::simulation::Simulation as LiftingLineSimulation;
 
@@ -26,6 +26,7 @@ use crate::common_utils::results::{
 };
 
 use builder::CompleteSailModelBuilder;
+use settings::CompleteSailModelSettings;
 
 use stormath::{
     type_aliases::Float,
@@ -37,12 +38,13 @@ use crate::error::Error;
 #[derive(Debug, Clone)]
 /// Collection of the necessary functionality to simulate a *complete sail system* using the lifting
 /// line model. This means combining a lifting line model of the sails with a model of the wind
-/// conditions and a control system that adjust the control parameters of the sails based on the
+/// environment and a control system that adjust the control parameters of the sails based on the
 /// wind conditions.
 pub struct CompleteSailModel {
     pub lifting_line_simulation: LiftingLineSimulation,
     pub wind_environment: WindEnvironment,
     pub controller: Controller,
+    pub settings: CompleteSailModelSettings
 }
 
 impl CompleteSailModel {
@@ -60,12 +62,13 @@ impl CompleteSailModel {
     
     /// Runs multiple `simulate_condition` calls with different loadings, and chooses the best one
     /// based on the maximum delivered power
-    pub fn simulate_condition_optimal_controller_loading(
+    pub fn simulate_optimal_steady_state_condition(
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
-        nr_loadings_to_test: usize,
     ) -> SimulationResult {
+
+        let nr_loadings_to_test = self.settings.nr_loadings_to_test_during_optimization;
         
         let loadings_to_test = array_generation::linspace(0.1, 1.0, nr_loadings_to_test);
         
@@ -102,26 +105,76 @@ impl CompleteSailModel {
         results[best_index].clone()
     }
     
+    /// The main interface to use the sail model in steady state conditions.
+    /// 
+    /// # Arguments
+    /// - `wind_condition`: structure containing variables defining the wind condition.
+    /// - `ship velocity`: The velocity of the ship in m/s
+    /// - `controller_loading`: the loading of the controller, meaning how close to the max angle of 
+    /// attack/max spin ratio/max flap angle/max suction rate the sail should be operated at. 1.0 
+    /// means max values, while 0.0 means sails in neutral position 
     pub fn simulate_steady_state_condition(
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
+        let loading_used = controller_loading.min(1.0).max(0.0);
+
+        // Apply initial controller settings based on the wind conditions alone, but which then 
+        // neglects the lift-induced velocity.
         self.apply_controller_based_on_wind_condition(
             0.0, 
             1.0, 
             wind_condition, 
             ship_velocity, 
-            controller_loading
+            loading_used
         );
+
+        let mut current_wing_angles = self.lifting_line_simulation
+            .line_force_model.local_wing_angles.clone();
+
+        let mut max_change_in_wing_angles = 999.0;
+        let mut iteration = 0;
+        let mut result: SimulationResult = SimulationResult::default();
         
-        self.do_step(
-            0.0,
-            1.0,
-            wind_condition, 
-            ship_velocity
-        )
+        while iteration < self.settings.max_controller_iterations && max_change_in_wing_angles > self.settings.allowed_angle_error {
+            result = self.do_step(
+                iteration as f64,
+                1.0,
+                wind_condition, 
+                ship_velocity
+            );
+
+            self.apply_controller_based_on_simulation_result(
+                iteration as f64,
+                1.0,
+                loading_used,
+                &result
+            );
+
+            let new_wing_angles = self.lifting_line_simulation
+                .line_force_model.local_wing_angles.clone();
+
+            let mut wing_angles_change = Vec::new();
+
+            for (angle_new, angle_old) in new_wing_angles.iter().zip(current_wing_angles.iter()) {
+                wing_angles_change.push((angle_new - angle_old).abs());
+            }
+
+            max_change_in_wing_angles = 0.0;
+
+            for c in wing_angles_change.iter() {
+                if *c > max_change_in_wing_angles {
+                    max_change_in_wing_angles = *c;
+                }
+            }
+
+            current_wing_angles = new_wing_angles;
+            iteration += 1;
+        }
+
+        result    
     }
     
     pub fn simulate_steady_state_condition_simple_output(
