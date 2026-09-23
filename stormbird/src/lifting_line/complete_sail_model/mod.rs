@@ -142,14 +142,14 @@ impl CompleteSailModel {
         // Iterate until the local wing angles converge
         while iteration < self.settings.max_controller_iterations && max_change_in_wing_angles > self.settings.allowed_angle_error {
             result = self.do_step(
-                iteration as f64,
+                iteration as Float,
                 1.0,
                 wind_condition, 
                 ship_velocity
             );
 
             self.apply_controller_based_on_simulation_result(
-                iteration as f64,
+                iteration as Float,
                 1.0,
                 loading_used,
                 &result
