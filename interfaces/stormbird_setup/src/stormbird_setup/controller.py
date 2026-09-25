@@ -8,7 +8,7 @@ from .base_model import StormbirdSetupBaseModel
 
 from enum import Enum
 
-from pydantic import field_serializer, Field
+from pydantic import field_serializer, model_validator, Field
 
 import numpy as np
 
@@ -109,24 +109,36 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         )
 
 
-class MeasurementType(Enum):
-    Mean = "Mean"
-    Max = "Max"
-    Min = "Min"
+class SpanwiseMeasurementBuilder(StormbirdSetupBaseModel):
+    '''
+    Defines the part of the span of each wing that the controller measures the flow on. The two
+    locations are non-dimensional, and run from -0.5 at one end of a wing to 0.5 at the other.
 
-class MeasurementSettings(StormbirdSetupBaseModel):
-    measurement_type: MeasurementType = MeasurementType.Mean
-    start_index: int = 1
-    end_offset: int = 1
+    Stormbird uses the control point that lies closest to each of the two locations, so a small
+    deviation from them is expected: the control points are what a simulation resolves. Both of them
+    are included in the measurement, so the same start and end location measures the single control
+    point that lies closest to it. Each wing gets its own indices, since the wings can be built with
+    a different number of sections.
+    '''
+    non_dim_start_location: float = -0.25
+    non_dim_end_location: float = 0.25
 
-class FlowMeasurementSettings(StormbirdSetupBaseModel):
-    angle_of_attack: MeasurementSettings = MeasurementSettings()
-    wind_direction: MeasurementSettings = MeasurementSettings()
-    wind_velocity: MeasurementSettings = MeasurementSettings()
+    @model_validator(mode='after')
+    def check_locations(self) -> "SpanwiseMeasurementBuilder":
+        if self.non_dim_end_location < self.non_dim_start_location:
+            raise ValueError(
+                "The end of a spanwise measurement cannot be before its start. The start location "
+                f"is {self.non_dim_start_location} and the end location is "
+                f"{self.non_dim_end_location}"
+            )
+
+        return self
 
 class ControllerBuilder(StormbirdSetupBaseModel):
     set_points: list[ControllerSetPoints]
-    flow_measurement_settings: FlowMeasurementSettings = FlowMeasurementSettings()
+    spanwise_measurement: SpanwiseMeasurementBuilder = Field(
+        default_factory=lambda: SpanwiseMeasurementBuilder()
+    )
     time_steps_between_updates: int = 1
     start_time: float = 0.0
     moving_average_window_size: int | None = None

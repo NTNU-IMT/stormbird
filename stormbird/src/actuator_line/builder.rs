@@ -79,7 +79,13 @@ impl ActuatorLineBuilder {
         let nr_span_lines = line_force_model.nr_span_lines();
 
         let controller = if let Some(controller_builder) = &self.controller {
-            Some(controller_builder.build())
+            // The actuator line builder cannot fail, so a controller that does not fit the line
+            // force model is reported the same way as the rest of the invalid input here
+            Some(
+                controller_builder
+                    .build(&line_force_model)
+                    .expect("Could not build the controller")
+            )
         } else {
             None
         };

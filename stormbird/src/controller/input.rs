@@ -11,13 +11,7 @@ use crate::{
     common_utils::forces_and_moments::CoordinateSystem,
 };
 
-use super::measurements::{
-    FlowMeasurementSettings,
-    measure_angles_of_attack,
-    measure_wind_velocity_magnitude,
-    measure_apparent_wind_direction,
-    measure_float_values
-};
+use super::measurements::SpanwiseMeasurement;
 
 use stormath::{spatial_vector::SpatialVector, type_aliases::Float};
 
@@ -48,7 +42,7 @@ impl ControllerInput {
         loading: Float,
         line_force_model: &LineForceModel,
         simulation_result: &SimulationResult,
-        measurement_settings: &FlowMeasurementSettings,
+        spanwise_measurement: &SpanwiseMeasurement,
         wind_environment: &WindEnvironment,
         use_input_velocity_for_apparent_wind_direction: bool,
     ) -> Vec<Self> {
@@ -56,19 +50,12 @@ impl ControllerInput {
         
         let section_models_internal_state = line_force_model.section_models_internal_state();
         
-        let angles_of_attack = measure_angles_of_attack(
-            simulation_result, 
-            &measurement_settings.angle_of_attack
-        );
+        let angles_of_attack = spanwise_measurement.measure_angles_of_attack(simulation_result);
         
-        let velocities = measure_wind_velocity_magnitude(
-            simulation_result, 
-            &measurement_settings.wind_velocity
-        );
+        let velocities = spanwise_measurement.measure_wind_velocity_magnitude(simulation_result);
         
-        let apparent_wind_directions = measure_apparent_wind_direction(
-            simulation_result, 
-            &measurement_settings.wind_direction, 
+        let apparent_wind_directions = spanwise_measurement.measure_apparent_wind_direction(
+            simulation_result,
             wind_environment, 
             line_force_model,
             use_input_velocity_for_apparent_wind_direction
@@ -99,7 +86,7 @@ impl ControllerInput {
         loading: Float,
         line_force_model: &LineForceModel,
         velocity: &[SpatialVector],
-        measurement_settings: &FlowMeasurementSettings,
+        spanwise_measurement: &SpanwiseMeasurement,
         wind_environment: &WindEnvironment,
     ) -> Vec<Self> {
         let nr_wings = line_force_model.nr_wings();
@@ -110,16 +97,14 @@ impl ControllerInput {
             velocity, CoordinateSystem::Global
         );
         
-        let angles_of_attack = measure_float_values(
+        let angles_of_attack = spanwise_measurement.measure_float_values(
             &angles_of_attack_all_sections, 
-            wing_indices.clone(), 
-            &measurement_settings.angle_of_attack
+            wing_indices.clone(),
         );
         
-        let velocities = measure_float_values(
+        let velocities = spanwise_measurement.measure_float_values(
             &velocities_all_sections, 
-            wing_indices.clone(), 
-            &measurement_settings.wind_velocity
+            wing_indices.clone(),
         );
         
         let wind_directions = wind_environment.apparent_wind_direction_from_velocity_and_line_force_model(
@@ -127,10 +112,9 @@ impl ControllerInput {
             line_force_model
         );
         
-        let apparent_wind_directions = measure_float_values(
+        let apparent_wind_directions = spanwise_measurement.measure_float_values(
             &wind_directions, 
-            wing_indices.clone(), 
-            &measurement_settings.wind_direction
+            wing_indices.clone(),
         );
         
         let section_models_internal_state = line_force_model.section_models_internal_state();

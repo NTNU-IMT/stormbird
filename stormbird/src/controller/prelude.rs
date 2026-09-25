@@ -9,9 +9,5 @@ pub use super::{
     set_points::ControllerSetPoints,
     input::ControllerInput,
     output::ControllerOutput,
-    measurements::{
-        MeasurementType,
-        MeasurementSettings,
-        FlowMeasurementSettings
-    }
+    measurements::SpanwiseMeasurement,
 };

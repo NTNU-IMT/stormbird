@@ -3,12 +3,13 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html) 
 
 use crate::error::Error;
+use crate::line_force_model::LineForceModel;
 
 use serde::{Deserialize, Serialize};
 
 use super::Controller;
 use super::set_points::ControllerSetPoints;
-use super::measurements::FlowMeasurementSettings;
+use super::measurements::SpanwiseMeasurementBuilder;
 
 use stormath::type_aliases::Float;
 
@@ -17,7 +18,7 @@ use stormath::type_aliases::Float;
 pub struct ControllerBuilder {
     pub set_points: Vec<ControllerSetPoints>,
     #[serde(default)]
-    pub flow_measurement_settings: FlowMeasurementSettings,
+    pub spanwise_measurement: SpanwiseMeasurementBuilder,
     #[serde(default = "ControllerBuilder::default_time_steps_between_updates")]
     pub time_steps_between_updates: usize,
     #[serde(default)]
@@ -43,14 +44,14 @@ impl ControllerBuilder {
         Self::from_json_string(&json_string)
     }
 
-    pub fn build(&self) -> Controller {
-        Controller {
+    pub fn build(&self, line_force_model: &LineForceModel) -> Result<Controller, Error> {
+        Ok(Controller {
             set_points: self.set_points.clone(),
-            flow_measurement_settings: self.flow_measurement_settings.clone(),
+            spanwise_measurement: self.spanwise_measurement.build(line_force_model)?,
             time_steps_between_updates: self.time_steps_between_updates,
             start_time: self.start_time,
             time_step_index: 0,
             use_input_velocity_for_apparent_wind_direction: self.use_input_velocity_for_apparent_wind_direction,
-        }
+        })
     }
 }

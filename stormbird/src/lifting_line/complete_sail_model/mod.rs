@@ -53,7 +53,7 @@ impl CompleteSailModel {
     pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
         let builder = CompleteSailModelBuilder::new_from_string(setup_string)?;
 
-        Ok(builder.build())
+        builder.build()
     }
     
     /// Query the model for the number of sails
@@ -356,7 +356,7 @@ impl CompleteSailModel {
             loading,
             &self.lifting_line_simulation.line_force_model,
             ctrl_points_velocity,
-            &self.controller.flow_measurement_settings,
+            &self.controller.spanwise_measurement,
             &self.wind_environment,
         );
 
@@ -385,7 +385,7 @@ impl CompleteSailModel {
             loading,
             &self.lifting_line_simulation.line_force_model,
             simulation_result,
-            &self.controller.flow_measurement_settings,
+            &self.controller.spanwise_measurement,
             &self.wind_environment,
             self.controller.use_input_velocity_for_apparent_wind_direction
         );
