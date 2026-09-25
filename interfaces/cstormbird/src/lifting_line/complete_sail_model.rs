@@ -158,6 +158,7 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition(
     sail_model: *mut CompleteSailModel,
     wind_condition: *const WindCondition,
     ship_velocity: f64,
+    max_loading: f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() {
         set_last_error(
@@ -176,7 +177,8 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition(
 
     let result = rust_model.simulate_optimal_steady_state_condition(
         wind_condition_rust,
-        ship_velocity
+        ship_velocity,
+        max_loading
     );
 
     box_simulation_result(result)
@@ -288,6 +290,7 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_si
     sail_model: *mut CompleteSailModel,
     wind_condition: *const WindCondition,
     ship_velocity: f64,
+    max_loading: f64,
     results_out: *mut SingleSailResult,
     results_out_length: usize,
 ) -> i32 {
@@ -317,7 +320,8 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_si
 
     let rust_results = rust_model.simulate_optimal_steady_state_condition_simple_output(
         wind_condition_rust,
-        ship_velocity
+        ship_velocity,
+        max_loading
     );
 
     write_single_sail_results(&rust_results, results_out, results_out_length)

@@ -9,6 +9,7 @@ pub mod builder;
 pub mod settings;
 
 use crate::lifting_line::simulation::Simulation as LiftingLineSimulation;
+use crate::common_utils::forces_and_moments::IntegratedValues;
 
 use crate::wind::{
     environment::WindEnvironment,
@@ -66,11 +67,12 @@ impl CompleteSailModel {
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
+        max_loading: Float
     ) -> SimulationResult {
 
         let nr_loadings_to_test = self.settings.nr_loadings_to_test_during_optimization;
         
-        let loadings_to_test = array_generation::linspace(0.1, 1.0, nr_loadings_to_test);
+        let loadings_to_test = array_generation::linspace(0.0, max_loading, nr_loadings_to_test);
         
         let mut results: Vec<SimulationResult> = Vec::with_capacity(nr_loadings_to_test);
         let mut effective_power: Vec<Float> = Vec::with_capacity(nr_loadings_to_test);
@@ -85,8 +87,7 @@ impl CompleteSailModel {
                 loadings_to_test[i]
             );
             
-            // TODO: must find a way to define what the thrust direction is!
-            let thrust = -result.integrated_forces_sum()[0];
+            let thrust = result.integrated_forces_sum().dot(self.settings.thrust_direction);
             let delivered_power = thrust * ship_velocity;
             let input_power = result.input_power_sum();
             
@@ -102,7 +103,19 @@ impl CompleteSailModel {
             );
         }
         
-        results[best_index].clone()
+        let mut best_result = results[best_index].clone();
+
+        // Set all integrated values to zero if the sails are not providing any useful work AND they
+        // are set to be retractable
+        if max_effective_power < 0.0 && self.settings.retractable {
+            let nr_wings = best_result.nr_of_wings();
+            
+            best_result.input_power = vec![0.0; nr_wings];
+            best_result.integrated_forces = vec![IntegratedValues::default(); nr_wings];
+            best_result.integrated_moments = vec![IntegratedValues::default(); nr_wings];
+        }
+
+        best_result
     }
     
     /// The main interface to use the sail model in steady state conditions.
@@ -198,10 +211,12 @@ impl CompleteSailModel {
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
+        max_loading: Float
     ) -> Vec<SingleSailResult> {
         let full_results = self.simulate_optimal_steady_state_condition(
             wind_condition, 
-            ship_velocity
+            ship_velocity,
+            max_loading
         );
         
         full_results.as_simplified()

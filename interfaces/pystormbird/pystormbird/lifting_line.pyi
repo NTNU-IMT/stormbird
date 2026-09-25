@@ -55,7 +55,8 @@ class CompleteSailModel:
         self,
         *,
         wind_condition: WindCondition,
-        ship_velocity: float
+        ship_velocity: float,
+        max_loading: float
     ) -> SimulationResult:
         """
         Runs multiple steady state simulations with different controller loadings, and returns the
@@ -92,7 +93,8 @@ class CompleteSailModel:
         self,
         *,
         wind_condition: WindCondition,
-        ship_velocity: float
+        ship_velocity: float,
+        max_loading: float
     ) -> list[SingleSailResult]:
         """
         Same as `simulate_optimal_steady_state_condition`, but the result is simplified to the

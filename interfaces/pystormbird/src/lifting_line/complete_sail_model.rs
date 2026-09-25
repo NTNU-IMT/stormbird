@@ -45,16 +45,19 @@ impl CompleteSailModel {
     #[pyo3(signature=(
         *,
         wind_condition,
-        ship_velocity
+        ship_velocity,
+        max_loading
     ))]
     pub fn simulate_optimal_steady_state_condition(
         &mut self,
         wind_condition: WindCondition,
-        ship_velocity: f64
+        ship_velocity: f64,
+        max_loading: f64
     ) -> SimulationResult {
         let result_rs = self.data.simulate_optimal_steady_state_condition(
             &wind_condition.data,
-            ship_velocity
+            ship_velocity,
+            max_loading
         );
 
         SimulationResult {
@@ -116,16 +119,19 @@ impl CompleteSailModel {
     #[pyo3(signature=(
         *,
         wind_condition,
-        ship_velocity
+        ship_velocity,
+        max_loading
     ))]
     pub fn simulate_optimal_steady_state_condition_simple_output(
         &mut self,
         wind_condition: WindCondition,
-        ship_velocity: f64
+        ship_velocity: f64,
+        max_loading: f64
     ) -> Vec<SingleSailResult> {
         let results_rs = self.data.simulate_optimal_steady_state_condition_simple_output(
             &wind_condition.data,
-            ship_velocity
+            ship_velocity,
+            max_loading
         );
 
         results_rs.into_iter().map(
