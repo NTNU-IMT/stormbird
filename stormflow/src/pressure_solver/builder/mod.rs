@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 use super::boundary_conditions::PressureBoundaryConditions;
 use crate::grid::Grid;
 use crate::geometry::Geometry;
+use crate::gpu_interface::context::GpuContext;
 
 pub mod settings;
 
@@ -29,11 +30,20 @@ impl Default for PressureSolverBuilder {
 }
 
 impl PressureSolverBuilder {
+    pub fn compute_platform(&self) -> ComputePlatform {
+        match self {
+            Self::Multigrid(settings) => settings.compute_platform,
+        }
+    }
+
+    /// Builds the solver. A GPU solver is created on the device in `gpu_context` if given, so that
+    /// it can share buffers with other solvers, and on a new device otherwise.
     pub fn build(
         &self,
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
-        slip_geometries: &[Geometry]
+        slip_geometries: &[Geometry],
+        gpu_context: Option<&GpuContext>
     ) -> PressureSolver {
         match self {
             Self::Multigrid(settings) => {
@@ -50,7 +60,8 @@ impl PressureSolverBuilder {
                     },
                     ComputePlatform::GPU => {
                         PressureSolver::MultigridGPU(
-                            MultigridGPU::new(
+                            MultigridGPU::new_with_context(
+                                gpu_context.cloned().unwrap_or_default(),
                                 grid,
                                 boundary_conditions,
                                 settings.build_settings(),

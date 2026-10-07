@@ -40,8 +40,10 @@ pub struct MultigridCPU {
     /// Dense matrix for the coarsest level's Poisson equation (same equation
     /// `poisson_jacobi_smoother` iterates towards, see `kernels::coarse_matrix`), built once here
     /// in `new` and reused for every V-cycle to solve that level exactly via Gaussian elimination
-    /// instead of approximating it with extra Jacobi iterations.
-    pub coarse_matrix: Matrix<Float>,
+    /// instead of approximating it with extra Jacobi iterations. Only built when
+    /// `solver_settings.coarsest_level_solver` is `CoarsestLevelSolver::Exact`, as it can use a lot
+    /// of memory.
+    pub coarse_matrix: Option<Matrix<Float>>,
     /// Precomputed pressure zero-gradient (Neumann) correction entries near slip walls, one
     /// `SlipPressureStencils` per level of `grids` (empty if there are no slip geometries). Folded
     /// directly into `poisson_jacobi_smoother`'s per-cell Jacobi update (see
@@ -76,10 +78,15 @@ impl MultigridCPU {
         let x_at_levels_work = x_at_levels.clone();
         let solution = vec![0.0; grids[0].nr_extended_cells()];
 
-        let coarse_matrix = build_poisson_matrix4(
-            grids.last().expect("grid hierarchy must have at least one level"),
-            boundary_conditions
-        );
+        let coarse_matrix = match solver_settings.coarsest_level_solver {
+            CoarsestLevelSolver::Exact => Some(
+                build_poisson_matrix4(
+                    grids.last().expect("grid hierarchy must have at least one level"),
+                    boundary_conditions
+                )
+            ),
+            CoarsestLevelSolver::Jacobi => None,
+        };
 
         println!("Building per-level slip-pressure stencils");
         let slip_pressure_interpolation_order = solver_settings.slip_pressure_interpolation_order;
@@ -245,7 +252,11 @@ impl MultigridCPU {
         let coarsest_level = self.grids.len() - 1;
         let rhs = &self.rhs_at_levels[coarsest_level];
 
-        let solution = self.coarse_matrix.solve_gaussian_elimination(rhs)
+        let coarse_matrix = self.coarse_matrix.as_ref().expect(
+            "The coarse matrix is only built when the solver is created with CoarsestLevelSolver::Exact"
+        );
+
+        let solution = coarse_matrix.solve_gaussian_elimination(rhs)
             .expect("Coarsest multigrid level's Poisson matrix should be non-singular");
 
         self.x_at_levels[coarsest_level].copy_from_slice(&solution);

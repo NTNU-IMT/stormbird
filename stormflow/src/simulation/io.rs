@@ -70,7 +70,7 @@ impl Simulation {
         writeln!(w, "SCALARS pressure double 1").unwrap();
         writeln!(w, "LOOKUP_TABLE default").unwrap();
 
-        let pressure = self.pressure_solver.pressure_ref();
+        let pressure = self.pressure_solver.pressure_host();
 
         for iz in 0..nz {
             for iy in 0..ny {
@@ -108,7 +108,7 @@ impl Simulation {
         //
         writeln!(w, "VECTORS velocity double").unwrap();
 
-        let velocity = &self.velocity_solver.velocity;
+        let velocity = self.velocity_solver.velocity_host();
 
         for iz in 0..nz {
             for iy in 0..ny {
@@ -139,7 +139,7 @@ impl Simulation {
 
         writeln!(w, "VECTORS body_force double").unwrap();
 
-        let body_force = &self.velocity_solver.body_force;
+        let body_force = self.velocity_solver.body_force_host();
 
         for iz in 0..nz {
             for iy in 0..ny {
@@ -169,7 +169,7 @@ impl Simulation {
         writeln!(w, "SCALARS sdf double 1").unwrap();
         writeln!(w, "LOOKUP_TABLE default").unwrap();
 
-        let signed_distance_function = &self.velocity_solver.signed_distance_function;
+        let signed_distance_function = &self.velocity_solver.setup().signed_distance_function;
 
         for iz in 0..nz {
             for iy in 0..ny {
@@ -192,7 +192,7 @@ impl Simulation {
         writeln!(w, "SCALARS sdf_slip double 1").unwrap();
         writeln!(w, "LOOKUP_TABLE default").unwrap();
 
-        let signed_distance_function_slip = &self.velocity_solver.signed_distance_function_slip;
+        let signed_distance_function_slip = &self.velocity_solver.setup().signed_distance_function_slip;
 
         for iz in 0..nz {
             for iy in 0..ny {
@@ -214,7 +214,7 @@ impl Simulation {
         // --- Normals for slip surfaces (vector) ---
         writeln!(w, "VECTORS normals_slip double").unwrap();
 
-        let normals_slip_surfaces = &self.velocity_solver.normals_slip_surfaces;
+        let normals_slip_surfaces = &self.velocity_solver.setup().normals_slip_surfaces;
 
         for iz in 0..nz {
             for iy in 0..ny {

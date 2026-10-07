@@ -4,12 +4,7 @@ use serde::{Serialize, Deserialize};
 use crate::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
 use crate::pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureInterpolationOrder;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub enum ComputePlatform {
-    #[default]
-    CPU,
-    GPU
-}
+pub use crate::gpu_interface::ComputePlatform;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultigridSettingsBuilder {

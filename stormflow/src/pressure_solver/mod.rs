@@ -6,6 +6,8 @@ pub mod multigrid_gpu;
 use multigrid_cpu::MultigridCPU;
 use multigrid_gpu::MultigridGPU;
 
+use std::borrow::Cow;
+
 use stormath::type_aliases::Float;
 
 pub enum PressureSolver {
@@ -21,6 +23,9 @@ impl PressureSolver {
         }
     }
 
+    /// The pressure on the host. Note that this is not updated for the GPU version when it is
+    /// solved with `MultigridGPU::solve_on_device`. See `pressure_host` for a version that always
+    /// returns the current values.
     pub fn pressure_ref(&self) -> &[Float] {
         match self {
             PressureSolver::MultigridCPU(solver) => &solver.solution,
@@ -28,12 +33,13 @@ impl PressureSolver {
         }
     }
  
-    /// The right hand side of the pressure Poisson equation on the finest level, stored on the 
-    /// **interior** grid. Must be populated before calling `solve`.
-    pub fn rhs_mut(&mut self) -> &mut [Float] {
+    /// The pressure on the host, for output purposes. Borrowed for the CPU version, and read from
+    /// the device for the GPU version, which is always up to date on the device, also when it is
+    /// solved with `MultigridGPU::solve_on_device`.
+    pub fn pressure_host(&self) -> Cow<'_, [Float]> {
         match self {
-            PressureSolver::MultigridCPU(solver) => &mut solver.rhs_at_levels[0],
-            PressureSolver::MultigridGPU(solver) => &mut solver.rhs,
+            PressureSolver::MultigridCPU(solver) => Cow::Borrowed(&solver.solution),
+            PressureSolver::MultigridGPU(solver) => Cow::Owned(solver.read_solution()),
         }
     }
 }

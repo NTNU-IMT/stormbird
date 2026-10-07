@@ -82,13 +82,13 @@ pub struct MultigridGPU {
     pub boundary_conditions: PressureBoundaryConditions,
     pub solver_settings: MultigridSettings,
     pub gpu_context: GpuContext,
-    /// Right-hand side for the finest level, on the **interior** grid. Written by the caller
-    /// (e.g. `Simulation::pressure_projection_rhs`) and uploaded to the GPU at the start of `solve`.
+    /// Right-hand side for the finest level, on the **interior** grid. Written by the caller and
+    /// uploaded to the GPU at the start of `solve`. Not used by `solve_on_device`.
     pub rhs: Vec<Float>,
     /// Solution for the finest level, on the **extended** grid (matching `MultigridCPU::solution`,
     /// since `Simulation::update_velocity` needs the boundary-extrapolated pressure one cell past
     /// the domain edge). Materialized once at the end of `solve`, entirely on the GPU — see
-    /// `MaterializeShader`.
+    /// `MaterializeShader`. Not updated by `solve_on_device`.
     pub solution: Vec<Float>,
 
     jacobi_shader: JacobiShader,
@@ -113,12 +113,14 @@ pub struct MultigridGPU {
     /// Dense matrix for the coarsest level's Poisson equation, built once here in `new` via the
     /// same `multigrid_cpu::kernels::coarse_matrix::build_poisson_matrix4` that `MultigridCPU`
     /// uses, and reused for every V-cycle when `solver_settings.coarsest_level_solver` is
-    /// `CoarsestLevelSolver::Exact` (see `solve_coarsest_level_exact`).
-    coarse_matrix: Matrix<Float>,
+    /// `CoarsestLevelSolver::Exact` (see `solve_coarsest_level_exact`). Only built in that case, as
+    /// it can use a lot of memory.
+    coarse_matrix: Option<Matrix<Float>>,
     /// Host-readable staging buffer for reading the coarsest level's restricted RHS back from the
     /// GPU when solving that level exactly on the CPU. Sized to the coarsest grid's interior cell
-    /// count, matching `levels[coarsest_level].rhs_buffer`.
-    coarse_rhs_staging_buffer: wgpu::Buffer,
+    /// count, matching `levels[coarsest_level].rhs_buffer`. Only created together with
+    /// `coarse_matrix`.
+    coarse_rhs_staging_buffer: Option<wgpu::Buffer>,
 
     /// Bind group for `materialize_shader`, reading the finest level's converged `x_buffer` and
     /// writing into `solution_buffer`.
@@ -131,7 +133,22 @@ pub struct MultigridGPU {
 }
 
 impl MultigridGPU {
+    /// Creates a new solver, with its own GPU context
     pub fn new(
+        grid: &Grid,
+        boundary_conditions: &PressureBoundaryConditions,
+        solver_settings: MultigridSettings,
+        slip_geometries: &[Geometry]
+    ) -> Self {
+        Self::new_with_context(
+            GpuContext::new(), grid, boundary_conditions, solver_settings, slip_geometries
+        )
+    }
+
+    /// Creates a new solver on the device in `gpu_context`. Use this to share the device with other
+    /// solvers, which is necessary for them to share buffers.
+    pub fn new_with_context(
+        gpu_context: GpuContext,
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
@@ -139,8 +156,6 @@ impl MultigridGPU {
     ) -> Self {
         let grids = grid.multigrid_hierarchy();
         let nr_levels = grids.len();
-
-        let gpu_context = GpuContext::new();
 
         let jacobi_shader = JacobiShader::new(&gpu_context, boundary_conditions);
         let restrict_shader = RestrictShader::new(&gpu_context, boundary_conditions);
@@ -279,8 +294,14 @@ impl MultigridGPU {
         }
 
         let coarsest_level = nr_levels - 1;
-        let coarse_matrix = build_poisson_matrix4(&grids[coarsest_level], boundary_conditions);
-        let coarse_rhs_staging_buffer = gpu_context.create_staging_buffer(grids[coarsest_level].nr_interior_cells());
+
+        let (coarse_matrix, coarse_rhs_staging_buffer) = match solver_settings.coarsest_level_solver {
+            CoarsestLevelSolver::Exact => (
+                Some(build_poisson_matrix4(&grids[coarsest_level], boundary_conditions)),
+                Some(gpu_context.create_staging_buffer(grids[coarsest_level].nr_interior_cells()))
+            ),
+            CoarsestLevelSolver::Jacobi => (None, None),
+        };
 
         let materialize_shader = MaterializeShader::new(&gpu_context, boundary_conditions);
         let solution_host = vec![0.0 as Float; grids[0].nr_extended_cells()];
@@ -408,19 +429,25 @@ impl MultigridGPU {
     /// `apply_relaxed_correction` `MultigridCPU`'s equivalent coarsest-level method uses — no GPU
     /// kernel needed for this one-shot, non-iterative branch.
     fn solve_coarsest_level_exact(&self, mut encoder: wgpu::CommandEncoder) -> wgpu::CommandEncoder {
+        let (Some(coarse_matrix), Some(coarse_rhs_staging_buffer)) = (
+            &self.coarse_matrix, &self.coarse_rhs_staging_buffer
+        ) else {
+            panic!("The coarse matrix is only built when the solver is created with CoarsestLevelSolver::Exact");
+        };
+
         let coarsest_level = self.levels.len() - 1;
 
         let byte_len = GpuContext::byte_length_from_length(self.grids[coarsest_level].nr_interior_cells());
         encoder.copy_buffer_to_buffer(
             &self.levels[coarsest_level].rhs_buffer, 0,
-            &self.coarse_rhs_staging_buffer, 0,
+            coarse_rhs_staging_buffer, 0,
             byte_len
         );
 
         let submission_index = self.gpu_context.queue.submit([encoder.finish()]);
-        let rhs_host = self.gpu_context.read_from_staging_buffer(&self.coarse_rhs_staging_buffer, submission_index);
+        let rhs_host = self.gpu_context.read_from_staging_buffer(coarse_rhs_staging_buffer, submission_index);
 
-        let mut x_host = self.coarse_matrix.solve_gaussian_elimination(&rhs_host)
+        let mut x_host = coarse_matrix.solve_gaussian_elimination(&rhs_host)
             .expect("Coarsest multigrid level's Poisson matrix should be non-singular");
 
         if self.solver_settings.enable_slip_pressure_correction {
@@ -470,7 +497,8 @@ impl MultigridGPU {
         encoder
     }
 
-    /// Solves the Poisson equation using multigrid V-cycles on the GPU.
+    /// Solves the Poisson equation using multigrid V-cycles on the GPU, with the right hand side
+    /// and the solution on the host.
     ///
     /// # Note
     /// The caller is responsible for populating `self.rhs` (finest-level RHS on the interior
@@ -479,6 +507,56 @@ impl MultigridGPU {
     pub fn solve(&mut self) {
         self.gpu_context.write_buffer(&self.levels[0].rhs_buffer, &self.rhs);
 
+        let mut encoder = self.record_solve();
+
+        let byte_len = GpuContext::byte_length_from_length(self.grids[0].nr_extended_cells());
+        encoder.copy_buffer_to_buffer(&self.solution_buffer, 0, &self.solution_staging_buffer, 0, byte_len);
+
+        let submission_index = self.gpu_context.queue.submit([encoder.finish()]);
+
+        self.solution = self.gpu_context.read_from_staging_buffer(&self.solution_staging_buffer, submission_index);
+
+        if self.solver_settings.compute_residual_after_solve {
+            self.report_residual(&self.solution, &self.rhs);
+        }
+    }
+
+    /// Solves the Poisson equation using multigrid V-cycles on the GPU, with the right hand side
+    /// and the solution only on the device. That is, the caller is responsible for populating
+    /// `rhs_buffer` before calling this, and the result is only available in `solution_buffer`.
+    /// Neither `self.rhs` nor `self.solution` is touched. Used when the velocity solver also runs
+    /// on the GPU, to avoid any transfers between the host and the device.
+    pub fn solve_on_device(&mut self) {
+        let encoder = self.record_solve();
+
+        self.gpu_context.queue.submit([encoder.finish()]);
+
+        if self.solver_settings.compute_residual_after_solve {
+            let solution = self.read_solution();
+            let rhs = self.gpu_context.read_buffer(self.rhs_buffer(), self.grids[0].nr_interior_cells());
+
+            self.report_residual(&solution, &rhs);
+        }
+    }
+
+    /// The device buffer holding the right hand side of the finest level, on the **interior** grid
+    pub fn rhs_buffer(&self) -> &wgpu::Buffer {
+        &self.levels[0].rhs_buffer
+    }
+
+    /// The device buffer holding the solution of the finest level, on the **extended** grid
+    pub fn solution_buffer(&self) -> &wgpu::Buffer {
+        &self.solution_buffer
+    }
+
+    /// Reads the current content of `solution_buffer` to the host
+    pub fn read_solution(&self) -> Vec<Float> {
+        self.gpu_context.read_buffer(&self.solution_buffer, self.grids[0].nr_extended_cells())
+    }
+
+    /// Records the V-cycles, followed by the materialization of the extended solution, assuming
+    /// that the finest level's rhs is already in place on the device.
+    fn record_solve(&self) -> wgpu::CommandEncoder {
         let mut encoder = self.gpu_context.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor::default()
         );
@@ -505,39 +583,34 @@ impl MultigridGPU {
             );
         }
 
-        let byte_len = GpuContext::byte_length_from_length(self.grids[0].nr_extended_cells());
-        encoder.copy_buffer_to_buffer(&self.solution_buffer, 0, &self.solution_staging_buffer, 0, byte_len);
+        encoder
+    }
 
-        let submission_index = self.gpu_context.queue.submit([encoder.finish()]);
+    fn report_residual(&self, solution: &[Float], rhs: &[Float]) {
+        // Same widened exclusion mask as `MultigridCPU::solve` — see
+        // `kernels::compute_residual4`'s doc comment for why slip-corrected cells (and their
+        // immediate residual-stencil neighbors) need to be excluded from the average.
+        let mut excluded_slip_cells = vec![false; rhs.len()];
+        let mut nr_excluded = 0;
 
-        self.solution = self.gpu_context.read_from_staging_buffer(&self.solution_staging_buffer, submission_index);
+        if self.solver_settings.enable_slip_pressure_correction {
+            let cell_lookup = &self.slip_pressure_stencils[0].cell_lookup;
 
-        if self.solver_settings.compute_residual_after_solve {
-            // Same widened exclusion mask as `MultigridCPU::solve` — see
-            // `kernels::compute_residual4`'s doc comment for why slip-corrected cells (and their
-            // immediate residual-stencil neighbors) need to be excluded from the average.
-            let mut excluded_slip_cells = vec![false; self.rhs.len()];
-            let mut nr_excluded = 0;
-
-            if self.solver_settings.enable_slip_pressure_correction {
-                let cell_lookup = &self.slip_pressure_stencils[0].cell_lookup;
-
-                for (idx, &lookup_index) in cell_lookup.iter().enumerate() {
-                    if lookup_index >= 0 {
-                        excluded_slip_cells[idx] = true;
-                    }
+            for (idx, &lookup_index) in cell_lookup.iter().enumerate() {
+                if lookup_index >= 0 {
+                    excluded_slip_cells[idx] = true;
                 }
-
-                dilate_exclusion_mask(&self.grids[0], &mut excluded_slip_cells, cell_lookup);
-
-                nr_excluded = excluded_slip_cells.iter().filter(|&&excluded| excluded).count();
             }
 
-            let avg_residual = cpu_kernels::compute_residual4(
-                &self.grids[0], &self.solution, &self.rhs, &excluded_slip_cells
-            );
+            dilate_exclusion_mask(&self.grids[0], &mut excluded_slip_cells, cell_lookup);
 
-            println!("Residual sum: {} ({} slip-boundary cells excluded)", avg_residual, nr_excluded);
+            nr_excluded = excluded_slip_cells.iter().filter(|&&excluded| excluded).count();
         }
+
+        let avg_residual = cpu_kernels::compute_residual4(
+            &self.grids[0], solution, rhs, &excluded_slip_cells
+        );
+
+        println!("Residual sum: {} ({} slip-boundary cells excluded)", avg_residual, nr_excluded);
     }
 }

@@ -3,6 +3,10 @@ use stormath::type_aliases::Float;
 
 use wgpu::util::DeviceExt;
 
+#[derive(Clone)]
+/// Handle to the GPU device and queue. Cloning is cheap (the wgpu handles are reference counted), 
+/// and all clones refer to the same device, so buffers can be shared between solvers that are 
+/// given clones of the same context.
 pub struct GpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue
@@ -83,6 +87,47 @@ impl GpuContext {
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             }
         )
+    }
+
+    /// Creates a storage buffer with the given number of `Float` values, initialized to zero, that
+    /// can be both read and written by shaders, and copied to and from.
+    pub fn create_zeroed_buffer(&self, length: usize) -> wgpu::Buffer {
+        self.device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: None,
+                size: Self::byte_length_from_length(length),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        )
+    }
+
+    /// Creates a uniform buffer initialized from a POD value, that can be updated with 
+    /// `write_pod_buffer`.
+    pub fn create_uniform_buffer_init<T: bytemuck::Pod>(&self, value: &T) -> wgpu::Buffer {
+        self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(value),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        )
+    }
+
+    pub fn write_pod_buffer<T: bytemuck::Pod>(&self, buffer: &wgpu::Buffer, data: &[T]) {
+        self.queue.write_buffer(buffer, 0, bytemuck::cast_slice(data));
+    }
+
+    /// Copies the first `length` `Float` values of `buffer` to the host. Submits all previously 
+    /// recorded work and blocks until the copy is done.
+    pub fn read_buffer(&self, buffer: &wgpu::Buffer, length: usize) -> Vec<Float> {
+        let staging_buffer = self.create_staging_buffer(length);
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, Self::byte_length_from_length(length));
+        let submission_index = self.queue.submit([encoder.finish()]);
+
+        self.read_from_staging_buffer(&staging_buffer, submission_index)
     }
 
     pub fn write_buffer(&self, buffer: &wgpu::Buffer, data: &[Float]) {

@@ -18,7 +18,13 @@ class ComputePlatform(Enum):
 
 
 class CoarsestLevelSolver(Enum):
-    """How the coarsest multigrid level's Poisson equation is solved at the bottom of each V-cycle."""
+    """
+    How the coarsest multigrid level's Poisson equation is solved at the bottom of each V-cycle.
+
+    `Exact` solves it with Gaussian elimination on a dense matrix, which can be very slow, and use a
+    lot of memory, if the coarsest level has many cells. `Jacobi` solves it approximately with extra
+    Jacobi iterations, and is the default.
+    """
 
     Exact = "Exact"
     Jacobi = "Jacobi"
@@ -39,7 +45,7 @@ class MultigridSettingsBuilder(StormbirdSetupBaseModel):
     nr_smooth_iterations: int = 4
     compute_residual_after_solve: bool = False
     compute_platform: ComputePlatform = ComputePlatform.CPU
-    coarsest_level_solver: CoarsestLevelSolver = CoarsestLevelSolver.Exact
+    coarsest_level_solver: CoarsestLevelSolver = CoarsestLevelSolver.Jacobi
     enable_slip_pressure_correction: bool = False
     """
     Experimental: applies a pressure zero-gradient (Neumann) correction near slip walls during each

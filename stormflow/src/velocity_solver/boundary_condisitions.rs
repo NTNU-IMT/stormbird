@@ -19,6 +19,17 @@ pub enum VelocityBoundaryCondition {
     SlipWall,
 }
 
+impl VelocityBoundaryCondition {
+    /// GPU-side flag matching the constants in the velocity solver's `ghost_cells.wgsl`
+    pub fn as_gpu_flag(&self) -> u32 {
+        match self {
+            VelocityBoundaryCondition::ZeroGradient => 0,
+            VelocityBoundaryCondition::InletOutlet => 1,
+            VelocityBoundaryCondition::SlipWall => 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// Boundary conditions for the staggered velocity field.
 ///

@@ -30,9 +30,16 @@ use crate::pressure_solver::{
 };
 
 use crate::velocity_solver::{
-    VelocitySolver, boundary_condisitions::VelocityBoundaryConditions,
+    VelocitySolver, VelocitySolverSetup, boundary_condisitions::VelocityBoundaryConditions,
     slip_mirror_stencils::{SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS},
-    no_slip_corrections::NoSlipCorrections
+    no_slip_corrections::NoSlipCorrections,
+    cpu::VelocitySolverCPU,
+    gpu::{VelocitySolverGPU, SharedPressureBuffers},
+};
+use crate::pressure_solver::PressureSolver;
+use crate::gpu_interface::{
+    ComputePlatform,
+    context::GpuContext
 };
 
 use crate::error::Error;
@@ -68,7 +75,12 @@ pub struct SimulationBuilder {
     pub slip_velocity_interpolation_order: SlipMirrorInterpolationOrder,
     /// Optional "override" of the boundary conditions, to be able to set some to slip walls
     #[serde(default)]
-    pub slip_wall_boundary_override: [[bool; 2]; 3]
+    pub slip_wall_boundary_override: [[bool; 2]; 3],
+    /// Where to execute the velocity solver. Independent of where the pressure solver is executed
+    /// (see `pressure_solver`), but the fewest transfers between the host and the device happen 
+    /// when both are on the same platform.
+    #[serde(default)]
+    pub velocity_solver_compute_platform: ComputePlatform,
 }
 
 impl SimulationBuilder {
@@ -98,8 +110,6 @@ impl SimulationBuilder {
 
         println!("Interior shape of the grid: {:?}", &grid.interior_shape);
         
-        let total_nr_cells = grid.nr_extended_cells();
-
         let pressure_boundary_conditions = PressureBoundaryConditions::new_from_up_direction(
             self.wind_environment.up_direction
         );
@@ -113,9 +123,6 @@ impl SimulationBuilder {
         );
 
         let velocity = velocity_boundary_conditions.initial_velocity(&grid);
-        let velocity_org = velocity.clone();
-        let velocity_star = velocity.clone();
-        let body_force = vec![SpatialVector::default(); total_nr_cells];
 
         let mut max_dx = 0.0;
         for axis_index in 0..3 {
@@ -144,10 +151,19 @@ impl SimulationBuilder {
             )
         }
 
+        // One context shared by all solvers on the GPU, so that they can share buffers
+        let gpu_context = if self.velocity_solver_compute_platform.is_gpu() || 
+            self.pressure_solver.compute_platform().is_gpu() {
+            Some(GpuContext::new())
+        } else {
+            None
+        };
+
         let pressure_solver = self.pressure_solver.build(
             &grid,
             &pressure_boundary_conditions,
-            &slip_geometries
+            &slip_geometries,
+            gpu_context.as_ref()
         );
 
         println!("Calculating SDF");
@@ -182,11 +198,7 @@ impl SimulationBuilder {
             self.slip_velocity_interpolation_order,
         );
 
-        let velocity_solver = VelocitySolver {
-            velocity,
-            velocity_org,
-            velocity_star,
-            body_force,
+        let velocity_solver_setup = VelocitySolverSetup {
             signed_distance_function,
             signed_distance_function_slip,
             normals_slip_surfaces,
@@ -195,6 +207,31 @@ impl SimulationBuilder {
             boundary_conditions: velocity_boundary_conditions,
             viscosity: self.effective_viscosity,
             density: 1.0,
+        };
+
+        let velocity_solver = match self.velocity_solver_compute_platform {
+            ComputePlatform::CPU => VelocitySolver::CPU(
+                VelocitySolverCPU::new(velocity_solver_setup, velocity)
+            ),
+            ComputePlatform::GPU => {
+                let shared_pressure_buffers = match &pressure_solver {
+                    PressureSolver::MultigridGPU(solver) => Some(SharedPressureBuffers {
+                        rhs: solver.rhs_buffer().clone(),
+                        pressure: solver.solution_buffer().clone(),
+                    }),
+                    PressureSolver::MultigridCPU(_) => None,
+                };
+
+                VelocitySolver::GPU(
+                    VelocitySolverGPU::new(
+                        gpu_context.expect("A GPU context is always created for a GPU velocity solver"),
+                        &grid,
+                        velocity_solver_setup,
+                        &velocity,
+                        shared_pressure_buffers
+                    )
+                )
+            }
         };
         
         Simulation {

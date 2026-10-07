@@ -10,11 +10,15 @@ pub enum CoarsestLevelSolver {
     /// `multigrid_cpu::kernels::coarse_matrix::build_poisson_matrix4`). `MultigridGPU` reuses this
     /// same CPU-side solve: it reads the restricted RHS back from the GPU, solves on the CPU, and
     /// writes the solution back before prolongation.
-    #[default]
+    ///
+    /// The cost of the solve, and the memory needed to store the dense matrix, grows quickly
+    /// with the number of cells on the coarsest level, so this can be very slow, and use a lot of
+    /// memory, if the grid cannot be coarsened much.
     Exact,
     /// Solve approximately via `nr_smooth_iterations * 4` extra Jacobi iterations (matching each
     /// level's smoother, just run longer), staying entirely on whichever device (CPU/GPU) is
-    /// already running the rest of the V-cycle.
+    /// already running the rest of the V-cycle. Default.
+    #[default]
     Jacobi,
 }
 

@@ -105,24 +105,12 @@ impl Simulation {
                 self.solver_settings.solve_pressure_on_first_iteration ||
                 self.solver_settings.nr_inner_iterations == 1 {
                 //let start_time = Instant::now();
-                self.velocity_solver.compute_pressure_rhs(
-                    &self.grid, 
-                    time_step,
-                    self.pressure_solver.rhs_mut()
-                );
-                //println!("Pressure rhs time: {:.?}", start_time.elapsed());
-                
-                //let start_time = Instant::now();
-                self.pressure_solver.solve();
+                self.solve_pressure(time_step);
                 //println!("Project pressure time: {:.?}", start_time.elapsed());
             }
  
             //let start_time = Instant::now();
-            self.velocity_solver.update_velocity(
-                &self.grid, 
-                self.pressure_solver.pressure_ref(), 
-                time_step
-            );
+            self.update_velocity(time_step);
             //println!("Update velocity time: {:.?}", start_time.elapsed());
         }
 
@@ -131,6 +119,54 @@ impl Simulation {
         //println!("Running actuator line model time: {:.?}", start_time.elapsed());
         
         //println!();
+    }
+
+    /// Computes the right hand side of the pressure equation from the velocity solver, and solves
+    /// the pressure equation. The data is only moved between the host and the device when the two
+    /// solvers run on different platforms.
+    fn solve_pressure(&mut self, time_step: Float) {
+        let grid = &self.grid;
+
+        match (&mut self.velocity_solver, &mut self.pressure_solver) {
+            (VelocitySolver::CPU(velocity_solver), PressureSolver::MultigridCPU(pressure_solver)) => {
+                velocity_solver.compute_pressure_rhs(grid, time_step, &mut pressure_solver.rhs_at_levels[0]);
+                pressure_solver.solve();
+            },
+            (VelocitySolver::CPU(velocity_solver), PressureSolver::MultigridGPU(pressure_solver)) => {
+                velocity_solver.compute_pressure_rhs(grid, time_step, &mut pressure_solver.rhs);
+                pressure_solver.solve();
+            },
+            (VelocitySolver::GPU(velocity_solver), PressureSolver::MultigridGPU(pressure_solver)) => {
+                // The buffers are shared, so the rhs is written directly to the pressure solver,
+                // and the result is read directly by the velocity solver.
+                velocity_solver.compute_pressure_rhs(time_step);
+                pressure_solver.solve_on_device();
+            },
+            (VelocitySolver::GPU(velocity_solver), PressureSolver::MultigridCPU(pressure_solver)) => {
+                velocity_solver.compute_pressure_rhs(time_step);
+                velocity_solver.read_pressure_rhs(&mut pressure_solver.rhs_at_levels[0]);
+                pressure_solver.solve();
+                velocity_solver.write_pressure(&pressure_solver.solution);
+            },
+        }
+    }
+
+    /// Adds the gradient of the latest pressure solution to the velocity
+    fn update_velocity(&mut self, time_step: Float) {
+        match &mut self.velocity_solver {
+            VelocitySolver::CPU(velocity_solver) => {
+                // The CPU version of the pressure solver always has the solution on the host. So 
+                // does the GPU version, as it is solved with `MultigridGPU::solve` in this case.
+                velocity_solver.update_velocity(
+                    &self.grid,
+                    self.pressure_solver.pressure_ref(),
+                    time_step
+                );
+            },
+            VelocitySolver::GPU(velocity_solver) => {
+                velocity_solver.update_velocity(time_step);
+            }
+        }
     }
 
     pub fn run_actuator_line_model(&mut self, time: Float, time_step: Float) {        
