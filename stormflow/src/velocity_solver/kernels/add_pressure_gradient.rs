@@ -15,7 +15,7 @@ pub fn add_pressure_gradient_kernel(
     let mut dp_dx = SpatialVector::default();
 
     // 4th order accurate pressure gradient onto u_i's face: the same symmetric 4-point
-    // staggered derivative as `PressureSolver::calculate_rhs`'s divergence, in the opposite
+    // staggered derivative as `pressure_rhs_kernel`'s divergence, in the opposite
     // staggering direction (cell-centered pressure -> face gradient instead of face-centered
     // velocity -> cell-center divergence).
     for axis_index in 0..3 {

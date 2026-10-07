@@ -31,7 +31,8 @@ use crate::pressure_solver::{
 
 use crate::velocity_solver::{
     VelocitySolver, boundary_condisitions::VelocityBoundaryConditions,
-    slip_mirror_stencils::{SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS}
+    slip_mirror_stencils::{SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS},
+    no_slip_corrections::NoSlipCorrections
 };
 
 use crate::error::Error;
@@ -107,8 +108,8 @@ impl SimulationBuilder {
             &self.wind_environment,
             &self.wind_condition,
             self.linear_velocity,
-            self.wind_environment.up_direction,
-            self.slip_wall_boundary_override
+            self.slip_wall_boundary_override,
+            &grid
         );
 
         let velocity = velocity_boundary_conditions.initial_velocity(&grid);
@@ -164,6 +165,13 @@ impl SimulationBuilder {
 
         let slip_epsilon = 4.0 * max_dx;
 
+        println!("Building no-slip corrections");
+        let no_slip_corrections = NoSlipCorrections::build(
+            &grid,
+            &signed_distance_function,
+            2.0 * max_dx,
+        );
+
         println!("Building slip-mirror stencils");
         let slip_mirror_stencils = SlipMirrorStencils::build(
             &grid,
@@ -182,9 +190,9 @@ impl SimulationBuilder {
             signed_distance_function,
             signed_distance_function_slip,
             normals_slip_surfaces,
+            no_slip_corrections,
             slip_mirror_stencils,
             boundary_conditions: velocity_boundary_conditions,
-            no_slip_epsilon: 2.0 * max_dx,
             viscosity: self.effective_viscosity,
             density: 1.0,
         };

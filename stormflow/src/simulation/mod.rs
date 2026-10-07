@@ -66,12 +66,7 @@ impl Simulation {
     }
 
     pub fn time_step_from_courant_number(&self, courant_number: Float) -> Float {
-        let mut max_velocity = 0.0;
-        for i in 0..self.velocity_solver.velocity.len() {
-            if self.velocity_solver.velocity[i].length() > max_velocity {
-                max_velocity = self.velocity_solver.velocity[i].length();
-            }
-        }
+        let max_velocity = self.velocity_solver.max_velocity();
 
         let cell_length = self.grid.cell_length;
 
@@ -110,11 +105,10 @@ impl Simulation {
                 self.solver_settings.solve_pressure_on_first_iteration ||
                 self.solver_settings.nr_inner_iterations == 1 {
                 //let start_time = Instant::now();
-                self.pressure_solver.calculate_rhs(
+                self.velocity_solver.compute_pressure_rhs(
                     &self.grid, 
-                    &self.velocity_solver.velocity_star, 
-                    self.velocity_solver.density, 
-                    time_step
+                    time_step,
+                    self.pressure_solver.rhs_mut()
                 );
                 //println!("Pressure rhs time: {:.?}", start_time.elapsed());
                 
@@ -140,33 +134,30 @@ impl Simulation {
     }
 
     pub fn run_actuator_line_model(&mut self, time: Float, time_step: Float) {        
-        let time_to_start = if let Some(actuator_line) = &self.actuator_line {
-            time >= actuator_line.model.start_time
-        } else {
-            false
+        let Some(actuator_line) = self.actuator_line.as_mut() else {
+            return;
         };
 
-        if time_to_start {
-            if let Some(actuator_line) = self.actuator_line.as_mut() {
-                actuator_line.step_model(
-                    time, 
-                    time_step, 
-                    &self.grid, 
-                    &self.velocity_solver.velocity
-                );
-            }
-    
-            if let Some(actuator_line) = &self.actuator_line {
-                actuator_line.compute_body_force(
-                    &self.grid, 
-                    &self.velocity_solver.velocity,
-                    &mut self.velocity_solver.body_force
-                );
-            }
-    
-            if let Some(actuator_line) = self.actuator_line.as_mut() {
-                let _need_update = actuator_line.model.update_controller(time, time_step);
-            }
+        if time < actuator_line.model.start_time {
+            return;
         }
+
+        // The actuator line model only needs the velocity at, and only sets the body force in, 
+        // the cells close to the lines.
+        let cell_velocities = self.velocity_solver.cell_centered_velocity_at_cells(
+            &self.grid,
+            &actuator_line.cell_indices_to_check
+        );
+
+        actuator_line.step_model(time, time_step, &self.grid, &cell_velocities);
+
+        let body_force = actuator_line.compute_body_force(&cell_velocities);
+
+        self.velocity_solver.set_body_force_at_cells(
+            &actuator_line.cell_indices_to_check,
+            &body_force
+        );
+
+        let _need_update = actuator_line.model.update_controller(time, time_step);
     }
 }

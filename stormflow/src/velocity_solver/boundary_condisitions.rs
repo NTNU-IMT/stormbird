@@ -20,32 +20,55 @@ pub enum VelocityBoundaryCondition {
 }
 
 #[derive(Debug, Clone)]
+/// Boundary conditions for the staggered velocity field.
+///
+/// The inlet velocity is steady and only varies with height, and the up-direction is aligned with
+/// one of the grid axes (`up_axis`). It is therefore precomputed at construction as a 1D profile
+/// over the extended cell layers along `up_axis`, so that no Stormbird functionality is needed
+/// when the ghost cells are updated.
 pub struct VelocityBoundaryConditions {
-    pub wind_environment: WindEnvironment,
-    pub wind_condition: WindCondition,
-    pub linear_velocity: SpatialVector,
-    pub face_conditions: [[VelocityBoundaryCondition; 2]; 3]
+    pub face_conditions: [[VelocityBoundaryCondition; 2]; 3],
+    /// The grid axis that is aligned with the up-direction of the wind environment
+    pub up_axis: usize,
+    /// Staggered inlet velocity for each extended cell layer along `up_axis`. Component `c` of
+    /// entry `k` is the inflow velocity component `c` evaluated at the positive `c`-face of a cell
+    /// with extended index `k` along `up_axis`. Length equals `grid.extended_shape[up_axis]`.
+    pub inlet_velocity_profile: Vec<SpatialVector>,
 }
 
 impl VelocityBoundaryConditions {
     pub fn new(
-        wind_environment: &WindEnvironment, 
-        wind_condition: &WindCondition, 
-        linear_velocity: SpatialVector, 
-        up_direction: SpatialVector,
-        slip_wall_boundary_override: [[bool; 2]; 3]
+        wind_environment: &WindEnvironment,
+        wind_condition: &WindCondition,
+        linear_velocity: SpatialVector,
+        slip_wall_boundary_override: [[bool; 2]; 3],
+        grid: &Grid,
     ) -> Self {
-        let mut face_conditions = [[VelocityBoundaryCondition::InletOutlet; 2]; 3];
+        let up_direction = wind_environment.up_direction;
 
         let mut up_axis: usize = 0;
 
-        if up_direction[1].abs() > up_direction[0].abs()  && 
+        if up_direction[1].abs() > up_direction[0].abs()  &&
             up_direction[1].abs() > up_direction[2].abs() {
             up_axis = 1;
-        } else if up_direction[2].abs() > up_direction[0].abs()  && 
+        } else if up_direction[2].abs() > up_direction[0].abs()  &&
             up_direction[2].abs() > up_direction[1].abs() {
             up_axis = 2;
         }
+
+        // The precomputed profile is only exact if the height depends on the up-axis coordinate
+        // alone, which requires the up-direction to be aligned with a grid axis.
+        for axis_index in 0..3 {
+            if axis_index != up_axis {
+                assert!(
+                    up_direction[axis_index].abs() < 1e-6 * up_direction[up_axis].abs(),
+                    "The up direction must be aligned with one of the grid axes. Got {:?}",
+                    up_direction
+                );
+            }
+        }
+
+        let mut face_conditions = [[VelocityBoundaryCondition::InletOutlet; 2]; 3];
 
         face_conditions[up_axis][0] = VelocityBoundaryCondition::SlipWall;
         face_conditions[up_axis][1] = VelocityBoundaryCondition::ZeroGradient;
@@ -59,43 +82,68 @@ impl VelocityBoundaryConditions {
             }
         }
 
-        Self {
-            wind_environment: wind_environment.clone(),
-            wind_condition: wind_condition.clone(),
+        let inlet_velocity_profile = Self::compute_inlet_velocity_profile(
+            wind_environment,
+            wind_condition,
             linear_velocity,
-            face_conditions
+            up_axis,
+            grid
+        );
+
+        Self {
+            face_conditions,
+            up_axis,
+            inlet_velocity_profile
         }
     }
 
-    #[inline(always)]
-    pub fn velocity_at_point(&self, point: SpatialVector) -> SpatialVector {
-        self.wind_environment.steady_apparent_wind_velocity_vector_at_location(
-            &self.wind_condition, point, self.linear_velocity
-        )
-    }
+    /// Evaluates the steady apparent wind at the staggered face positions of each extended cell
+    /// layer along `up_axis`. Only the up-axis coordinate of the evaluation points matter, so the
+    /// other coordinates are taken at the grid start point.
+    fn compute_inlet_velocity_profile(
+        wind_environment: &WindEnvironment,
+        wind_condition: &WindCondition,
+        linear_velocity: SpatialVector,
+        up_axis: usize,
+        grid: &Grid,
+    ) -> Vec<SpatialVector> {
+        (0..grid.extended_shape[up_axis]).map(|i_up| {
+            let mut extended_indices = [0; 3];
+            extended_indices[up_axis] = i_up;
 
-    pub fn initial_velocity(&self, grid: &Grid) -> Vec<SpatialVector> {
-        let nr_extended_cells = grid.nr_extended_cells();
-
-        (0..nr_extended_cells).into_iter().map(|i_flat_extended| {
-            let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
+            let cell_center = grid.cell_center_extended(extended_indices);
 
             let mut velocity = SpatialVector::default();
-            let cell_center = grid.cell_center_extended(extended_indices); 
 
-            for axis_index in 0..3 {
+            for c in 0..3 {
                 let mut face_point = cell_center;
-                face_point[axis_index] += 0.5 * grid.cell_length[axis_index]; // TODO: check if this is consistent over all the code...
+                face_point[c] += 0.5 * grid.cell_length[c]; // positive-face convention
 
-                let face_velocity = self.velocity_at_point(face_point);
-
-                velocity[axis_index] = face_velocity[axis_index]
+                velocity[c] = wind_environment.steady_apparent_wind_velocity_vector_at_location(
+                    wind_condition, face_point, linear_velocity
+                )[c];
             }
 
             velocity
         }).collect()
     }
-    
+
+    #[inline(always)]
+    /// Returns the precomputed staggered inlet velocity for the cell at `flat_index` on the
+    /// extended grid
+    pub fn inlet_velocity(&self, grid: &Grid, flat_index: usize) -> SpatialVector {
+        let i_up = (flat_index / grid.extended_stride[self.up_axis]) %
+            grid.extended_shape[self.up_axis];
+
+        self.inlet_velocity_profile[i_up]
+    }
+
+    pub fn initial_velocity(&self, grid: &Grid) -> Vec<SpatialVector> {
+        (0..grid.nr_extended_cells()).into_par_iter().map(|i_flat_extended| {
+            self.inlet_velocity(grid, i_flat_extended)
+        }).collect()
+    }
+
     /// Updates the ghost cells on one face (`axis_index`/`face_index`), in parallel over the
     /// face's cells. Mirrors `PressureBoundaryConditions::set_ghost_cells_kernel`: a raw pointer
     /// lets the closure write `flat_current` while reads of `flat_neighbor` go through the
@@ -129,15 +177,12 @@ impl VelocityBoundaryConditions {
 
                 let new_value = match condition {
                     VelocityBoundaryCondition::InletOutlet => {
-                        // Check the direction of the domain flow at the cell center. 
-                        // `neighbor_delta`is positive on the min-boundary face (neighbor is toward 
-                        // +axis) and negative on the max-boundary face, so its sign alone tells us 
+                        // `neighbor_delta`is positive on the min-boundary face (neighbor is toward
+                        // +axis) and negative on the max-boundary face, so its sign alone tells us
                         // which flow direction counts as inflow, without needing `face_index` here.
                         let at_the_min_boundary_face = boundary_face.neighbor_delta > 0;
 
                         let neighbor_axis_flow = velocity[flat_neighbor][axis_index];
-
-                        //let domain_flow = self.velocity_at_point(cell_center)[axis_index];
 
                         let inflow = if at_the_min_boundary_face{
                             neighbor_axis_flow > 0.0
@@ -146,16 +191,7 @@ impl VelocityBoundaryConditions {
                         };
 
                         if inflow {
-                            let extended_indices = grid.extended_indices_from_flat_index(flat_current);
-                            let cell_center = grid.cell_center_extended(extended_indices);
-                            
-                            let mut new_value = SpatialVector::default();
-                            for c in 0..3 {
-                                let mut face_point = cell_center;
-                                face_point[c] += 0.5 * grid.cell_length[c]; // positive-face convention
-                                new_value[c] = self.velocity_at_point(face_point)[c];
-                            }
-                            new_value
+                            self.inlet_velocity(grid, flat_current)
                         } else {
                             velocity[flat_neighbor]
                         }
@@ -177,6 +213,12 @@ impl VelocityBoundaryConditions {
     /// Updates the ghost cells on the velocity, using the boundary conditions in self and the
     /// supplied grid for the indexing logic.
     pub fn set_ghost_cells(&self, grid: &Grid, velocity: &mut [SpatialVector]) {
+        debug_assert_eq!(
+            self.inlet_velocity_profile.len(),
+            grid.extended_shape[self.up_axis],
+            "The inlet velocity profile does not match the grid"
+        );
+
         for axis_index in 0..3 {
             for face_index in 0..2 {
                 let condition = self.face_conditions[axis_index][face_index];

@@ -60,10 +60,12 @@ impl ActuatorLineInterface {
         }
     }
 
+    /// Updates the control point velocities of the model, based on `cell_velocities`, which must 
+    /// hold the cell-centered velocity of each cell in `cell_indices_to_check`, in the same order.
     pub fn update_ctrl_points_velocity(
         &mut self, 
         grid: &Grid, 
-        velocity: &[SpatialVector]
+        cell_velocities: &[SpatialVector]
     ) {           
         let nr_cells_to_check = self.cell_indices_to_check.len();
         
@@ -82,16 +84,11 @@ impl ActuatorLineInterface {
             
             let cell_center = grid.cell_center(interior_indices);
             
-            let velocity = grid.cell_centered_value_from_face_staggered(
-                interior_indices, 
-                velocity
-            );
-            
             let line_index = self.dominating_line_indices[i];
             
             let (temp_num, temp_den) = self.model.get_weighted_velocity_sampling_integral_terms_for_cell(
                 line_index, 
-                velocity, 
+                cell_velocities[i], 
                 cell_center, 
                 cell_volume
             );
@@ -107,31 +104,31 @@ impl ActuatorLineInterface {
         }
     }
 
-    pub fn step_model(&mut self, time: Float, time_step: Float, grid: &Grid, velocity: &[SpatialVector]) {
-        self.update_ctrl_points_velocity(grid, velocity);
+    /// Steps the model, based on `cell_velocities` (see `update_ctrl_points_velocity`)
+    pub fn step_model(
+        &mut self, 
+        time: Float, 
+        time_step: Float, 
+        grid: &Grid, 
+        cell_velocities: &[SpatialVector]
+    ) {
+        self.update_ctrl_points_velocity(grid, cell_velocities);
 
         self.model.do_step(time, time_step);
     }
 
+    /// Returns the body force for each cell in `cell_indices_to_check`, in the same order, based 
+    /// on `cell_velocities` (see `update_ctrl_points_velocity`).
     pub fn compute_body_force(
         &self, 
-        grid: &Grid, 
-        velocity: &[SpatialVector],
-        body_force: &mut [SpatialVector]
-    ) {
+        cell_velocities: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
         let nr_cells_to_check = self.cell_indices_to_check.len();
         
-        let new_body_forces: Vec<(usize, SpatialVector)> = (0..nr_cells_to_check)
+        (0..nr_cells_to_check)
             .into_par_iter()
             .map(|i| {
-                let i_flat_extended = self.cell_indices_to_check[i];
-                let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
-                let interior_indices = grid.interior_indices_from_extended_indices(extended_indices);
-                
-                let cell_velocity = grid.cell_centered_value_from_face_staggered(
-                    interior_indices, 
-                    velocity
-                );
+                let cell_velocity = cell_velocities[i];
                 
                 let line_index = self.dominating_line_indices[i];
                 
@@ -149,11 +146,7 @@ impl ActuatorLineInterface {
 
                 let force_to_project = line_force_force + spanwise_damping_force;
             
-                (i_flat_extended, body_force_weight * force_to_project)
-            }).collect();
-        
-        for (i_flat_extended, force) in new_body_forces {
-            body_force[i_flat_extended] = -force;
-        }
+                -(body_force_weight * force_to_project)
+            }).collect()
     }
 }
