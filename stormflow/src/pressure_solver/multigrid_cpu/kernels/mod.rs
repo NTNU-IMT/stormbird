@@ -36,18 +36,15 @@ pub fn laplacian_stencil4(
     result
 }
 
-/// 4th order accurate counterpart to `compute_residual`, used by `MultigridCPU`/`MultigridGPU`
-/// (both now solving with the 4th order stencil) instead of the 2nd order `compute_residual`,
-/// which remains as-is for `FftCPU`.
+/// Average absolute residual of the 4th order accurate Poisson equation, used as a diagnostic by
+/// `MultigridCPU`/`MultigridGPU`.
 ///
 /// `exclude` marks interior cells (by flat interior index) to leave out of the average — meant for
 /// cells whose pressure value is blended with a mirrored image point rather than purely solved for
-/// (e.g. `jacobi::jacobi_kernel_with_slip_correction`'s slip-wall zero-gradient correction). Such
+/// (i.e. `jacobi::jacobi_kernel_with_zero_gradient`'s zero-gradient correction on walls). Such
 /// cells don't satisfy `Ax = rhs` by construction, so including them would report a permanently
 /// nonzero "residual" that reflects the deliberate boundary correction rather than how well the
-/// solve actually converged elsewhere. Pass `&[]` (as
-/// `MultigridGPU` does, since it has no such correction) to include every cell, matching the
-/// previous unconditional behavior.
+/// solve actually converged elsewhere. Pass `&[]` to include every cell.
 pub fn compute_residual4(
     grid: &Grid,
     x: &[Float],

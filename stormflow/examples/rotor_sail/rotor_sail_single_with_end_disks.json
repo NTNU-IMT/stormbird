@@ -95,8 +95,8 @@
       "nr_v_cycles": 2,
       "compute_platform": "GPU",
       "compute_residual_after_solve": true,
-      "enable_slip_pressure_correction": true,
-      "slip_pressure_interpolation_order": "Tricubic"
+      "zero_gradient_on_walls": "SlipWallsOnly",
+      "zero_gradient_interpolation_order": "Tricubic"
     }
   },
   "slip_velocity_interpolation_order": "Tricubic"

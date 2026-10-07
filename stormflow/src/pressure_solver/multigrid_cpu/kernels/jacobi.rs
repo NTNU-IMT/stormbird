@@ -1,15 +1,15 @@
 use crate::{
     grid::Grid,
     pressure_solver::boundary_conditions::PressureBoundaryConditions,
-    pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureStencils
+    pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientStencils
 };
 
 use stormath::type_aliases::Float;
 
 pub const JACOBI_WEIGHT: Float = 0.666_666_7;
 
-/// Under-relaxation factor for the slip-pressure zero-gradient correction blend (see
-/// `jacobi_kernel_with_slip_correction`), analogous to `JACOBI_WEIGHT` for the plain Jacobi update.
+/// Under-relaxation factor for the zero-gradient correction blend on walls (see
+/// `jacobi_kernel_with_zero_gradient`), analogous to `JACOBI_WEIGHT` for the plain Jacobi update.
 /// The tricubic interpolation used to sample the mirrored image point has non-convex weights (some
 /// negative; the per-axis weights sum to 1 but sum in absolute value to noticeably more than 1,
 /// unlike trilinear's always-non-negative, non-expansive weights), so it can mildly amplify
@@ -18,7 +18,7 @@ pub const JACOBI_WEIGHT: Float = 0.666_666_7;
 /// produced slow, compounding growth instead of convergence. Damping how far each application
 /// actually moves a corrected cell keeps most of the per-iteration correction benefit while
 /// limiting how much amplification can accumulate.
-pub const SLIP_CORRECTION_RELAXATION: Float = 0.5;
+pub const ZERO_GRADIENT_RELAXATION: Float = 0.5;
 
 #[inline]
 pub(crate) fn boundary_sign(boundary_conditions: &PressureBoundaryConditions, axis: usize, face: usize) -> Float {
@@ -139,41 +139,41 @@ pub fn jacobi_kernel(
     (1.0 - JACOBI_WEIGHT) * current[idx] + JACOBI_WEIGHT * jacobi_update
 }
 
-/// Same Jacobi update as `jacobi_kernel`, with the pressure zero-gradient (Neumann) slip-wall
-/// correction folded directly into the same pass instead of applied as a separate post-hoc step:
-/// `slip_pressure_stencils.cell_lookup[idx]` is `-1` for the overwhelming majority of cells (a
+/// Same Jacobi update as `jacobi_kernel`, with the pressure zero-gradient (Neumann) correction on
+/// walls folded directly into the same pass instead of applied as a separate post-hoc step:
+/// `zero_gradient_stencils.cell_lookup[idx]` is `-1` for the overwhelming majority of cells (a
 /// single cheap, sequentially-accessed, branch-predictable array read — see
-/// `SlipPressureStencils::cell_lookup`'s doc comment), in which case this is exactly
+/// `ZeroGradientStencils::cell_lookup`'s doc comment), in which case this is exactly
 /// `jacobi_kernel`. Only for the small, precomputed band of corrected cells does it look up that
-/// cell's `SlipPressureEntry` and blend in the mirrored image point, sampled from the same
+/// cell's `ZeroGradientEntry` and blend in the mirrored image point, sampled from the same
 /// `current` read buffer the plain Jacobi update already reads its neighbors from — reusing the
 /// smoother's existing double-buffer swap for the "read old, write new" isolation a separate
 /// correction pass would otherwise need a full extra snapshot copy for.
 #[inline(always)]
-pub fn jacobi_kernel_with_slip_correction(
+pub fn jacobi_kernel_with_zero_gradient(
     grid: &Grid,
     boundary_conditions: &PressureBoundaryConditions,
     rhs: &[Float],
     current: &[Float],
     idx: usize,
     indices: [usize; 3],
-    slip_pressure_stencils: &SlipPressureStencils
+    zero_gradient_stencils: &ZeroGradientStencils
 ) -> Float {
     let relaxed = jacobi_kernel(grid, boundary_conditions, rhs, current, idx, indices);
 
-    let lookup_index = slip_pressure_stencils.cell_lookup[idx];
+    let lookup_index = zero_gradient_stencils.cell_lookup[idx];
 
     if lookup_index < 0 {
         return relaxed;
     }
 
-    let entry = &slip_pressure_stencils.entries[lookup_index as usize];
+    let entry = &zero_gradient_stencils.entries[lookup_index as usize];
     let p_image = entry.stencil.sample_scalar(current, grid.interior_stride);
 
     let corrected_target = entry.mu * relaxed + (1.0 - entry.mu) * p_image;
 
-    // Under-relax the correction itself (see `SLIP_CORRECTION_RELAXATION`'s doc comment) — move
+    // Under-relax the correction itself (see `ZERO_GRADIENT_RELAXATION`'s doc comment) — move
     // only partway from the cell's own previous value toward the blended target, rather than
     // fully committing to it every single sweep.
-    (1.0 - SLIP_CORRECTION_RELAXATION) * current[idx] + SLIP_CORRECTION_RELAXATION * corrected_target
+    (1.0 - ZERO_GRADIENT_RELAXATION) * current[idx] + ZERO_GRADIENT_RELAXATION * corrected_target
 }

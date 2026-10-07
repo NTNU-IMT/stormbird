@@ -11,7 +11,8 @@ from .pressure_solver import (
     MultigridSettingsBuilder,
     ComputePlatform,
     CoarsestLevelSolver,
-    SlipPressureInterpolationOrder,
+    ZeroGradientOnWalls,
+    ZeroGradientInterpolationOrder,
 )
 from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder
 from .simulation_builder import SimulationBuilder
@@ -28,7 +29,8 @@ __all__ = [
     "MultigridSettingsBuilder",
     "ComputePlatform",
     "CoarsestLevelSolver",
-    "SlipPressureInterpolationOrder",
+    "ZeroGradientOnWalls",
+    "ZeroGradientInterpolationOrder",
     "SolverSettings",
     "SlipMirrorInterpolationOrder",
     "SimulationBuilder",

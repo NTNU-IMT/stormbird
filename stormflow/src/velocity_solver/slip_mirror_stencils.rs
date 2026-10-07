@@ -10,7 +10,7 @@ use crate::geometry::Geometry;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 /// Which interpolation order is used to sample the mirrored image point for the slip-wall
 /// *velocity* correction specifically — independent of
-/// `pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureInterpolationOrder`, which
+/// `pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder`, which
 /// is the same choice for the pressure side. The two are deliberately separate settings (velocity
 /// and pressure corrections live in unrelated solvers with no shared configuration today), but set
 /// them to the same order if you want matching accuracy at the slip wall for both fields.

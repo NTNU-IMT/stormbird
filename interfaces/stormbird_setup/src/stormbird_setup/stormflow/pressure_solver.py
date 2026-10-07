@@ -30,10 +30,24 @@ class CoarsestLevelSolver(Enum):
     Jacobi = "Jacobi"
 
 
-class SlipPressureInterpolationOrder(Enum):
+class ZeroGradientOnWalls(Enum):
     """
-    Interpolation order used to sample the mirrored image point for the slip-wall pressure
-    correction specifically.
+    Which walls get a zero-gradient (Neumann) boundary condition on the pressure, enforced by
+    mirroring the pressure across the wall surface for the cells just inside each geometry. This is
+    independent of how the walls are represented in the velocity solver. Without this condition, the
+    walls only affect the pressure through the velocity field.
+    """
+
+    NotUsed = "NotUsed"
+    SlipWallsOnly = "SlipWallsOnly"
+    NoSlipWallsOnly = "NoSlipWallsOnly"
+    AllWalls = "AllWalls"
+
+
+class ZeroGradientInterpolationOrder(Enum):
+    """
+    Interpolation order used to sample the pressure at the mirrored image point for the
+    zero-gradient condition on walls specifically.
     """
 
     Trilinear = "Trilinear"
@@ -46,17 +60,18 @@ class MultigridSettingsBuilder(StormbirdSetupBaseModel):
     compute_residual_after_solve: bool = False
     compute_platform: ComputePlatform = ComputePlatform.CPU
     coarsest_level_solver: CoarsestLevelSolver = CoarsestLevelSolver.Jacobi
-    enable_slip_pressure_correction: bool = False
+    zero_gradient_on_walls: ZeroGradientOnWalls = ZeroGradientOnWalls.NotUsed
     """
-    Experimental: applies a pressure zero-gradient (Neumann) correction near slip walls during each
-    V-cycle. Off by default; only has an effect on `ComputePlatform.CPU`.
+    Experimental: which walls get a zero-gradient (Neumann) boundary condition on the pressure,
+    independently of how the walls are represented in the velocity solver. Not used by default.
+    Works on both `ComputePlatform.CPU` and `ComputePlatform.GPU`.
     """
-    slip_pressure_interpolation_order: SlipPressureInterpolationOrder = (
-        SlipPressureInterpolationOrder.Tricubic
+    zero_gradient_interpolation_order: ZeroGradientInterpolationOrder = (
+        ZeroGradientInterpolationOrder.Tricubic
     )
     """
-    Interpolation order for the slip-wall pressure correction specifically (ignored when
-    `enable_slip_pressure_correction` is false).
+    Interpolation order for the zero-gradient condition on walls specifically (ignored when
+    `zero_gradient_on_walls` is `NotUsed`).
     """
 
 

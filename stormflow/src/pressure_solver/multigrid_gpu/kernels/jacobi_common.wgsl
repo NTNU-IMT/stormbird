@@ -1,5 +1,6 @@
 // Shared boundary-folded Jacobi update logic, included via `include_str!` into both
-// jacobi_shader.wgsl (plain) and jacobi_slip_shader.wgsl (adds the slip-wall pressure correction)
+// jacobi_shader.wgsl (plain) and jacobi_zero_gradient_shader.wgsl (adds the zero-gradient
+// correction on walls)
 // so the two stay in sync automatically instead of duplicating this by hand. Assumes the including
 // shader has already declared `grid: Grid` (binding 0) and `current: array<f32>` (binding 1), and
 // that BC_X0/BC_X1/BC_Y0/BC_Y1/BC_Z0/BC_Z1 have been injected as consts (see bc_consts_wgsl) —
@@ -94,8 +95,8 @@ fn off_diagonal_sum(idx: u32, ii: u32, ji: u32, ki: u32) -> f32 {
 }
 
 /// Plain (uncorrected) relaxed Jacobi update at interior cell (ii,ji,ki)/idx — shared by both
-/// shaders, since `jacobi_slip_shader.wgsl` needs exactly this value before deciding whether to
-/// blend in the slip-wall correction on top of it.
+/// shaders, since `jacobi_zero_gradient_shader.wgsl` needs exactly this value before deciding
+/// whether to blend in the zero-gradient correction on top of it.
 fn jacobi_relaxed_update(idx: u32, ii: u32, ji: u32, ki: u32) -> f32 {
     let off_diag = off_diagonal_sum(idx, ii, ji, ki);
     let jacobi_update = (rhs[idx] - off_diag) * grid.poisson_inv_diagonal4;

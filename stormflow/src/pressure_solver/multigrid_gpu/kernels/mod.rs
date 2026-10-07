@@ -1,6 +1,6 @@
 pub mod jacobi_shader;
-pub mod jacobi_slip_shader;
-pub mod slip_pressure_gpu;
+pub mod jacobi_zero_gradient_shader;
+pub mod zero_gradient_gpu;
 pub mod restrict_shader;
 pub mod prolongate_shader;
 pub mod materialize_shader;

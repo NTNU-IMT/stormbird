@@ -1,14 +1,14 @@
 pub mod kernels;
 pub mod settings;
-pub mod slip_pressure_stencils;
+pub mod zero_gradient_stencils;
 
 use stormath::type_aliases::Float;
 use stormath::matrix::Matrix;
 use settings::{MultigridSettings, CoarsestLevelSolver};
-use slip_pressure_stencils::{SlipPressureStencils, apply_relaxed_correction, dilate_exclusion_mask};
+use zero_gradient_stencils::{ZeroGradientStencils, apply_relaxed_correction, dilate_exclusion_mask};
 
 use kernels::{
-    jacobi::{jacobi_kernel, jacobi_kernel_with_slip_correction},
+    jacobi::{jacobi_kernel, jacobi_kernel_with_zero_gradient},
     restrict::compute_residual_and_restrict_kernel,
     prolongate::prolongate_and_correct_kernel,
     coarse_matrix::build_poisson_matrix4
@@ -44,21 +44,24 @@ pub struct MultigridCPU {
     /// `solver_settings.coarsest_level_solver` is `CoarsestLevelSolver::Exact`, as it can use a lot
     /// of memory.
     pub coarse_matrix: Option<Matrix<Float>>,
-    /// Precomputed pressure zero-gradient (Neumann) correction entries near slip walls, one
-    /// `SlipPressureStencils` per level of `grids` (empty if there are no slip geometries). Folded
-    /// directly into `poisson_jacobi_smoother`'s per-cell Jacobi update (see
-    /// `kernels::jacobi::jacobi_kernel_with_slip_correction`) when
-    /// `solver_settings.enable_slip_pressure_correction` is set. Built once here in `new`, since
-    /// the slip geometry is static.
-    pub slip_pressure_stencils: Vec<SlipPressureStencils>,
+    /// Precomputed zero-gradient (Neumann) pressure correction entries near the walls selected by
+    /// `solver_settings.zero_gradient_on_walls`, one `ZeroGradientStencils` per level of `grids`
+    /// (empty if the condition is not used, or there are no such walls). Folded directly into
+    /// `poisson_jacobi_smoother`'s per-cell Jacobi update (see
+    /// `kernels::jacobi::jacobi_kernel_with_zero_gradient`). Built once here in `new`, since the
+    /// geometry is static.
+    pub zero_gradient_stencils: Vec<ZeroGradientStencils>,
 }
 
 impl MultigridCPU {
+    /// Creates a new solver. The geometries are only used for the zero-gradient condition on 
+    /// walls, as selected by `solver_settings.zero_gradient_on_walls`.
     pub fn new(
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
-        slip_geometries: &[Geometry]
+        slip_geometries: &[Geometry],
+        no_slip_geometries: &[Geometry]
     ) -> Self {
         let grids = grid.multigrid_hierarchy();
 
@@ -88,11 +91,9 @@ impl MultigridCPU {
             CoarsestLevelSolver::Jacobi => None,
         };
 
-        println!("Building per-level slip-pressure stencils");
-        let slip_pressure_interpolation_order = solver_settings.slip_pressure_interpolation_order;
-        let slip_pressure_stencils: Vec<SlipPressureStencils> = grids.iter()
-            .map(|level_grid| SlipPressureStencils::build(level_grid, slip_geometries, slip_pressure_interpolation_order))
-            .collect();
+        let zero_gradient_stencils = ZeroGradientStencils::build_for_all_levels(
+            &grids, &solver_settings, slip_geometries, no_slip_geometries
+        );
 
         Self {
             grids,
@@ -103,23 +104,23 @@ impl MultigridCPU {
             rhs_at_levels,
             solution,
             coarse_matrix,
-            slip_pressure_stencils,
+            zero_gradient_stencils,
         }
     }
 
     /// One-shot post-solve pressure correction for the coarsest level's exact (Gaussian
     /// elimination) solve. That solve isn't iterative, so there's nothing to fold the correction
-    /// into the way `jacobi_kernel_with_slip_correction` does for the smoother — this reproduces
+    /// into the way `jacobi_kernel_with_zero_gradient` does for the smoother — this reproduces
     /// the same blend directly, in place, sequentially (the coarsest level is small enough, by
     /// construction of the multigrid hierarchy, for that to be negligible). Shared with
-    /// `MultigridGPU`'s equivalent via `slip_pressure_stencils::apply_relaxed_correction`.
-    fn correct_coarsest_level_pressure_for_slip_geometry(&mut self) {
+    /// `MultigridGPU`'s equivalent via `zero_gradient_stencils::apply_relaxed_correction`.
+    fn apply_zero_gradient_on_coarsest_level(&mut self) {
         let coarsest_level = self.grids.len() - 1;
         let stride = self.grids[coarsest_level].interior_stride;
 
         apply_relaxed_correction(
             &mut self.x_at_levels[coarsest_level],
-            &self.slip_pressure_stencils[coarsest_level],
+            &self.zero_gradient_stencils[coarsest_level],
             stride
         );
     }
@@ -208,19 +209,18 @@ impl MultigridCPU {
     /// layer. So the very first iteration is always well-defined from whatever `current` already
     /// holds — after a clear, after prolongation, or carried over from a previous smoother call.
     ///
-    /// When `solver_settings.enable_slip_pressure_correction` is set (and this level actually has
-    /// any corrected cells), every sweep also folds in the slip-wall zero-gradient correction via
-    /// `jacobi_kernel_with_slip_correction` instead of the plain `jacobi_kernel` — see that
-    /// function's doc comment. Disabled (the default), this is byte-for-byte the same as before:
-    /// no extra branching, no extra per-cell data touched.
+    /// When this level has any cells with the zero-gradient condition on walls (see
+    /// `solver_settings.zero_gradient_on_walls`), every sweep also folds in the zero-gradient
+    /// correction via `jacobi_kernel_with_zero_gradient` instead of the plain `jacobi_kernel` —
+    /// see that function's doc comment. Otherwise (the default), this is the plain Jacobi
+    /// smoother: no extra branching, no extra per-cell data touched.
     pub fn poisson_jacobi_smoother(&mut self, i_g: usize, nr_iterations: usize) {
         let grid = &self.grids[i_g];
         let boundary_conditions = &self.boundary_conditions;
         let rhs = &self.rhs_at_levels[i_g];
-        let slip_pressure_stencils = &self.slip_pressure_stencils[i_g];
+        let zero_gradient_stencils = &self.zero_gradient_stencils[i_g];
 
-        let use_slip_correction = self.solver_settings.enable_slip_pressure_correction
-            && !slip_pressure_stencils.entries.is_empty();
+        let use_zero_gradient = !zero_gradient_stencils.entries.is_empty();
 
         for iteration in 0..nr_iterations {
             // Swap buffers: read from current, write to new
@@ -230,12 +230,12 @@ impl MultigridCPU {
                 let current = &self.x_at_levels[i_g];
                 let out = &mut self.x_at_levels_work[i_g];
 
-                jacobi_sweep(grid, boundary_conditions, rhs, current, out, slip_pressure_stencils, use_slip_correction);
+                jacobi_sweep(grid, boundary_conditions, rhs, current, out, zero_gradient_stencils, use_zero_gradient);
             } else {
                 let current = &self.x_at_levels_work[i_g];
                 let out = &mut self.x_at_levels[i_g];
 
-                jacobi_sweep(grid, boundary_conditions, rhs, current, out, slip_pressure_stencils, use_slip_correction);
+                jacobi_sweep(grid, boundary_conditions, rhs, current, out, zero_gradient_stencils, use_zero_gradient);
             }
         }
 
@@ -282,9 +282,9 @@ impl MultigridCPU {
                 self.solve_coarsest_level();
 
                 // Not an iterative smoother, so there's no per-sweep pass to fold the correction
-                // into — apply it once, directly, same as before this change.
-                if self.solver_settings.enable_slip_pressure_correction {
-                    self.correct_coarsest_level_pressure_for_slip_geometry();
+                // into — apply it once, directly.
+                if self.solver_settings.zero_gradient_on_walls.is_used() {
+                    self.apply_zero_gradient_on_coarsest_level();
                 }
             },
             CoarsestLevelSolver::Jacobi => {
@@ -324,7 +324,7 @@ impl MultigridCPU {
         self.boundary_conditions.set_ghost_cells(&self.grids[0], &mut self.solution);
 
         if self.solver_settings.compute_residual_after_solve {
-            // Slip-corrected cells don't satisfy Ax = rhs by construction (see
+            // Cells with the zero-gradient correction don't satisfy Ax = rhs by construction (see
             // `kernels::compute_residual4`'s doc comment), so exclude them from the average —
             // otherwise the metric mixes genuine solve-quality with the boundary correction's
             // deliberate, permanent local mismatch. Also dilate the exclusion by
@@ -332,39 +332,39 @@ impl MultigridCPU {
             // reads a corrected neighbor is checking `Ax = rhs` against data that includes a
             // deliberately non-solved value, so its residual is contaminated too even though it
             // was never itself patched.
-            let mut excluded_slip_cells = vec![false; self.rhs_at_levels[0].len()];
+            let mut excluded_wall_cells = vec![false; self.rhs_at_levels[0].len()];
             let mut nr_excluded = 0;
 
-            if self.solver_settings.enable_slip_pressure_correction {
-                let cell_lookup = &self.slip_pressure_stencils[0].cell_lookup;
+            if self.solver_settings.zero_gradient_on_walls.is_used() {
+                let cell_lookup = &self.zero_gradient_stencils[0].cell_lookup;
 
                 for (idx, &lookup_index) in cell_lookup.iter().enumerate() {
                     if lookup_index >= 0 {
-                        excluded_slip_cells[idx] = true;
+                        excluded_wall_cells[idx] = true;
                     }
                 }
 
-                dilate_exclusion_mask(&self.grids[0], &mut excluded_slip_cells, cell_lookup);
+                dilate_exclusion_mask(&self.grids[0], &mut excluded_wall_cells, cell_lookup);
 
-                nr_excluded = excluded_slip_cells.iter().filter(|&&excluded| excluded).count();
+                nr_excluded = excluded_wall_cells.iter().filter(|&&excluded| excluded).count();
             }
 
             let avg_residual = kernels::compute_residual4(
                 &self.grids[0],
                 &self.solution,
                 &self.rhs_at_levels[0],
-                &excluded_slip_cells
+                &excluded_wall_cells
             );
 
-            println!("Residual sum: {} ({} slip-boundary cells excluded)", avg_residual, nr_excluded);
+            println!("Residual sum: {} ({} wall cells excluded)", avg_residual, nr_excluded);
         }
     }
 }
 
 /// Runs one Jacobi sweep (`grid.parallel_interior_update`) from `current` into `out`, using
-/// `jacobi_kernel_with_slip_correction` when `use_slip_correction` is set and plain `jacobi_kernel`
+/// `jacobi_kernel_with_zero_gradient` when `use_zero_gradient` is set and plain `jacobi_kernel`
 /// otherwise — chosen once per sweep, not per cell, so the disabled path never touches
-/// `slip_pressure_stencils` at all.
+/// `zero_gradient_stencils` at all.
 #[inline(always)]
 fn jacobi_sweep(
     grid: &Grid,
@@ -372,15 +372,15 @@ fn jacobi_sweep(
     rhs: &[Float],
     current: &[Float],
     out: &mut [Float],
-    slip_pressure_stencils: &SlipPressureStencils,
-    use_slip_correction: bool
+    zero_gradient_stencils: &ZeroGradientStencils,
+    use_zero_gradient: bool
 ) {
-    if use_slip_correction {
+    if use_zero_gradient {
         grid.parallel_interior_update(
             out,
             |idx, indices, _current_out| {
-                jacobi_kernel_with_slip_correction(
-                    grid, boundary_conditions, rhs, current, idx, indices, slip_pressure_stencils
+                jacobi_kernel_with_zero_gradient(
+                    grid, boundary_conditions, rhs, current, idx, indices, zero_gradient_stencils
                 )
             }
         );

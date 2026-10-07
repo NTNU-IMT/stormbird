@@ -1,12 +1,13 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver};
-use crate::pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureInterpolationOrder;
+use crate::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver, ZeroGradientOnWalls};
+use crate::pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder;
 
 pub use crate::gpu_interface::ComputePlatform;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultigridSettingsBuilder {
     #[serde(default="MultigridSettingsBuilder::default_nr_v_cycles")]
     pub nr_v_cycles: usize,
@@ -18,15 +19,16 @@ pub struct MultigridSettingsBuilder {
     pub compute_platform: ComputePlatform,
     #[serde(default)]
     pub coarsest_level_solver: CoarsestLevelSolver,
-    /// Experimental: applies a pressure zero-gradient (Neumann) correction near slip walls during
-    /// each V-cycle. Off by default; only has an effect on `ComputePlatform::CPU`.
+    /// Experimental: which walls get a zero-gradient (Neumann) boundary condition on the pressure,
+    /// independently of how the walls are represented in the velocity solver. Not used by
+    /// default. Works on both `ComputePlatform::CPU` and `ComputePlatform::GPU`.
     #[serde(default)]
-    pub enable_slip_pressure_correction: bool,
-    /// Interpolation order for the slip-wall pressure correction specifically (ignored when
-    /// `enable_slip_pressure_correction` is false) — does not affect the rest of the pressure
-    /// solve, which always uses 4th order stencils.
+    pub zero_gradient_on_walls: ZeroGradientOnWalls,
+    /// Interpolation order for the zero-gradient condition on walls specifically (ignored when
+    /// `zero_gradient_on_walls` is `NotUsed`) — does not affect the rest of the pressure solve,
+    /// which always uses 4th order stencils.
     #[serde(default)]
-    pub slip_pressure_interpolation_order: SlipPressureInterpolationOrder
+    pub zero_gradient_interpolation_order: ZeroGradientInterpolationOrder
 }
 
 impl MultigridSettingsBuilder {
@@ -39,8 +41,8 @@ impl MultigridSettingsBuilder {
             nr_smooth_iterations: self.nr_smooth_iterations,
             compute_residual_after_solve: self.compute_residual_after_solve,
             coarsest_level_solver: self.coarsest_level_solver,
-            enable_slip_pressure_correction: self.enable_slip_pressure_correction,
-            slip_pressure_interpolation_order: self.slip_pressure_interpolation_order
+            zero_gradient_on_walls: self.zero_gradient_on_walls,
+            zero_gradient_interpolation_order: self.zero_gradient_interpolation_order
         }
     }
 }
@@ -53,8 +55,8 @@ impl Default for MultigridSettingsBuilder {
             compute_residual_after_solve: false,
             compute_platform: ComputePlatform::default(),
             coarsest_level_solver: CoarsestLevelSolver::default(),
-            enable_slip_pressure_correction: false,
-            slip_pressure_interpolation_order: SlipPressureInterpolationOrder::default()
+            zero_gradient_on_walls: ZeroGradientOnWalls::default(),
+            zero_gradient_interpolation_order: ZeroGradientInterpolationOrder::default()
         }
     }
 }

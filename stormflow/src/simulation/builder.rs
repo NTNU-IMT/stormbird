@@ -163,6 +163,7 @@ impl SimulationBuilder {
             &grid,
             &pressure_boundary_conditions,
             &slip_geometries,
+            &geometries,
             gpu_context.as_ref()
         );
 

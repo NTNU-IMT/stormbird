@@ -6,47 +6,47 @@ use crate::gpu_interface::{
 
 const GPU_GRID_SRC: &str = include_str!("../../../grid/gpu_version/gpu_grid.wgsl");
 const JACOBI_COMMON_SRC: &str = include_str!("jacobi_common.wgsl");
-const JACOBI_SLIP_SRC: &str = include_str!("jacobi_slip_shader.wgsl");
+const JACOBI_ZERO_GRADIENT_SRC: &str = include_str!("jacobi_zero_gradient_shader.wgsl");
 
 use crate::grid::gpu_version::GpuGrid;
 use crate::pressure_solver::boundary_conditions::PressureBoundaryConditions;
-use crate::pressure_solver::multigrid_cpu::kernels::jacobi::SLIP_CORRECTION_RELAXATION;
-use crate::pressure_solver::multigrid_cpu::slip_pressure_stencils::SlipPressureInterpolationOrder;
+use crate::pressure_solver::multigrid_cpu::kernels::jacobi::ZERO_GRADIENT_RELAXATION;
+use crate::pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder;
 
 use super::bc_consts_wgsl;
 
 pub const WORKGROUP_SIZE: u32 = 4;
 
 /// Weights-per-axis for the mirrored image-point gather, matching
-/// `SlipPressureInterpolationOrder`: 2 for `Trilinear`, 4 for `Tricubic`. Determines both the
-/// `weights` buffer's per-entry stride and the `SLIP_N` const baked into the shader source.
-pub fn weights_per_axis(order: SlipPressureInterpolationOrder) -> usize {
+/// `ZeroGradientInterpolationOrder`: 2 for `Trilinear`, 4 for `Tricubic`. Determines both the
+/// `weights` buffer's per-entry stride and the `ZERO_GRADIENT_N` const baked into the shader
+/// source.
+pub fn weights_per_axis(order: ZeroGradientInterpolationOrder) -> usize {
     match order {
-        SlipPressureInterpolationOrder::Trilinear => 2,
-        SlipPressureInterpolationOrder::Tricubic => 4,
+        ZeroGradientInterpolationOrder::Trilinear => 2,
+        ZeroGradientInterpolationOrder::Tricubic => 4,
     }
 }
 
-fn slip_consts_wgsl(order: SlipPressureInterpolationOrder) -> String {
+fn zero_gradient_consts_wgsl(order: ZeroGradientInterpolationOrder) -> String {
     format!(
-        "const SLIP_N: u32 = {slip_n}u;\nconst SLIP_CORRECTION_RELAXATION: f32 = {relaxation};\n",
-        slip_n = weights_per_axis(order),
-        relaxation = SLIP_CORRECTION_RELAXATION
+        "const ZERO_GRADIENT_N: u32 = {weights_per_axis}u;\nconst ZERO_GRADIENT_RELAXATION: f32 = {relaxation};\n",
+        weights_per_axis = weights_per_axis(order),
+        relaxation = ZERO_GRADIENT_RELAXATION
     )
 }
 
 /// Separate pipeline from `JacobiShader`'s (rather than a runtime branch added to it), so the
 /// disabled/no-correction path never binds or pays for the 4 extra buffers below — see
-/// `jacobi_slip_shader.wgsl`'s doc comment. Only built at all when
-/// `MultigridSettings::enable_slip_pressure_correction` is set (see `MultigridGPU::new`), since
-/// compiling an unused pipeline has real cost on the GPU, unlike the CPU path's "always build the
-/// (cheap) stencils, gate only the dispatch."
-pub struct JacobiSlipShader {
+/// `jacobi_zero_gradient_shader.wgsl`'s doc comment. Only built at all when
+/// `MultigridSettings::zero_gradient_on_walls` is used (see `MultigridGPU::new`), since compiling
+/// an unused pipeline has a real cost on the GPU.
+pub struct JacobiZeroGradientShader {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group_layout: wgpu::BindGroupLayout,
 }
 
-impl JacobiSlipShader {
+impl JacobiZeroGradientShader {
     pub fn bind_group_layout_entries() -> [wgpu::BindGroupLayoutEntry; 8] {
         [
             GpuGrid::bind_group_layout_entry(0),
@@ -60,13 +60,13 @@ impl JacobiSlipShader {
         ]
     }
 
-    pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions, order: SlipPressureInterpolationOrder) -> Self {
+    pub fn new(context: &GpuContext, boundary_conditions: &PressureBoundaryConditions, order: ZeroGradientInterpolationOrder) -> Self {
         let shader_src = format!(
-            "{grid_src}\n{bc_consts}{slip_consts}{jacobi_src}\n{jacobi_common_src}",
+            "{grid_src}\n{bc_consts}{zero_gradient_consts}{jacobi_src}\n{jacobi_common_src}",
             grid_src = GPU_GRID_SRC,
             bc_consts = bc_consts_wgsl(boundary_conditions),
-            slip_consts = slip_consts_wgsl(order),
-            jacobi_src = JACOBI_SLIP_SRC,
+            zero_gradient_consts = zero_gradient_consts_wgsl(order),
+            jacobi_src = JACOBI_ZERO_GRADIENT_SRC,
             jacobi_common_src = JACOBI_COMMON_SRC
         );
 
@@ -82,7 +82,7 @@ impl JacobiSlipShader {
 
     /// Creates the pair of bind groups needed to alternate the Jacobi smoother between the
     /// solution and work buffers of a single grid level, mirroring `JacobiShader::create_bind_groups`
-    /// with the 4 extra slip-correction buffers appended.
+    /// with the 4 extra zero-gradient buffers appended.
     #[allow(clippy::too_many_arguments)]
     pub fn create_bind_groups(
         &self,

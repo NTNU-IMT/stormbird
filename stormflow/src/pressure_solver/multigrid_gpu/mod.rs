@@ -18,16 +18,16 @@ use crate::gpu_interface::{
 };
 
 use kernels::jacobi_shader::{JacobiShader, WORKGROUP_SIZE as JACOBI_WORKGROUP_SIZE};
-use kernels::jacobi_slip_shader::JacobiSlipShader;
-use kernels::slip_pressure_gpu::gpu_buffers_from_stencils;
+use kernels::jacobi_zero_gradient_shader::JacobiZeroGradientShader;
+use kernels::zero_gradient_gpu::gpu_buffers_from_stencils;
 use kernels::restrict_shader::{RestrictShader, WORKGROUP_SIZE as RESTRICT_WORKGROUP_SIZE};
 use kernels::prolongate_shader::{ProlongateShader, WORKGROUP_SIZE as PROLONGATE_WORKGROUP_SIZE};
 use kernels::materialize_shader::MaterializeShader;
 
 use crate::pressure_solver::multigrid_cpu::kernels as cpu_kernels;
 use cpu_kernels::coarse_matrix::build_poisson_matrix4;
-use crate::pressure_solver::multigrid_cpu::slip_pressure_stencils::{
-    SlipPressureStencils, apply_relaxed_correction, dilate_exclusion_mask
+use crate::pressure_solver::multigrid_cpu::zero_gradient_stencils::{
+    ZeroGradientStencils, apply_relaxed_correction, dilate_exclusion_mask
 };
 
 /// All GPU resources belonging to a single multigrid level. `x_buffer`/`x_work_buffer`/
@@ -42,21 +42,22 @@ struct GpuLevel {
     jacobi_bind_group_work_to_sol: wgpu::BindGroup,
     /// Workgroup dispatch counts for the Jacobi kernel on this level.
     jacobi_dispatch: [u32; 3],
-    /// Slip-wall pressure correction buffers/bind groups for this level. `Some` only when
-    /// `solver_settings.enable_slip_pressure_correction` is set *and* this level actually has
+    /// Buffers/bind groups for the zero-gradient correction on walls for this level. `Some` only
+    /// when `solver_settings.zero_gradient_on_walls` is used *and* this level actually has
     /// corrected cells — mirrors `MultigridCPU::poisson_jacobi_smoother`'s per-level
-    /// `use_slip_correction` gate. The 4 buffers are kept alive here even though nothing ever
+    /// `use_zero_gradient` gate. The 4 buffers are kept alive here even though nothing ever
     /// reads them back to the host or rewrites them after `MultigridGPU::new` — only the bind
     /// groups get used per V-cycle — matching this codebase's existing convention of keeping GPU
     /// buffers as owned fields rather than relying on bind groups to keep them alive implicitly.
-    slip_buffers: Option<GpuSlipLevel>,
+    zero_gradient_buffers: Option<GpuZeroGradientLevel>,
 }
 
-/// Per-level GPU resources for the slip-wall pressure correction — see `GpuLevel::slip_buffers`.
+/// Per-level GPU resources for the zero-gradient correction on walls — see
+/// `GpuLevel::zero_gradient_buffers`.
 /// The 4 buffer fields are only ever read by the GPU (via the bind groups built from them in
 /// `MultigridGPU::new`), never read back from Rust, hence `#[allow(dead_code)]`.
 #[allow(dead_code)]
-struct GpuSlipLevel {
+struct GpuZeroGradientLevel {
     cell_lookup_buffer: wgpu::Buffer,
     weights_buffer: wgpu::Buffer,
     base_index_buffer: wgpu::Buffer,
@@ -92,10 +93,9 @@ pub struct MultigridGPU {
     pub solution: Vec<Float>,
 
     jacobi_shader: JacobiShader,
-    /// Only built when `solver_settings.enable_slip_pressure_correction` is set — compiling an
-    /// unused pipeline has real GPU cost, unlike the CPU path's "always build the (cheap)
-    /// stencils, gate only the dispatch."
-    jacobi_slip_shader: Option<JacobiSlipShader>,
+    /// Only built when `solver_settings.zero_gradient_on_walls` is used, since compiling an
+    /// unused pipeline has a real cost.
+    jacobi_zero_gradient_shader: Option<JacobiZeroGradientShader>,
     restrict_shader: RestrictShader,
     prolongate_shader: ProlongateShader,
     materialize_shader: MaterializeShader,
@@ -104,11 +104,11 @@ pub struct MultigridGPU {
     restrict_levels: Vec<RestrictLevel>,
     prolongate_levels: Vec<ProlongateLevel>,
 
-    /// Precomputed per-level slip-wall pressure correction stencils, built the same way
-    /// `MultigridCPU`'s are (`SlipPressureStencils::build`). Kept around (not just consumed into
+    /// Precomputed per-level stencils for the zero-gradient correction on walls, built the same
+    /// way as `MultigridCPU`'s (`ZeroGradientStencils::build_for_all_levels`). Kept around (not just consumed into
     /// GPU buffers) since `solve_coarsest_level_exact`'s host-side correction and `solve`'s
     /// residual-exclusion diagnostic both need host-side access to them.
-    slip_pressure_stencils: Vec<SlipPressureStencils>,
+    zero_gradient_stencils: Vec<ZeroGradientStencils>,
 
     /// Dense matrix for the coarsest level's Poisson equation, built once here in `new` via the
     /// same `multigrid_cpu::kernels::coarse_matrix::build_poisson_matrix4` that `MultigridCPU`
@@ -133,15 +133,17 @@ pub struct MultigridGPU {
 }
 
 impl MultigridGPU {
-    /// Creates a new solver, with its own GPU context
+    /// Creates a new solver, with its own GPU context. The geometries are only used for the
+    /// zero-gradient condition on walls, as selected by `solver_settings.zero_gradient_on_walls`.
     pub fn new(
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
-        slip_geometries: &[Geometry]
+        slip_geometries: &[Geometry],
+        no_slip_geometries: &[Geometry]
     ) -> Self {
         Self::new_with_context(
-            GpuContext::new(), grid, boundary_conditions, solver_settings, slip_geometries
+            GpuContext::new(), grid, boundary_conditions, solver_settings, slip_geometries, no_slip_geometries
         )
     }
 
@@ -152,7 +154,8 @@ impl MultigridGPU {
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
-        slip_geometries: &[Geometry]
+        slip_geometries: &[Geometry],
+        no_slip_geometries: &[Geometry]
     ) -> Self {
         let grids = grid.multigrid_hierarchy();
         let nr_levels = grids.len();
@@ -161,14 +164,14 @@ impl MultigridGPU {
         let restrict_shader = RestrictShader::new(&gpu_context, boundary_conditions);
         let prolongate_shader = ProlongateShader::new(&gpu_context);
 
-        println!("Building per-level slip-pressure stencils");
-        let slip_pressure_interpolation_order = solver_settings.slip_pressure_interpolation_order;
-        let slip_pressure_stencils: Vec<SlipPressureStencils> = grids.iter()
-            .map(|level_grid| SlipPressureStencils::build(level_grid, slip_geometries, slip_pressure_interpolation_order))
-            .collect();
+        let zero_gradient_stencils = ZeroGradientStencils::build_for_all_levels(
+            &grids, &solver_settings, slip_geometries, no_slip_geometries
+        );
 
-        let jacobi_slip_shader = if solver_settings.enable_slip_pressure_correction {
-            Some(JacobiSlipShader::new(&gpu_context, boundary_conditions, slip_pressure_interpolation_order))
+        let jacobi_zero_gradient_shader = if solver_settings.zero_gradient_on_walls.is_used() {
+            Some(JacobiZeroGradientShader::new(
+                &gpu_context, boundary_conditions, solver_settings.zero_gradient_interpolation_order
+            ))
         } else {
             None
         };
@@ -198,10 +201,10 @@ impl MultigridGPU {
                 gpu_utils::workgroup_count(level_grid.interior_shape[2], JACOBI_WORKGROUP_SIZE as usize),
             ];
 
-            let level_stencils = &slip_pressure_stencils[level_index];
+            let level_stencils = &zero_gradient_stencils[level_index];
 
-            let slip_buffers = match &jacobi_slip_shader {
-                Some(slip_shader) if !level_stencils.entries.is_empty() => {
+            let zero_gradient_buffers = match &jacobi_zero_gradient_shader {
+                Some(zero_gradient_shader) if !level_stencils.entries.is_empty() => {
                     let (weights, base_index, mu) = gpu_buffers_from_stencils(level_stencils);
 
                     let cell_lookup_buffer = gpu_context.create_storage_buffer_init(&level_stencils.cell_lookup);
@@ -209,7 +212,7 @@ impl MultigridGPU {
                     let base_index_buffer = gpu_context.create_storage_buffer_init(&base_index);
                     let mu_buffer = gpu_context.create_storage_buffer_init(&mu);
 
-                    let (bind_group_sol_to_work, bind_group_work_to_sol) = slip_shader.create_bind_groups(
+                    let (bind_group_sol_to_work, bind_group_work_to_sol) = zero_gradient_shader.create_bind_groups(
                         &gpu_context,
                         &grid_buffer,
                         &x_buffer,
@@ -221,7 +224,7 @@ impl MultigridGPU {
                         &mu_buffer,
                     );
 
-                    Some(GpuSlipLevel {
+                    Some(GpuZeroGradientLevel {
                         cell_lookup_buffer,
                         weights_buffer,
                         base_index_buffer,
@@ -241,7 +244,7 @@ impl MultigridGPU {
                 jacobi_bind_group_sol_to_work,
                 jacobi_bind_group_work_to_sol,
                 jacobi_dispatch,
-                slip_buffers,
+                zero_gradient_buffers,
             });
         }
 
@@ -325,14 +328,14 @@ impl MultigridGPU {
             rhs,
             solution,
             jacobi_shader,
-            jacobi_slip_shader,
+            jacobi_zero_gradient_shader,
             restrict_shader,
             prolongate_shader,
             materialize_shader,
             levels,
             restrict_levels,
             prolongate_levels,
-            slip_pressure_stencils,
+            zero_gradient_stencils,
             coarse_matrix,
             coarse_rhs_staging_buffer,
             materialize_bind_group,
@@ -347,9 +350,10 @@ impl MultigridGPU {
     /// layer. So the very first iteration is always well-defined from whatever `current` already
     /// holds — after a clear, after prolongation, or carried over from a previous smoother call.
     ///
-    /// Picks the plain (`jacobi_shader`) or slip-correction (`jacobi_slip_shader`) pipeline once
-    /// per call — not per dispatched invocation — based on `level_data.slip_buffers`, the direct
-    /// GPU analogue of `MultigridCPU::poisson_jacobi_smoother`'s `use_slip_correction` gate.
+    /// Picks the plain (`jacobi_shader`) or zero-gradient (`jacobi_zero_gradient_shader`) pipeline
+    /// once per call — not per dispatched invocation — based on `level_data.zero_gradient_buffers`,
+    /// the direct GPU analogue of `MultigridCPU::poisson_jacobi_smoother`'s `use_zero_gradient`
+    /// gate.
     fn poisson_jacobi_smoother_gpu(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -358,17 +362,17 @@ impl MultigridGPU {
     ) {
         let level_data = &self.levels[level];
 
-        let pipeline = match &level_data.slip_buffers {
-            Some(_) => &self.jacobi_slip_shader.as_ref()
-                .expect("level_data.slip_buffers is only Some when jacobi_slip_shader was built")
+        let pipeline = match &level_data.zero_gradient_buffers {
+            Some(_) => &self.jacobi_zero_gradient_shader.as_ref()
+                .expect("level_data.zero_gradient_buffers is only Some when jacobi_zero_gradient_shader was built")
                 .pipeline,
             None => &self.jacobi_shader.pipeline,
         };
 
         for iteration in 0..nr_iterations {
-            let bind_group = match (&level_data.slip_buffers, iteration % 2 == 0) {
-                (Some(slip_level), true) => &slip_level.bind_group_sol_to_work,
-                (Some(slip_level), false) => &slip_level.bind_group_work_to_sol,
+            let bind_group = match (&level_data.zero_gradient_buffers, iteration % 2 == 0) {
+                (Some(zero_gradient_level), true) => &zero_gradient_level.bind_group_sol_to_work,
+                (Some(zero_gradient_level), false) => &zero_gradient_level.bind_group_work_to_sol,
                 (None, true) => &level_data.jacobi_bind_group_sol_to_work,
                 (None, false) => &level_data.jacobi_bind_group_work_to_sol,
             };
@@ -424,8 +428,8 @@ impl MultigridGPU {
     /// caller to record the up-sweep into. This host round-trip is the unavoidable cost of an
     /// exact coarsest-level solve; `CoarsestLevelSolver::Jacobi` avoids it by staying on the GPU.
     ///
-    /// Since this already has the coarsest level's solution on the host, the slip-wall correction
-    /// (when enabled) is applied right here in plain Rust via the same
+    /// Since this already has the coarsest level's solution on the host, the zero-gradient
+    /// correction on walls (when used) is applied right here in plain Rust via the same
     /// `apply_relaxed_correction` `MultigridCPU`'s equivalent coarsest-level method uses — no GPU
     /// kernel needed for this one-shot, non-iterative branch.
     fn solve_coarsest_level_exact(&self, mut encoder: wgpu::CommandEncoder) -> wgpu::CommandEncoder {
@@ -450,9 +454,9 @@ impl MultigridGPU {
         let mut x_host = coarse_matrix.solve_gaussian_elimination(&rhs_host)
             .expect("Coarsest multigrid level's Poisson matrix should be non-singular");
 
-        if self.solver_settings.enable_slip_pressure_correction {
+        if self.solver_settings.zero_gradient_on_walls.is_used() {
             let stride = self.grids[coarsest_level].interior_stride;
-            apply_relaxed_correction(&mut x_host, &self.slip_pressure_stencils[coarsest_level], stride);
+            apply_relaxed_correction(&mut x_host, &self.zero_gradient_stencils[coarsest_level], stride);
         }
 
         self.gpu_context.write_buffer(&self.levels[coarsest_level].x_buffer, &x_host);
@@ -588,29 +592,29 @@ impl MultigridGPU {
 
     fn report_residual(&self, solution: &[Float], rhs: &[Float]) {
         // Same widened exclusion mask as `MultigridCPU::solve` — see
-        // `kernels::compute_residual4`'s doc comment for why slip-corrected cells (and their
+        // `kernels::compute_residual4`'s doc comment for why corrected wall cells (and their
         // immediate residual-stencil neighbors) need to be excluded from the average.
-        let mut excluded_slip_cells = vec![false; rhs.len()];
+        let mut excluded_wall_cells = vec![false; rhs.len()];
         let mut nr_excluded = 0;
 
-        if self.solver_settings.enable_slip_pressure_correction {
-            let cell_lookup = &self.slip_pressure_stencils[0].cell_lookup;
+        if self.solver_settings.zero_gradient_on_walls.is_used() {
+            let cell_lookup = &self.zero_gradient_stencils[0].cell_lookup;
 
             for (idx, &lookup_index) in cell_lookup.iter().enumerate() {
                 if lookup_index >= 0 {
-                    excluded_slip_cells[idx] = true;
+                    excluded_wall_cells[idx] = true;
                 }
             }
 
-            dilate_exclusion_mask(&self.grids[0], &mut excluded_slip_cells, cell_lookup);
+            dilate_exclusion_mask(&self.grids[0], &mut excluded_wall_cells, cell_lookup);
 
-            nr_excluded = excluded_slip_cells.iter().filter(|&&excluded| excluded).count();
+            nr_excluded = excluded_wall_cells.iter().filter(|&&excluded| excluded).count();
         }
 
         let avg_residual = cpu_kernels::compute_residual4(
-            &self.grids[0], solution, rhs, &excluded_slip_cells
+            &self.grids[0], solution, rhs, &excluded_wall_cells
         );
 
-        println!("Residual sum: {} ({} slip-boundary cells excluded)", avg_residual, nr_excluded);
+        println!("Residual sum: {} ({} wall cells excluded)", avg_residual, nr_excluded);
     }
 }

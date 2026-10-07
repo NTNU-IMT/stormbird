@@ -36,13 +36,16 @@ impl PressureSolverBuilder {
         }
     }
 
-    /// Builds the solver. A GPU solver is created on the device in `gpu_context` if given, so that
-    /// it can share buffers with other solvers, and on a new device otherwise.
+    /// Builds the solver. The geometries are only used for the zero-gradient condition on walls,
+    /// if enabled in the settings (see `ZeroGradientOnWalls`). A GPU solver is created on the
+    /// device in `gpu_context` if given, so that it can share buffers with other solvers, and on a
+    /// new device otherwise.
     pub fn build(
         &self,
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         slip_geometries: &[Geometry],
+        no_slip_geometries: &[Geometry],
         gpu_context: Option<&GpuContext>
     ) -> PressureSolver {
         match self {
@@ -54,7 +57,8 @@ impl PressureSolverBuilder {
                                 grid,
                                 boundary_conditions,
                                 settings.build_settings(),
-                                slip_geometries
+                                slip_geometries,
+                                no_slip_geometries
                             )
                         )
                     },
@@ -65,7 +69,8 @@ impl PressureSolverBuilder {
                                 grid,
                                 boundary_conditions,
                                 settings.build_settings(),
-                                slip_geometries
+                                slip_geometries,
+                                no_slip_geometries
                             )
                         )
                     }
