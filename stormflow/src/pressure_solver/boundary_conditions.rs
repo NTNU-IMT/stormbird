@@ -3,6 +3,7 @@ use stormath::type_aliases::Float;
 use crate::grid::Grid;
 use crate::grid::INTERIOR_OFFSET;
 use crate::grid::boundary_face::BoundaryFace;
+use crate::velocity_solver::boundary_condisitions::{VelocityBoundaryConditions, VelocityBoundaryCondition};
 
 use stormath::spatial_vector::SpatialVector;
 
@@ -51,6 +52,41 @@ impl PressureBoundaryConditions {
             face_conditions[up_axis][0] = PressureBoundaryCondition::ZeroValue;
         }
         
+        Self {
+            face_conditions
+        }
+    }
+
+    /// Constructs the boundary conditions that are consistent with the velocity boundary
+    /// conditions: the open top of the domain (zero gradient velocity) gets a zero pressure, while
+    /// the slip walls and the inlet/outlet faces get a zero pressure gradient. This makes the
+    /// pressure follow the ground/top placement of the velocity, including any slip wall
+    /// overrides, so that no flow is driven through a slip wall by the pressure.
+    ///
+    /// # Panics
+    /// Panics if no face gets a zero pressure, as the pressure equation then has no reference
+    /// value. This happens if the open top of the domain is overridden to be a slip wall.
+    pub fn new_from_velocity_boundary_conditions(
+        velocity_boundary_conditions: &VelocityBoundaryConditions
+    ) -> Self {
+        let face_conditions = velocity_boundary_conditions.face_conditions.map(|axis_conditions| {
+            axis_conditions.map(|condition| match condition {
+                VelocityBoundaryCondition::ZeroGradient => PressureBoundaryCondition::ZeroValue,
+                VelocityBoundaryCondition::InletOutlet => PressureBoundaryCondition::ZeroGradient,
+                VelocityBoundaryCondition::SlipWall => PressureBoundaryCondition::ZeroGradient,
+            })
+        });
+
+        let has_reference_pressure = face_conditions.iter().flatten().any(
+            |condition| matches!(condition, PressureBoundaryCondition::ZeroValue)
+        );
+
+        assert!(
+            has_reference_pressure,
+            "At least one boundary must be open, with a zero pressure. The top of the domain is \
+             the only open boundary, so it can not be overridden to be a slip wall."
+        );
+
         Self {
             face_conditions
         }

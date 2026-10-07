@@ -2,8 +2,12 @@
 // Each invocation handles one column through the face, and fills all INTERIOR_OFFSET ghost layers
 // of that column. Ghost layer `l` (0 = nearest the interior) is paired with the interior cell
 // `2 * l + 1` cells away, the same pairing as `BoundaryFace`, so a ghost cell never reads another
-// ghost cell of the same face. The faces must be dispatched in the same order as on the CPU
-// (axis-major, then face), since edge and corner cells are written by more than one face.
+// ghost cell of the same face. The normal velocity component of slip walls is mirrored with the
+// opposite sign across the wall, which, due to the staggering, uses a different pairing, and the
+// inlet/outlet condition checks the flow direction at the interior cell adjacent to the boundary
+// for all layers. See `VelocityBoundaryConditions::set_ghost_cells_kernel` for the details. The
+// faces must be dispatched in the same order as on the CPU (axis-major, then face), since edge
+// and corner cells are written by more than one face.
 
 // Matches `GpuFaceParams` on the Rust side.
 struct FaceParams {
@@ -57,18 +61,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let axis_length = shape[axis];
     let axis_stride = stride[axis];
 
-    for (var layer: u32 = 0u; layer < INTERIOR_OFFSET; layer = layer + 1u) {
-        let neighbor_distance = 2u * layer + 1u;
+    let at_min_face = face_params.face == 0u;
 
+    for (var layer: u32 = 0u; layer < INTERIOR_OFFSET; layer = layer + 1u) {
         var ghost: u32;
         var neighbor: u32;
+        var adjacent: u32;
 
-        if face_params.face == 0u {
+        if at_min_face {
             ghost = INTERIOR_OFFSET - 1u - layer;
-            neighbor = ghost + neighbor_distance;
+            neighbor = ghost + 2u * layer + 1u;
+            adjacent = ghost + layer + 1u;
         } else {
             ghost = axis_length - INTERIOR_OFFSET + layer;
-            neighbor = ghost - neighbor_distance;
+            neighbor = ghost - (2u * layer + 1u);
+            adjacent = ghost - (layer + 1u);
         }
 
         let flat_current = column_offset + ghost * axis_stride;
@@ -81,16 +88,30 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         );
 
         if face_params.condition == SLIP_WALL {
-            new_value[axis] = 0.0;
+            // Opposite sign mirror of the normal component across the wall. At the start of the
+            // axis, the normal face of layer 0 is on the wall itself.
+            if at_min_face && layer == 0u {
+                new_value[axis] = 0.0;
+            } else {
+                var mirror: u32;
+
+                if at_min_face {
+                    mirror = ghost + 2u * layer;
+                } else {
+                    mirror = ghost - (2u * layer + 2u);
+                }
+
+                new_value[axis] = -field[3u * (column_offset + mirror * axis_stride) + axis];
+            }
         } else if face_params.condition == INLET_OUTLET {
-            let neighbor_axis_flow = new_value[axis];
+            let adjacent_axis_flow = field[3u * (column_offset + adjacent * axis_stride) + axis];
 
             var inflow: bool;
 
-            if face_params.face == 0u {
-                inflow = neighbor_axis_flow > 0.0;
+            if at_min_face {
+                inflow = adjacent_axis_flow > 0.0;
             } else {
-                inflow = neighbor_axis_flow < 0.0;
+                inflow = adjacent_axis_flow < 0.0;
             }
 
             if inflow {
@@ -107,5 +128,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         field[3u * flat_current] = new_value.x;
         field[3u * flat_current + 1u] = new_value.y;
         field[3u * flat_current + 2u] = new_value.z;
+
+        // At the end of the axis, the normal face on the wall belongs to the last interior cell
+        if face_params.condition == SLIP_WALL && !at_min_face && layer == 0u {
+            field[3u * (flat_current - axis_stride) + axis] = 0.0;
+        }
     }
 }

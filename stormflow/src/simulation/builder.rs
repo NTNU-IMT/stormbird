@@ -110,9 +110,9 @@ impl SimulationBuilder {
 
         println!("Interior shape of the grid: {:?}", &grid.interior_shape);
         
-        let pressure_boundary_conditions = PressureBoundaryConditions::new_from_up_direction(
-            self.wind_environment.up_direction
-        );
+        // The density of the fluid. The actuator line model is synced to this value, so that the
+        // forces it projects are consistent with the flow.
+        let density: Float = 1.0;
 
         let velocity_boundary_conditions = VelocityBoundaryConditions::new(
             &self.wind_environment,
@@ -120,6 +120,10 @@ impl SimulationBuilder {
             self.linear_velocity,
             self.slip_wall_boundary_override,
             &grid
+        );
+
+        let pressure_boundary_conditions = PressureBoundaryConditions::new_from_velocity_boundary_conditions(
+            &velocity_boundary_conditions
         );
 
         let velocity = velocity_boundary_conditions.initial_velocity(&grid);
@@ -131,9 +135,21 @@ impl SimulationBuilder {
             }
         }
 
-        let actuator_line = self.actuator_line.as_ref().map(
-            |builder| ActuatorLineInterface::new(builder.build(), &grid)
-        );
+        let actuator_line = self.actuator_line.as_ref().map(|builder| {
+            let mut model = builder.build();
+
+            if model.line_force_model.density != density {
+                println!(
+                    "Note: the density of the actuator line model ({}) is replaced by the density \
+                     of the flow solver ({})",
+                    model.line_force_model.density, density
+                );
+
+                model.line_force_model.density = density;
+            }
+
+            ActuatorLineInterface::new(model, &grid)
+        });
 
         let mut geometries: Vec<Geometry> = Vec::new();
 
@@ -207,7 +223,7 @@ impl SimulationBuilder {
             slip_mirror_stencils,
             boundary_conditions: velocity_boundary_conditions,
             viscosity: self.effective_viscosity,
-            density: 1.0,
+            density,
         };
 
         let velocity_solver = match self.velocity_solver_compute_platform {

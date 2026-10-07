@@ -95,6 +95,8 @@ pub fn main() -> Result<(), Error> {
     
     let mut sim = sim_builder.build();
 
+    sim.initialize_after_build();
+
     let new_internal_states: bool = !args.section_models_internal_state.is_empty();
 
     if new_internal_states && let Some(actuator_line) = &mut sim.actuator_line {
