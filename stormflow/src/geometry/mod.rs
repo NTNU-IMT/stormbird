@@ -162,6 +162,24 @@ impl Geometry {
         }
     }
 
+    /// Reflects `point`, which is at `signed_distance` from the union of `geometries`, across the
+    /// (locally planar) surface of the union. Returns the surface normal (see
+    /// `normal_from_signed_distance_function_union`, with step length `normal_delta`) and the
+    /// mirrored image point. For points inside a geometry, the signed distance is negative, so
+    /// the image point is on the fluid side. Used to build mirror (ghost cell) stencils.
+    pub fn mirror_image_point(
+        geometries: &[Geometry],
+        point: SpatialVector,
+        signed_distance: Float,
+        normal_delta: SpatialVector
+    ) -> (SpatialVector, SpatialVector) {
+        let normal = Geometry::normal_from_signed_distance_function_union(
+            geometries, point, normal_delta
+        );
+
+        (normal, point - 2.0 * signed_distance * normal)
+    }
+
     /// Computes the surface normal direction (see `normal_from_signed_distance_function_union`),
     /// with a step length of `delta_factor` cell lengths, at the cells on the extended grid where
     /// `cells_to_compute` is `true`. All other cells are set to zero. Each normal requires six

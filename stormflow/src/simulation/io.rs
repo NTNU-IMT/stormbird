@@ -1,5 +1,7 @@
 use super::Simulation;
 
+use stormath::type_aliases::Float;
+
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
@@ -165,7 +167,23 @@ impl Simulation {
 
         if binary { writeln!(w).unwrap(); }
 
-        // --- Pressure (scalar, stored at cell centers on the extended grid) ---
+        // --- Turbulence model fields, and the eddy viscosity used by the velocity solver ---
+        if let Some(turbulence_solver) = &self.turbulence_solver {
+            let fields = turbulence_solver.fields_host();
+            let nr_extended_cells = self.grid.nr_extended_cells();
+
+            for (field_index, name) in turbulence_solver.field_names().iter().enumerate() {
+                let field = &fields[field_index * nr_extended_cells..(field_index + 1) * nr_extended_cells];
+
+                self.write_cell_centered_scalar(&mut w, name, field, binary);
+            }
+        }
+
+        if let Some(eddy_viscosity) = self.velocity_solver.eddy_viscosity_host() {
+            self.write_cell_centered_scalar(&mut w, "eddy_viscosity", &eddy_viscosity, binary);
+        }
+
+        // --- Signed distance function for no-slip surfaces (scalar) ---
         writeln!(w, "SCALARS sdf double 1").unwrap();
         writeln!(w, "LOOKUP_TABLE default").unwrap();
 
@@ -239,6 +257,32 @@ impl Simulation {
         if binary { writeln!(w).unwrap(); }
 
         w
+    }
+
+    /// Writes a scalar field stored at the cell centers of the extended grid as VTK cell data, in
+    /// the same format as the other fields in [`Simulation::fields_as_vtk`].
+    fn write_cell_centered_scalar(&self, w: &mut Vec<u8>, name: &str, values: &[Float], binary: bool) {
+        let [nx, ny, nz] = self.grid.interior_shape;
+
+        writeln!(w, "SCALARS {} double 1", name).unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+                    let value = values[flat] as f64;
+
+                    if binary {
+                        w.write_all(&value.to_be_bytes()).unwrap();
+                    } else {
+                        writeln!(w, "{}", value).unwrap();
+                    }
+                }
+            }
+        }
+
+        if binary { writeln!(w).unwrap(); }
     }
 
     /// Export the current simulation fields to a VTK legacy file.

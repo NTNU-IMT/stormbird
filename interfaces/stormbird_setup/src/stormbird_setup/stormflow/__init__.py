@@ -15,6 +15,17 @@ from .pressure_solver import (
     ZeroGradientInterpolationOrder,
 )
 from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder
+from .turbulence import (
+    TurbulenceSolverBuilder,
+    TurbulenceModel,
+    RealizableKEpsilon,
+    InletTurbulence,
+    IntensityAndLengthScale,
+    IntensityAndViscosityRatio,
+    AtmosphericBoundaryLayer,
+    WallTreatment,
+    ConvectionScheme,
+)
 from .simulation_builder import SimulationBuilder
 from ..wind import WindCondition, WindEnvironment
 
@@ -33,6 +44,15 @@ __all__ = [
     "ZeroGradientInterpolationOrder",
     "SolverSettings",
     "SlipMirrorInterpolationOrder",
+    "TurbulenceSolverBuilder",
+    "TurbulenceModel",
+    "RealizableKEpsilon",
+    "InletTurbulence",
+    "IntensityAndLengthScale",
+    "IntensityAndViscosityRatio",
+    "AtmosphericBoundaryLayer",
+    "WallTreatment",
+    "ConvectionScheme",
     "SimulationBuilder",
     "WindCondition",
     "WindEnvironment",

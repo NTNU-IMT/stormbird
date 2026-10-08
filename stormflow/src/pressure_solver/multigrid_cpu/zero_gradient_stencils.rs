@@ -272,14 +272,11 @@ impl ZeroGradientStencils {
 
                 let cell_center = grid.cell_center_extended(extended_indices);
 
-                let normal = Geometry::normal_from_signed_distance_function_union(
-                    wall_geometries, cell_center, normal_delta
-                );
-
                 // Reflect the cell center across the (locally linear) interface to get the
-                // image point on the fluid side: `sdf` is negative inside the body, so this
-                // moves outward.
-                let image_point = cell_center - 2.0 * sdf * normal;
+                // image point on the fluid side
+                let (_normal, image_point) = Geometry::mirror_image_point(
+                    wall_geometries, cell_center, sdf, normal_delta
+                );
 
                 let stencil = match order {
                     ZeroGradientInterpolationOrder::Trilinear => ZeroGradientInterpolationStencil::Trilinear(

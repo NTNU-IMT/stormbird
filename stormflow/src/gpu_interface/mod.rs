@@ -1,5 +1,6 @@
 pub mod context;
 pub mod utils;
+pub mod kernels;
 
 use serde::{Serialize, Deserialize};
 

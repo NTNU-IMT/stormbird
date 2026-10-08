@@ -15,6 +15,7 @@ use super::kernels::{
         correct_slip_mirror_entry_kernel
     },
     convect_and_diffuse::convect_and_diffuse_kernel,
+    turbulent_stress::convect_and_diffuse_turbulent_kernel,
     add_pressure_gradient::add_pressure_gradient_kernel,
     pressure_rhs::pressure_rhs_kernel
 };
@@ -26,10 +27,20 @@ pub struct VelocitySolverCPU {
     pub velocity_star: Vec<SpatialVector>,
     pub velocity: Vec<SpatialVector>,
     pub body_force: Vec<SpatialVector>,
+    /// The cell-centered eddy viscosity, which is added to the momentum equation as a turbulent
+    /// stress. `None` when no turbulence model is used, in which case the solver is unchanged. The
+    /// field is set by the turbulence solver.
+    pub eddy_viscosity: Option<Vec<Float>>,
 }
 
 impl VelocitySolverCPU {
-    pub fn new(setup: VelocitySolverSetup, initial_velocity: Vec<SpatialVector>) -> Self {
+    /// Creates the solver. If `use_eddy_viscosity` is true, an eddy viscosity field is allocated,
+    /// initialized to zero.
+    pub fn new(
+        setup: VelocitySolverSetup,
+        initial_velocity: Vec<SpatialVector>,
+        use_eddy_viscosity: bool
+    ) -> Self {
         let nr_extended_cells = initial_velocity.len();
 
         Self {
@@ -38,6 +49,7 @@ impl VelocitySolverCPU {
             velocity_star: initial_velocity.clone(),
             velocity: initial_velocity,
             body_force: vec![SpatialVector::default(); nr_extended_cells],
+            eddy_viscosity: use_eddy_viscosity.then(|| vec![0.0; nr_extended_cells]),
         }
     }
 
@@ -62,19 +74,35 @@ impl VelocitySolverCPU {
     ) {
         let inv_density = 1.0 / self.setup.density;
 
-        grid.parallel_spatial_vector_update(
-            &mut self.velocity_star,
-            |i, _current| convect_and_diffuse_kernel(
-                i,
-                grid,
-                &self.velocity_org,
-                &self.velocity,
-                &self.body_force,
-                self.setup.viscosity,
-                inv_density,
-                time_step
-            )
-        );
+        match &self.eddy_viscosity {
+            None => grid.parallel_spatial_vector_update(
+                &mut self.velocity_star,
+                |i, _current| convect_and_diffuse_kernel(
+                    i,
+                    grid,
+                    &self.velocity_org,
+                    &self.velocity,
+                    &self.body_force,
+                    self.setup.viscosity,
+                    inv_density,
+                    time_step
+                )
+            ),
+            Some(eddy_viscosity) => grid.parallel_spatial_vector_update(
+                &mut self.velocity_star,
+                |i, _current| convect_and_diffuse_turbulent_kernel(
+                    i,
+                    grid,
+                    &self.velocity_org,
+                    &self.velocity,
+                    &self.body_force,
+                    eddy_viscosity,
+                    self.setup.viscosity,
+                    inv_density,
+                    time_step
+                )
+            ),
+        }
 
         Self::correct_velocities_for_geometry(grid, &self.setup, &mut self.velocity_star);
 

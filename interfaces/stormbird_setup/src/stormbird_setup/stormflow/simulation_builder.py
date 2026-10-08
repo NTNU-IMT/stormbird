@@ -8,6 +8,7 @@ from .grid import GridBuilder
 from .geometry import GeometryBuilder
 from .pressure_solver import PressureSolverBuilder, ComputePlatform
 from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder
+from .turbulence import TurbulenceSolverBuilder
 from ..actuator_line import ActuatorLineBuilder
 
 
@@ -31,4 +32,10 @@ class SimulationBuilder(StormbirdSetupBaseModel):
     Where to execute the velocity solver. Independent of where the pressure solver is executed
     (see `compute_platform` in `MultigridSettingsBuilder`), but the fewest transfers between the
     host and the device happen when both are on the same platform.
+    """
+    turbulence: TurbulenceSolverBuilder | None = None
+    """
+    Optional RANS turbulence model. The turbulence solver always runs on the same platform as the
+    velocity solver. When a turbulence model is used, `effective_viscosity` is the molecular
+    viscosity.
     """

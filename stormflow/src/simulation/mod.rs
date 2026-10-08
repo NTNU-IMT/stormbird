@@ -9,6 +9,7 @@ use crate::actuator_line_interface::ActuatorLineInterface;
 
 use crate::pressure_solver::PressureSolver;
 use crate::velocity_solver::VelocitySolver;
+use crate::turbulence_solver::TurbulenceSolver;
 use builder::SimulationBuilder;
 
 use serde::{Serialize, Deserialize};
@@ -43,6 +44,8 @@ pub struct Simulation {
     pub grid: Grid,
     pub velocity_solver: VelocitySolver,
     pub pressure_solver: PressureSolver,
+    /// Only present when a turbulence model is used
+    pub turbulence_solver: Option<TurbulenceSolver>,
     pub actuator_line: Option<ActuatorLineInterface>,
     pub solver_settings: SolverSettings
 }
@@ -61,6 +64,10 @@ impl Simulation {
     pub fn initialize_after_build(&mut self) {
         println!("Initializing after build");
         self.velocity_solver.initialize_after_build(&self.grid);
+
+        if let Some(turbulence_solver) = &mut self.turbulence_solver {
+            turbulence_solver.initialize(&self.grid, &mut self.velocity_solver);
+        }
 
         println!();
     }
@@ -112,6 +119,10 @@ impl Simulation {
             //let start_time = Instant::now();
             self.update_velocity(time_step);
             //println!("Update velocity time: {:.?}", start_time.elapsed());
+        }
+
+        if let Some(turbulence_solver) = &mut self.turbulence_solver {
+            turbulence_solver.update(&self.grid, &mut self.velocity_solver, time_step);
         }
 
         //let start_time = Instant::now();

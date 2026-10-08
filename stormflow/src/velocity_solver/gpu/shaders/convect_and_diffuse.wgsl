@@ -1,5 +1,7 @@
 // GPU version of `convect_and_diffuse_kernel`. See that function for the details of the numerics.
-// Dispatched over the interior cells, with gid.x along the contiguous z-axis.
+// Dispatched over the interior cells, with gid.x along the contiguous z-axis. When the velocity
+// solver uses an eddy viscosity, turbulent_stress.wgsl is appended to this source, and its
+// `main_turbulent` entry point is used instead of `main`.
 
 @group(0) @binding(0) var<uniform> grid: Grid;
 @group(0) @binding(1) var<uniform> params: VelocityParams;
@@ -37,21 +39,43 @@ fn face_to_cell_center(col: u32, stride: u32, component: u32) -> f32 {
     );
 }
 
-@compute @workgroup_size(WG_X, WG_Y, WG_Z)
-fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+// Flat extended index of the interior cell of the invocation, or N_EXTENDED_CELLS if the
+// invocation is outside the interior grid.
+fn interior_cell_index(gid: vec3<u32>) -> u32 {
     let ki = gid.x;
     let ji = gid.y;
     let ii = gid.z;
 
     if ii >= grid.interior_shape.x || ji >= grid.interior_shape.y || ki >= grid.interior_shape.z {
-        return;
+        return N_EXTENDED_CELLS;
     }
 
     let stride = grid.extended_stride.xyz;
 
-    let i_0 = (ii + INTERIOR_OFFSET) * stride.x + (ji + INTERIOR_OFFSET) * stride.y + (ki + INTERIOR_OFFSET);
+    return (ii + INTERIOR_OFFSET) * stride.x + (ji + INTERIOR_OFFSET) * stride.y + (ki + INTERIOR_OFFSET);
+}
 
-    var new_value = array<f32, 3>(0.0, 0.0, 0.0);
+@compute @workgroup_size(WG_X, WG_Y, WG_Z)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let i_0 = interior_cell_index(gid);
+
+    if i_0 >= N_EXTENDED_CELLS {
+        return;
+    }
+
+    let new_value = explicit_rate(i_0);
+
+    for (var c: u32 = 0u; c < 3u; c = c + 1u) {
+        velocity_star[3u * i_0 + c] = velocity_org[3u * i_0 + c] + params.time_step * new_value[c];
+    }
+}
+
+// GPU version of `explicit_rate`: the rate of change of the velocity from convection, the
+// molecular diffusion and the body force.
+fn explicit_rate(i_0: u32) -> vec3<f32> {
+    let stride = grid.extended_stride.xyz;
+
+    var new_value = vec3<f32>(0.0, 0.0, 0.0);
 
     for (var vel_comp: u32 = 0u; vel_comp < 3u; vel_comp = vel_comp + 1u) {
         let u_i = vel(i_0, vel_comp);
@@ -108,7 +132,5 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         ) * params.inv_density;
     }
 
-    for (var c: u32 = 0u; c < 3u; c = c + 1u) {
-        velocity_star[3u * i_0 + c] = velocity_org[3u * i_0 + c] + params.time_step * new_value[c];
-    }
+    return new_value;
 }

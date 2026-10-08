@@ -38,6 +38,12 @@ use crate::velocity_solver::{
     gpu::{VelocitySolverGPU, SharedPressureBuffers},
 };
 use crate::pressure_solver::PressureSolver;
+use crate::turbulence_solver::{
+    TurbulenceSolver,
+    builder::TurbulenceSolverBuilder,
+    cpu::TurbulenceSolverCPU,
+    gpu::TurbulenceSolverGPU,
+};
 use crate::gpu_interface::{
     ComputePlatform,
     context::GpuContext
@@ -82,6 +88,11 @@ pub struct SimulationBuilder {
     /// when both are on the same platform.
     #[serde(default)]
     pub velocity_solver_compute_platform: ComputePlatform,
+    /// Optional RANS turbulence model. The turbulence solver always runs on the same platform as
+    /// the velocity solver. `effective_viscosity` is used as the molecular viscosity when a
+    /// turbulence model is used.
+    #[serde(default)]
+    pub turbulence: Option<TurbulenceSolverBuilder>,
 }
 
 impl SimulationBuilder {
@@ -190,6 +201,24 @@ impl SimulationBuilder {
             gpu_context.as_ref()
         );
 
+        // The blending width of the no-slip correction, which the turbulence solver's wall
+        // treatment must be consistent with
+        let no_slip_epsilon = 2.0 * max_dx;
+
+        let turbulence_solver_setup = self.turbulence.as_ref().map(|builder| {
+            builder.build_setup(
+                &grid,
+                &velocity_boundary_conditions,
+                &self.wind_environment,
+                &no_slip_walls,
+                &slip_walls,
+                self.effective_viscosity,
+                no_slip_epsilon
+            )
+        });
+
+        let use_eddy_viscosity = turbulence_solver_setup.is_some();
+
         let signed_distance_function = no_slip_walls.signed_distance_function;
         let signed_distance_function_slip = slip_walls.signed_distance_function;
 
@@ -210,7 +239,7 @@ impl SimulationBuilder {
         let no_slip_corrections = NoSlipCorrections::build(
             &grid,
             &signed_distance_function,
-            2.0 * max_dx,
+            no_slip_epsilon,
         );
 
         println!("Building slip-mirror stencils");
@@ -236,7 +265,7 @@ impl SimulationBuilder {
 
         let velocity_solver = match self.velocity_solver_compute_platform {
             ComputePlatform::CPU => VelocitySolver::CPU(
-                VelocitySolverCPU::new(velocity_solver_setup, velocity)
+                VelocitySolverCPU::new(velocity_solver_setup, velocity, use_eddy_viscosity)
             ),
             ComputePlatform::GPU => {
                 let shared_pressure_buffers = match &pressure_solver {
@@ -253,16 +282,37 @@ impl SimulationBuilder {
                         &grid,
                         velocity_solver_setup,
                         &velocity,
-                        shared_pressure_buffers
+                        shared_pressure_buffers,
+                        use_eddy_viscosity
                     )
                 )
             }
         };
         
+        // The turbulence solver runs on the same platform as the velocity solver, and shares the
+        // velocity and the eddy viscosity directly with it on the GPU
+        let turbulence_solver = turbulence_solver_setup.map(|setup| match &velocity_solver {
+            VelocitySolver::CPU(_) => TurbulenceSolver::CPU(
+                TurbulenceSolverCPU::new(setup, &grid)
+            ),
+            VelocitySolver::GPU(velocity_solver) => TurbulenceSolver::GPU(
+                TurbulenceSolverGPU::new(
+                    velocity_solver.context().clone(),
+                    &grid,
+                    setup,
+                    velocity_solver.velocity_buffer().clone(),
+                    velocity_solver.eddy_viscosity_buffer()
+                        .expect("The velocity solver is created with an eddy viscosity")
+                        .clone()
+                )
+            ),
+        });
+
         Simulation {
             grid,
             velocity_solver,
             pressure_solver,
+            turbulence_solver,
             actuator_line,
             solver_settings: self.solver_settings.clone()
         }

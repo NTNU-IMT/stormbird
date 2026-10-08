@@ -114,6 +114,15 @@ impl VelocitySolver {
         }
     }
 
+    /// The eddy viscosity field on the host, if the solver uses one. Borrowed for the CPU version,
+    /// and read from the device for the GPU version.
+    pub fn eddy_viscosity_host(&self) -> Option<Cow<'_, [Float]>> {
+        match self {
+            Self::CPU(solver) => solver.eddy_viscosity.as_deref().map(Cow::Borrowed),
+            Self::GPU(solver) => solver.read_eddy_viscosity().map(Cow::Owned),
+        }
+    }
+
     /// The body force field on the host. Borrowed for the CPU version, and read from the device
     /// for the GPU version.
     pub fn body_force_host(&self) -> Cow<'_, [SpatialVector]> {

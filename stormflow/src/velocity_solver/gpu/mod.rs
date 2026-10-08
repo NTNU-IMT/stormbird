@@ -120,17 +120,35 @@ struct VelocityKernels {
 }
 
 impl VelocityKernels {
-    fn new(context: &GpuContext, constants: &ShaderConstants) -> Self {
+    /// `use_eddy_viscosity` selects the version of the convect and diffuse kernel that includes the
+    /// turbulent stresses, which has the eddy viscosity as an additional binding.
+    fn new(context: &GpuContext, constants: &ShaderConstants, use_eddy_viscosity: bool) -> Self {
         use Binding::*;
+
+        let prelude = constants.prelude();
+        let constants = prelude.as_str();
 
         let slip_bindings = [Uniform, ReadOnly, ReadOnly, ReadWrite, ReadWrite];
         let cell_sampling_bindings = [Uniform, ReadOnly, ReadOnly, ReadWrite, ReadWrite];
 
-        Self {
-            convect_and_diffuse: Kernel::new(
+        let convect_and_diffuse = if use_eddy_viscosity {
+            Kernel::new(
+                context,
+                constants,
+                &format!("{}
+{}", kernels::CONVECT_AND_DIFFUSE_SRC, kernels::TURBULENT_STRESS_SRC),
+                "main_turbulent",
+                &[Uniform, Uniform, ReadOnly, ReadOnly, ReadOnly, ReadWrite, ReadOnly]
+            )
+        } else {
+            Kernel::new(
                 context, constants, kernels::CONVECT_AND_DIFFUSE_SRC, "main",
                 &[Uniform, Uniform, ReadOnly, ReadOnly, ReadOnly, ReadWrite]
-            ),
+            )
+        };
+
+        Self {
+            convect_and_diffuse,
             pressure_rhs: Kernel::new(
                 context, constants, kernels::PRESSURE_RHS_SRC, "main",
                 &[Uniform, Uniform, ReadOnly, ReadWrite]
@@ -203,6 +221,9 @@ pub struct VelocitySolverGPU {
     velocity_org_buffer: wgpu::Buffer,
     velocity_star_buffer: wgpu::Buffer,
     body_force_buffer: wgpu::Buffer,
+    /// The cell-centered eddy viscosity, set by the turbulence solver. `None` when no turbulence
+    /// model is used.
+    eddy_viscosity_buffer: Option<wgpu::Buffer>,
     /// Either owned by this solver, or shared with the pressure solver
     rhs_buffer: wgpu::Buffer,
     /// Either owned by this solver, or shared with the pressure solver
@@ -230,13 +251,16 @@ impl VelocitySolverGPU {
     /// device, its buffers should be given in `shared_pressure_buffers`, so that the pressure
     /// coupling happens without any transfers. Otherwise, the solver allocates its own buffers,
     /// that must be synchronized with the pressure solver through `read_pressure_rhs` and
-    /// `write_pressure`.
+    /// `write_pressure`. If `use_eddy_viscosity` is true, an eddy viscosity buffer is allocated,
+    /// initialized to zero, which the turbulence solver writes to directly (see
+    /// `eddy_viscosity_buffer`).
     pub fn new(
         context: GpuContext,
         grid: &Grid,
         setup: VelocitySolverSetup,
         initial_velocity: &[SpatialVector],
-        shared_pressure_buffers: Option<SharedPressureBuffers>
+        shared_pressure_buffers: Option<SharedPressureBuffers>,
+        use_eddy_viscosity: bool
     ) -> Self {
         let nr_extended_cells = grid.nr_extended_cells();
         let nr_interior_cells = grid.nr_interior_cells();
@@ -265,7 +289,7 @@ impl VelocitySolverGPU {
             nr_extended_cells,
         };
 
-        let kernels = VelocityKernels::new(&context, &constants);
+        let kernels = VelocityKernels::new(&context, &constants, use_eddy_viscosity);
 
         let grid_buffer = grid.as_gpu_version().as_buffer(&context);
 
@@ -279,6 +303,9 @@ impl VelocitySolverGPU {
         let velocity_org_buffer = context.create_buffer_from_src(&initial_velocity_flat);
         let velocity_star_buffer = context.create_buffer_from_src(&initial_velocity_flat);
         let body_force_buffer = context.create_zeroed_buffer(3 * nr_extended_cells);
+        let eddy_viscosity_buffer = use_eddy_viscosity.then(
+            || context.create_zeroed_buffer(nr_extended_cells)
+        );
 
         let (rhs_buffer, pressure_buffer) = match shared_pressure_buffers {
             Some(buffers) => (buffers.rhs, buffers.pressure),
@@ -288,16 +315,21 @@ impl VelocitySolverGPU {
             )
         };
 
+        let mut convect_and_diffuse_buffers = vec![
+            &grid_buffer,
+            &params_buffer,
+            &velocity_org_buffer,
+            &velocity_buffer,
+            &body_force_buffer,
+            &velocity_star_buffer
+        ];
+
+        if let Some(eddy_viscosity_buffer) = &eddy_viscosity_buffer {
+            convect_and_diffuse_buffers.push(eddy_viscosity_buffer);
+        }
+
         let convect_and_diffuse_bind_group = kernels.convect_and_diffuse.bind_group(
-            &context,
-            &[
-                &grid_buffer,
-                &params_buffer,
-                &velocity_org_buffer,
-                &velocity_buffer,
-                &body_force_buffer,
-                &velocity_star_buffer
-            ]
+            &context, &convect_and_diffuse_buffers
         );
 
         let pressure_rhs_bind_group = kernels.pressure_rhs.bind_group(
@@ -399,6 +431,7 @@ impl VelocitySolverGPU {
             velocity_org_buffer,
             velocity_star_buffer,
             body_force_buffer,
+            eddy_viscosity_buffer,
             rhs_buffer,
             pressure_buffer,
             interior_workgroups: dispatch_interior(grid.interior_shape),
@@ -584,6 +617,30 @@ impl VelocitySolverGPU {
     /// Reads the full body force field from the device
     pub fn read_body_force(&self) -> Vec<SpatialVector> {
         self.read_vector_field(&self.body_force_buffer)
+    }
+
+    /// Reads the full eddy viscosity field from the device, if it exists
+    pub fn read_eddy_viscosity(&self) -> Option<Vec<Float>> {
+        self.eddy_viscosity_buffer.as_ref().map(
+            |buffer| self.context.read_buffer(buffer, self.nr_extended_cells)
+        )
+    }
+
+    /// The velocity buffer on the device, for solvers on the same device that read the velocity
+    /// directly, such as the turbulence solver.
+    pub fn velocity_buffer(&self) -> &wgpu::Buffer {
+        &self.velocity_buffer
+    }
+
+    /// The eddy viscosity buffer on the device, which the turbulence solver writes to directly.
+    /// `None` if the solver was created without an eddy viscosity.
+    pub fn eddy_viscosity_buffer(&self) -> Option<&wgpu::Buffer> {
+        self.eddy_viscosity_buffer.as_ref()
+    }
+
+    /// The device context of the solver
+    pub fn context(&self) -> &GpuContext {
+        &self.context
     }
 
     fn read_vector_field(&self, buffer: &wgpu::Buffer) -> Vec<SpatialVector> {

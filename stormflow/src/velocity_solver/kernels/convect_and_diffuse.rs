@@ -61,6 +61,20 @@ pub fn convect_and_diffuse_kernel(
     inv_density: Float,
     time_step: Float
 ) -> SpatialVector {
+    velocity_org[i_0] + time_step * explicit_rate(i_0, grid, velocity, body_force, viscosity, inv_density)
+}
+
+#[inline(always)]
+/// The rate of change of the velocity at the faces of cell `i_0` from convection, the molecular
+/// diffusion and the body force, all evaluated explicitly from `velocity`.
+pub fn explicit_rate(
+    i_0: usize,
+    grid: &Grid,
+    velocity: &[SpatialVector],
+    body_force: &[SpatialVector],
+    viscosity: Float,
+    inv_density: Float,
+) -> SpatialVector {
     let i_p = [i_0 + grid.extended_stride[0], i_0 + grid.extended_stride[1], i_0 + grid.extended_stride[2]];
     let i_n = [i_0 - grid.extended_stride[0], i_0 - grid.extended_stride[1], i_0 - grid.extended_stride[2]];
     let i_p2 = [i_p[0] + grid.extended_stride[0], i_p[1] + grid.extended_stride[1], i_p[2] + grid.extended_stride[2]];
@@ -132,5 +146,5 @@ pub fn convect_and_diffuse_kernel(
         ) * inv_density;
     }
 
-    velocity_org[i_0] + time_step * new_value
+    new_value
 }
