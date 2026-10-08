@@ -21,6 +21,8 @@ use crate::grid::Grid;
 use super::VelocitySolverSetup;
 use super::no_slip_corrections::NoSlipCorrections;
 use super::slip_mirror_stencils::{SlipMirrorStencils, SlipMirrorInterpolationStencil};
+use super::wall_model::WallStressEntries;
+use crate::log_law::NR_FRICTION_VELOCITY_ITERATIONS;
 
 use kernels::{
     Kernel,
@@ -82,6 +84,19 @@ struct GpuSlipEntry {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+/// Matches `WallStressEntry` in wall_stress.wgsl
+struct GpuWallStressEntry {
+    cell_index: u32,
+    axis: u32,
+    delta: f32,
+    tangential_factor: f32,
+    normal: [f32; 3],
+    base_index: [u32; 3],
+    weights: [f32; 18],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 /// Matches `FaceParams` in ghost_cells.wgsl
 struct GpuFaceParams {
     axis: u32,
@@ -117,12 +132,19 @@ struct VelocityKernels {
     max_velocity: Kernel,
     gather_cells: Kernel,
     scatter_cells: Kernel,
+    /// `None` when the no-slip geometries use the data immersion
+    wall_stress: Option<Kernel>,
 }
 
 impl VelocityKernels {
     /// `use_eddy_viscosity` selects the version of the convect and diffuse kernel that includes the
     /// turbulent stresses, which has the eddy viscosity as an additional binding.
-    fn new(context: &GpuContext, constants: &ShaderConstants, use_eddy_viscosity: bool) -> Self {
+    fn new(
+        context: &GpuContext,
+        constants: &ShaderConstants,
+        use_eddy_viscosity: bool,
+        wall_stress: &WallStressEntries
+    ) -> Self {
         use Binding::*;
 
         let prelude = constants.prelude();
@@ -181,6 +203,29 @@ impl VelocityKernels {
             scatter_cells: Kernel::new(
                 context, constants, kernels::CELL_SAMPLING_SRC, "scatter", &cell_sampling_bindings
             ),
+            wall_stress: (!wall_stress.entries.is_empty()).then(|| {
+                let log_law_constants = format!(
+                    "const WALL_KAPPA: f32 = {:?};
+                     const WALL_E: f32 = {:?};
+                     const WALL_Y_PLUS_LAM: f32 = {:?};
+                     const WALL_REFERENCE_DISTANCE: f32 = {:?};
+                     const NR_FRICTION_VELOCITY_ITERATIONS: u32 = {}u;
+",
+                    wall_stress.constants.kappa,
+                    wall_stress.constants.e,
+                    wall_stress.constants.y_plus_lam(),
+                    wall_stress.reference_distance,
+                    NR_FRICTION_VELOCITY_ITERATIONS
+                );
+
+                Kernel::new(
+                    context,
+                    constants,
+                    &format!("{}{}", log_law_constants, kernels::WALL_STRESS_SRC),
+                    "main",
+                    &[Uniform, Uniform, ReadOnly, ReadOnly, ReadWrite]
+                )
+            }),
         }
     }
 }
@@ -231,6 +276,9 @@ pub struct VelocitySolverGPU {
 
     interior_workgroups: [u32; 3],
     convect_and_diffuse_bind_group: wgpu::BindGroup,
+    /// Together with the number of entries. `None` when the no-slip geometries use the data
+    /// immersion.
+    wall_stress_bind_group: Option<(wgpu::BindGroup, usize)>,
     pressure_rhs_bind_group: wgpu::BindGroup,
     add_pressure_gradient_bind_group: wgpu::BindGroup,
 
@@ -289,7 +337,7 @@ impl VelocitySolverGPU {
             nr_extended_cells,
         };
 
-        let kernels = VelocityKernels::new(&context, &constants, use_eddy_viscosity);
+        let kernels = VelocityKernels::new(&context, &constants, use_eddy_viscosity, &setup.wall_stress);
 
         let grid_buffer = grid.as_gpu_version().as_buffer(&context);
 
@@ -331,6 +379,19 @@ impl VelocitySolverGPU {
         let convect_and_diffuse_bind_group = kernels.convect_and_diffuse.bind_group(
             &context, &convect_and_diffuse_buffers
         );
+
+        let wall_stress_bind_group = kernels.wall_stress.as_ref().map(|kernel| {
+            let entries = wall_stress_entries_for_gpu(&setup.wall_stress);
+            let entries_buffer = context.create_storage_buffer_init(&entries);
+
+            (
+                kernel.bind_group(
+                    &context,
+                    &[&grid_buffer, &params_buffer, &entries_buffer, &velocity_buffer, &velocity_star_buffer]
+                ),
+                entries.len()
+            )
+        });
 
         let pressure_rhs_bind_group = kernels.pressure_rhs.bind_group(
             &context,
@@ -436,6 +497,7 @@ impl VelocitySolverGPU {
             pressure_buffer,
             interior_workgroups: dispatch_interior(grid.interior_shape),
             convect_and_diffuse_bind_group,
+            wall_stress_bind_group,
             pressure_rhs_bind_group,
             add_pressure_gradient_bind_group,
             nr_no_slip_entries: no_slip_entries.len(),
@@ -480,6 +542,10 @@ impl VelocitySolverGPU {
         self.kernels.convect_and_diffuse.record(
             &mut encoder, &self.convect_and_diffuse_bind_group, self.interior_workgroups
         );
+
+        if let (Some(kernel), Some((bind_group, nr_entries))) = (&self.kernels.wall_stress, &self.wall_stress_bind_group) {
+            kernel.record(&mut encoder, bind_group, dispatch_1d(*nr_entries));
+        }
 
         self.record_geometry_corrections(&mut encoder, Field::VelocityStar);
         self.record_ghost_cells(&mut encoder, Field::VelocityStar);
@@ -740,6 +806,35 @@ fn no_slip_entries_for_gpu(corrections: &NoSlipCorrections) -> Vec<GpuNoSlipEntr
     }
 
     entries
+}
+
+fn wall_stress_entries_for_gpu(wall_stress: &WallStressEntries) -> Vec<GpuWallStressEntry> {
+    wall_stress.entries.iter().map(|entry| {
+        let mut weights = [0.0; 18];
+        let mut base_index = [0u32; 3];
+
+        for component in 0..3 {
+            let stencil = &entry.velocity_stencils[component];
+
+            base_index[component] = stencil.base_index as u32;
+
+            for axis in 0..3 {
+                let offset = 6 * component + 2 * axis;
+
+                weights[offset..offset + 2].copy_from_slice(&stencil.weights[axis]);
+            }
+        }
+
+        GpuWallStressEntry {
+            cell_index: entry.cell_index as u32,
+            axis: entry.axis as u32,
+            delta: entry.delta,
+            tangential_factor: entry.tangential_factor,
+            normal: [entry.normal[0], entry.normal[1], entry.normal[2]],
+            base_index,
+            weights,
+        }
+    }).collect()
 }
 
 /// Flattens the slip corrections for all three axes into one list, plus a separate list of the

@@ -23,3 +23,21 @@ class SlipMirrorInterpolationOrder(Enum):
 
     Trilinear = "Trilinear"
     Tricubic = "Tricubic"
+
+
+class NoSlipWallTreatment(Enum):
+    """
+    How the velocity solver treats the no-slip geometries.
+
+    `DataImmersion` (default) blends the velocity towards zero in a band of a few cells around the
+    surface. Robust, also for thin geometries, but the wall shear stress depends on the grid
+    resolution.
+
+    `WallModel` uses a mirror (slip) correction inside the geometries, together with the wall shear
+    stress from the log-law, applied as a momentum sink close to the surface. Requires geometries
+    that are at least a few cells thick, and `effective_viscosity` should be the molecular
+    viscosity.
+    """
+
+    DataImmersion = "DataImmersion"
+    WallModel = "WallModel"

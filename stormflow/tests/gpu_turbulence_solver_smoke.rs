@@ -10,7 +10,7 @@ const NR_STEPS: usize = 5;
 /// an extra no-slip sphere and the realizable k-epsilon model, so that every part of the
 /// turbulence solver is exercised: the inlet/outlet conditions, the mirror corrections in both slip
 /// and no-slip geometries, the wall functions and the damping of the eddy viscosity.
-fn setup_string(platform: &str, inlet: serde_json::Value) -> String {
+fn setup_string(platform: &str, inlet: serde_json::Value, wall_treatment: &str) -> String {
     let example_path = concat!(
         env!("CARGO_MANIFEST_DIR"), "/examples/rotor_sail/rotor_sail_single_with_end_disks.json"
     );
@@ -29,6 +29,7 @@ fn setup_string(platform: &str, inlet: serde_json::Value) -> String {
     setup["geometries"] = serde_json::json!([
         {"Sphere": {"center": {"x": 20.0, "y": 5.0, "z": 10.0}, "radius": 4.0}}
     ]);
+    setup["no_slip_wall_treatment"] = wall_treatment.into();
     setup["turbulence"] = serde_json::json!({
         "model": {"RealizableKEpsilon": {}},
         "inlet": inlet,
@@ -45,8 +46,8 @@ struct SimulationOutput {
     turbulence_fields: Vec<Float>,
 }
 
-fn run(platform: &str, inlet: serde_json::Value) -> SimulationOutput {
-    let mut sim = Simulation::new_from_string(&setup_string(platform, inlet)).unwrap();
+fn run(platform: &str, inlet: serde_json::Value, wall_treatment: &str) -> SimulationOutput {
+    let mut sim = Simulation::new_from_string(&setup_string(platform, inlet, wall_treatment)).unwrap();
 
     let mut time_steps = Vec::with_capacity(NR_STEPS);
     let mut time = 0.0;
@@ -122,21 +123,23 @@ fn default_inlet() -> serde_json::Value {
 
 #[test]
 fn cpu_turbulence_solver_gives_finite_positive_fields() {
-    let output = run("CPU", default_inlet());
+    for wall_treatment in ["DataImmersion", "WallModel"] {
+        let output = run("CPU", default_inlet(), wall_treatment);
 
-    assert!(output.turbulence_fields.iter().all(|value| value.is_finite() && *value > 0.0));
-    assert!(output.eddy_viscosity.iter().all(|value| value.is_finite() && *value >= 0.0));
+        assert!(output.turbulence_fields.iter().all(|value| value.is_finite() && *value > 0.0));
+        assert!(output.eddy_viscosity.iter().all(|value| value.is_finite() && *value >= 0.0));
 
-    let max_eddy_viscosity = output.eddy_viscosity.iter().cloned().fold(0.0, Float::max);
+        let max_eddy_viscosity = output.eddy_viscosity.iter().cloned().fold(0.0, Float::max);
 
-    println!("max eddy viscosity: {max_eddy_viscosity}");
+        println!("{wall_treatment}: max eddy viscosity: {max_eddy_viscosity}");
 
-    assert!(max_eddy_viscosity > 0.0);
+        assert!(max_eddy_viscosity > 0.0);
+    }
 }
 
-fn assert_gpu_matches_cpu(inlet: serde_json::Value) {
-    let reference = run("CPU", inlet.clone());
-    let gpu = run("GPU", inlet);
+fn assert_gpu_matches_cpu(inlet: serde_json::Value, wall_treatment: &str) {
+    let reference = run("CPU", inlet.clone(), wall_treatment);
+    let gpu = run("GPU", inlet, wall_treatment);
 
     let grid = &reference.grid;
 
@@ -168,14 +171,19 @@ fn assert_gpu_matches_cpu(inlet: serde_json::Value) {
 
 #[test]
 fn gpu_turbulence_solver_matches_cpu() {
-    assert_gpu_matches_cpu(default_inlet());
+    assert_gpu_matches_cpu(default_inlet(), "DataImmersion");
+}
+
+#[test]
+fn gpu_turbulence_solver_matches_cpu_with_wall_model() {
+    assert_gpu_matches_cpu(default_inlet(), "WallModel");
 }
 
 #[test]
 fn gpu_turbulence_solver_matches_cpu_with_atmospheric_boundary_layer_inlet() {
     assert_gpu_matches_cpu(serde_json::json!({
         "AtmosphericBoundaryLayer": {"friction_velocity": 0.5, "roughness_length": 0.01}
-    }));
+    }), "DataImmersion");
 }
 
 

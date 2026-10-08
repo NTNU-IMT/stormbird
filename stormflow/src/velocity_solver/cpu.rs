@@ -8,6 +8,7 @@ use crate::grid::Grid;
 use super::VelocitySolverSetup;
 use super::slip_mirror_stencils::SlipMirrorStencils;
 use super::no_slip_corrections::NoSlipCorrections;
+use super::wall_model::wall_stress_kernel;
 
 use super::kernels::{
     correct_velocities_for_geometry::{
@@ -104,9 +105,46 @@ impl VelocitySolverCPU {
             ),
         }
 
+        self.apply_wall_stress(grid, time_step);
+
         Self::correct_velocities_for_geometry(grid, &self.setup, &mut self.velocity_star);
 
         self.setup.boundary_conditions.set_ghost_cells(grid, &mut self.velocity_star);
+    }
+
+    /// Applies the wall shear stress of the wall model to `velocity_star`, with the reference
+    /// velocity sampled from `velocity`. Does nothing when the no-slip geometries use the data
+    /// immersion.
+    fn apply_wall_stress(&mut self, grid: &Grid, time_step: Float) {
+        let wall_stress = &self.setup.wall_stress;
+
+        if wall_stress.entries.is_empty() {
+            return;
+        }
+
+        let y_plus_lam = wall_stress.constants.y_plus_lam();
+        let velocity = &self.velocity;
+        let velocity_star = &self.velocity_star;
+
+        // Several entries can belong to the same cell (for different axes), so all values are
+        // computed before any is written
+        let new_values: Vec<Float> = wall_stress.entries.par_iter().map(|entry| {
+            wall_stress_kernel(
+                entry,
+                wall_stress.reference_distance,
+                &wall_stress.constants,
+                y_plus_lam,
+                velocity,
+                grid.extended_stride,
+                self.setup.viscosity,
+                time_step,
+                velocity_star[entry.cell_index][entry.axis]
+            )
+        }).collect();
+
+        for (entry, value) in wall_stress.entries.iter().zip(new_values) {
+            self.velocity_star[entry.cell_index][entry.axis] = value;
+        }
     }
 
     /// Computes the right hand side of the pressure Poisson equation from `velocity_star`, and

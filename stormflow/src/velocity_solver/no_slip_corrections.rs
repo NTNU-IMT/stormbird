@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use stormath::type_aliases::Float;
 
 use crate::grid::Grid;
@@ -62,6 +64,32 @@ impl NoSlipCorrections {
                     }
                 }
             }
+        }
+
+        Self { entries }
+    }
+}
+
+impl NoSlipCorrections {
+    /// Combines two sets of corrections, using the smallest blend factor for the faces that are in
+    /// both. Each face gets at most one entry, which the correction kernels rely on.
+    pub fn merged(self, other: Self) -> Self {
+        let mut entries: [Vec<NoSlipEntry>; 3] = Default::default();
+
+        for (axis, (self_entries, other_entries)) in self.entries.into_iter().zip(other.entries).enumerate() {
+            let mut mu_per_cell: HashMap<usize, Float> = HashMap::new();
+
+            for entry in self_entries.into_iter().chain(other_entries) {
+                mu_per_cell.entry(entry.cell_index)
+                    .and_modify(|mu| *mu = mu.min(entry.mu))
+                    .or_insert(entry.mu);
+            }
+
+            entries[axis] = mu_per_cell.into_iter()
+                .map(|(cell_index, mu)| NoSlipEntry { cell_index, mu })
+                .collect();
+
+            entries[axis].sort_by_key(|entry| entry.cell_index);
         }
 
         Self { entries }

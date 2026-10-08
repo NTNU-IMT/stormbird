@@ -1,5 +1,6 @@
 
 use std::fs;
+use std::collections::HashSet;
 
 use serde::{Serialize, Deserialize};
 
@@ -32,8 +33,11 @@ use crate::pressure_solver::{
 
 use crate::velocity_solver::{
     VelocitySolver, VelocitySolverSetup, boundary_condisitions::VelocityBoundaryConditions,
-    slip_mirror_stencils::{SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS},
+    slip_mirror_stencils::{
+        SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS, mirror_interior_corrections
+    },
     no_slip_corrections::NoSlipCorrections,
+    wall_model::{NoSlipWallTreatment, WallStressEntries},
     cpu::VelocitySolverCPU,
     gpu::{VelocitySolverGPU, SharedPressureBuffers},
 };
@@ -83,6 +87,11 @@ pub struct SimulationBuilder {
     /// Optional "override" of the boundary conditions, to be able to set some to slip walls
     #[serde(default)]
     pub slip_wall_boundary_override: [[bool; 2]; 3],
+    /// How the velocity solver treats the no-slip geometries: with the data immersion (default),
+    /// or with the wall model, which is a slip condition together with the wall shear stress from
+    /// the log-law (see `velocity_solver::wall_model`).
+    #[serde(default)]
+    pub no_slip_wall_treatment: NoSlipWallTreatment,
     /// Where to execute the velocity solver. Independent of where the pressure solver is executed
     /// (see `pressure_solver`), but the fewest transfers between the host and the device happen 
     /// when both are on the same platform.
@@ -219,6 +228,38 @@ impl SimulationBuilder {
 
         let use_eddy_viscosity = turbulence_solver_setup.is_some();
 
+        let use_wall_model = self.no_slip_wall_treatment == NoSlipWallTreatment::WallModel;
+
+        // With the wall model, the no-slip geometries get the same mirror correction as the slip
+        // geometries, so the stencils are built from the union of both
+        let mirror_geometries: Vec<Geometry> = if use_wall_model {
+            slip_walls.geometries.iter().chain(no_slip_walls.geometries.iter()).cloned().collect()
+        } else {
+            slip_walls.geometries.clone()
+        };
+
+        let signed_distance_function_mirror: Vec<Float> = if use_wall_model {
+            slip_walls.signed_distance_function.iter()
+                .zip(&no_slip_walls.signed_distance_function)
+                .map(|(slip, no_slip)| slip.min(*no_slip))
+                .collect()
+        } else {
+            slip_walls.signed_distance_function.clone()
+        };
+
+        let wall_stress = if use_wall_model {
+            println!("Building wall model");
+            WallStressEntries::build(
+                &grid,
+                &no_slip_walls.geometries,
+                &no_slip_walls.signed_distance_function,
+                &slip_walls.signed_distance_function,
+            )
+        } else {
+            WallStressEntries::default()
+        };
+
+        let no_slip_geometries = no_slip_walls.geometries.clone();
         let signed_distance_function = no_slip_walls.signed_distance_function;
         let signed_distance_function_slip = slip_walls.signed_distance_function;
 
@@ -227,30 +268,56 @@ impl SimulationBuilder {
         // The normals are only computed where the slip-mirror stencils use them, and are zero
         // everywhere else
         let normals_slip_surfaces = Geometry::geometry_normals_on_extended_grid(
-            &slip_walls.geometries, &grid, 0.1,
+            &mirror_geometries, &grid, 0.1,
             &SlipMirrorStencils::cells_needing_normals(
-                &grid, &signed_distance_function_slip, slip_reach_distance
+                &grid, &signed_distance_function_mirror, slip_reach_distance
             )
         );
 
         let slip_epsilon = 4.0 * max_dx;
 
-        println!("Building no-slip corrections");
-        let no_slip_corrections = NoSlipCorrections::build(
-            &grid,
-            &signed_distance_function,
-            no_slip_epsilon,
-        );
-
         println!("Building slip-mirror stencils");
-        let slip_mirror_stencils = SlipMirrorStencils::build(
+        let mut slip_mirror_stencils = SlipMirrorStencils::build(
             &grid,
-            &signed_distance_function_slip,
+            &signed_distance_function_mirror,
             &normals_slip_surfaces,
             slip_epsilon,
             slip_reach_distance,
             self.slip_velocity_interpolation_order,
         );
+
+        // The velocity is set to zero deep inside the geometries with a mirror correction, and where
+        // the mirror correction is not well defined, see `mirror_interior_corrections`
+        println!("Building corrections for the interior of the mirror geometries");
+        let all_geometries: Vec<Geometry> = slip_walls.geometries.iter()
+            .chain(no_slip_geometries.iter())
+            .cloned()
+            .collect();
+
+        let (mirror_interior, zeroed_faces) = mirror_interior_corrections(
+            &grid,
+            &mirror_geometries,
+            &all_geometries,
+            &signed_distance_function_mirror,
+            slip_reach_distance,
+        );
+
+        let zeroed_faces: HashSet<(usize, usize)> = zeroed_faces.into_iter().collect();
+
+        for (axis, entries) in slip_mirror_stencils.entries.iter_mut().enumerate() {
+            entries.retain(|entry| !zeroed_faces.contains(&(entry.cell_index, axis)));
+        }
+
+        let no_slip_corrections = if use_wall_model {
+            mirror_interior
+        } else {
+            println!("Building no-slip corrections");
+            NoSlipCorrections::build(
+                &grid,
+                &signed_distance_function,
+                no_slip_epsilon,
+            ).merged(mirror_interior)
+        };
 
         let velocity_solver_setup = VelocitySolverSetup {
             signed_distance_function,
@@ -258,6 +325,7 @@ impl SimulationBuilder {
             normals_slip_surfaces,
             no_slip_corrections,
             slip_mirror_stencils,
+            wall_stress,
             boundary_conditions: velocity_boundary_conditions,
             viscosity: self.effective_viscosity,
             density,

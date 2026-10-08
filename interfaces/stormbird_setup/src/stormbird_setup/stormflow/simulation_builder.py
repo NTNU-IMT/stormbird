@@ -7,7 +7,7 @@ from ..wind import WindCondition, WindEnvironment
 from .grid import GridBuilder
 from .geometry import GeometryBuilder
 from .pressure_solver import PressureSolverBuilder, ComputePlatform
-from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder
+from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder, NoSlipWallTreatment
 from .turbulence import TurbulenceSolverBuilder
 from ..actuator_line import ActuatorLineBuilder
 
@@ -27,6 +27,12 @@ class SimulationBuilder(StormbirdSetupBaseModel):
         SlipMirrorInterpolationOrder.Tricubic
     )
     slip_wall_boundary_override: list[list[bool]] | None = None
+    no_slip_wall_treatment: NoSlipWallTreatment = NoSlipWallTreatment.DataImmersion
+    """
+    How the velocity solver treats the no-slip geometries: with the data immersion (default), or
+    with the wall model, which is a slip condition together with the wall shear stress from the
+    log-law.
+    """
     velocity_solver_compute_platform: ComputePlatform = ComputePlatform.CPU
     """
     Where to execute the velocity solver. Independent of where the pressure solver is executed

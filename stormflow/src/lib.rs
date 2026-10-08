@@ -3,6 +3,7 @@ pub mod grid;
 pub mod pressure_solver;
 pub mod velocity_solver;
 pub mod turbulence_solver;
+pub mod log_law;
 pub mod simulation;
 pub mod actuator_line_interface;
 pub mod geometry;

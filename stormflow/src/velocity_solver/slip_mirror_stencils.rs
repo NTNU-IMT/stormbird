@@ -7,6 +7,10 @@ use crate::grid::Grid;
 use crate::grid::interpolation::{TrilinearStencil, TricubicStencil};
 use crate::geometry::Geometry;
 
+use rayon::prelude::*;
+
+use super::no_slip_corrections::{NoSlipCorrections, NoSlipEntry};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 /// Which interpolation order is used to sample the mirrored image point for the slip-wall
 /// *velocity* correction specifically — independent of
@@ -198,5 +202,161 @@ impl SlipMirrorStencils {
         );
 
         Self { entries }
+    }
+}
+
+/// How far inside the geometries, as a multiple of the largest cell length, the data immersion
+/// that sets the velocity to zero in the interior of the mirror geometries is centered. With a
+/// blending width of one cell, the velocity is zero beyond `SHIFT + 1` cells, and untouched closer
+/// to the surface than `SHIFT - 1` cells (see `mirror_interior_corrections`).
+pub const MIRROR_INTERIOR_SHIFT_CELLS: Float = 3.0;
+
+/// How far inside the domain, as a multiple of the cell length along each axis, a mirrored image
+/// point must be for the mirror correction to be used. Closer to the boundary, the interpolation
+/// stencil reads the ghost cells, which, for instance at the ground, mirror the cells just inside
+/// the geometry back to themselves.
+pub const MIRROR_DOMAIN_MARGIN_CELLS: Float = 1.0;
+
+/// Builds the corrections that set the velocity to zero inside the geometries with a mirror
+/// correction (the slip geometries, and the no-slip geometries with the wall model), where the
+/// mirror correction can not be used:
+///
+/// - Deep inside the geometries, beyond the reach of the mirror correction, with a blending
+///   centered `MIRROR_INTERIOR_SHIFT_CELLS` cells inside the surface.
+/// - Where the mirrored image point of a face is outside the domain, closer to the domain boundary
+///   than `MIRROR_DOMAIN_MARGIN_CELLS`, or inside a geometry. This happens, e.g., for geometries
+///   that extend to, through, or to less than a cell from the ground, as the cells just inside the
+///   bottom of the geometry would otherwise be mirrored to themselves through the ghost cells, and
+///   at concave corners and thin parts of the geometries.
+///
+/// `signed_distance_function` must be the signed distance function of the union of
+/// `mirror_geometries`, while `all_geometries` are all geometries in the simulation. Returns the
+/// corrections, together with the faces that are set fully to zero, as `(cell_index, axis)`, which
+/// should not get any mirror correction.
+pub fn mirror_interior_corrections(
+    grid: &Grid,
+    mirror_geometries: &[Geometry],
+    all_geometries: &[Geometry],
+    signed_distance_function: &[Float],
+    mirror_reach_distance: Float,
+) -> (NoSlipCorrections, Vec<(usize, usize)>) {
+    let mut max_dx: Float = 0.0;
+    for axis in 0..3 {
+        max_dx = max_dx.max(grid.cell_length[axis]);
+    }
+
+    let shift = MIRROR_INTERIOR_SHIFT_CELLS * max_dx;
+    let normal_delta = 0.1 * grid.cell_length;
+
+    let domain_start = grid.start_point;
+    let domain_end = grid.start_point + SpatialVector([
+        grid.interior_shape[0] as Float * grid.cell_length[0],
+        grid.interior_shape[1] as Float * grid.cell_length[1],
+        grid.interior_shape[2] as Float * grid.cell_length[2],
+    ]);
+
+    let [nxi, nyi, nzi] = grid.interior_shape;
+
+    let face_entries: Vec<(usize, NoSlipEntry)> = (0..nxi).into_par_iter().flat_map_iter(|ii| {
+        let mut plane_entries = Vec::new();
+
+        if mirror_geometries.is_empty() {
+            return plane_entries;
+        }
+
+        for ji in 0..nyi {
+            for ki in 0..nzi {
+                let extended_indices = grid.extended_indices_from_interior_indices([ii, ji, ki]);
+                let i_0 = grid.flat_index_on_extended_grid(extended_indices);
+
+                for axis in 0..3 {
+                    let i_p = i_0 + grid.extended_stride[axis];
+
+                    let distance = 0.5 * (signed_distance_function[i_0] + signed_distance_function[i_p]);
+
+                    if distance >= 0.0 {
+                        continue;
+                    }
+
+                    let mut mu = Geometry::blending_function(distance + shift, max_dx);
+
+                    if mu > 0.0 && distance > -mirror_reach_distance {
+                        let mut face_center = grid.cell_center_extended(extended_indices);
+                        face_center[axis] += 0.5 * grid.cell_length[axis];
+
+                        let (_normal, image_point) = Geometry::mirror_image_point(
+                            mirror_geometries, face_center, distance, normal_delta
+                        );
+
+                        let outside_domain = (0..3).any(|a| {
+                            let margin = MIRROR_DOMAIN_MARGIN_CELLS * grid.cell_length[a];
+
+                            image_point[a] < domain_start[a] + margin || image_point[a] > domain_end[a] - margin
+                        });
+
+                        let inside_geometry = Geometry::signed_distance_function_union(
+                            all_geometries, image_point
+                        ) < 0.0;
+
+                        if outside_domain || inside_geometry {
+                            mu = 0.0;
+                        }
+                    }
+
+                    if mu < 1.0 {
+                        plane_entries.push((axis, NoSlipEntry { cell_index: i_0, mu }));
+                    }
+                }
+            }
+        }
+
+        plane_entries
+    }).collect();
+
+    let mut corrections = NoSlipCorrections::default();
+    let mut zeroed_faces = Vec::new();
+
+    for (axis, entry) in face_entries {
+        if entry.mu == 0.0 {
+            zeroed_faces.push((entry.cell_index, axis));
+        }
+
+        corrections.entries[axis].push(entry);
+    }
+
+    (corrections, zeroed_faces)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::geometry::analytical_shapes::Cuboid;
+
+    /// For a box standing on the ground, the faces just inside the bottom of the box have their
+    /// mirror image below the ground, and must be set to zero rather than mirrored. Faces further
+    /// up, close to the side walls, have valid mirror images.
+    #[test]
+    fn mirror_images_outside_the_domain_are_zeroed() {
+        let grid = Grid::new(SpatialVector([0.0; 3]), SpatialVector([1.0; 3]), [16, 16, 16]);
+
+        let geometries = [Geometry::Cuboid(Cuboid {
+            center: SpatialVector([0.5, 0.5, 0.4]),
+            half_extents: SpatialVector([0.25, 0.25, 0.4]),
+        })];
+
+        let sdf = Geometry::signed_distance_function_on_extended_grid(&geometries, &grid);
+
+        let (corrections, zeroed_faces) = mirror_interior_corrections(&grid, &geometries, &geometries, &sdf, 3.0 / 16.0);
+
+        let x_face = |indices: [usize; 3]| (grid.flat_index_on_extended_grid_from_interior_indices(indices), 0);
+
+        // Just above the ground, in the middle of the box: mirrored to below the ground
+        assert!(zeroed_faces.contains(&x_face([8, 8, 0])));
+
+        // Close to the side wall, but well above the ground: a valid mirror image
+        assert!(!zeroed_faces.contains(&x_face([4, 8, 4])));
+
+        assert!(!corrections.entries[0].is_empty());
     }
 }

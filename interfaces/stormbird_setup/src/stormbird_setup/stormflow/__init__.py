@@ -14,7 +14,7 @@ from .pressure_solver import (
     ZeroGradientOnWalls,
     ZeroGradientInterpolationOrder,
 )
-from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder
+from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder, NoSlipWallTreatment
 from .turbulence import (
     TurbulenceSolverBuilder,
     TurbulenceModel,
@@ -44,6 +44,7 @@ __all__ = [
     "ZeroGradientInterpolationOrder",
     "SolverSettings",
     "SlipMirrorInterpolationOrder",
+    "NoSlipWallTreatment",
     "TurbulenceSolverBuilder",
     "TurbulenceModel",
     "RealizableKEpsilon",

@@ -26,6 +26,8 @@ use crate::grid::Grid;
 use crate::grid::interpolation::TrilinearStencil;
 use crate::geometry::{Geometry, WallGeometries};
 
+pub use crate::log_law::WallFunctionConstants;
+
 /// How many cells deep into a geometry the mirror entries are computed, as a multiple of the
 /// largest cell length. The widest stencil that reads the transported fields is the limited linear
 /// convection, which reaches two cells, so this has some margin.
@@ -42,39 +44,6 @@ pub enum WallTreatment {
     /// the wall. Default.
     #[default]
     WallFunction,
-}
-
-#[derive(Debug, Clone, Copy)]
-/// The constants of the standard log-law wall functions, with the same default values as in
-/// OpenFOAM.
-pub struct WallFunctionConstants {
-    pub c_mu: Float,
-    pub kappa: Float,
-    pub e: Float,
-}
-
-impl Default for WallFunctionConstants {
-    fn default() -> Self {
-        Self {
-            c_mu: 0.09,
-            kappa: 0.41,
-            e: 9.8,
-        }
-    }
-}
-
-impl WallFunctionConstants {
-    /// The y+ value where the viscous sublayer and the log-law region intersect, computed in the
-    /// same way as in OpenFOAM's `nutWallFunction`.
-    pub fn y_plus_lam(&self) -> Float {
-        let mut y_plus_lam: Float = 11.0;
-
-        for _ in 0..10 {
-            y_plus_lam = (self.e * y_plus_lam).max(1.0).ln() / self.kappa;
-        }
-
-        y_plus_lam
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -275,17 +244,5 @@ impl WallTreatmentEntries {
             wall_functions,
             damping,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn y_plus_lam_matches_openfoam() {
-        let y_plus_lam = WallFunctionConstants::default().y_plus_lam();
-
-        assert!((y_plus_lam - 11.53).abs() < 0.01, "{y_plus_lam}");
     }
 }

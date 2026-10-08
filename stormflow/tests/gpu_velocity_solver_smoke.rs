@@ -29,6 +29,23 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
         {"Sphere": {"center": {"x": 20.0, "y": 5.0, "z": 10.0}, "radius": 4.0}}
     ]);
 
+    if let BoundaryCase::WallModel = boundary_case {
+        setup["no_slip_wall_treatment"] = "WallModel".into();
+        setup["effective_viscosity"] = 1.5e-5.into();
+
+        // A cuboid standing on the ground, which exercises the zeroing of the faces where the
+        // mirror image is outside the domain
+        setup["geometries"].as_array_mut().unwrap().push(serde_json::json!(
+            {"Cuboid": {"center": {"x": 30.0, "y": 0.0, "z": 8.0}, "half_extents": {"x": 4.0, "y": 6.0, "z": 8.0}}}
+        ));
+    }
+
+    if let BoundaryCase::SlipCuboidOnGround = boundary_case {
+        setup["slip_geometries"].as_array_mut().unwrap().push(serde_json::json!(
+            {"Cuboid": {"center": {"x": 30.0, "y": 0.0, "z": 8.0}, "half_extents": {"x": 4.0, "y": 6.0, "z": 8.0}}}
+        ));
+    }
+
     if let BoundaryCase::DownwardUpDirectionAndSideWalls = boundary_case {
         setup["wind_environment"] = serde_json::json!({
             "up_direction": {"x": 0.0, "y": 0.0, "z": -1.0},
@@ -49,6 +66,11 @@ enum BoundaryCase {
     /// and slip walls on both y faces, with an oblique wind, so that slip walls at both the start
     /// and the end of an axis are exercised.
     DownwardUpDirectionAndSideWalls,
+    /// The boundary conditions of the example, with an extra slip cuboid standing on the ground
+    SlipCuboidOnGround,
+    /// The boundary conditions of the example, with the wall model instead of the data immersion,
+    /// for the no-slip sphere and a cuboid standing on the ground
+    WallModel,
 }
 
 struct SimulationOutput {
@@ -162,4 +184,14 @@ fn gpu_velocity_solver_matches_cpu_with_gpu_pressure_solver() {
 #[test]
 fn gpu_velocity_solver_matches_cpu_with_downward_up_direction_and_side_walls() {
     assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::DownwardUpDirectionAndSideWalls);
+}
+
+#[test]
+fn gpu_velocity_solver_matches_cpu_with_wall_model() {
+    assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::WallModel);
+}
+
+#[test]
+fn gpu_velocity_solver_matches_cpu_with_slip_cuboid_on_ground() {
+    assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::SlipCuboidOnGround);
 }

@@ -2,6 +2,7 @@ pub mod boundary_condisitions;
 pub mod kernels;
 pub mod slip_mirror_stencils;
 pub mod no_slip_corrections;
+pub mod wall_model;
 pub mod cpu;
 pub mod gpu;
 
@@ -14,6 +15,7 @@ use crate::grid::Grid;
 use boundary_condisitions::VelocityBoundaryConditions;
 use slip_mirror_stencils::SlipMirrorStencils;
 use no_slip_corrections::NoSlipCorrections;
+use wall_model::WallStressEntries;
 
 use cpu::VelocitySolverCPU;
 use gpu::VelocitySolverGPU;
@@ -25,10 +27,15 @@ pub struct VelocitySolverSetup {
     pub signed_distance_function: Vec<Float>,
     pub signed_distance_function_slip: Vec<Float>,
     /// Only computed for the cells where the slip-mirror stencils use them (see
-    /// `SlipMirrorStencils::cells_needing_normals`), and zero everywhere else.
+    /// `SlipMirrorStencils::cells_needing_normals`), and zero everywhere else. Includes the no-slip
+    /// geometries when they use the wall model.
     pub normals_slip_surfaces: Vec<SpatialVector>,
     pub no_slip_corrections: NoSlipCorrections,
+    /// The mirror corrections. Includes the no-slip geometries when they use the wall model.
     pub slip_mirror_stencils: SlipMirrorStencils,
+    /// The wall shear stress of the wall model. Empty when the no-slip geometries use the data
+    /// immersion.
+    pub wall_stress: WallStressEntries,
     pub boundary_conditions: VelocityBoundaryConditions,
     pub viscosity: Float,
     pub density: Float,
