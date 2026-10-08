@@ -74,12 +74,79 @@ pub struct SlipMirrorStencils {
     pub entries: [Vec<SlipMirrorEntry>; 3],
 }
 
+/// Calls `face_action` for every staggered face (one cell, one axis) that gets a slip-mirror entry,
+/// with the face's base cell extended indices, the flat extended indices of the two cells on each
+/// side of the face, the axis, and the signed distance at the face. Shared by
+/// `SlipMirrorStencils::build` and `SlipMirrorStencils::cells_needing_normals`, so that the normals
+/// are always computed for exactly the cells the entries read them from.
+fn for_each_corrected_face(
+    grid: &Grid,
+    signed_distance_function_slip: &[Float],
+    reach_distance: Float,
+    mut face_action: impl FnMut([usize; 3], usize, usize, usize, Float)
+) {
+    let [nxi, nyi, nzi] = grid.interior_shape;
+
+    for ii in 0..nxi {
+        for ji in 0..nyi {
+            for ki in 0..nzi {
+                let extended_indices = grid.extended_indices_from_interior_indices([ii, ji, ki]);
+                let i_0 = grid.flat_index_on_extended_grid(extended_indices);
+
+                for axis_index in 0..3 {
+                    let mut extended_indices_p = extended_indices;
+                    extended_indices_p[axis_index] += 1;
+
+                    let i_p = grid.flat_index_on_extended_grid(extended_indices_p);
+
+                    let sdf = 0.5 * (
+                        signed_distance_function_slip[i_0] +
+                        signed_distance_function_slip[i_p]
+                    );
+
+                    // Fluid-side faces (sdf >= 0) must stay completely untouched (see the doc
+                    // comment on the old mirror kernel), and cells deeper than
+                    // `reach_distance` can never affect the flow outside the body — skip both
+                    // by simply not creating an entry.
+                    if sdf >= 0.0 || sdf <= -reach_distance {
+                        continue;
+                    }
+
+                    face_action(extended_indices, i_0, i_p, axis_index, sdf);
+                }
+            }
+        }
+    }
+}
+
 impl SlipMirrorStencils {
+    /// Returns, for every cell on the extended grid, whether `build` reads the slip surface normal
+    /// of that cell, given the same `signed_distance_function_slip` and `reach_distance`. Used to
+    /// only compute the normals where they are needed, as each normal is expensive to compute.
+    pub fn cells_needing_normals(
+        grid: &Grid,
+        signed_distance_function_slip: &[Float],
+        reach_distance: Float,
+    ) -> Vec<bool> {
+        let mut cells_needing_normals = vec![false; grid.nr_extended_cells()];
+
+        for_each_corrected_face(
+            grid, signed_distance_function_slip, reach_distance,
+            |_, i_0, i_p, _, _| {
+                cells_needing_normals[i_0] = true;
+                cells_needing_normals[i_p] = true;
+            }
+        );
+
+        cells_needing_normals
+    }
+
     /// Builds the slip-mirror correction entries for every interior cell/axis within
     /// `reach_distance` of a slip surface, sampling the mirrored image point in the given
     /// interpolation `order`. Mirrors the per-cell geometry math that
     /// `correct_velocities_for_slip_geometry_mirror_kernel` used to perform at runtime; since the
-    /// geometry is static, this only needs to run once.
+    /// geometry is static, this only needs to run once. `normals_slip_surfaces` only needs to be
+    /// valid for the cells marked by `cells_needing_normals`.
     pub fn build(
         grid: &Grid,
         signed_distance_function_slip: &[Float],
@@ -90,71 +157,45 @@ impl SlipMirrorStencils {
     ) -> Self {
         let mut entries: [Vec<SlipMirrorEntry>; 3] = Default::default();
 
-        let [nxi, nyi, nzi] = grid.interior_shape;
+        for_each_corrected_face(
+            grid, signed_distance_function_slip, reach_distance,
+            |extended_indices, i_0, i_p, axis_index, sdf| {
+                let mu = Geometry::blending_function(sdf, epsilon);
 
-        for ii in 0..nxi {
-            for ji in 0..nyi {
-                for ki in 0..nzi {
-                    let extended_indices = grid.extended_indices_from_interior_indices([ii, ji, ki]);
-                    let i_0 = grid.flat_index_on_extended_grid(extended_indices);
+                let normal = (
+                    0.5 * (normals_slip_surfaces[i_0] + normals_slip_surfaces[i_p])
+                ).normalize();
 
-                    for axis_index in 0..3 {
-                        let mut extended_indices_p = extended_indices;
-                        extended_indices_p[axis_index] += 1;
+                let mut face_center = grid.cell_center_extended(extended_indices);
+                face_center[axis_index] += 0.5 * grid.cell_length[axis_index];
 
-                        let i_p = grid.flat_index_on_extended_grid(extended_indices_p);
+                // Reflect the face location across the (locally linear) interface to get
+                // the image point on the fluid side: `sdf` is negative inside the body, so
+                // this moves outward.
+                let image_point = face_center - 2.0 * sdf * normal;
 
-                        let sdf = 0.5 * (
-                            signed_distance_function_slip[i_0] +
-                            signed_distance_function_slip[i_p]
-                        );
+                let component_stencils: [SlipMirrorInterpolationStencil; 3] = std::array::from_fn(|component| {
+                    let mut field_origin = grid.cell_center_extended([0, 0, 0]);
+                    field_origin[component] += 0.5 * grid.cell_length[component];
 
-                        // Fluid-side faces (sdf >= 0) must stay completely untouched (see the doc
-                        // comment on the old mirror kernel), and cells deeper than
-                        // `reach_distance` can never affect the flow outside the body — skip both
-                        // by simply not creating an entry.
-                        if sdf >= 0.0 || sdf <= -reach_distance {
-                            continue;
-                        }
-
-                        let mu = Geometry::blending_function(sdf, epsilon);
-
-                        let normal = (
-                            0.5 * (normals_slip_surfaces[i_0] + normals_slip_surfaces[i_p])
-                        ).normalize();
-
-                        let mut face_center = grid.cell_center_extended(extended_indices);
-                        face_center[axis_index] += 0.5 * grid.cell_length[axis_index];
-
-                        // Reflect the face location across the (locally linear) interface to get
-                        // the image point on the fluid side: `sdf` is negative inside the body, so
-                        // this moves outward.
-                        let image_point = face_center - 2.0 * sdf * normal;
-
-                        let component_stencils: [SlipMirrorInterpolationStencil; 3] = std::array::from_fn(|component| {
-                            let mut field_origin = grid.cell_center_extended([0, 0, 0]);
-                            field_origin[component] += 0.5 * grid.cell_length[component];
-
-                            match order {
-                                SlipMirrorInterpolationOrder::Trilinear => SlipMirrorInterpolationStencil::Trilinear(
-                                    grid.trilinear_stencil_at(field_origin, image_point)
-                                ),
-                                SlipMirrorInterpolationOrder::Tricubic => SlipMirrorInterpolationStencil::Tricubic(
-                                    grid.tricubic_stencil_at(field_origin, image_point)
-                                ),
-                            }
-                        });
-
-                        entries[axis_index].push(SlipMirrorEntry {
-                            cell_index: i_0,
-                            mu,
-                            normal,
-                            component_stencils,
-                        });
+                    match order {
+                        SlipMirrorInterpolationOrder::Trilinear => SlipMirrorInterpolationStencil::Trilinear(
+                            grid.trilinear_stencil_at(field_origin, image_point)
+                        ),
+                        SlipMirrorInterpolationOrder::Tricubic => SlipMirrorInterpolationStencil::Tricubic(
+                            grid.tricubic_stencil_at(field_origin, image_point)
+                        ),
                     }
-                }
+                });
+
+                entries[axis_index].push(SlipMirrorEntry {
+                    cell_index: i_0,
+                    mu,
+                    normal,
+                    component_stencils,
+                });
             }
-        }
+        );
 
         Self { entries }
     }

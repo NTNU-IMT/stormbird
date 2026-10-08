@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 
 use super::boundary_conditions::PressureBoundaryConditions;
 use crate::grid::Grid;
-use crate::geometry::Geometry;
+use crate::geometry::WallGeometries;
 use crate::gpu_interface::context::GpuContext;
 
 pub mod settings;
@@ -44,8 +44,8 @@ impl PressureSolverBuilder {
         &self,
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
-        slip_geometries: &[Geometry],
-        no_slip_geometries: &[Geometry],
+        slip_walls: &WallGeometries,
+        no_slip_walls: &WallGeometries,
         gpu_context: Option<&GpuContext>
     ) -> PressureSolver {
         match self {
@@ -57,8 +57,8 @@ impl PressureSolverBuilder {
                                 grid,
                                 boundary_conditions,
                                 settings.build_settings(),
-                                slip_geometries,
-                                no_slip_geometries
+                                slip_walls,
+                                no_slip_walls
                             )
                         )
                     },
@@ -69,8 +69,8 @@ impl PressureSolverBuilder {
                                 grid,
                                 boundary_conditions,
                                 settings.build_settings(),
-                                slip_geometries,
-                                no_slip_geometries
+                                slip_walls,
+                                no_slip_walls
                             )
                         )
                     }

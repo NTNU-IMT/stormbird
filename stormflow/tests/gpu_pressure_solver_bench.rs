@@ -8,6 +8,7 @@ use stormflow::grid::Grid;
 use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
 use stormflow::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver, ZeroGradientOnWalls};
 use stormflow::pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder;
+use stormflow::geometry::WallGeometries;
 
 #[test]
 fn gpu_pressure_solver_bench() {
@@ -27,7 +28,7 @@ fn gpu_pressure_solver_bench() {
         zero_gradient_interpolation_order: ZeroGradientInterpolationOrder::default()
     };
 
-    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &[], &[]);
+    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &WallGeometries::default(), &WallGeometries::default());
 
     let n = grid.nr_interior_cells();
     let mut rhs = vec![0.0 as Float; n];

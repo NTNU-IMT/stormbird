@@ -41,6 +41,31 @@ impl GeometryBuilder {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+/// A set of wall geometries, together with the union of their signed distance functions on the
+/// extended grid of the simulation. The signed distance function is the most expensive part of
+/// setting up the geometry corrections, so it is computed once, when the simulation is built, and
+/// shared by the velocity and the pressure solver.
+pub struct WallGeometries {
+    pub geometries: Vec<Geometry>,
+    /// The union of the signed distance functions of `geometries`, on the extended grid. Empty
+    /// when constructed with `Default`, which is only valid when `geometries` is also empty.
+    pub signed_distance_function: Vec<Float>,
+}
+
+impl WallGeometries {
+    pub fn new(geometries: Vec<Geometry>, grid: &Grid) -> Self {
+        let signed_distance_function = Geometry::signed_distance_function_on_extended_grid(
+            &geometries, grid
+        );
+
+        Self {
+            geometries,
+            signed_distance_function
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Geometry {
     Sphere(Sphere),
@@ -90,13 +115,63 @@ impl Geometry {
             }).collect()
     }
 
-    /// Computes the surface normal direction at each grid point using finite differences
-    /// on the signed distance function union. The normal is computed as the normalized
-    /// gradient of the SDF: n = ∇φ / |∇φ|
+    /// Computes the surface normal direction at `point` using central finite differences, with
+    /// step length `delta` along each axis, on the signed distance function union. The normal is
+    /// computed as the normalized gradient of the SDF: n = ∇φ / |∇φ|
+    pub fn normal_from_signed_distance_function_union(
+        geometries: &[Geometry],
+        point: SpatialVector,
+        delta: SpatialVector
+    ) -> SpatialVector {
+        let dx = Geometry::signed_distance_function_union(
+            geometries,
+            point + SpatialVector::new(delta[0], 0.0, 0.0)
+        ) - Geometry::signed_distance_function_union(
+            geometries,
+            point - SpatialVector::new(delta[0], 0.0, 0.0)
+        );
+
+        let dy = Geometry::signed_distance_function_union(
+            geometries,
+            point + SpatialVector::new(0.0, delta[1], 0.0)
+        ) - Geometry::signed_distance_function_union(
+            geometries,
+            point - SpatialVector::new(0.0, delta[1], 0.0)
+        );
+
+        let dz = Geometry::signed_distance_function_union(
+            geometries,
+            point + SpatialVector::new(0.0, 0.0, delta[2])
+        ) - Geometry::signed_distance_function_union(
+            geometries,
+            point - SpatialVector::new(0.0, 0.0, delta[2])
+        );
+
+        let gradient = SpatialVector::new(
+            dx / (2.0 * delta[0]),
+            dy / (2.0 * delta[1]),
+            dz / (2.0 * delta[2])
+        );
+
+        // Normalize to get unit normal (handle zero gradient case)
+        let length = gradient.length();
+        if length > 1e-12 {
+            gradient / length
+        } else {
+            SpatialVector::default()
+        }
+    }
+
+    /// Computes the surface normal direction (see `normal_from_signed_distance_function_union`),
+    /// with a step length of `delta_factor` cell lengths, at the cells on the extended grid where
+    /// `cells_to_compute` is `true`. All other cells are set to zero. Each normal requires six
+    /// evaluations of the signed distance function, so this is only done for the cells where the
+    /// normal is actually used.
     pub fn geometry_normals_on_extended_grid(
         geometries: &[Geometry], 
         grid: &Grid, 
-        delta_factor: Float
+        delta_factor: Float,
+        cells_to_compute: &[bool]
     ) -> Vec<SpatialVector> {
         let delta = delta_factor * grid.cell_length;
         
@@ -104,47 +179,14 @@ impl Geometry {
 
         (0..nr_extended_cells).into_par_iter()
             .map(|i_flat_extended| {
+                if !cells_to_compute[i_flat_extended] {
+                    return SpatialVector::default();
+                }
+
                 let extended_indices = grid.extended_indices_from_flat_index(i_flat_extended);
                 let cell_center = grid.cell_center_extended(extended_indices);
 
-                // Compute gradient using central finite differences
-                let dx = Geometry::signed_distance_function_union(
-                    geometries,
-                    cell_center + SpatialVector::new(delta[0], 0.0, 0.0)
-                ) - Geometry::signed_distance_function_union(
-                    geometries,
-                    cell_center - SpatialVector::new(delta[0], 0.0, 0.0)
-                );
-
-                let dy = Geometry::signed_distance_function_union(
-                    geometries,
-                    cell_center + SpatialVector::new(0.0, delta[1], 0.0)
-                ) - Geometry::signed_distance_function_union(
-                    geometries,
-                    cell_center - SpatialVector::new(0.0, delta[1], 0.0)
-                );
-
-                let dz = Geometry::signed_distance_function_union(
-                    geometries,
-                    cell_center + SpatialVector::new(0.0, 0.0, delta[2])
-                ) - Geometry::signed_distance_function_union(
-                    geometries,
-                    cell_center - SpatialVector::new(0.0, 0.0, delta[2])
-                );
-
-                let gradient = SpatialVector::new(
-                    dx / (2.0 * delta[0]),
-                    dy / (2.0 * delta[1]),
-                    dz / (2.0 * delta[2])
-                );
-
-                // Normalize to get unit normal (handle zero gradient case)
-                let length = gradient.length();
-                if length > 1e-12 {
-                    gradient / length
-                } else {
-                    SpatialVector::default()
-                }
+                Geometry::normal_from_signed_distance_function_union(geometries, cell_center, delta)
             }).collect()
     }
 

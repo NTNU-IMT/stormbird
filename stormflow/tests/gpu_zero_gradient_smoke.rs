@@ -1,7 +1,7 @@
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 
-use stormflow::geometry::Geometry;
+use stormflow::geometry::{Geometry, WallGeometries};
 use stormflow::geometry::analytical_shapes::Sphere;
 use stormflow::grid::Grid;
 use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
@@ -55,14 +55,17 @@ fn solve(
 
     let rhs = synthetic_rhs(grid);
 
+    let slip_walls = WallGeometries::new(slip_geometries.to_vec(), grid);
+    let no_slip_walls = WallGeometries::new(no_slip_geometries.to_vec(), grid);
+
     let mut cpu_solver = MultigridCPU::new(
-        grid, &boundary_conditions, settings.clone(), slip_geometries, no_slip_geometries
+        grid, &boundary_conditions, settings.clone(), &slip_walls, &no_slip_walls
     );
     cpu_solver.rhs_at_levels[0].copy_from_slice(&rhs);
     cpu_solver.solve();
 
     let mut gpu_solver = MultigridGPU::new(
-        grid, &boundary_conditions, settings, slip_geometries, no_slip_geometries
+        grid, &boundary_conditions, settings, &slip_walls, &no_slip_walls
     );
     gpu_solver.rhs.copy_from_slice(&rhs);
     gpu_solver.solve();

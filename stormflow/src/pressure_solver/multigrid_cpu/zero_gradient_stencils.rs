@@ -2,9 +2,11 @@ use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;
 
+use rayon::prelude::*;
+
 use crate::grid::Grid;
 use crate::grid::interpolation::{TrilinearStencil, TricubicStencil};
-use crate::geometry::Geometry;
+use crate::geometry::{Geometry, WallGeometries};
 
 use super::kernels::jacobi::ZERO_GRADIENT_RELAXATION;
 use super::settings::MultigridSettings;
@@ -53,6 +55,113 @@ impl ZeroGradientInterpolationStencil {
 /// the pruning boundary instead of leaving a partially-blended band that then gets discarded.
 pub const ZERO_GRADIENT_REACH_CELLS: Float = 2.0;
 
+/// Safety margin, as a multiple of the largest cell length of the finer level, added to the
+/// distance between a coarse cell center and its children when bounding the signed distance
+/// function on a coarse level (see `SignedDistanceBounds::coarsened`). Covers round-off errors in
+/// the signed distance function, so that the pruning never skips a cell that would have gotten an
+/// entry if the signed distance function had been evaluated directly.
+const SIGNED_DISTANCE_BOUND_MARGIN_CELLS: Float = 0.1;
+
+fn max_cell_length(grid: &Grid) -> Float {
+    let mut max_dx = 0.0;
+    for axis_index in 0..3 {
+        if grid.cell_length[axis_index] > max_dx {
+            max_dx = grid.cell_length[axis_index];
+        }
+    }
+
+    max_dx
+}
+
+/// Lower and upper bounds on the signed distance function of the wall geometries, for each
+/// interior cell (flat index) of one multigrid level. Evaluating the signed distance function is
+/// the expensive part of building the stencils, so on the coarse levels it is only evaluated
+/// exactly (giving `lower == upper`) for the cells that the bounds from the finer level can't rule
+/// out from getting an entry. Since only cells with `-reach_distance < sdf < 0` get an entry, this
+/// is a thin band of cells around the wall surfaces.
+struct SignedDistanceBounds {
+    lower: Vec<Float>,
+    upper: Vec<Float>,
+}
+
+impl SignedDistanceBounds {
+    /// Exact values on the finest level, taken from the precomputed signed distance functions of
+    /// the selected walls. The union of several sets of walls is the minimum of their signed
+    /// distance functions.
+    fn finest_level(grid: &Grid, selected_walls: &[&WallGeometries]) -> Self {
+        let sdf: Vec<Float> = (0..grid.nr_interior_cells()).into_par_iter()
+            .map(|cell_index| {
+                let interior_indices = grid.interior_indices_from_flat_index(cell_index);
+                let i_extended = grid.flat_index_on_extended_grid_from_interior_indices(interior_indices);
+
+                selected_walls.iter()
+                    .map(|walls| walls.signed_distance_function[i_extended])
+                    .fold(Float::MAX, Float::min)
+            }).collect();
+
+        Self {
+            lower: sdf.clone(),
+            upper: sdf,
+        }
+    }
+
+    /// Bounds on `coarse_grid`, derived from the bounds on the next finer level. The signed
+    /// distance function changes by at most the distance moved, and each coarse cell center is at
+    /// a distance of half a fine cell diagonal from the centers of its eight children. Coarse
+    /// cells where the resulting bounds show that they can't get an entry (see `build_level`) keep
+    /// the bounds, while the signed distance function is evaluated exactly for the rest.
+    fn coarsened(
+        &self,
+        fine_grid: &Grid,
+        coarse_grid: &Grid,
+        wall_geometries: &[Geometry]
+    ) -> Self {
+        let child_distance = 0.5 * fine_grid.cell_length.length() +
+            SIGNED_DISTANCE_BOUND_MARGIN_CELLS * max_cell_length(fine_grid);
+
+        let reach_distance = ZERO_GRADIENT_REACH_CELLS * max_cell_length(coarse_grid);
+
+        let (lower, upper) = (0..coarse_grid.nr_interior_cells()).into_par_iter()
+            .map(|coarse_index| {
+                let [ic, jc, kc] = coarse_grid.interior_indices_from_flat_index(coarse_index);
+
+                let mut max_fine_lower = -Float::MAX;
+                let mut min_fine_upper = Float::MAX;
+
+                for i_offset in 0..2 {
+                    for j_offset in 0..2 {
+                        for k_offset in 0..2 {
+                            let fine_index = fine_grid.flat_index_on_interior_grid(
+                                [2 * ic + i_offset, 2 * jc + j_offset, 2 * kc + k_offset]
+                            );
+
+                            max_fine_lower = max_fine_lower.max(self.lower[fine_index]);
+                            min_fine_upper = min_fine_upper.min(self.upper[fine_index]);
+                        }
+                    }
+                }
+
+                let lower = max_fine_lower - child_distance;
+                let upper = min_fine_upper + child_distance;
+
+                if lower >= 0.0 || upper <= -reach_distance {
+                    (lower, upper)
+                } else {
+                    let extended_indices = coarse_grid.extended_indices_from_interior_indices([ic, jc, kc]);
+
+                    let sdf = Geometry::signed_distance_function_union(
+                        wall_geometries,
+                        coarse_grid.cell_center_extended(extended_indices)
+                    );
+
+                    (sdf, sdf)
+                }
+            }).unzip();
+
+        Self { lower, upper }
+    }
+}
+
 #[derive(Debug, Clone)]
 /// A precomputed pressure zero-gradient (Neumann) correction for one interior cell of one
 /// multigrid level. Everything geometry-dependent (how much to blend, the interpolation stencil
@@ -82,107 +191,114 @@ pub struct ZeroGradientStencils {
 }
 
 impl ZeroGradientStencils {
-    /// Builds the stencils for every level in `grids` (a multigrid hierarchy), for the walls
-    /// selected by `settings.zero_gradient_on_walls`. All levels get empty stencils if the
-    /// condition is not used. Shared by `MultigridCPU` and `MultigridGPU`.
+    /// Builds the stencils for every level in `grids` (a multigrid hierarchy, where the first level
+    /// must be the grid that the signed distance functions in `slip_walls`/`no_slip_walls` are
+    /// computed on), for the walls selected by `settings.zero_gradient_on_walls`. All levels get
+    /// empty stencils if the condition is not used. Shared by `MultigridCPU` and `MultigridGPU`.
     pub fn build_for_all_levels(
         grids: &[Grid],
         settings: &MultigridSettings,
-        slip_geometries: &[Geometry],
-        no_slip_geometries: &[Geometry]
+        slip_walls: &WallGeometries,
+        no_slip_walls: &WallGeometries
     ) -> Vec<Self> {
-        let wall_geometries = settings.zero_gradient_on_walls.wall_geometries(
-            slip_geometries, no_slip_geometries
+        let selected_walls = settings.zero_gradient_on_walls.selected_walls(
+            slip_walls, no_slip_walls
         );
 
-        if !wall_geometries.is_empty() {
-            println!("Building per-level zero-gradient stencils");
+        if selected_walls.is_empty() {
+            return vec![Self::default(); grids.len()];
         }
 
-        grids.iter()
-            .map(|level_grid| Self::build(level_grid, &wall_geometries, settings.zero_gradient_interpolation_order))
-            .collect()
+        println!("Building per-level zero-gradient stencils");
+
+        let wall_geometries: Vec<Geometry> = selected_walls.iter()
+            .flat_map(|walls| walls.geometries.iter().cloned())
+            .collect();
+
+        let mut stencils = Vec::with_capacity(grids.len());
+        let mut bounds = SignedDistanceBounds::finest_level(&grids[0], &selected_walls);
+
+        for (level, level_grid) in grids.iter().enumerate() {
+            if level > 0 {
+                bounds = bounds.coarsened(&grids[level - 1], level_grid, &wall_geometries);
+            }
+
+            stencils.push(
+                Self::build_level(level_grid, &wall_geometries, &bounds, settings.zero_gradient_interpolation_order)
+            );
+        }
+
+        stencils
     }
 
     /// Builds the pressure zero-gradient correction entries for `grid` (one level of a multigrid
     /// hierarchy), `wall_geometries`, and the chosen interpolation `order`. The signed distance
-    /// function and normals are only needed transiently here to build the stencils, not kept around
-    /// afterward — everything needed at solve time ends up baked into the returned
-    /// `entries`/`cell_lookup`.
-    pub fn build(grid: &Grid, wall_geometries: &[Geometry], order: ZeroGradientInterpolationOrder) -> Self {
-        if wall_geometries.is_empty() {
-            return Self::default();
-        }
-
-        let signed_distance_function = Geometry::signed_distance_function_on_extended_grid(
-            wall_geometries, grid
-        );
-        let normals = Geometry::geometry_normals_on_extended_grid(
-            wall_geometries, grid, 0.1
-        );
-
-        let mut max_dx = 0.0;
-        for axis_index in 0..3 {
-            if grid.cell_length[axis_index] > max_dx {
-                max_dx = grid.cell_length[axis_index];
-            }
-        }
-
+    /// function bounds and the normals are only needed transiently here to build the stencils, not
+    /// kept around afterward — everything needed at solve time ends up baked into the returned
+    /// `entries`/`cell_lookup`. The normals are only computed for the cells that get an entry.
+    fn build_level(
+        grid: &Grid,
+        wall_geometries: &[Geometry],
+        bounds: &SignedDistanceBounds,
+        order: ZeroGradientInterpolationOrder
+    ) -> Self {
         // The reach also doubles as the blending width, so `mu` saturates to 0 exactly at the
         // pruning boundary (see `ZERO_GRADIENT_REACH_CELLS`'s doc comment).
-        let epsilon = ZERO_GRADIENT_REACH_CELLS * max_dx;
+        let epsilon = ZERO_GRADIENT_REACH_CELLS * max_cell_length(grid);
         let reach_distance = epsilon;
+
+        let normal_delta = 0.1 * grid.cell_length;
 
         let field_origin = grid.cell_center([0, 0, 0]);
 
-        let mut entries = Vec::new();
+        let corrected_cells: Vec<(usize, ZeroGradientEntry)> = (0..grid.nr_interior_cells()).into_par_iter()
+            .filter_map(|cell_index| {
+                // Fluid-side cells (sdf >= 0) must stay untouched, and cells deeper than
+                // `reach_distance` can never affect the pressure field outside the body at
+                // this level's resolution — skip both by simply not creating an entry. This also
+                // skips all cells where the signed distance function is only bounded.
+                if bounds.lower[cell_index] >= 0.0 || bounds.upper[cell_index] <= -reach_distance {
+                    return None;
+                }
+
+                debug_assert!(bounds.lower[cell_index] == bounds.upper[cell_index]);
+
+                let sdf = bounds.lower[cell_index];
+
+                let mu = Geometry::blending_function(sdf, epsilon);
+
+                let interior_indices = grid.interior_indices_from_flat_index(cell_index);
+                let extended_indices = grid.extended_indices_from_interior_indices(interior_indices);
+
+                let cell_center = grid.cell_center_extended(extended_indices);
+
+                let normal = Geometry::normal_from_signed_distance_function_union(
+                    wall_geometries, cell_center, normal_delta
+                );
+
+                // Reflect the cell center across the (locally linear) interface to get the
+                // image point on the fluid side: `sdf` is negative inside the body, so this
+                // moves outward.
+                let image_point = cell_center - 2.0 * sdf * normal;
+
+                let stencil = match order {
+                    ZeroGradientInterpolationOrder::Trilinear => ZeroGradientInterpolationStencil::Trilinear(
+                        grid.trilinear_stencil_at_interior(field_origin, image_point)
+                    ),
+                    ZeroGradientInterpolationOrder::Tricubic => ZeroGradientInterpolationStencil::Tricubic(
+                        grid.tricubic_stencil_at_interior(field_origin, image_point)
+                    ),
+                };
+
+                Some((cell_index, ZeroGradientEntry { mu, stencil }))
+            }).collect();
+
+        let mut entries = Vec::with_capacity(corrected_cells.len());
         let mut cell_lookup = vec![-1i32; grid.nr_interior_cells()];
 
-        let [nxi, nyi, nzi] = grid.interior_shape;
-
-        for ii in 0..nxi {
-            for ji in 0..nyi {
-                for ki in 0..nzi {
-                    let extended_indices = grid.extended_indices_from_interior_indices([ii, ji, ki]);
-                    let i_extended = grid.flat_index_on_extended_grid(extended_indices);
-
-                    let sdf = signed_distance_function[i_extended];
-
-                    // Fluid-side cells (sdf >= 0) must stay untouched, and cells deeper than
-                    // `reach_distance` can never affect the pressure field outside the body at
-                    // this level's resolution — skip both by simply not creating an entry.
-                    if sdf >= 0.0 || sdf <= -reach_distance {
-                        continue;
-                    }
-
-                    let mu = Geometry::blending_function(sdf, epsilon);
-                    let normal = normals[i_extended];
-
-                    let cell_center = grid.cell_center_extended(extended_indices);
-
-                    // Reflect the cell center across the (locally linear) interface to get the
-                    // image point on the fluid side: `sdf` is negative inside the body, so this
-                    // moves outward.
-                    let image_point = cell_center - 2.0 * sdf * normal;
-
-                    let stencil = match order {
-                        ZeroGradientInterpolationOrder::Trilinear => ZeroGradientInterpolationStencil::Trilinear(
-                            grid.trilinear_stencil_at_interior(field_origin, image_point)
-                        ),
-                        ZeroGradientInterpolationOrder::Tricubic => ZeroGradientInterpolationStencil::Tricubic(
-                            grid.tricubic_stencil_at_interior(field_origin, image_point)
-                        ),
-                    };
-
-                    let cell_index = grid.flat_index_on_interior_grid([ii, ji, ki]);
-                    cell_lookup[cell_index] = entries.len() as i32;
-
-                    entries.push(ZeroGradientEntry {
-                        mu,
-                        stencil,
-                    });
-                }
-            }
+        for (cell_index, entry) in corrected_cells {
+            cell_lookup[cell_index] = entries.len() as i32;
+            entries.push(entry);
         }
 
         Self { entries, cell_lookup }

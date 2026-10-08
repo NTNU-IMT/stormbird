@@ -24,6 +24,8 @@ use gpu::VelocitySolverGPU;
 pub struct VelocitySolverSetup {
     pub signed_distance_function: Vec<Float>,
     pub signed_distance_function_slip: Vec<Float>,
+    /// Only computed for the cells where the slip-mirror stencils use them (see
+    /// `SlipMirrorStencils::cells_needing_normals`), and zero everywhere else.
     pub normals_slip_surfaces: Vec<SpatialVector>,
     pub no_slip_corrections: NoSlipCorrections,
     pub slip_mirror_stencils: SlipMirrorStencils,

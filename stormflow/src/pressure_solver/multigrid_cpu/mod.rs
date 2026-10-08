@@ -16,7 +16,7 @@ use kernels::{
 
 use crate::{
     pressure_solver::boundary_conditions::PressureBoundaryConditions,
-    geometry::Geometry,
+    geometry::WallGeometries,
     grid::Grid
 };
 
@@ -60,8 +60,8 @@ impl MultigridCPU {
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
-        slip_geometries: &[Geometry],
-        no_slip_geometries: &[Geometry]
+        slip_walls: &WallGeometries,
+        no_slip_walls: &WallGeometries
     ) -> Self {
         let grids = grid.multigrid_hierarchy();
 
@@ -92,7 +92,7 @@ impl MultigridCPU {
         };
 
         let zero_gradient_stencils = ZeroGradientStencils::build_for_all_levels(
-            &grids, &solver_settings, slip_geometries, no_slip_geometries
+            &grids, &solver_settings, slip_walls, no_slip_walls
         );
 
         Self {

@@ -22,7 +22,8 @@ use crate::grid::{
 use crate::simulation::{Simulation, SolverSettings};
 use crate::geometry::{
     Geometry,
-    GeometryBuilder
+    GeometryBuilder,
+    WallGeometries
 };
 use crate::pressure_solver::{
     builder::PressureSolverBuilder,
@@ -167,6 +168,12 @@ impl SimulationBuilder {
             )
         }
 
+        // The signed distance functions are computed once, and shared by the pressure and the
+        // velocity solver
+        println!("Calculating SDF");
+        let no_slip_walls = WallGeometries::new(geometries, &grid);
+        let slip_walls = WallGeometries::new(slip_geometries, &grid);
+
         // One context shared by all solvers on the GPU, so that they can share buffers
         let gpu_context = if self.velocity_solver_compute_platform.is_gpu() || 
             self.pressure_solver.compute_platform().is_gpu() {
@@ -178,22 +185,23 @@ impl SimulationBuilder {
         let pressure_solver = self.pressure_solver.build(
             &grid,
             &pressure_boundary_conditions,
-            &slip_geometries,
-            &geometries,
+            &slip_walls,
+            &no_slip_walls,
             gpu_context.as_ref()
         );
 
-        println!("Calculating SDF");
-        let signed_distance_function = Geometry::signed_distance_function_on_extended_grid(
-            &geometries, &grid
-        );
+        let signed_distance_function = no_slip_walls.signed_distance_function;
+        let signed_distance_function_slip = slip_walls.signed_distance_function;
 
-        let signed_distance_function_slip = Geometry::signed_distance_function_on_extended_grid(
-            &slip_geometries, &grid
-        );
+        let slip_reach_distance = SLIP_MIRROR_REACH_CELLS * max_dx;
 
+        // The normals are only computed where the slip-mirror stencils use them, and are zero
+        // everywhere else
         let normals_slip_surfaces = Geometry::geometry_normals_on_extended_grid(
-            &slip_geometries, &grid, 0.1
+            &slip_walls.geometries, &grid, 0.1,
+            &SlipMirrorStencils::cells_needing_normals(
+                &grid, &signed_distance_function_slip, slip_reach_distance
+            )
         );
 
         let slip_epsilon = 4.0 * max_dx;
@@ -211,7 +219,7 @@ impl SimulationBuilder {
             &signed_distance_function_slip,
             &normals_slip_surfaces,
             slip_epsilon,
-            SLIP_MIRROR_REACH_CELLS * max_dx,
+            slip_reach_distance,
             self.slip_velocity_interpolation_order,
         );
 

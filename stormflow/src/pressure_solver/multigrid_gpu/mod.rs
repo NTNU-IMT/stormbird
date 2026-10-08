@@ -8,7 +8,7 @@ use super::{
 };
 
 use crate::grid::Grid;
-use crate::geometry::Geometry;
+use crate::geometry::WallGeometries;
 
 pub mod kernels;
 
@@ -139,11 +139,11 @@ impl MultigridGPU {
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
-        slip_geometries: &[Geometry],
-        no_slip_geometries: &[Geometry]
+        slip_walls: &WallGeometries,
+        no_slip_walls: &WallGeometries
     ) -> Self {
         Self::new_with_context(
-            GpuContext::new(), grid, boundary_conditions, solver_settings, slip_geometries, no_slip_geometries
+            GpuContext::new(), grid, boundary_conditions, solver_settings, slip_walls, no_slip_walls
         )
     }
 
@@ -154,8 +154,8 @@ impl MultigridGPU {
         grid: &Grid,
         boundary_conditions: &PressureBoundaryConditions,
         solver_settings: MultigridSettings,
-        slip_geometries: &[Geometry],
-        no_slip_geometries: &[Geometry]
+        slip_walls: &WallGeometries,
+        no_slip_walls: &WallGeometries
     ) -> Self {
         let grids = grid.multigrid_hierarchy();
         let nr_levels = grids.len();
@@ -165,7 +165,7 @@ impl MultigridGPU {
         let prolongate_shader = ProlongateShader::new(&gpu_context);
 
         let zero_gradient_stencils = ZeroGradientStencils::build_for_all_levels(
-            &grids, &solver_settings, slip_geometries, no_slip_geometries
+            &grids, &solver_settings, slip_walls, no_slip_walls
         );
 
         let jacobi_zero_gradient_shader = if solver_settings.zero_gradient_on_walls.is_used() {

@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 
 use super::zero_gradient_stencils::ZeroGradientInterpolationOrder;
-use crate::geometry::Geometry;
+use crate::geometry::WallGeometries;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 /// How the coarsest multigrid level's Poisson equation is solved at the bottom of each V-cycle.
@@ -47,18 +47,22 @@ impl ZeroGradientOnWalls {
         *self != Self::NotUsed
     }
 
-    /// Returns the geometries that should get the zero-gradient condition
-    pub fn wall_geometries(
+    /// Returns the wall geometry sets that should get the zero-gradient condition
+    pub fn selected_walls<'a>(
         &self,
-        slip_geometries: &[Geometry],
-        no_slip_geometries: &[Geometry]
-    ) -> Vec<Geometry> {
-        match self {
-            Self::NotUsed => Vec::new(),
-            Self::SlipWallsOnly => slip_geometries.to_vec(),
-            Self::NoSlipWallsOnly => no_slip_geometries.to_vec(),
-            Self::AllWalls => slip_geometries.iter().chain(no_slip_geometries).cloned().collect(),
-        }
+        slip_walls: &'a WallGeometries,
+        no_slip_walls: &'a WallGeometries
+    ) -> Vec<&'a WallGeometries> {
+        let selected = match self {
+            Self::NotUsed => vec![],
+            Self::SlipWallsOnly => vec![slip_walls],
+            Self::NoSlipWallsOnly => vec![no_slip_walls],
+            Self::AllWalls => vec![slip_walls, no_slip_walls],
+        };
+
+        selected.into_iter()
+            .filter(|walls| !walls.geometries.is_empty())
+            .collect()
     }
 }
 

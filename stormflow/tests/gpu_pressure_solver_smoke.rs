@@ -8,6 +8,7 @@ use stormflow::pressure_solver::multigrid_cpu::MultigridCPU;
 use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
 use stormflow::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver, ZeroGradientOnWalls};
 use stormflow::pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder;
+use stormflow::geometry::WallGeometries;
 
 /// Builds a synthetic RHS (not physically meaningful, just varied enough to exercise the
 /// restrict/prolongate/smoother chain across every multigrid level, including the coarsest one).
@@ -43,11 +44,11 @@ fn assert_gpu_matches_cpu(grid: &Grid, coarsest_level_solver: CoarsestLevelSolve
 
     let rhs = synthetic_rhs(&grid);
 
-    let mut cpu_solver = MultigridCPU::new(&grid, &boundary_conditions, settings.clone(), &[], &[]);
+    let mut cpu_solver = MultigridCPU::new(&grid, &boundary_conditions, settings.clone(), &WallGeometries::default(), &WallGeometries::default());
     cpu_solver.rhs_at_levels[0].copy_from_slice(&rhs);
     cpu_solver.solve();
 
-    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &[], &[]);
+    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &WallGeometries::default(), &WallGeometries::default());
     gpu_solver.rhs.copy_from_slice(&rhs);
     gpu_solver.solve();
 
