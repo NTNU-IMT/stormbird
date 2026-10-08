@@ -19,11 +19,11 @@ use super::settings::MultigridSettings;
 pub enum ZeroGradientInterpolationOrder {
     /// 2nd order accurate. Trilinear weights are always non-negative and sum to 1 (a true convex
     /// combination), so this interpolation can never amplify oscillatory error the way the cubic
-    /// variant can (see `ZERO_GRADIENT_RELAXATION`'s doc comment) — useful for comparing whether
-    /// that's actually what's driving a given stability/accuracy trade-off.
-    Trilinear,
-    /// 4th order accurate, matching the rest of the pressure solve's accuracy order. Default.
+    /// variant can (see `ZERO_GRADIENT_RELAXATION`'s doc comment). Default, as it is the most
+    /// robust choice, and matches the default of the velocity mirror correction.
     #[default]
+    Trilinear,
+    /// 4th order accurate, matching the rest of the pressure solve's accuracy order.
     Tricubic,
 }
 

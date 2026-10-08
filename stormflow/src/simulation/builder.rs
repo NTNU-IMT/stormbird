@@ -1,6 +1,5 @@
 
 use std::fs;
-use std::collections::HashSet;
 
 use serde::{Serialize, Deserialize};
 
@@ -32,26 +31,17 @@ use crate::pressure_solver::{
 };
 
 use crate::velocity_solver::{
-    VelocitySolver, VelocitySolverSetup, boundary_condisitions::VelocityBoundaryConditions,
-    slip_mirror_stencils::{
-        SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS, mirror_interior_corrections
-    },
-    no_slip_corrections::NoSlipCorrections,
-    wall_model::{NoSlipWallTreatment, WallStressEntries},
-    cpu::VelocitySolverCPU,
-    gpu::{VelocitySolverGPU, SharedPressureBuffers},
+    VelocitySolver,
+    builder::VelocitySolverBuilder,
+    boundary_condisitions::VelocityBoundaryConditions,
 };
-use crate::pressure_solver::PressureSolver;
 use crate::turbulence_solver::{
     TurbulenceSolver,
     builder::TurbulenceSolverBuilder,
     cpu::TurbulenceSolverCPU,
     gpu::TurbulenceSolverGPU,
 };
-use crate::gpu_interface::{
-    ComputePlatform,
-    context::GpuContext
-};
+use crate::gpu_interface::context::GpuContext;
 
 use crate::error::Error;
 
@@ -71,32 +61,17 @@ pub struct SimulationBuilder {
     pub effective_viscosity: Float,
     #[serde(default)]
     pub wind_environment: WindEnvironment,
+    /// Settings for the velocity solver
+    #[serde(default)]
+    pub velocity_solver: VelocitySolverBuilder,
+    /// Settings for the pressure solver
     #[serde(default)]
     pub pressure_solver: PressureSolverBuilder,
     #[serde(default)]
     pub solver_settings: SolverSettings,
-    /// Interpolation order for the slip-wall *velocity* mirror correction specifically (see
-    /// `SlipMirrorInterpolationOrder`) — independent of `pressure_solver`'s equivalent pressure
-    /// setting, though you'll usually want to set both to the same order for matching accuracy at
-    /// the slip wall on both fields. Defaults to 4th order (`Tricubic`, matching the rest of the
-    /// solver); switch to `Trilinear` (2nd order) for thin walls, where the tricubic stencil's
-    /// wider reach is more likely to pull an image point in from the wrong side of a nearby
-    /// second surface.
-    #[serde(default)]
-    pub slip_velocity_interpolation_order: SlipMirrorInterpolationOrder,
     /// Optional "override" of the boundary conditions, to be able to set some to slip walls
     #[serde(default)]
     pub slip_wall_boundary_override: [[bool; 2]; 3],
-    /// How the velocity solver treats the no-slip geometries: with the data immersion (default),
-    /// or with the wall model, which is a slip condition together with the wall shear stress from
-    /// the log-law (see `velocity_solver::wall_model`).
-    #[serde(default)]
-    pub no_slip_wall_treatment: NoSlipWallTreatment,
-    /// Where to execute the velocity solver. Independent of where the pressure solver is executed
-    /// (see `pressure_solver`), but the fewest transfers between the host and the device happen 
-    /// when both are on the same platform.
-    #[serde(default)]
-    pub velocity_solver_compute_platform: ComputePlatform,
     /// Optional RANS turbulence model. The turbulence solver always runs on the same platform as
     /// the velocity solver. `effective_viscosity` is used as the molecular viscosity when a
     /// turbulence model is used.
@@ -149,13 +124,6 @@ impl SimulationBuilder {
 
         let velocity = velocity_boundary_conditions.initial_velocity(&grid);
 
-        let mut max_dx = 0.0;
-        for axis_index in 0..3 {
-            if grid.cell_length[axis_index] > max_dx {
-                max_dx = grid.cell_length[axis_index];
-            }
-        }
-
         let actuator_line = self.actuator_line.as_ref().map(|builder| {
             let mut model = builder.build();
 
@@ -195,7 +163,7 @@ impl SimulationBuilder {
         let slip_walls = WallGeometries::new(slip_geometries, &grid);
 
         // One context shared by all solvers on the GPU, so that they can share buffers
-        let gpu_context = if self.velocity_solver_compute_platform.is_gpu() || 
+        let gpu_context = if self.velocity_solver.compute_platform.is_gpu() || 
             self.pressure_solver.compute_platform().is_gpu() {
             Some(GpuContext::new())
         } else {
@@ -210,10 +178,8 @@ impl SimulationBuilder {
             gpu_context.as_ref()
         );
 
-        // The blending width of the no-slip correction, which the turbulence solver's wall
-        // treatment must be consistent with
-        let no_slip_epsilon = 2.0 * max_dx;
-
+        // The turbulence solver's wall treatment must be consistent with the blending width of the
+        // no-slip correction
         let turbulence_solver_setup = self.turbulence.as_ref().map(|builder| {
             builder.build_setup(
                 &grid,
@@ -222,141 +188,23 @@ impl SimulationBuilder {
                 &no_slip_walls,
                 &slip_walls,
                 self.effective_viscosity,
-                no_slip_epsilon
+                self.velocity_solver.no_slip_epsilon(&grid)
             )
         });
 
-        let use_eddy_viscosity = turbulence_solver_setup.is_some();
-
-        let use_wall_model = self.no_slip_wall_treatment == NoSlipWallTreatment::WallModel;
-
-        // With the wall model, the no-slip geometries get the same mirror correction as the slip
-        // geometries, so the stencils are built from the union of both
-        let mirror_geometries: Vec<Geometry> = if use_wall_model {
-            slip_walls.geometries.iter().chain(no_slip_walls.geometries.iter()).cloned().collect()
-        } else {
-            slip_walls.geometries.clone()
-        };
-
-        let signed_distance_function_mirror: Vec<Float> = if use_wall_model {
-            slip_walls.signed_distance_function.iter()
-                .zip(&no_slip_walls.signed_distance_function)
-                .map(|(slip, no_slip)| slip.min(*no_slip))
-                .collect()
-        } else {
-            slip_walls.signed_distance_function.clone()
-        };
-
-        let wall_stress = if use_wall_model {
-            println!("Building wall model");
-            WallStressEntries::build(
-                &grid,
-                &no_slip_walls.geometries,
-                &no_slip_walls.signed_distance_function,
-                &slip_walls.signed_distance_function,
-            )
-        } else {
-            WallStressEntries::default()
-        };
-
-        let no_slip_geometries = no_slip_walls.geometries.clone();
-        let signed_distance_function = no_slip_walls.signed_distance_function;
-        let signed_distance_function_slip = slip_walls.signed_distance_function;
-
-        let slip_reach_distance = SLIP_MIRROR_REACH_CELLS * max_dx;
-
-        // The normals are only computed where the slip-mirror stencils use them, and are zero
-        // everywhere else
-        let normals_slip_surfaces = Geometry::geometry_normals_on_extended_grid(
-            &mirror_geometries, &grid, 0.1,
-            &SlipMirrorStencils::cells_needing_normals(
-                &grid, &signed_distance_function_mirror, slip_reach_distance
-            )
-        );
-
-        let slip_epsilon = 4.0 * max_dx;
-
-        println!("Building slip-mirror stencils");
-        let mut slip_mirror_stencils = SlipMirrorStencils::build(
+        let velocity_solver = self.velocity_solver.build(
             &grid,
-            &signed_distance_function_mirror,
-            &normals_slip_surfaces,
-            slip_epsilon,
-            slip_reach_distance,
-            self.slip_velocity_interpolation_order,
-        );
-
-        // The velocity is set to zero deep inside the geometries with a mirror correction, and where
-        // the mirror correction is not well defined, see `mirror_interior_corrections`
-        println!("Building corrections for the interior of the mirror geometries");
-        let all_geometries: Vec<Geometry> = slip_walls.geometries.iter()
-            .chain(no_slip_geometries.iter())
-            .cloned()
-            .collect();
-
-        let (mirror_interior, zeroed_faces) = mirror_interior_corrections(
-            &grid,
-            &mirror_geometries,
-            &all_geometries,
-            &signed_distance_function_mirror,
-            slip_reach_distance,
-        );
-
-        let zeroed_faces: HashSet<(usize, usize)> = zeroed_faces.into_iter().collect();
-
-        for (axis, entries) in slip_mirror_stencils.entries.iter_mut().enumerate() {
-            entries.retain(|entry| !zeroed_faces.contains(&(entry.cell_index, axis)));
-        }
-
-        let no_slip_corrections = if use_wall_model {
-            mirror_interior
-        } else {
-            println!("Building no-slip corrections");
-            NoSlipCorrections::build(
-                &grid,
-                &signed_distance_function,
-                no_slip_epsilon,
-            ).merged(mirror_interior)
-        };
-
-        let velocity_solver_setup = VelocitySolverSetup {
-            signed_distance_function,
-            signed_distance_function_slip,
-            normals_slip_surfaces,
-            no_slip_corrections,
-            slip_mirror_stencils,
-            wall_stress,
-            boundary_conditions: velocity_boundary_conditions,
-            viscosity: self.effective_viscosity,
+            velocity_boundary_conditions,
+            velocity,
+            no_slip_walls,
+            slip_walls,
+            self.effective_viscosity,
             density,
-        };
+            gpu_context,
+            &pressure_solver,
+            turbulence_solver_setup.is_some(),
+        );
 
-        let velocity_solver = match self.velocity_solver_compute_platform {
-            ComputePlatform::CPU => VelocitySolver::CPU(
-                VelocitySolverCPU::new(velocity_solver_setup, velocity, use_eddy_viscosity)
-            ),
-            ComputePlatform::GPU => {
-                let shared_pressure_buffers = match &pressure_solver {
-                    PressureSolver::MultigridGPU(solver) => Some(SharedPressureBuffers {
-                        rhs: solver.rhs_buffer().clone(),
-                        pressure: solver.solution_buffer().clone(),
-                    }),
-                    PressureSolver::MultigridCPU(_) => None,
-                };
-
-                VelocitySolver::GPU(
-                    VelocitySolverGPU::new(
-                        gpu_context.expect("A GPU context is always created for a GPU velocity solver"),
-                        &grid,
-                        velocity_solver_setup,
-                        &velocity,
-                        shared_pressure_buffers,
-                        use_eddy_viscosity
-                    )
-                )
-            }
-        };
-        
         // The turbulence solver runs on the same platform as the velocity solver, and shares the
         // velocity and the eddy viscosity directly with it on the GPU
         let turbulence_solver = turbulence_solver_setup.map(|setup| match &velocity_solver {

@@ -1,4 +1,5 @@
 pub mod boundary_condisitions;
+pub mod builder;
 pub mod kernels;
 pub mod slip_mirror_stencils;
 pub mod no_slip_corrections;
@@ -37,6 +38,9 @@ pub struct VelocitySolverSetup {
     /// immersion.
     pub wall_stress: WallStressEntries,
     pub boundary_conditions: VelocityBoundaryConditions,
+    /// The largest allowed magnitude of each velocity component, if the velocity limiter is used
+    /// (see `VelocitySolverBuilder::max_velocity_factor`)
+    pub velocity_limit: Option<Float>,
     pub viscosity: Float,
     pub density: Float,
 }
@@ -118,6 +122,16 @@ impl VelocitySolver {
         match self {
             Self::CPU(solver) => Cow::Borrowed(&solver.velocity),
             Self::GPU(solver) => Cow::Owned(solver.read_velocity()),
+        }
+    }
+
+    /// The number of velocity components that were clipped by the velocity limiter during the last
+    /// time step, summed over all the inner iterations. Always zero if the limiter is not used.
+    /// For the GPU version, this reads a single value from the device.
+    pub fn nr_limited_velocity_values(&self) -> usize {
+        match self {
+            Self::CPU(solver) => solver.nr_limited_velocity_values,
+            Self::GPU(solver) => solver.nr_limited_velocity_values(),
         }
     }
 

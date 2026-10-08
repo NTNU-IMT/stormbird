@@ -6,8 +6,9 @@ from ..spatial_vector import SpatialVector
 from ..wind import WindCondition, WindEnvironment
 from .grid import GridBuilder
 from .geometry import GeometryBuilder
-from .pressure_solver import PressureSolverBuilder, ComputePlatform
-from .solver_settings import SolverSettings, SlipMirrorInterpolationOrder, NoSlipWallTreatment
+from .pressure_solver import PressureSolverBuilder
+from .velocity_solver import VelocitySolverBuilder
+from .solver_settings import SolverSettings
 from .turbulence import TurbulenceSolverBuilder
 from ..actuator_line import ActuatorLineBuilder
 
@@ -21,24 +22,12 @@ class SimulationBuilder(StormbirdSetupBaseModel):
     slip_geometries: list[GeometryBuilder] = Field(default_factory=list)
     effective_viscosity: float = 0.0001
     wind_environment: WindEnvironment = Field(default_factory=WindEnvironment)
+    velocity_solver: VelocitySolverBuilder = Field(default_factory=VelocitySolverBuilder)
+    """Settings for the velocity solver"""
     pressure_solver: PressureSolverBuilder = Field(default_factory=PressureSolverBuilder)
+    """Settings for the pressure solver"""
     solver_settings: SolverSettings = Field(default_factory=SolverSettings)
-    slip_velocity_interpolation_order: SlipMirrorInterpolationOrder = (
-        SlipMirrorInterpolationOrder.Tricubic
-    )
     slip_wall_boundary_override: list[list[bool]] | None = None
-    no_slip_wall_treatment: NoSlipWallTreatment = NoSlipWallTreatment.DataImmersion
-    """
-    How the velocity solver treats the no-slip geometries: with the data immersion (default), or
-    with the wall model, which is a slip condition together with the wall shear stress from the
-    log-law.
-    """
-    velocity_solver_compute_platform: ComputePlatform = ComputePlatform.CPU
-    """
-    Where to execute the velocity solver. Independent of where the pressure solver is executed
-    (see `compute_platform` in `MultigridSettingsBuilder`), but the fewest transfers between the
-    host and the device happen when both are on the same platform.
-    """
     turbulence: TurbulenceSolverBuilder | None = None
     """
     Optional RANS turbulence model. The turbulence solver always runs on the same platform as the

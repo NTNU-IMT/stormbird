@@ -72,6 +72,13 @@ impl Simulation {
         println!();
     }
 
+    /// The number of velocity components that were clipped by the velocity limiter during the last
+    /// time step, summed over all the inner iterations. Always zero if the limiter is not used (see
+    /// `VelocitySolverBuilder::max_velocity_factor`).
+    pub fn nr_limited_velocity_values(&self) -> usize {
+        self.velocity_solver.nr_limited_velocity_values()
+    }
+
     pub fn time_step_from_courant_number(&self, courant_number: Float) -> Float {
         let max_velocity = self.velocity_solver.max_velocity();
 

@@ -134,6 +134,8 @@ struct VelocityKernels {
     scatter_cells: Kernel,
     /// `None` when the no-slip geometries use the data immersion
     wall_stress: Option<Kernel>,
+    /// `None` when the velocity limiter is not used
+    limit_velocity: Option<Kernel>,
 }
 
 impl VelocityKernels {
@@ -143,7 +145,8 @@ impl VelocityKernels {
         context: &GpuContext,
         constants: &ShaderConstants,
         use_eddy_viscosity: bool,
-        wall_stress: &WallStressEntries
+        wall_stress: &WallStressEntries,
+        velocity_limit: Option<Float>,
     ) -> Self {
         use Binding::*;
 
@@ -226,6 +229,15 @@ impl VelocityKernels {
                     &[Uniform, Uniform, ReadOnly, ReadOnly, ReadWrite]
                 )
             }),
+            limit_velocity: velocity_limit.map(|limit| {
+                Kernel::new(
+                    context,
+                    constants,
+                    &format!("const VELOCITY_LIMIT: f32 = {:?};\n{}", limit, kernels::LIMIT_VELOCITY_SRC),
+                    "main",
+                    &[ReadWrite, ReadWrite]
+                )
+            }),
         }
     }
 }
@@ -288,6 +300,13 @@ pub struct VelocitySolverGPU {
 
     max_velocity_result_buffer: wgpu::Buffer,
     max_velocity_bind_group: wgpu::BindGroup,
+
+    /// Counts the velocity components clipped by the velocity limiter during the current time
+    /// step, as a u32
+    limited_values_counter_buffer: wgpu::Buffer,
+    /// Bind groups of the velocity limiter for `velocity` and `velocity_star`. `None` when the
+    /// velocity limiter is not used.
+    limit_velocity_bind_groups: Option<[wgpu::BindGroup; 2]>,
     max_velocity_workgroups: [u32; 3],
 
     /// Created on the first request for data at a set of cells, and recreated if the cells change
@@ -337,7 +356,9 @@ impl VelocitySolverGPU {
             nr_extended_cells,
         };
 
-        let kernels = VelocityKernels::new(&context, &constants, use_eddy_viscosity, &setup.wall_stress);
+        let kernels = VelocityKernels::new(
+            &context, &constants, use_eddy_viscosity, &setup.wall_stress, setup.velocity_limit
+        );
 
         let grid_buffer = grid.as_gpu_version().as_buffer(&context);
 
@@ -472,6 +493,15 @@ impl VelocitySolverGPU {
             }
         });
 
+        // --- Velocity limiter ---
+        let limited_values_counter_buffer = context.create_zeroed_buffer(1);
+
+        let limit_velocity_bind_groups = kernels.limit_velocity.as_ref().map(|kernel| {
+            [&velocity_buffer, &velocity_star_buffer].map(|field_buffer| {
+                kernel.bind_group(&context, &[field_buffer, &limited_values_counter_buffer])
+            })
+        });
+
         // --- Max velocity ---
         let max_velocity_result_buffer = context.create_zeroed_buffer(1);
 
@@ -505,6 +535,8 @@ impl VelocitySolverGPU {
             field_bind_groups,
             max_velocity_result_buffer,
             max_velocity_bind_group,
+            limited_values_counter_buffer,
+            limit_velocity_bind_groups,
             max_velocity_workgroups: dispatch_reduce(nr_extended_cells),
             cell_sampling: None,
             context,
@@ -524,6 +556,8 @@ impl VelocitySolverGPU {
         let mut encoder = self.create_encoder();
 
         self.record_ghost_cells(&mut encoder, Field::Velocity);
+
+        encoder.clear_buffer(&self.limited_values_counter_buffer, 0, None);
 
         encoder.copy_buffer_to_buffer(
             &self.velocity_buffer, 0,
@@ -546,6 +580,8 @@ impl VelocitySolverGPU {
         if let (Some(kernel), Some((bind_group, nr_entries))) = (&self.kernels.wall_stress, &self.wall_stress_bind_group) {
             kernel.record(&mut encoder, bind_group, dispatch_1d(*nr_entries));
         }
+
+        self.record_velocity_limiter(&mut encoder, Field::VelocityStar);
 
         self.record_geometry_corrections(&mut encoder, Field::VelocityStar);
         self.record_ghost_cells(&mut encoder, Field::VelocityStar);
@@ -590,6 +626,8 @@ impl VelocitySolverGPU {
         self.kernels.add_pressure_gradient.record(
             &mut encoder, &self.add_pressure_gradient_bind_group, self.interior_workgroups
         );
+
+        self.record_velocity_limiter(&mut encoder, Field::Velocity);
 
         self.record_geometry_corrections(&mut encoder, Field::Velocity);
         self.record_ghost_cells(&mut encoder, Field::Velocity);
@@ -729,6 +767,24 @@ impl VelocitySolverGPU {
 
             self.context.write_pod_buffer(&self.params_buffer, &[params]);
         }
+    }
+
+    /// Records the velocity limiter on `field`, if the limiter is used
+    fn record_velocity_limiter(&self, encoder: &mut wgpu::CommandEncoder, field: Field) {
+        if let (Some(kernel), Some(bind_groups)) = (&self.kernels.limit_velocity, &self.limit_velocity_bind_groups) {
+            kernel.record(encoder, &bind_groups[field as usize], dispatch_1d(3 * self.nr_extended_cells));
+        }
+    }
+
+    /// The number of velocity components clipped by the velocity limiter during the last time
+    /// step. Only a single value is transferred from the device.
+    pub fn nr_limited_velocity_values(&self) -> usize {
+        if self.limit_velocity_bind_groups.is_none() {
+            return 0;
+        }
+
+        // The counter is stored as a u32, and read as the bit pattern of an f32
+        self.context.read_buffer(&self.limited_values_counter_buffer, 1)[0].to_bits() as usize
     }
 
     /// Records first the no-slip and then the slip geometry corrections of `field`

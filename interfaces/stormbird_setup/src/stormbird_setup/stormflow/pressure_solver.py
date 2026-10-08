@@ -67,7 +67,7 @@ class MultigridSettingsBuilder(StormbirdSetupBaseModel):
     Works on both `ComputePlatform.CPU` and `ComputePlatform.GPU`.
     """
     zero_gradient_interpolation_order: ZeroGradientInterpolationOrder = (
-        ZeroGradientInterpolationOrder.Tricubic
+        ZeroGradientInterpolationOrder.Trilinear
     )
     """
     Interpolation order for the zero-gradient condition on walls specifically (ignored when

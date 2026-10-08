@@ -20,7 +20,7 @@ fn setup_string(platform: &str, inlet: serde_json::Value, wall_treatment: &str) 
     ).unwrap();
 
     setup["grid"]["cells_per_representative_length"] = serde_json::json!([6, 6, 6]);
-    setup["velocity_solver_compute_platform"] = platform.into();
+    setup["velocity_solver"] = serde_json::json!({"compute_platform": platform});
     setup["pressure_solver"]["Multigrid"]["compute_platform"] = platform.into();
     setup["pressure_solver"]["Multigrid"]["compute_residual_after_solve"] = false.into();
     setup["pressure_solver"]["Multigrid"]["coarsest_level_solver"] = "Jacobi".into();
@@ -29,7 +29,7 @@ fn setup_string(platform: &str, inlet: serde_json::Value, wall_treatment: &str) 
     setup["geometries"] = serde_json::json!([
         {"Sphere": {"center": {"x": 20.0, "y": 5.0, "z": 10.0}, "radius": 4.0}}
     ]);
-    setup["no_slip_wall_treatment"] = wall_treatment.into();
+    setup["velocity_solver"]["no_slip_wall_treatment"] = wall_treatment.into();
     setup["turbulence"] = serde_json::json!({
         "model": {"RealizableKEpsilon": {}},
         "inlet": inlet,

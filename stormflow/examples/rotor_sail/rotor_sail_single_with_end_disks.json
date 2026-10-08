@@ -99,5 +99,7 @@
       "zero_gradient_interpolation_order": "Tricubic"
     }
   },
-  "slip_velocity_interpolation_order": "Tricubic"
+  "velocity_solver": {
+    "mirror_interpolation_order": "Tricubic"
+  }
 }

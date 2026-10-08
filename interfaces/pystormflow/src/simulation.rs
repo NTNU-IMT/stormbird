@@ -29,6 +29,13 @@ impl Simulation {
         self.data.do_step(time, time_step);
     }
 
+    /// The number of velocity components that were clipped by the velocity limiter during the
+    /// last time step, summed over all the inner iterations. Always zero if the limiter is not
+    /// used (see `max_velocity_factor` in the velocity solver settings).
+    pub fn nr_limited_velocity_values(&self) -> usize {
+        self.data.nr_limited_velocity_values()
+    }
+
     pub fn do_steps_until_end_time(&mut self, end_time: Float, courant_number: Float) {
         self.data.do_steps_until_end_time(end_time, courant_number);
     }

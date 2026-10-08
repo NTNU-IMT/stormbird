@@ -12,20 +12,22 @@ use rayon::prelude::*;
 use super::no_slip_corrections::{NoSlipCorrections, NoSlipEntry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-/// Which interpolation order is used to sample the mirrored image point for the slip-wall
-/// *velocity* correction specifically — independent of
+/// Which interpolation order is used to sample the mirrored image point for the *velocity* mirror
+/// correction specifically (the slip geometries, and the no-slip geometries with the wall model) —
+/// independent of
 /// `pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder`, which
 /// is the same choice for the pressure side. The two are deliberately separate settings (velocity
 /// and pressure corrections live in unrelated solvers with no shared configuration today), but set
 /// them to the same order if you want matching accuracy at the slip wall for both fields.
 pub enum SlipMirrorInterpolationOrder {
     /// 2nd order accurate. Trilinear weights are always non-negative and sum to 1 (a true convex
-    /// combination, unlike tricubic's), so this is the safer choice near thin/close-together
-    /// walls, where the tricubic stencil's wider reach is more likely to pull in image points
-    /// from the "wrong side" of a nearby second surface.
-    Trilinear,
-    /// 4th order accurate, matching the rest of the solver's accuracy order. Default.
+    /// combination, unlike tricubic's), so this can never amplify oscillatory errors, and is the
+    /// safer choice near thin/close-together walls, where the tricubic stencil's wider reach is
+    /// more likely to pull in image points from the "wrong side" of a nearby second surface.
+    /// Default.
     #[default]
+    Trilinear,
+    /// 4th order accurate, matching the rest of the solver's accuracy order.
     Tricubic,
 }
 

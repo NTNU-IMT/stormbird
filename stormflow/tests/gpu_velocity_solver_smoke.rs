@@ -20,7 +20,7 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
     ).unwrap();
 
     setup["grid"]["cells_per_representative_length"] = serde_json::json!([6, 6, 6]);
-    setup["velocity_solver_compute_platform"] = velocity_platform.into();
+    setup["velocity_solver"] = serde_json::json!({"compute_platform": velocity_platform});
     setup["pressure_solver"]["Multigrid"]["compute_platform"] = pressure_platform.into();
     setup["pressure_solver"]["Multigrid"]["compute_residual_after_solve"] = false.into();
     setup["pressure_solver"]["Multigrid"]["coarsest_level_solver"] = "Jacobi".into();
@@ -30,7 +30,7 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
     ]);
 
     if let BoundaryCase::WallModel = boundary_case {
-        setup["no_slip_wall_treatment"] = "WallModel".into();
+        setup["velocity_solver"]["no_slip_wall_treatment"] = "WallModel".into();
         setup["effective_viscosity"] = 1.5e-5.into();
 
         // A cuboid standing on the ground, which exercises the zeroing of the faces where the
@@ -38,6 +38,11 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
         setup["geometries"].as_array_mut().unwrap().push(serde_json::json!(
             {"Cuboid": {"center": {"x": 30.0, "y": 0.0, "z": 8.0}, "half_extents": {"x": 4.0, "y": 6.0, "z": 8.0}}}
         ));
+    }
+
+    if let BoundaryCase::VelocityLimiter = boundary_case {
+        // Low enough to clip the velocity close to the rotor sail
+        setup["velocity_solver"]["max_velocity_factor"] = 1.1.into();
     }
 
     if let BoundaryCase::SlipCuboidOnGround = boundary_case {
@@ -68,6 +73,8 @@ enum BoundaryCase {
     DownwardUpDirectionAndSideWalls,
     /// The boundary conditions of the example, with an extra slip cuboid standing on the ground
     SlipCuboidOnGround,
+    /// The boundary conditions of the example, with the velocity limiter
+    VelocityLimiter,
     /// The boundary conditions of the example, with the wall model instead of the data immersion,
     /// for the no-slip sphere and a cuboid standing on the ground
     WallModel,
@@ -79,12 +86,15 @@ struct SimulationOutput {
     velocity: Vec<SpatialVector>,
     body_force: Vec<SpatialVector>,
     pressure: Vec<Float>,
+    /// The number of velocity values clipped by the velocity limiter in each time step
+    nr_limited_values: Vec<usize>,
 }
 
 fn run(velocity_platform: &str, pressure_platform: &str, boundary_case: BoundaryCase) -> SimulationOutput {
     let mut sim = Simulation::new_from_string(&setup_string(velocity_platform, pressure_platform, boundary_case)).unwrap();
 
     let mut time_steps = Vec::with_capacity(NR_STEPS);
+    let mut nr_limited_values = Vec::with_capacity(NR_STEPS);
     let mut time = 0.0;
 
     for _ in 0..NR_STEPS {
@@ -93,6 +103,7 @@ fn run(velocity_platform: &str, pressure_platform: &str, boundary_case: Boundary
         sim.do_step(time, time_step);
 
         time_steps.push(time_step);
+        nr_limited_values.push(sim.nr_limited_velocity_values());
         time += time_step;
     }
 
@@ -101,6 +112,7 @@ fn run(velocity_platform: &str, pressure_platform: &str, boundary_case: Boundary
         velocity: sim.velocity_solver.velocity_host().to_vec(),
         body_force: sim.velocity_solver.body_force_host().to_vec(),
         pressure: sim.pressure_solver.pressure_host().to_vec(),
+        nr_limited_values,
         grid: sim.grid,
     }
 }
@@ -142,6 +154,29 @@ fn assert_gpu_velocity_matches_cpu(pressure_platform: &str, boundary_case: Bound
         let relative_diff = (cpu_time_step - gpu_time_step).abs() / cpu_time_step;
 
         assert!(relative_diff < 1e-5, "Time steps differ: {cpu_time_step} vs {gpu_time_step}");
+    }
+
+    println!("Limited values per step: CPU {:?}, GPU {:?}", reference.nr_limited_values, gpu.nr_limited_values);
+
+    if let BoundaryCase::VelocityLimiter = boundary_case {
+        let max_velocity = reference.velocity.iter()
+            .flat_map(|v| [v[0].abs(), v[1].abs(), v[2].abs()])
+            .fold(0.0, Float::max);
+
+        let inlet_velocity = setup_inlet_velocity_magnitude();
+
+        assert!(reference.nr_limited_values.iter().sum::<usize>() > 0, "The limiter was never active");
+        assert!(max_velocity <= 1.1 * inlet_velocity * (1.0 + 1e-5), "{max_velocity} exceeds the limit");
+
+        // The counts can differ slightly, from values that are rounded to either side of the limit
+        for (cpu, gpu) in reference.nr_limited_values.iter().zip(&gpu.nr_limited_values) {
+            let difference = (*cpu as Float - *gpu as Float).abs();
+
+            assert!(difference <= 0.01 * (*cpu as Float) + 2.0, "Limited values differ: {cpu} vs {gpu}");
+        }
+    } else {
+        assert!(reference.nr_limited_values.iter().all(|&n| n == 0));
+        assert!(gpu.nr_limited_values.iter().all(|&n| n == 0));
     }
 
     let velocity_diff = max_interior_diff(grid, &reference.velocity, &gpu.velocity);
@@ -194,4 +229,30 @@ fn gpu_velocity_solver_matches_cpu_with_wall_model() {
 #[test]
 fn gpu_velocity_solver_matches_cpu_with_slip_cuboid_on_ground() {
     assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::SlipCuboidOnGround);
+}
+
+/// The largest inlet velocity magnitude of the example, which the velocity limit is relative to
+fn setup_inlet_velocity_magnitude() -> Float {
+    let builder = stormflow::simulation::builder::SimulationBuilder::new_from_string(
+        &setup_string("CPU", "CPU", BoundaryCase::VelocityLimiter)
+    ).unwrap();
+
+    let grid = builder.grid.build_from_line_force_model_builder(
+        &builder.actuator_line.as_ref().unwrap().line_force_model
+    );
+
+    let boundary_conditions = stormflow::velocity_solver::boundary_condisitions::VelocityBoundaryConditions::new(
+        &builder.wind_environment,
+        &builder.wind_condition,
+        builder.linear_velocity,
+        builder.slip_wall_boundary_override,
+        &grid
+    );
+
+    builder.velocity_solver.velocity_limit(&boundary_conditions).unwrap() / 1.1
+}
+
+#[test]
+fn gpu_velocity_solver_matches_cpu_with_velocity_limiter() {
+    assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::VelocityLimiter);
 }

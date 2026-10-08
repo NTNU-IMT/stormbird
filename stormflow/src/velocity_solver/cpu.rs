@@ -21,6 +21,29 @@ use super::kernels::{
     pressure_rhs::pressure_rhs_kernel
 };
 
+/// Clips each component of `velocity` to the range `[-limit, limit]`, and returns the number of
+/// clipped components. The ghost cells are included, but they are always within the limit when
+/// this is called, as they are set from the interior cells or the inlet velocity.
+fn limit_velocity(velocity: &mut [SpatialVector], limit: Float) -> usize {
+    velocity.par_iter_mut()
+        .map(|value| {
+            let mut nr_limited = 0;
+
+            for component in 0..3 {
+                if value[component] > limit {
+                    value[component] = limit;
+                    nr_limited += 1;
+                } else if value[component] < -limit {
+                    value[component] = -limit;
+                    nr_limited += 1;
+                }
+            }
+
+            nr_limited
+        })
+        .sum()
+}
+
 /// Velocity solver executed on the CPU, with all fields stored on the host.
 pub struct VelocitySolverCPU {
     pub setup: VelocitySolverSetup,
@@ -32,6 +55,9 @@ pub struct VelocitySolverCPU {
     /// stress. `None` when no turbulence model is used, in which case the solver is unchanged. The
     /// field is set by the turbulence solver.
     pub eddy_viscosity: Option<Vec<Float>>,
+    /// The number of velocity components clipped by the velocity limiter during the last time
+    /// step, summed over all the inner iterations
+    pub nr_limited_velocity_values: usize,
 }
 
 impl VelocitySolverCPU {
@@ -51,6 +77,7 @@ impl VelocitySolverCPU {
             velocity: initial_velocity,
             body_force: vec![SpatialVector::default(); nr_extended_cells],
             eddy_viscosity: use_eddy_viscosity.then(|| vec![0.0; nr_extended_cells]),
+            nr_limited_velocity_values: 0,
         }
     }
 
@@ -66,6 +93,8 @@ impl VelocitySolverCPU {
         );
 
         self.velocity_org.copy_from_slice(&self.velocity);
+
+        self.nr_limited_velocity_values = 0;
     }
 
     pub fn update_velocity_star(
@@ -106,6 +135,10 @@ impl VelocitySolverCPU {
         }
 
         self.apply_wall_stress(grid, time_step);
+
+        if let Some(limit) = self.setup.velocity_limit {
+            self.nr_limited_velocity_values += limit_velocity(&mut self.velocity_star, limit);
+        }
 
         Self::correct_velocities_for_geometry(grid, &self.setup, &mut self.velocity_star);
 
@@ -189,6 +222,10 @@ impl VelocitySolverCPU {
                 time_step
             )
         );
+
+        if let Some(limit) = self.setup.velocity_limit {
+            self.nr_limited_velocity_values += limit_velocity(&mut self.velocity, limit);
+        }
 
         Self::correct_velocities_for_geometry(grid, &self.setup, &mut self.velocity);
 
@@ -299,5 +336,24 @@ impl VelocitySolverCPU {
                     }
                 });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn limit_velocity_clips_each_component() {
+        let mut velocity = vec![
+            SpatialVector([1.0, -2.0, 3.0]),
+            SpatialVector([-5.0, 0.5, 2.5]),
+        ];
+
+        let nr_limited = limit_velocity(&mut velocity, 2.5);
+
+        assert_eq!(nr_limited, 2);
+        assert_eq!(velocity[0], SpatialVector([1.0, -2.0, 2.5]));
+        assert_eq!(velocity[1], SpatialVector([-2.5, 0.5, 2.5]));
     }
 }

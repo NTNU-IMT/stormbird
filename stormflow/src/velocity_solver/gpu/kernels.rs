@@ -22,6 +22,7 @@ pub const NO_SLIP_CORRECTION_SRC: &str = include_str!("shaders/no_slip_correctio
 pub const SLIP_CORRECTION_SRC: &str = include_str!("shaders/slip_correction.wgsl");
 pub const GHOST_CELLS_SRC: &str = include_str!("shaders/ghost_cells.wgsl");
 pub const WALL_STRESS_SRC: &str = include_str!("shaders/wall_stress.wgsl");
+pub const LIMIT_VELOCITY_SRC: &str = include_str!("shaders/limit_velocity.wgsl");
 pub const MAX_VELOCITY_SRC: &str = include_str!("shaders/max_velocity.wgsl");
 pub const CELL_SAMPLING_SRC: &str = include_str!("shaders/cell_sampling.wgsl");
 
