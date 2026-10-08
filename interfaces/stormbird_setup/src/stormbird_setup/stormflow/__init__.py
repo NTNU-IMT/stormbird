@@ -23,6 +23,7 @@ from .turbulence import (
     IntensityAndLengthScale,
     IntensityAndViscosityRatio,
     AtmosphericBoundaryLayer,
+    Fixed,
     WallTreatment,
     ConvectionScheme,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "IntensityAndLengthScale",
     "IntensityAndViscosityRatio",
     "AtmosphericBoundaryLayer",
+    "Fixed",
     "WallTreatment",
     "ConvectionScheme",
     "SimulationBuilder",

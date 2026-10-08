@@ -42,6 +42,11 @@ pub enum InletTurbulence {
         friction_velocity: Float,
         roughness_length: Float,
     },
+    /// The same values of k and epsilon at all heights
+    Fixed {
+        k: Float,
+        epsilon: Float,
+    },
 }
 
 impl Default for InletTurbulence {
@@ -75,6 +80,7 @@ impl InletTurbulence {
 
                 (k, friction_velocity.powi(3) / (constants.kappa * (height.max(0.0) + roughness_length)))
             },
+            Self::Fixed { k, epsilon } => (k, epsilon),
         }
     }
 }

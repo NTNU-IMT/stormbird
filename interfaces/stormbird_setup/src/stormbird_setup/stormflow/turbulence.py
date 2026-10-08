@@ -101,11 +101,22 @@ class AtmosphericBoundaryLayer(StormbirdSetupBaseModel):
     roughness_length: float
 
 
+class Fixed(StormbirdSetupBaseModel):
+    """
+    The same values of k and epsilon at all heights. For values given as k and omega, as in the
+    k-omega models, use `epsilon = C_mu * k * omega`, with `C_mu = 0.09`.
+    """
+
+    k: float
+    epsilon: float
+
+
 # The name of each variant in the Rust `InletTurbulence` enum, mapped to its Python class
 _INLET_VARIANTS: dict[str, type[StormbirdSetupBaseModel]] = {
     "IntensityAndLengthScale": IntensityAndLengthScale,
     "IntensityAndViscosityRatio": IntensityAndViscosityRatio,
     "AtmosphericBoundaryLayer": AtmosphericBoundaryLayer,
+    "Fixed": Fixed,
 }
 
 
@@ -116,7 +127,7 @@ class InletTurbulence(StormbirdSetupBaseModel):
     `{"AtmosphericBoundaryLayer": {...}}`.
     """
 
-    inlet: IntensityAndLengthScale | IntensityAndViscosityRatio | AtmosphericBoundaryLayer = Field(
+    inlet: IntensityAndLengthScale | IntensityAndViscosityRatio | AtmosphericBoundaryLayer | Fixed = Field(
         default_factory=IntensityAndViscosityRatio
     )
 
@@ -150,6 +161,10 @@ class InletTurbulence(StormbirdSetupBaseModel):
                 friction_velocity=friction_velocity, roughness_length=roughness_length
             )
         )
+
+    @classmethod
+    def new_fixed(cls, k: float, epsilon: float) -> "InletTurbulence":
+        return cls(inlet=Fixed(k=k, epsilon=epsilon))
 
     @model_validator(mode="before")
     @classmethod
