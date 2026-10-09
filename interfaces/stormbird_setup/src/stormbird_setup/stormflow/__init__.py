@@ -19,6 +19,7 @@ from .velocity_solver import (
     VelocitySolverBuilder,
     SlipMirrorInterpolationOrder,
     NoSlipWallTreatment,
+    SharpEdgeSettings,
 )
 from .turbulence import (
     TurbulenceSolverBuilder,
@@ -52,6 +53,7 @@ __all__ = [
     "VelocitySolverBuilder",
     "SlipMirrorInterpolationOrder",
     "NoSlipWallTreatment",
+    "SharpEdgeSettings",
     "TurbulenceSolverBuilder",
     "TurbulenceModel",
     "RealizableKEpsilon",

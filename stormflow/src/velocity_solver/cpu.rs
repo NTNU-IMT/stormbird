@@ -278,6 +278,12 @@ impl VelocitySolverCPU {
     ) {
         Self::correct_velocities_for_no_slip_geometry(&setup.no_slip_corrections, velocity);
         Self::correct_velocities_for_slip_geometry(grid, &setup.slip_mirror_stencils, velocity);
+
+        // The data immersion close to the sharp edges also damps the mirrored velocity inside the
+        // geometries, so it must be applied after the mirror correction
+        if let Some(sharp_edges) = &setup.sharp_edges {
+            Self::correct_velocities_for_no_slip_geometry(&sharp_edges.corrections, velocity);
+        }
     }
 
     /// No-slip correction, applied only to the precomputed list of faces near or inside a no-slip

@@ -7,6 +7,7 @@ use serde::{Serialize, Deserialize};
 
 pub mod triangle_mesh;
 pub mod analytical_shapes;
+pub mod sharp_edges;
 
 use crate::grid::Grid;
 

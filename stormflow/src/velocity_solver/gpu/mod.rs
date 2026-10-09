@@ -248,6 +248,9 @@ struct FieldBindGroups {
     no_slip: Option<wgpu::BindGroup>,
     /// Bind groups for the compute and scatter phase. `None` if there are no slip corrections
     slip: Option<(wgpu::BindGroup, wgpu::BindGroup)>,
+    /// The data immersion close to the sharp edges, with the same kernel as the no-slip
+    /// corrections. `None` if there are no such corrections
+    sharp_edges: Option<wgpu::BindGroup>,
     /// One bind group per boundary face, in the order they must be applied, together with the
     /// workgroup counts for the face
     ghost_cells: Vec<(wgpu::BindGroup, [u32; 3])>,
@@ -296,6 +299,7 @@ pub struct VelocitySolverGPU {
 
     nr_no_slip_entries: usize,
     nr_slip_entries: usize,
+    nr_sharp_edge_entries: usize,
     field_bind_groups: [FieldBindGroups; 2],
 
     max_velocity_result_buffer: wgpu::Buffer,
@@ -348,6 +352,9 @@ impl VelocitySolverGPU {
         );
 
         let no_slip_entries = no_slip_entries_for_gpu(&setup.no_slip_corrections);
+        let sharp_edge_entries = setup.sharp_edges.as_ref()
+            .map(|sharp_edges| no_slip_entries_for_gpu(&sharp_edges.corrections))
+            .unwrap_or_default();
         let (slip_entries, slip_weights, slip_n) = slip_entries_for_gpu(&setup.slip_mirror_stencils);
 
         let constants = ShaderConstants {
@@ -431,6 +438,10 @@ impl VelocitySolverGPU {
             || context.create_storage_buffer_init(&no_slip_entries)
         );
 
+        let sharp_edge_entries_buffer = (!sharp_edge_entries.is_empty()).then(
+            || context.create_storage_buffer_init(&sharp_edge_entries)
+        );
+
         let slip_buffers = (!slip_entries.is_empty()).then(|| (
             context.create_storage_buffer_init(&slip_entries),
             context.create_storage_buffer_init(&slip_weights),
@@ -480,6 +491,9 @@ impl VelocitySolverGPU {
                         kernels.slip_compute.bind_group(&context, &buffers),
                         kernels.slip_scatter.bind_group(&context, &buffers)
                     )
+                }),
+                sharp_edges: sharp_edge_entries_buffer.as_ref().map(|entries_buffer| {
+                    kernels.no_slip_correction.bind_group(&context, &[entries_buffer, field_buffer])
                 }),
                 ghost_cells: face_params_buffers.iter().map(|(face_params_buffer, workgroups)| {
                     (
@@ -532,6 +546,7 @@ impl VelocitySolverGPU {
             add_pressure_gradient_bind_group,
             nr_no_slip_entries: no_slip_entries.len(),
             nr_slip_entries: slip_entries.len(),
+            nr_sharp_edge_entries: sharp_edge_entries.len(),
             field_bind_groups,
             max_velocity_result_buffer,
             max_velocity_bind_group,
@@ -787,7 +802,8 @@ impl VelocitySolverGPU {
         self.context.read_buffer(&self.limited_values_counter_buffer, 1)[0].to_bits() as usize
     }
 
-    /// Records first the no-slip and then the slip geometry corrections of `field`
+    /// Records first the no-slip and then the slip geometry corrections of `field`, followed by the
+    /// data immersion close to the sharp edges, which also damps the mirrored velocity
     fn record_geometry_corrections(&self, encoder: &mut wgpu::CommandEncoder, field: Field) {
         let bind_groups = &self.field_bind_groups[field as usize];
 
@@ -802,6 +818,12 @@ impl VelocitySolverGPU {
 
             self.kernels.slip_compute.record(encoder, compute_bind_group, workgroups);
             self.kernels.slip_scatter.record(encoder, scatter_bind_group, workgroups);
+        }
+
+        if let Some(bind_group) = &bind_groups.sharp_edges {
+            self.kernels.no_slip_correction.record(
+                encoder, bind_group, dispatch_1d(self.nr_sharp_edge_entries)
+            );
         }
     }
 

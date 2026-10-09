@@ -1,6 +1,7 @@
 use super::Simulation;
 
 use stormath::type_aliases::Float;
+use stormath::spatial_vector::SpatialVector;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -256,7 +257,44 @@ impl Simulation {
 
         if binary { writeln!(w).unwrap(); }
 
+        // --- Weight of the data immersion close to the sharp edges (staggered vector) ---
+        if let Some(sharp_edges) = &self.velocity_solver.setup().sharp_edges {
+            let weights = sharp_edges.weight_field(self.grid.nr_extended_cells());
+
+            self.write_cell_vector(&mut w, "sharp_edge_weight", &weights, binary);
+        }
+
         w
+    }
+
+    /// Writes a vector field stored on the extended grid as VTK cell data, in the same format as
+    /// the other fields in [`Simulation::fields_as_vtk`].
+    fn write_cell_vector(&self, w: &mut Vec<u8>, name: &str, values: &[SpatialVector], binary: bool) {
+        let [nx, ny, nz] = self.grid.interior_shape;
+
+        writeln!(w, "VECTORS {} double", name).unwrap();
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+
+                    for component in 0..3 {
+                        let value = values[flat][component] as f64;
+
+                        if binary {
+                            w.write_all(&value.to_be_bytes()).unwrap();
+                        } else if component < 2 {
+                            write!(w, "{} ", value).unwrap();
+                        } else {
+                            writeln!(w, "{}", value).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+
+        if binary { writeln!(w).unwrap(); }
     }
 
     /// Writes a scalar field stored at the cell centers of the extended grid as VTK cell data, in

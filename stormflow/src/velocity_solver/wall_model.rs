@@ -10,6 +10,9 @@
 //! 2. The wall shear stress from the log-law is added as a momentum sink in a thin band of fluid
 //!    cells next to the surface, distributed with a smoothed delta function of the wall distance.
 //!    The tangential velocity used in the log-law is sampled at a reference point outside the band.
+//! 3. Close to the sharp convex edges of the geometries, the velocity is blended towards zero with
+//!    the data immersion, to trip the flow separation there, and the wall shear stress is reduced
+//!    accordingly (see `sharp_edges`). On by default, but can be turned off.
 //!
 //! This is the same idea as wall functions in conventional RANS solvers, where the first cell
 //! above the wall is in the log-law region, and the wall shear stress is imposed directly, rather
@@ -27,17 +30,18 @@ use crate::grid::interpolation::TrilinearStencil;
 use crate::geometry::Geometry;
 use crate::log_law::WallFunctionConstants;
 
+use super::sharp_edges::SharpEdgeField;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 /// How the velocity solver treats the no-slip geometries
 pub enum NoSlipWallTreatment {
     /// The velocity is blended towards zero in a band of a few cells around the surface. Robust,
     /// also for thin geometries, but the wall shear stress depends on the grid resolution.
-    /// Default.
-    #[default]
     DataImmersion,
     /// A mirror (slip) correction inside the geometries, together with the wall shear stress from
-    /// the log-law, applied as a momentum sink close to the surface. Requires geometries that are
-    /// at least a few cells thick.
+    /// the log-law, applied as a momentum sink close to the surface, and the data immersion close
+    /// to the sharp edges. Requires geometries that are at least a few cells thick. Default.
+    #[default]
     WallModel,
 }
 
@@ -80,12 +84,15 @@ pub struct WallStressEntries {
 impl WallStressEntries {
     /// Builds the entries for all faces with a wall distance between zero and the band width,
     /// based on the signed distance function of the no-slip geometries. Faces inside a slip
-    /// geometry get no entry.
+    /// geometry get no entry. If `sharp_edges` is given, the stress is scaled by `1 - w`, where
+    /// `w` is the weight of the data immersion close to the sharp edges, as the data immersion
+    /// then already removes the momentum there (see `sharp_edges`).
     pub fn build(
         grid: &Grid,
         no_slip_geometries: &[Geometry],
         signed_distance_function: &[Float],
         signed_distance_function_slip: &[Float],
+        sharp_edges: Option<&SharpEdgeField>,
     ) -> Self {
         let mut max_dx: Float = 0.0;
         for axis in 0..3 {
@@ -137,6 +144,15 @@ impl WallStressEntries {
                         let mut face_center = grid.cell_center_extended(extended_indices);
                         face_center[axis] += 0.5 * grid.cell_length[axis];
 
+                        let sharp_edge_factor = match sharp_edges {
+                            Some(edge_field) => 1.0 - edge_field.weight(face_center),
+                            None => 1.0,
+                        };
+
+                        if sharp_edge_factor <= 0.0 {
+                            continue;
+                        }
+
                         let normal = Geometry::normal_from_signed_distance_function_union(
                             no_slip_geometries, face_center, normal_delta
                         );
@@ -153,7 +169,7 @@ impl WallStressEntries {
                         plane_entries.push(WallStressEntry {
                             cell_index: i_0,
                             axis,
-                            delta: delta_function(distance),
+                            delta: sharp_edge_factor * delta_function(distance),
                             tangential_factor: 1.0 - normal[axis] * normal[axis],
                             normal,
                             velocity_stencils,
@@ -238,7 +254,7 @@ mod tests {
             let sdf = Geometry::signed_distance_function_on_extended_grid(&geometries, &grid);
             let sdf_slip = vec![Float::MAX; grid.nr_extended_cells()];
 
-            let walls = WallStressEntries::build(&grid, &geometries, &sdf, &sdf_slip);
+            let walls = WallStressEntries::build(&grid, &geometries, &sdf, &sdf_slip, None);
 
             let column = grid.extended_indices_from_interior_indices([5, 7, 0]);
 

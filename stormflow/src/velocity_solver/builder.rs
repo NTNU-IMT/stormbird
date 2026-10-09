@@ -18,10 +18,12 @@ use super::{
     VelocitySolverSetup,
     boundary_condisitions::VelocityBoundaryConditions,
     slip_mirror_stencils::{
-        SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS, mirror_interior_corrections
+        SlipMirrorStencils, SlipMirrorInterpolationOrder, SLIP_MIRROR_REACH_CELLS,
+        MIRROR_INTERIOR_SHIFT_CELLS, mirror_interior_corrections
     },
     no_slip_corrections::NoSlipCorrections,
-    wall_model::{NoSlipWallTreatment, WallStressEntries},
+    wall_model::{NoSlipWallTreatment, WallStressEntries, WALL_STRESS_BAND_CELLS},
+    sharp_edges::{SharpEdgeSettings, SharpEdgeField, SharpEdgeCorrections},
     cpu::VelocitySolverCPU,
     gpu::{VelocitySolverGPU, SharedPressureBuffers},
 };
@@ -36,16 +38,27 @@ pub struct VelocitySolverBuilder {
     /// solver.
     #[serde(default)]
     pub compute_platform: ComputePlatform,
-    /// How the no-slip geometries are treated: with the data immersion (default), or with the wall
-    /// model, which is a slip condition together with the wall shear stress from the log-law (see
-    /// `wall_model`).
+    /// How the no-slip geometries are treated: with the wall model (default), which is a slip
+    /// condition together with the wall shear stress from the log-law (see `wall_model`), or with
+    /// the data immersion.
     #[serde(default)]
     pub no_slip_wall_treatment: NoSlipWallTreatment,
+    /// Settings for the data immersion close to the sharp convex edges of the no-slip geometries,
+    /// which trips the flow separation there. Only used with the wall model, where it is on by
+    /// default. See `sharp_edges`.
+    #[serde(default)]
+    pub sharp_edges: SharpEdgeSettings,
+    /// Settings for the data immersion close to the sharp convex edges of the slip geometries,
+    /// which trips the flow separation there, while the rest of the slip surfaces stay inviscid.
+    /// On by default. See `sharp_edges`.
+    #[serde(default)]
+    pub slip_sharp_edges: SharpEdgeSettings,
     /// The half width of the band where the data immersion blends the velocity towards zero, as a
     /// number of (the largest) cell lengths. The velocity is blended from zero at this distance
     /// inside the no-slip geometries, to the unchanged velocity at the same distance outside them.
     /// Also used for the wall functions of the turbulence model, which are applied in the fluid
-    /// part of the band. Only used with the data immersion. Values below about one cell make the
+    /// part of the band. Only used with the data immersion, including the data immersion close to
+    /// the sharp edges of the geometries with a mirror correction. Values below about one cell make the
     /// blending a step from one face to the next, which can cause oscillations close to the
     /// surfaces.
     #[serde(default="VelocitySolverBuilder::default_no_slip_blending_cells")]
@@ -74,6 +87,8 @@ impl Default for VelocitySolverBuilder {
         Self {
             compute_platform: ComputePlatform::default(),
             no_slip_wall_treatment: NoSlipWallTreatment::default(),
+            sharp_edges: SharpEdgeSettings::default(),
+            slip_sharp_edges: SharpEdgeSettings::default(),
             no_slip_blending_cells: Self::default_no_slip_blending_cells(),
             mirror_interpolation_order: SlipMirrorInterpolationOrder::default(),
             max_velocity_factor: None,
@@ -209,6 +224,31 @@ impl VelocitySolverBuilder {
             slip_walls.signed_distance_function.clone()
         };
 
+        let all_geometries: Vec<Geometry> = slip_walls.geometries.iter()
+            .chain(no_slip_walls.geometries.iter())
+            .cloned()
+            .collect();
+
+        let sharp_edge_field = (use_wall_model && self.sharp_edges.enabled).then(|| {
+            println!("Finding sharp edges of the no-slip geometries");
+            let edge_field = SharpEdgeField::build(
+                grid, &no_slip_walls.geometries, &all_geometries, &self.sharp_edges
+            );
+            println!("Number of sharp edge segments: {}", edge_field.edges.len());
+
+            edge_field
+        });
+
+        let slip_sharp_edge_field = self.slip_sharp_edges.enabled.then(|| {
+            println!("Finding sharp edges of the slip geometries");
+            let edge_field = SharpEdgeField::build(
+                grid, &slip_walls.geometries, &all_geometries, &self.slip_sharp_edges
+            );
+            println!("Number of sharp edge segments: {}", edge_field.edges.len());
+
+            edge_field
+        });
+
         let wall_stress = if use_wall_model {
             println!("Building wall model");
             WallStressEntries::build(
@@ -216,15 +256,11 @@ impl VelocitySolverBuilder {
                 &no_slip_walls.geometries,
                 &no_slip_walls.signed_distance_function,
                 &slip_walls.signed_distance_function,
+                sharp_edge_field.as_ref(),
             )
         } else {
             WallStressEntries::default()
         };
-
-        let all_geometries: Vec<Geometry> = slip_walls.geometries.iter()
-            .chain(no_slip_walls.geometries.iter())
-            .cloned()
-            .collect();
 
         let signed_distance_function = no_slip_walls.signed_distance_function;
         let signed_distance_function_slip = slip_walls.signed_distance_function;
@@ -269,6 +305,41 @@ impl VelocitySolverBuilder {
             entries.retain(|entry| !zeroed_faces.contains(&(entry.cell_index, axis)));
         }
 
+        // The faces deeper inside the mirror geometries than this are already set to zero by the
+        // interior corrections
+        let interior_zero_distance = (MIRROR_INTERIOR_SHIFT_CELLS + 1.0) * max_dx;
+
+        // For the no-slip geometries, the weights are also needed in the band where the wall shear
+        // stress is applied
+        let no_slip_sharp_edges = sharp_edge_field.map(|edge_field| {
+            println!("Building the data immersion close to the sharp edges of the no-slip geometries");
+            SharpEdgeCorrections::build(
+                grid,
+                &edge_field,
+                &signed_distance_function,
+                self.no_slip_epsilon(grid),
+                interior_zero_distance,
+                self.no_slip_epsilon(grid).max(WALL_STRESS_BAND_CELLS * max_dx),
+            )
+        });
+
+        let slip_sharp_edges = slip_sharp_edge_field.map(|edge_field| {
+            println!("Building the data immersion close to the sharp edges of the slip geometries");
+            SharpEdgeCorrections::build(
+                grid,
+                &edge_field,
+                &signed_distance_function_slip,
+                self.no_slip_epsilon(grid),
+                interior_zero_distance,
+                self.no_slip_epsilon(grid),
+            )
+        });
+
+        let sharp_edges = match (no_slip_sharp_edges, slip_sharp_edges) {
+            (Some(no_slip), Some(slip)) => Some(no_slip.merged(slip)),
+            (no_slip, slip) => no_slip.or(slip),
+        };
+
         let no_slip_corrections = if use_wall_model {
             mirror_interior
         } else {
@@ -287,6 +358,7 @@ impl VelocitySolverBuilder {
             no_slip_corrections,
             slip_mirror_stencils,
             wall_stress,
+            sharp_edges,
             boundary_conditions,
             velocity_limit,
             viscosity,
@@ -304,10 +376,20 @@ mod tests {
         let builder: VelocitySolverBuilder = serde_json::from_str("{}").unwrap();
 
         assert_eq!(builder.compute_platform, ComputePlatform::CPU);
-        assert_eq!(builder.no_slip_wall_treatment, NoSlipWallTreatment::DataImmersion);
+        assert_eq!(builder.no_slip_wall_treatment, NoSlipWallTreatment::WallModel);
         assert_eq!(builder.no_slip_blending_cells, 2.0);
         assert_eq!(builder.mirror_interpolation_order, SlipMirrorInterpolationOrder::Trilinear);
         assert_eq!(builder.max_velocity_factor, None);
+        assert_eq!(builder.sharp_edges, SharpEdgeSettings::default());
+        assert!(builder.sharp_edges.enabled);
+        assert_eq!(builder.slip_sharp_edges, SharpEdgeSettings::default());
+
+        let builder: VelocitySolverBuilder = serde_json::from_str(
+            r#"{"slip_sharp_edges": {"enabled": false}}"#
+        ).unwrap();
+
+        assert!(!builder.slip_sharp_edges.enabled);
+        assert_eq!(builder.slip_sharp_edges.outer_radius_cells, 3.0);
     }
 
     #[test]

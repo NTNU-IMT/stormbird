@@ -4,6 +4,7 @@ pub mod kernels;
 pub mod slip_mirror_stencils;
 pub mod no_slip_corrections;
 pub mod wall_model;
+pub mod sharp_edges;
 pub mod cpu;
 pub mod gpu;
 
@@ -17,6 +18,7 @@ use boundary_condisitions::VelocityBoundaryConditions;
 use slip_mirror_stencils::SlipMirrorStencils;
 use no_slip_corrections::NoSlipCorrections;
 use wall_model::WallStressEntries;
+use sharp_edges::SharpEdgeCorrections;
 
 use cpu::VelocitySolverCPU;
 use gpu::VelocitySolverGPU;
@@ -37,6 +39,10 @@ pub struct VelocitySolverSetup {
     /// The wall shear stress of the wall model. Empty when the no-slip geometries use the data
     /// immersion.
     pub wall_stress: WallStressEntries,
+    /// The data immersion close to the sharp edges of the no-slip geometries with the wall model,
+    /// and of the slip geometries, applied after the mirror correction. `None` when it is not
+    /// used for any of them.
+    pub sharp_edges: Option<SharpEdgeCorrections>,
     pub boundary_conditions: VelocityBoundaryConditions,
     /// The largest allowed magnitude of each velocity component, if the velocity limiter is used
     /// (see `VelocitySolverBuilder::max_velocity_factor`)

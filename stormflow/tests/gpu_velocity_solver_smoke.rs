@@ -20,7 +20,11 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
     ).unwrap();
 
     setup["grid"]["cells_per_representative_length"] = serde_json::json!([6, 6, 6]);
-    setup["velocity_solver"] = serde_json::json!({"compute_platform": velocity_platform});
+    setup["velocity_solver"] = serde_json::json!({
+        "compute_platform": velocity_platform,
+        "no_slip_wall_treatment": "DataImmersion",
+        "slip_sharp_edges": {"enabled": false}
+    });
     setup["pressure_solver"]["Multigrid"]["compute_platform"] = pressure_platform.into();
     setup["pressure_solver"]["Multigrid"]["compute_residual_after_solve"] = false.into();
     setup["pressure_solver"]["Multigrid"]["coarsest_level_solver"] = "Jacobi".into();
@@ -45,7 +49,11 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
         setup["velocity_solver"]["max_velocity_factor"] = 1.1.into();
     }
 
-    if let BoundaryCase::SlipCuboidOnGround = boundary_case {
+    if let BoundaryCase::SlipCuboidOnGroundWithSharpEdges = boundary_case {
+        setup["velocity_solver"]["slip_sharp_edges"] = serde_json::json!({"enabled": true});
+    }
+
+    if let BoundaryCase::SlipCuboidOnGround | BoundaryCase::SlipCuboidOnGroundWithSharpEdges = boundary_case {
         setup["slip_geometries"].as_array_mut().unwrap().push(serde_json::json!(
             {"Cuboid": {"center": {"x": 30.0, "y": 0.0, "z": 8.0}, "half_extents": {"x": 4.0, "y": 6.0, "z": 8.0}}}
         ));
@@ -73,6 +81,9 @@ enum BoundaryCase {
     DownwardUpDirectionAndSideWalls,
     /// The boundary conditions of the example, with an extra slip cuboid standing on the ground
     SlipCuboidOnGround,
+    /// The same as `SlipCuboidOnGround`, with the data immersion close to the sharp edges of the
+    /// slip geometries
+    SlipCuboidOnGroundWithSharpEdges,
     /// The boundary conditions of the example, with the velocity limiter
     VelocityLimiter,
     /// The boundary conditions of the example, with the wall model instead of the data immersion,
@@ -229,6 +240,11 @@ fn gpu_velocity_solver_matches_cpu_with_wall_model() {
 #[test]
 fn gpu_velocity_solver_matches_cpu_with_slip_cuboid_on_ground() {
     assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::SlipCuboidOnGround);
+}
+
+#[test]
+fn gpu_velocity_solver_matches_cpu_with_slip_sharp_edges() {
+    assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::SlipCuboidOnGroundWithSharpEdges);
 }
 
 /// The largest inlet velocity magnitude of the example, which the velocity limit is relative to
