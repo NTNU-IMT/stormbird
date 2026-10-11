@@ -5,7 +5,7 @@ use stormath::type_aliases::Float;
 /// Returns the point on a triangle, specified as an array of spatial vectors, that is closest to 
 /// the supplied input point. 
 /// 
-/// Source: [https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf]
+/// Source: <https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf>
 pub fn closest_point_on_triangle(
     point: SpatialVector, 
     triangle: [SpatialVector; 3]

@@ -40,7 +40,7 @@ impl GridBuilder {
     
     /// The "core builder method" that constructs a Grid based on the supplied length. The typical 
     /// use case is to call this method from another builder method, which different logic to 
-    /// supply the length value. See [`Self::build_from_line_force_model`] or 
+    /// supply the length value. See [`Self::build_from_line_force_model_builder`] or 
     /// [`Self::build_from_internal_length`] for examples.
     pub fn build_from_specified_length(&self, length: Float) -> Grid {
         let interior_shape: [usize; 3] = std::array::from_fn(|axis_index| {

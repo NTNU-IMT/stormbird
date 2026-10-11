@@ -167,7 +167,7 @@ impl MultigridCPU {
     }
 
     /// Prolongates (interpolates) the correction from a coarser grid level to a finer level
-    /// using trilinear interpolation, and adds it directly to x_at_levels[fine_level].
+    /// using trilinear interpolation, and adds it directly to `x_at_levels[fine_level]`.
     ///
     /// This fuses the prolongation and correction addition into a single pass, avoiding
     /// the need for a separate corrections buffer and reducing memory traffic.
