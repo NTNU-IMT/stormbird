@@ -1,6 +1,6 @@
 # Input power
 
-Some sail types, like rotor sail and suction sails require input power to operate. This is modeled entirely empirically in Stormbird. The structure that controls these models are shown below.
+Some sail types, like rotor sails and suction sails, require input power to operate. This is modeled entirely empirically in Stormbird. The structures that control these models are shown below.
 
 MORE TO COME ON THIS LATER
 

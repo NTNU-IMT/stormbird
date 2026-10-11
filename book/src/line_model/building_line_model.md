@@ -1,9 +1,9 @@
 # Building a line model
 
-As shown in the [intro section](./line_model_intro.md), a line model consist of many line elements. To simplify the construction of this line model, Stormbird uses a *line force model builder* that helps with at least two things:
+As shown in the [intro section](./line_model_intro.md), a line model consists of many line elements. To simplify the construction of this line model, Stormbird uses a *line force model builder* that helps with at least two things:
 
 1) **Reduce the amount of input data:** Rather than having to specify data directly for each line element, it is possible to only specify data at some chosen points along the span - such as the beginning and the end - and let the builder interpolate for every line segment between the specified points
-2) **Automate the setup of multiple wings:** The line force model requires information about which line element belongs to which wing. This can be cumbersome to set up manually, and it is not really necessary to do so. The builder automatically keep tracks of which line element belong to which wing.
+2) **Automate the setup of multiple wings:** The line force model requires information about which line element belongs to which wing. This can be cumbersome to set up manually, and it is not really necessary to do so. The builder automatically keeps track of which line element belongs to which wing.
 
 ## Input data
 The Rust definition of the builder structure looks like the following:
@@ -14,47 +14,60 @@ pub struct LineForceModelBuilder {
     pub nr_sections: usize,
     pub density: f64,
     pub circulation_correction: CirculationCorrectionBuilder,
+    pub angle_of_attack_correction: AngleOfAttackCorrection,
     pub output_coordinate_system: CoordinateSystem,
+    pub rotation_type: RotationType,
     pub local_wing_angles: Vec<f64>,
     pub rotation: SpatialVector,
     pub translation: SpatialVector,
+    pub force_calculation_settings: ForceCalculationSettings,
 }
 ```
 
-The only required input is the vector containing  `WingBuilder` structures and the `nr_sections` [^nr_sections_note]. The nr sections should be tested for each project, and will affect both the accuracy and the computational speed. Typical values range between 10-50. The `density` is set to the [standard air density for 15 degrees Celsius](https://en.wikipedia.org/wiki/Density_of_air) by default ( which = 1.225 kg / m^3).
+The only required input is the vector containing `WingBuilder` structures and the `nr_sections` [^nr_sections_note]. The nr sections should be tested for each project, and will affect both the accuracy and the computational speed. Typical values range between 10-50. The `density` is set to the [standard air density for 15 degrees Celsius](https://en.wikipedia.org/wiki/Density_of_air) by default (which = 1.225 kg / m^3).
 
-The `circulation_corrections` is an enum, where the default variant is `None`, and therefore not used by default. There will be more on the circulation corrections option [later](./circulation_strength.md). This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues.
+The `circulation_correction` is an enum, where the default variant is `None`, and therefore not used by default. There will be more on the circulation corrections option [later](./circulation_strength.md). This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues.
+
+The `angle_of_attack_correction` is an enum with the variants `None` and `GaussianSmoothing`. The default is `None`. The `GaussianSmoothing` variant is not yet implemented, so this field should be left at its default value for now.
 
 The `output_coordinate_system` is an enum that specifies how the forces and moments from the line force model should be calculated. The default is `Global`, which means all values are in a global coordinate system. That is, the coordinate system for the forces are not moved even if the wings are moved during a simulation. The other option is to set it to `Body`. In this case, the coordinate system of the forces will always follow the wings when they are moved.
 
-The `local_wing_angles`, `rotation`, and `translation` specifies the initial values for the local rotation of the wing angles as well as the global rotation and translation of the whole line force model. See the [move line models chapter](/line_model/move_line_models.md) for more.
+The `local_wing_angles`, `rotation`, and `translation` specify the initial values for the local rotation of the wing angles as well as the global rotation and translation of the whole line force model. The `rotation_type` specifies the order of the rotations, where the default is `XYZ`. See the [move line models chapter](/line_model/move_line_models.md) for more.
 
-[^nr_sections_note]: The number of sections for set in the `LineForceModelBuilder` is used as default, except when another value is defined in the `WingBuilder` below.
+The `force_calculation_settings` controls details in how the forces on each line element are calculated. See the [force calculations chapter](./force_calculations.md) for more.
+
+[^nr_sections_note]: The number of sections set in the `LineForceModelBuilder` is used as default, except when another value is defined in the `WingBuilder` below.
 
 ### Wing builder
-A wing builder contain data to build line segments for a single wing. When a vector (or list) of wing builders are provided, the `LineForceModelBuilder` will automatically keep track of which line segment belong to each wing. The fields in a `WingBuilder` structure is as shown as Rust code below:
+A wing builder contains data to build line segments for a single wing. When a vector (or list) of wing builders is provided, the `LineForceModelBuilder` will automatically keep track of which line segment belongs to each wing. The fields in a `WingBuilder` structure are shown as Rust code below:
 
 ```rust
 pub struct WingBuilder {
-    pub section_points: Vec<SpatialVector<3>>,
-    pub chord_vectors: Vec<SpatialVector<3>>,
+    pub section_points: Vec<SpatialVector>,
+    pub chord_vectors: Vec<SpatialVector>,
     pub section_model: SectionModel,
+    pub line_segment_is_virtual: Option<Vec<bool>>,
     pub non_zero_circulation_at_ends: [bool; 2],
     pub nr_sections: Option<usize>,
+    pub input_power_model: InputPowerModel,
 }
 ```
 
-The input consist of a set of `section_points` which contain information about the span line position. The minimum number of section points is two, and the first has to start at one end of the wing, while the last must end up at the other. There can, however, also be more section points in between the ends.
+The input consists of a set of `section_points` which contain information about the span line position. The minimum number of section points is two, and the first has to start at one end of the wing, while the last must end up at the other. There can, however, also be more section points in between the ends.
 
 For each section point, there also needs to be `chord_vectors`, which specify the local chord at the points. The `chord_vectors` give information about both chord length and orientation.
 
 Each wing also needs a [sectional model](./../sectional_models/sectional_models_intro.md). The sectional model can differ between different wings given to the `LineForceModelBuilder`, which is useful for cases where different sail types are installed on the same ship (uncommon today, but might happen in the future).
 
-The `non_zero_circulation_at_ends` is boolean values that specifies the expected behavior of the circulation distribution at the ends of the wing. It is used when initializing the circulation distribution before a simulation, and when applying corrections to the circulation distribution. In most cases, the expected value of the circulation strength at the ends is zero, and the value of this variable should be `[false, false]`. However, if, for instance, the wing is standing directly on a symmetry plane, or is directly coupled to another wing, the circulation distribution will typically not be zero. If an end is coupled to *something* that might give a non-zero circulation, then that end should then get a `true` value. For instance, if the first end is standing on a symmetry plane, the value of this variable should be `[true, false]`.
+The `line_segment_is_virtual` is an optional vector of boolean values, with one value for each segment between two consecutive section points. All line elements generated within a segment that is marked as `true` are treated as *virtual*. Virtual line elements are part of the simulation in the same way as other line elements, but they are not included in the integrated forces and moments. They can, for instance, be used to effectively increase the aspect ratio of a wing without adding more line elements to the force calculation. By default, no line elements are virtual.
+
+The `non_zero_circulation_at_ends` consists of boolean values that specify the expected behavior of the circulation distribution at the ends of the wing. It is used when initializing the circulation distribution before a simulation, and when applying corrections to the circulation distribution. In most cases, the expected value of the circulation strength at the ends is zero, and the value of this variable should be `[false, false]`. However, if, for instance, the wing is standing directly on a symmetry plane, or is directly coupled to another wing, the circulation distribution will typically not be zero. If an end is coupled to *something* that might give a non-zero circulation, then that end should then get a `true` value. For instance, if the first end is standing on a symmetry plane, the value of this variable should be `[true, false]`.
 
 The `nr_sections` variable is optional but can be set for each wing to override the default parameters in the `LineForceModelBuilder`. Typically, it will not be used, as the most common scenario is to have the same number of sections for each wing.
 
-When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note]
+The `input_power_model` specifies an optional empirical model for the power needed to operate the wing, for instance for rotor sails or suction sails. The default is `NoPower`. See the [input power chapter](./input_power.md) for more.
+
+When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note].
 
 [^interpolation_note]: The interpolation method is possible to change or update to something that can handle non-linear changes between section points. This is, however, so far not prioritized as most sail types tend to use fairly simple geometrical structures. This might change in the future if there is a need to do so.
 

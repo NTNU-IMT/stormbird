@@ -1,6 +1,6 @@
 # Move and modify a line model
 
-In dynamic simulations, it will often be interesting to apply motion to the sails and dynamically change the angle of attack or internal state of a section model. This can, for instance, be done to simulate how the sails affect the seakeeping or maneuvering abilities of a ship or to allow the operational variables of the sails be dependent on the current wind conditions. This chapter specifies how to apply motion data to the sails during a dynamic simulation and how to modify the operational variables for each sail.
+In dynamic simulations, it will often be interesting to apply motion to the sails and dynamically change the angle of attack or internal state of a section model. This can, for instance, be done to simulate how the sails affect the seakeeping or maneuvering abilities of a ship or to allow the operational variables of the sails to be dependent on the current wind conditions. This chapter specifies how to apply motion data to the sails during a dynamic simulation and how to modify the operational variables for each sail.
 
 ## Motion variables
 
@@ -16,9 +16,9 @@ pub struct RigidBodyMotion {
 }
 ```
 
-It specifiies translation and rotation, both in terms of the curren positions and in terms of the velocities at any given time. The position is important both for updating the wake shape and for determining local wind conditions on each line segment. When applying the motion variables, the rotation will be applied first, then the translation. That is, the rotation happens around a local coordinate system always. The order of the rotation can be set with the `rotation_type` field, but the default is rotation in x first, then y, and then z.
+It specifies translation and rotation, both in terms of the current positions and in terms of the velocities at any given time. The position is important both for updating the wake shape and for determining local wind conditions on each line segment. When applying the motion variables, the rotation will be applied first, then the translation. That is, the rotation happens around a local coordinate system always. The order of the rotation can be set with the `rotation_type` field, but the default is rotation in x first, then y, and then z.
 
-The motion velocities, `velocity_linear` and `velocity_angular`, are important for the calcualtion of forces. The forces on the each line segment is primarily dependent on the local velocity, local angle of attack, and the internal state of the sectional models. As such, when a motion is applied to the line force model, it is necessary to calculate the *felt velocity* and *felt acceleration* of each line segment, so that this can further be used as input to the force calculation functions. This can be calculated from the gloabl rotation and translation velocity vectors using methods in the `RigidBodyMotion` structure. As will be further highlighted [later](force_calculations.md), the forces are estimated from a `SectionalForceInput` structure, which have fields as shown in the code block below. The velocity and acceleration values calculated in the `SectionalForceInput` structure are dependent on the motion of the sails.
+The motion velocities, `velocity_linear` and `velocity_angular`, are important for the calculation of forces. The forces on each line segment are primarily dependent on the local velocity, local angle of attack, and the internal state of the sectional models. As such, when a motion is applied to the line force model, it is necessary to calculate the *felt velocity* and *felt acceleration* of each line segment, so that this can further be used as input to the force calculation functions. This can be calculated from the global rotation and translation velocity vectors using methods in the `RigidBodyMotion` structure. As will be further highlighted [later](force_calculations.md), the forces are estimated from a `SectionalForcesInput` structure, which has fields as shown in the code block below. The velocity and acceleration values calculated in the `SectionalForcesInput` structure are dependent on the motion of the sails.
 
 ```rust
 pub struct SectionalForcesInput {
@@ -31,27 +31,27 @@ pub struct SectionalForcesInput {
 }
 ```
 
-Each element in the vectors in the `SectionalForceInput` corresponds to a line element in the `LineForceModel`. Both the velocity and the acceleration is a combination of freestream conditions, induced velocities, and motion velocities. The motion velocities can either be automatically calcualted based on fintie difference and the time history of the motion or set manually if the variables are available from some other sources (e.g., a rigid body solver of a ship)
+Each element in the vectors in the `SectionalForcesInput` corresponds to a line element in the `LineForceModel`. Both the velocity and the acceleration are a combination of freestream conditions, induced velocities, and motion velocities. The motion velocities can either be automatically calculated based on finite difference and the time history of the motion or set manually if the variables are available from some other sources (e.g., a rigid body solver of a ship).
 
 ## Control variables
 
 Two types of control variables exist for the sails in a `LineForceModel`.
 
-The first is the `local_wing_angles`, which defines the rotation of the sails around its local axis. The local axis is defined as the axis of the first span line. If the sails is defined to be oriented in the z-direction as the span direction, a local wing angle value will then rotate all chord vectors around the z-axis.
+The first is the `local_wing_angles`, which defines the rotation of the sails around its local axis. The local axis is defined as the axis of the first span line. If the sail is defined to be oriented in the z-direction as the span direction, a local wing angle value will then rotate all chord vectors around the z-axis.
 
 The second value is the internal state of the section model for each wing. This value can represent different things, depending on the sail type and how it is modeled. Typical values are flap angles, rotational speeds, and suction rates.
 
 ## Updating the LineForceModel
 
-When setting new values for either the motion variables or the control variables it is important to do it in way that also updates all dependent internal variables. For instance, many of the variables that define the geometry of the wings are defined both with their local values and their global values (e.g., `chord_vectors_local` and `chord_vectors_global`). In general, the global version of a variable type is calcualted from the local one, with the motion and wing angles applied to them. As such, updating the line force model should be done with `set` methods that also updates the global representation of the line force model.
+When setting new values for either the motion variables or the control variables it is important to do it in a way that also updates all dependent internal variables. For instance, many of the variables that define the geometry of the wings are defined both with their local values and their global values (e.g., `chord_vectors_local` and `chord_vectors_global`). In general, the global version of a variable type is calculated from the local one, with the motion and wing angles applied to them. As such, updating the line force model should be done with `set` methods that also update the global representation of the line force model.
 
-The line force model have a general update function that should update all global geometry variables, and which should also be called after all `set` methods.
+The line force model has a general update function that should update all global geometry variables, and which should also be called after all `set` methods.
 
 ### Motions
 
 Motion can be set in two ways: either with the position and rotation only, and using finite difference to calculate the corresponding velocities due to this motion, or by updating the velocity values manually. The first option is generally the easiest. However, the latter might be useful in cases where motion velocity is available from an external source, such as a rigid body solver that integrates the acceleration of an entire ship.
 
-Below is some examples of how to apply different motion variables through the Python interface.
+Below are some examples of how to apply different motion variables through the Python interface.
 
 ```python
 import numpy as np
@@ -73,7 +73,7 @@ simulation.set_translation_and_rotation_with_finite_difference_for_the_velocity(
     rotation = rotation
 )
 
-# Alternativluy, update everything manually
+# Alternatively, update everything manually
 simulation.set_translation_only(translation)
 simulation.set_rotation_only(rotation)
 
@@ -89,7 +89,7 @@ simulation.set_velocity_angular(angular_velocity)
 
 ### Local chord angle control
 
-Updating the chord angles in the Python interface is done by set-method that takes a list of angles as input, that must have a length equal to the number of wings in the line force model. An example code snippet is shown below, for a case with three sails:
+Updating the chord angles in the Python interface is done by a set-method that takes a list of angles as input, that must have a length equal to the number of wings in the line force model. An example code snippet is shown below, for a case with three sails:
 
 ```python
 import numpy as np
