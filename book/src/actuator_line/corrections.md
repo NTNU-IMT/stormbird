@@ -22,7 +22,12 @@ This is done by first computing the lift-induced velocities from a lifting line 
 ### Wake shape
 One challenge with such an approach is that the shape of the wake must be assumed somehow. This is a trivial task if there is only a single wing, but more difficult if there are multiple wings in close proximity OR wings standing on a ship superstructure. However, the point of the lifting line corrections is **only to compute the error due to a too large projection width**. The effect of a viscous core on the induced velocities is most significant from the wake close to the wing. The effect from the vortices far downstream should be small. The exact wake shape for the correction may, therefore, not be that important.
 
-As a simple solution to this, the lifting line correction in Stormbird assumes a steady wake shape, with a direction equal to the average sampled velocity over each wing. The correction for each wing is also simulated independently. That is, **the correction should NOT affect interaction effects between wings in any way**, only errors due to a too large viscous core on the wing's own wake. This choice is made to keep the correction method local to a single wing. In other words, the lifting line correction only corrects for errors in the *self-induced* velocities, and not interaction effects.
+As a simple solution to this, the lifting line correction in Stormbird assumes a steady wake shape, with a direction equal to the sampled velocity along each wing.
+
+### Isolated wings or wing interactions
+By default, the correction for each wing is simulated independently. That is, **the correction does NOT affect interaction effects between wings in any way**, only errors due to a too large viscous core on the wing's own wake. This choice is made to keep the correction method local to a single wing, under the assumption that interaction effects are better predicted directly by the actuator line model itself. In other words, the default lifting line correction only corrects for errors in the *self-induced* velocities.
+
+However, a too large viscous core may also cause errors in the wing-to-wing interactions, for instance when wings are placed close to each other. To account for this, the correction can optionally include all wings, by setting `include_wing_interactions` to `true` in the input structure (see below). The wakes of all wings are then included when computing the induced velocities in both wake models, so that the difference between them also contains the error in the velocities induced by the other wings. For a single wing, the two options give identical results.
 
 The actual code used to calculate the correction for a given time step is the same as the steady [wake models](../lifting_line/wake.md) used in the lifting line methods.
 
@@ -34,15 +39,18 @@ pub struct LiftingLineCorrectionBuilder {
     pub wake_length_factor: f64,
     pub symmetry_condition: SymmetryCondition,
     pub initialization_time: Option<f64>,
-    pub reference_core_length_factor: f64
+    pub reference_core_length_factor: f64,
+    pub include_wing_interactions: bool,
 }
 ```
 
 The `wake_length_factor` is set to 100.0 by default, which means that the wake used for computing lift-induced velocities is assumed to extend 100 chord lengths downstream. The `symmetry_condition` is set to `NoSymmetry` by default. The symmetry condition should generally reflect the same symmetry condition as used in the CFD simulation. For instance, if the bottom of the domain is at the lowest z-coordinate, the symmetry condition should be set to `Z`.
 
-The viscous core length used to represent the actuator line is calculated from the force projection settings, as the average of the `chord_factor` and `thickness_factor` in the [Gaussian projection kernel](force_projection.md) multiplied with the average chord length. The *very small* core length used in the second wake model is then calculated by dividing this value by the `reference_core_length_factor`, which is set to 10.0 by default.
+The viscous core length used to represent the actuator line is calculated from the force projection settings, as the average of the `chord_factor` and `thickness_factor` in the [Gaussian projection kernel](force_projection.md) multiplied with the average chord length. The *very small* core length used in the second wake model is then calculated by dividing this value by the `reference_core_length_factor`, which is set to 100.0 by default.
 
 The `initialization_time` is optional, and not used by default. If it is set, the correction is gradually ramped up from zero to its full value, using a smooth cosine transition, over the specified time from the start of the simulation. This can be used to avoid large corrections in the start-up phase of a CFD simulation.
+
+The `include_wing_interactions` is set to `false` by default, meaning that the correction is computed for each wing in isolation. If set to `true`, the correction includes the induced velocities from all wings, as described in the [section above](#isolated-wings-or-wing-interactions).
 
 Experience from this correction technique is that it works very well for actuator line simulations that only include wings. Even with a **large isotropic projection width**, the result from an actuator line simulation will match the lifting line model almost perfectly. However, it can also create instabilities when combined with complex ship geometries. **The hope is to find a solution to this in the future**, as this type of correction is believed to be very general and promising for practical use cases.
 

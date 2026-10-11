@@ -13,6 +13,7 @@ class LiftingLineCorrectionBuilder(StormbirdSetupBaseModel):
     symmetry_condition: SymmetryCondition = SymmetryCondition.NoSymmetry
     initialization_time: float | None = None
     reference_core_length_factor: float = 100.0
+    include_wing_interactions: bool = False
 
 class EmpiricalCirculationCorrection(StormbirdSetupBaseModel):
     exp_factor: float = 10.0

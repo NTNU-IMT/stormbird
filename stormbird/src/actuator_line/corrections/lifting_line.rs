@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use crate::lifting_line::wake::frozen_wake::FrozenWake;
+use crate::lifting_line::singularity_elements::horseshoe_vortex::HorseshoeVortex;
 use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondition;
 
 use crate::line_force_model::LineForceModel;
@@ -25,7 +26,9 @@ pub struct LiftingLineCorrectionBuilder {
     #[serde(default)]
     pub initialization_time: Option<Float>,
     #[serde(default="LiftingLineCorrectionBuilder::default_reference_core_length_factor")]
-    pub reference_core_length_factor: Float
+    pub reference_core_length_factor: Float,
+    #[serde(default)]
+    pub include_wing_interactions: bool,
 }
 
 impl Default for LiftingLineCorrectionBuilder {
@@ -34,14 +37,15 @@ impl Default for LiftingLineCorrectionBuilder {
             wake_length_factor: Self::default_wake_length_factor(),
             symmetry_condition: SymmetryCondition::NoSymmetry,
             initialization_time: None,
-            reference_core_length_factor: Self::default_reference_core_length_factor()
+            reference_core_length_factor: Self::default_reference_core_length_factor(),
+            include_wing_interactions: false,
         }
     }
 }
 
 impl LiftingLineCorrectionBuilder {
     fn default_wake_length_factor() -> Float {100.0}
-    fn default_reference_core_length_factor() -> Float {10.0}
+    fn default_reference_core_length_factor() -> Float {100.0}
 
     pub fn build(
         &self,
@@ -60,6 +64,7 @@ impl LiftingLineCorrectionBuilder {
             wake_length_factor: self.wake_length_factor,
             symmetry_condition: self.symmetry_condition,
             initialization_time: self.initialization_time,
+            include_wing_interactions: self.include_wing_interactions,
         }
     }
 }
@@ -71,26 +76,69 @@ impl LiftingLineCorrectionBuilder {
 /// force projection width. The difference in induced velocities are then added to the velocity that
 /// is sampled directly from the flow field. This is to account for the fact that realistic force
 /// projection widths tend to smear out the tip vortices, leading to under predicted induced
-/// velocities
+/// velocities.
+///
+/// By default, the correction is computed for each wing in isolation, so that only errors in the
+/// self-induced velocities are corrected. If `include_wing_interactions` is true, the induced
+/// velocities from all wings are included, so that errors in the wing-to-wing interactions are
+/// also corrected.
 pub struct LiftingLineCorrection {
     pub viscous_core_length: Float,
     pub viscous_core_length_reference: Float,
     pub wake_length_factor: Float,
     pub symmetry_condition: SymmetryCondition,
     pub initialization_time: Option<Float>,
+    pub include_wing_interactions: bool,
 }
 
 impl LiftingLineCorrection {
     /// Computes a difference in the induced velocities between two lifting line simulations; one
     /// with a viscous core length equal to the force projection width, and one with a small viscous
     /// core length. The difference is then returned as a vector of induced velocities at the control
-    /// points of the line force model
+    /// points of the line force model.
+    ///
+    /// Whether each wing is treated in isolation, or whether the interactions between wings are
+    /// included, is determined by the `include_wing_interactions` field.
     pub fn velocity_correction(
         &self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
         circulation_strength: &[Float],
         time: Float,
+    ) -> Vec<SpatialVector> {
+        let mut u_i_correction = if self.include_wing_interactions {
+            self.velocity_correction_all_wings(
+                line_force_model,
+                ctrl_points_velocity,
+                circulation_strength
+            )
+        } else {
+            self.velocity_correction_isolated_wings(
+                line_force_model,
+                ctrl_points_velocity,
+                circulation_strength
+            )
+        };
+
+        if let Some(initialization_time) = self.initialization_time {
+            let correction_factor = cosine_transition_zero_to_one(time, 0.0, initialization_time);
+
+            for i in 0..u_i_correction.len() {
+                u_i_correction[i] *= correction_factor;
+            }
+        }
+
+        u_i_correction
+    }
+
+    /// Computes the velocity correction for each wing in isolation. That is, only the velocities
+    /// induced by a wing on itself are included, so that only errors in the self-induced velocities
+    /// are corrected.
+    pub fn velocity_correction_isolated_wings(
+        &self,
+        line_force_model: &LineForceModel,
+        ctrl_points_velocity: &[SpatialVector],
+        circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
         let span_lines = &line_force_model.span_lines_global;
         let chord_lengths = &line_force_model.chord_lengths;
@@ -130,26 +178,26 @@ impl LiftingLineCorrection {
 
             wing_span_point_velocities.push(wing_ctrl_points_velocity[nr_span_lines-1]);
 
-            let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() / 
+            let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() /
                 line_force_model.chord_lengths.len() as Float;
 
             let wake_length = average_chord_length * self.wake_length_factor;
 
 
             let mut frozen_wake_viscous = FrozenWake::new_for_single_wing_from_span_lines_and_velocities(
-                wing_span_lines, 
+                wing_span_lines,
                 wing_chord_lengths,
-                &wing_span_point_velocities, 
-                wake_length, 
+                &wing_span_point_velocities,
+                wake_length,
                 self.viscous_core_length,
                 self.symmetry_condition
             );
 
             let mut frozen_wake_default = FrozenWake::new_for_single_wing_from_span_lines_and_velocities(
-                wing_span_lines, 
+                wing_span_lines,
                 wing_chord_lengths,
-                &wing_span_point_velocities, 
-                wake_length, 
+                &wing_span_point_velocities,
+                wake_length,
                 self.viscous_core_length_reference,
                 self.symmetry_condition
             );
@@ -169,15 +217,96 @@ impl LiftingLineCorrection {
                 );
             }
         }
-        
-        if let Some(initialization_time) = self.initialization_time {
-            let correction_factor = cosine_transition_zero_to_one(time, 0.0, initialization_time);
-            
-            for i in 0..u_i_correction.len() {
-                u_i_correction[i] *= correction_factor;
+
+        u_i_correction
+    }
+
+    /// Computes the velocity correction with all wings included. That is, the induced velocities
+    /// at the control points of each wing are computed from the wakes of all wings, so that errors
+    /// in the wing-to-wing interactions are also corrected.
+    pub fn velocity_correction_all_wings(
+        &self,
+        line_force_model: &LineForceModel,
+        ctrl_points_velocity: &[SpatialVector],
+        circulation_strength: &[Float],
+    ) -> Vec<SpatialVector> {
+        let span_lines = &line_force_model.span_lines_global;
+        let nr_span_lines = span_lines.len();
+
+        // Same interpolation as in the isolated version: the end points of each wing use the
+        // velocity at the nearest control point, the inner points use the average.
+        let span_point_velocities = line_force_model.span_point_values_from_ctrl_point_values(
+            ctrl_points_velocity,
+            false
+        );
+
+        let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() /
+            line_force_model.chord_lengths.len() as Float;
+
+        let wake_length = average_chord_length * self.wake_length_factor;
+
+        let wake_vectors: Vec<SpatialVector> = span_point_velocities.iter().map(|v| {
+            wake_length * v.normalize()
+        }).collect();
+
+        let horseshoe_vortices_viscous = HorseshoeVortex::vortices_from_line_force_model_and_wake_vectors(
+            line_force_model,
+            &wake_vectors,
+            self.viscous_core_length
+        );
+
+        let horseshoe_vortices_default = HorseshoeVortex::vortices_from_line_force_model_and_wake_vectors(
+            line_force_model,
+            &wake_vectors,
+            self.viscous_core_length_reference
+        );
+
+        let mut u_i_correction: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines);
+
+        for row_index in 0..nr_span_lines {
+            let ctrl_point = span_lines[row_index].ctrl_point();
+            let point_mirrored = self.symmetry_condition.mirrored_point(ctrl_point);
+
+            let mut u_i_viscous = SpatialVector::default();
+            let mut u_i_default = SpatialVector::default();
+
+            for col_index in 0..nr_span_lines {
+                let strength = circulation_strength[col_index];
+
+                u_i_viscous += strength * self.unit_strength_induced_velocity(
+                    &horseshoe_vortices_viscous[col_index],
+                    ctrl_point,
+                    point_mirrored
+                );
+
+                u_i_default += strength * self.unit_strength_induced_velocity(
+                    &horseshoe_vortices_default[col_index],
+                    ctrl_point,
+                    point_mirrored
+                );
             }
+
+            u_i_correction.push(u_i_default - u_i_viscous);
         }
 
         u_i_correction
+    }
+
+    /// Induced velocity from a horseshoe vortex with unit strength, including the effect of the
+    /// symmetry condition.
+    fn unit_strength_induced_velocity(
+        &self,
+        vortex: &HorseshoeVortex,
+        ctrl_point: SpatialVector,
+        point_mirrored: Option<SpatialVector>,
+    ) -> SpatialVector {
+        let u_i = vortex.induced_velocity_with_unit_strength(ctrl_point);
+
+        if let Some(p_m) = point_mirrored {
+            let u_i_mirrored = vortex.induced_velocity_with_unit_strength(p_m);
+            self.symmetry_condition.corrected_velocity(u_i, u_i_mirrored)
+        } else {
+            u_i
+        }
     }
 }
