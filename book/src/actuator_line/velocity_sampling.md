@@ -22,7 +22,7 @@ Some of the settings are independent of the sampling methods chosen. In particul
 
 ## Direct interpolation
 
-The first and most direct method is to simply use interpolated velocities from the CFD grid at each control point. This method relies on the built in interpolation methods in the CFD solver, which means that the order of the interpolation is also chosen by the CFD solver. For a second order unstructured CFD code, like OpenFOAM, the interpolation will often be linear. To active this method, simply set the `use_point_sampling` flag to true in the `SamplingSettings`.
+The first and most direct method is to simply use interpolated velocities from the CFD grid at each control point. This method relies on the built in interpolation methods in the CFD solver, which means that the order of the interpolation is also chosen by the CFD solver. For a second order unstructured CFD code, like OpenFOAM, the interpolation will often be linear. To activate this method, simply set the `use_point_sampling` flag to true in the `SamplingSettings`.
 
 ## Body force weighted estimate
 
@@ -30,7 +30,7 @@ The second method for velocity sampling is implemented based on the explanation 
 
 The additional settings variables for this sampling method are generally connected to how the Gaussian kernel should be along the spanwise direction for each line segment. There are two variables controlling this:
 
-- `span_projection_factor`: This variable sets the width of the Gaussian kernel along the spanwise direction as a multiple of the local line segment length. The default value is 0.5. That is, it is the cells closest to the control point that will influence the sampled velocity the most, also in the spanwise direction. The fall off in the spanwise direction is controller by this factor.
-- `neglect_span_projection`: If this flag is set to true, the Gaussian kernel is assumed to be infinitely wide along the spanwise direction, effectively reducing the kernel to a 2D Gaussian in the plane normal to the line segment. However, only cells that are normal to the span line is included in the weighted average; cells that are either *above* or *below* is neglected. The weight of each cell is still based on the 2D force projection kernel, just no longer any spanwise distribution. The default value is false.
+- `span_projection_factor`: This variable sets the width of the Gaussian kernel along the spanwise direction as a multiple of the local line segment length. The default value is 0.5. That is, it is the cells closest to the control point that will influence the sampled velocity the most, also in the spanwise direction. The fall off in the spanwise direction is controlled by this factor.
+- `neglect_span_projection`: If this flag is set to true, the Gaussian kernel is assumed to be infinitely wide along the spanwise direction, effectively reducing the kernel to a 2D Gaussian in the plane normal to the line segment. However, only cells that are normal to the span line is included in the weighted average; cells that are either *above* or *below* are neglected. The weight of each cell is still based on the 2D force projection kernel, just no longer any spanwise distribution. The default value is false.
 
 This method is claimed to be more robust against numerical noise, in particular when using coarse grids. It also has the benefit that the interpolation method itself is not dependent on the CFD solver so that it is easy to use with any solver.

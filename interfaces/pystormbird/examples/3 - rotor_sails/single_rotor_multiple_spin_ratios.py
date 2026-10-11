@@ -15,7 +15,7 @@ import pandas as pd
 
 # These settings are used to generate multiple versions of the simulation, for test purposes
 TEST_SETTINGS = {
-    "solver_types": [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative],
+    "solver_types": [SolverType.Linearized, SolverType.Iterative, SolverType.Iterative],
     "max_induced_velocity_ratios": [0.0, 0.0, 0.0],
     "smoothing_lengths": [0.0, 0.0, 0.0],
     "virtual_extension_factor_top": [0.0, 0.0, 0.1]

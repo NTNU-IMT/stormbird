@@ -1,0 +1,105 @@
+{
+  "grid": {
+    "start_point": [-30.0, -31.25, 0.0],
+    "end_point": [60.0, 31.25, 45.0],
+    "cells_per_representative_length": [10, 10, 10]
+  },
+  "effective_viscosity": 0.00001,
+  "wind_condition": {
+    "direction_coming_from": 0.0,
+    "velocity_variation": {
+      "Constant": 10.0
+    }
+  },
+  "linear_velocity": { "x": 0.0, "y": 0.0, "z": 0.0 },
+  "actuator_line": {
+    "line_force_model": {
+      "wing_builders": [
+        {
+          "section_points": [
+            { "x": 0.0, "y": 0.0, "z": 1.875 },
+            { "x": 0.0, "y": 0.0, "z": 31.875 }
+          ],
+          "chord_vectors": [
+            { "x": 5.0, "y": 0.0, "z": 0.0 },
+            { "x": 5.0, "y": 0.0, "z": 0.0 }
+          ],
+          "section_model": {
+            "RotatingCylinder": {
+              "revolutions_per_second": -1.273,
+              "spin_ratio_data": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+              "cl_data": [0.0, 1.45, 4.75, 8.77, 10.38, 11.0],
+              "cd_start": 0.686,
+              "cd_end": 0.1
+            }
+          },
+          "non_zero_circulation_at_ends": [false, false],
+          "input_power_model": "NoPower"
+        }
+      ],
+      "nr_sections": 32,
+      "density": 1.0,
+      "local_wing_angles": [0.0],
+      "output_coordinate_system": "Global",
+      "circulation_correction": {
+        "Smoothing": {
+          "smoothing_type": {
+            "Gaussian": {
+              "smoothing_length_factor": 0.05
+            }
+          }
+        }
+      }
+    },
+    "projection_settings": {
+      "projection_function": {
+        "chord_factor": 0.6,
+        "thickness_factor": 0.6,
+        "span_falloff_factor": 0.0
+      },
+      "realign_sectional_forces": true,
+      "realign_to_local_velocity_at_each_cell": false
+    },
+    "solver_settings": {
+      "damping_factor": 0.05
+    },
+    "sampling_settings": {
+      "remove_span_velocity": true
+    },
+    "lifting_line_correction": {
+      "symmetry_condition": "Z",
+      "initialization_time": 3.0
+    },
+    "write_iterations_full_result": 100,
+    "start_time": 0.0
+  },
+  "slip_geometries": [
+    {
+      "Disk": {
+        "center": { "x": 0.0, "y": 0.0, "z": 31.875 },
+        "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+        "radius": 3.75,
+        "thickness": 1.0,
+        "fillet_radius": 0.5
+      }
+    },
+    {
+      "Cuboid": {
+        "center": { "x": 0.0, "y": 0.0, "z": 0.0 },
+        "half_extents": {"x": 2.5, "y": 2.5, "z": 1.875}
+      }
+    }
+  ],
+  "pressure_solver": {
+    "Multigrid": {
+      "nr_v_cycles": 2,
+      "compute_platform": "GPU",
+      "compute_residual_after_solve": true,
+      "zero_gradient_on_walls": "SlipWallsOnly",
+      "zero_gradient_interpolation_order": "Tricubic"
+    }
+  },
+  "velocity_solver": {
+    "mirror_interpolation_order": "Tricubic"
+  }
+}

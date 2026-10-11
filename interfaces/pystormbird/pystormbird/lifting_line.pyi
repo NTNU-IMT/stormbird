@@ -1,6 +1,6 @@
 """Type stubs for pystormbird.lifting_line."""
 
-from pystormbird import SimulationResult
+from pystormbird import SimulationResult, SingleSailResult
 from .line_force_model import LineForceModel
 from .wind import WindCondition, WindEnvironment
 
@@ -41,10 +41,66 @@ class Simulation:
     ) -> SimulationResult: ...
 
     def induced_velocities(self, points: list[list[float]]) -> list[list[float]]: ...
+    def dynamic_wake_as_vtk(self, binary: bool = True) -> bytes | None: ...
 
 
 class CompleteSailModel:
     def __init__(self, setup_string: str) -> None: ...
+
+    def get_number_of_sails(self) -> int:
+        """The number of sails in the model."""
+        ...
+
+    def simulate_optimal_steady_state_condition(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity: float,
+        max_loading: float
+    ) -> SimulationResult:
+        """
+        Runs multiple steady state simulations with different controller loadings, and returns the
+        result with the highest effective power. That is, the power delivered by the thrust, minus
+        the power that is used by the sails. The number of loadings that are tested is defined by
+        the model settings.
+        """
+        ...
+
+    def simulate_steady_state_condition(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity: float,
+        controller_loading: float
+    ) -> SimulationResult:
+        """Applies the controller and simulates a single steady state condition."""
+        ...
+
+    def simulate_steady_state_condition_simple_output(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity: float,
+        controller_loading: float
+    ) -> list[SingleSailResult]:
+        """
+        Same as `simulate_steady_state_condition`, but the result is simplified to the total force
+        and moment and the input power for each sail.
+        """
+        ...
+
+    def simulate_optimal_steady_state_condition_simple_output(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity: float,
+        max_loading: float
+    ) -> list[SingleSailResult]:
+        """
+        Same as `simulate_optimal_steady_state_condition`, but the result is simplified to the
+        total force and moment and the input power for each sail.
+        """
+        ...
 
     def apply_controller_based_on_wind_condition(
         self,
@@ -54,6 +110,28 @@ class CompleteSailModel:
         wind_condition: WindCondition,
         ship_velocity: float,
         controller_loading: float
+    ) -> None: ...
+
+    def freestream_velocity(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity: float,
+        time: float
+    ) -> list[list[float]]:
+        """
+        The freestream velocity at all the points where it is needed by the simulation. That is,
+        the apparent wind, including the effect of the ship velocity and inflow corrections.
+        """
+        ...
+
+    def apply_controller_based_on_freestream(
+        self,
+        *,
+        time: float,
+        time_step: float,
+        loading: float,
+        freestream_velocity: list[list[float]]
     ) -> None: ...
 
     def apply_controller_based_on_simulation_result(

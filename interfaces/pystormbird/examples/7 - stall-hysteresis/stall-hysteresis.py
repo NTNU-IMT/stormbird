@@ -10,7 +10,7 @@ from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.section_models import SectionModel, Foil
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
-from stormbird_setup.lifting_line.solver import SimpleIterative
+from stormbird_setup.lifting_line.solver import Iterative
 from stormbird_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
 from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrections
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         symmetry_condition=SymmetryCondition.Z,
     )
     
-    solver = SimpleIterative(
+    solver = Iterative(
         max_iterations_per_time_step=200,
         damping_factor = 0.02,
         velocity_corrections=VelocityCorrections.new_max_induced_velocity_magnitude()

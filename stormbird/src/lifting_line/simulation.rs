@@ -115,14 +115,7 @@ impl Simulation {
         let ctrl_points_freestream_range = 0..self.line_force_model.nr_span_lines();
         let wake_points_freestream_range = self.line_force_model.nr_span_lines()..freestream_velocity.len();
 
-        let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_velocity(
-            &freestream_velocity[ctrl_points_freestream_range.clone()],
-        );
-
-        let felt_span_points_freestream = self.line_force_model.span_point_values_from_ctrl_point_values(
-            &felt_ctrl_points_freestream, 
-            false
-        );
+        let ctrl_points_freestream = &freestream_velocity[ctrl_points_freestream_range.clone()];
 
         if !self.first_time_step_completed {
             self.initialize(
@@ -137,7 +130,7 @@ impl Simulation {
                 wake.update_before_solving(
                     time_step, 
                     &self.line_force_model,
-                    &felt_span_points_freestream
+                    ctrl_points_freestream
                 );
 
                 // Use the updated wake model to update the frozen wake
@@ -149,7 +142,7 @@ impl Simulation {
             WakeData::QuasiSteady(settings) => {
                 self.frozen_wake.update_as_steady_from_line_force_model_and_velocities(
                     &self.line_force_model, 
-                    &felt_span_points_freestream,
+                    ctrl_points_freestream,
                     &settings
                 );
             }
@@ -157,8 +150,12 @@ impl Simulation {
 
         // Run the solver with the frozen wake
 
+        let felt_ctrl_points_freestream = self.line_force_model.felt_ctrl_points_velocity(
+            ctrl_points_freestream
+        );
+
         let solver_result = match &self.solver {
-            Solver::SimpleIterative(solver) => solver.solve(
+            Solver::Iterative(solver) => solver.solve(
                 &self.line_force_model,
                 &felt_ctrl_points_freestream,
                 &mut self.frozen_wake,
@@ -202,6 +199,22 @@ impl Simulation {
         )
     }
 
+    /// Serialize the current dynamic wake as a legacy VTK PolyData buffer.
+    ///
+    /// Returns `Some(bytes)` when the simulation uses a dynamic wake, so the wake geometry and 
+    /// strengths can be obtained in memory (e.g. for visualization in pyvista) without touching the 
+    /// disk. The `binary` switch selects between the ASCII and BINARY variants of the VTK legacy 
+    /// format.
+    ///
+    /// Returns `None` for quasi-steady (static) wakes, which have no explicit wake geometry to 
+    /// export.
+    pub fn dynamic_wake_as_vtk(&self, binary: bool) -> Option<Vec<u8>> {
+        if let WakeData::Dynamic(wake) = &self.wake_data {
+            Some(wake.wake_as_vtk(binary))
+        } else {
+            None
+        }
+    }
 
     /// Interface function to calculate the induced velocities from the wake at the given points.
     pub fn induced_velocities(

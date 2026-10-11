@@ -29,8 +29,15 @@ class StormbirdSetupBaseModel(BaseModel):
         return cls.model_validate_json(json_string)
 
     @classmethod
-    def from_json_file(cls: Type[T], file_path: Path) -> T:
-        return cls.model_validate_json(file_path.read_text())
+    def from_json_file(cls: Type[T], file_path: Path | str) -> T:
+        if isinstance(file_path, str):
+            file_path_in = Path(file_path)
+        elif isinstance(file_path, Path):
+            file_path_in = file_path
+        else:
+            raise TypeError(f"Input must be of type Path or str. Right now it is {type(file_path)}")
+            
+        return cls.model_validate_json(file_path_in.read_text())
 
     def to_json_string(self) -> str:
         return self.model_dump_json(exclude_none=True, indent=4)
@@ -44,6 +51,7 @@ class StormbirdSetupBaseModel(BaseModel):
         else:
             raise TypeError(f"Input must be of type Path or str. Right now it is {type(file_path)}")
 
+        file_path_out.parent.mkdir(parents=True, exist_ok=True)
         file_path_out.write_text(self.to_json_string())
 
     def to_dict(self) -> dict:

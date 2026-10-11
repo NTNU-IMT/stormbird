@@ -23,7 +23,7 @@
 //! - [`sectional_drag_forces`](LineForceModel::sectional_drag_forces)
 //! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
 //! - [`sectional_gyroscopic_force`](LineForceModel::sectional_gyroscopic_force)
-//! - [`lift_from_circulation`](LineForceModel::lift_from_circulation)
+//! - [`lift_coefficient_from_circulation`](LineForceModel::lift_coefficient_from_circulation)
 //! - [`lift_from_coefficients`](LineForceModel::lift_from_coefficients)
 //! - [`residual`](LineForceModel::residual)
 //! - [`residual_absolute`](LineForceModel::residual_absolute)
@@ -66,6 +66,29 @@ impl LineForceModel {
         }
 
         ctrl_point_velocity
+    }
+
+    /// Function used to calculate the *felt* velocity at each span point. That is, the input
+    /// velocity minus the motion velocity at each span point.
+    pub fn felt_span_points_velocity(
+        &self,
+        span_points_velocity_no_motion: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
+        let span_points = &self.span_points_global;
+
+        let mut span_point_velocity = Vec::with_capacity(span_points.len());
+
+        for i in 0..span_points.len() {
+            let motion_velocity = self.rigid_body_motion.velocity_at_point(
+                span_points[i]
+            );
+
+            span_point_velocity.push(
+                span_points_velocity_no_motion[i] - motion_velocity
+            );
+        }
+
+        span_point_velocity
     }
 
     /// Return the angle of attack at each control point.
@@ -540,7 +563,7 @@ impl LineForceModel {
                         let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
 
                         angular_momentum.cross(rotation_velocity)
-                    }
+                    },
                 }
 
             }

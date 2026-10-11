@@ -13,6 +13,7 @@ use stormath::{
 };
 
 use crate::line_force_model::LineForceModel;
+use crate::error::Error;
 
 use crate::lifting_line::singularity_elements::prelude::*;
 use crate::lifting_line::wake::settings::ViscousCoreLength;
@@ -101,6 +102,9 @@ pub struct DynamicWakeBuilder {
     /// **WARNING**: should probably always be used in combination with a prescribed circulation
     /// shape in the line force model to maintain a realistic local shape.
     pub neglect_self_induced_velocities: bool,
+    #[serde(default)]
+    // Switch to set the strength update to be "steady-state"
+    pub steady_state_strength_update: bool,
     #[serde(default="DynamicWakeBuilder::default_initial_relative_wake_length")]
     /// Length of wake during initialization, relative to the chord length
     pub initial_relative_wake_length: Float,
@@ -118,10 +122,35 @@ impl DynamicWakeBuilder {
     fn default_first_panel_relative_length() -> Float {0.75}
     fn default_last_panel_relative_length() -> Float {0.25}
 
+    /// Checks that the settings are valid for building a dynamic wake. All checks are executed, so
+    /// that the returned error lists every problem with the settings, not just the first.
+    pub fn settings_is_valid(&self) -> Result<(), Error> {
+        let mut error_messages: Vec<String> = Vec::new();
+
+        if self.nr_panels_per_line_element < 2 {
+            error_messages.push(format!(
+                "nr_panels_per_line_element must be at least 2 for a dynamic wake, but is {}. Use \
+                a quasi-steady wake for single-panel wakes.",
+                self.nr_panels_per_line_element
+            ));
+        }
+
+        if error_messages.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::CustomStringError(format!(
+                "Invalid dynamic wake settings: {}",
+                error_messages.join(" ")
+            )))
+        }
+    }
+
     pub fn build(
         &self,
         line_force_model: &LineForceModel,
     ) -> DynamicWake {
+        self.settings_is_valid().unwrap();
+
         let span_points = &line_force_model.span_points_global;
 
         let indices = self.get_wake_indices(line_force_model);
@@ -136,10 +165,14 @@ impl DynamicWakeBuilder {
             }
         }
 
-        let end_index_induced_velocities_on_wake = (
-            self.ratio_of_wake_affected_by_induced_velocities *
-            (indices.nr_points() - 1) as Float
-        ).ceil() as usize;
+        // The number of points in the streamwise direction that are affected by induced velocities
+        let ui_affected_stream_index = (self.ratio_of_wake_affected_by_induced_velocities.min(1.0) * 
+            (indices.nr_points_per_line_element - 1) as Float).ceil() as usize;
+
+        let end_index_induced_velocities_on_wake = indices.point_index(
+            ui_affected_stream_index, 
+            indices.nr_points_along_span - 1 
+        );
 
         let settings = WakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
@@ -148,6 +181,7 @@ impl DynamicWakeBuilder {
             end_index_induced_velocities_on_wake,
             shape_damping_factor: self.shape_damping_factor,
             neglect_self_induced_velocities: self.neglect_self_induced_velocities,
+            steady_state_strength_update: self.steady_state_strength_update,
             write_wake_data_to_file: self.write_wake_data_to_file,
             wake_files_folder_path: self.wake_files_folder_path.clone(),
         };
@@ -290,6 +324,7 @@ impl Default for DynamicWakeBuilder {
             far_field_ratio: PotentialTheorySettings::default_far_field_ratio(),
             shape_damping_factor: 0.0,
             neglect_self_induced_velocities: false,
+            steady_state_strength_update: false,
             initial_relative_wake_length: Self::default_initial_relative_wake_length(),
             write_wake_data_to_file: false,
             wake_files_folder_path: String::new(),

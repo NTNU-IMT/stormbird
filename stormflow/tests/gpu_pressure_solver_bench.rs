@@ -1,0 +1,50 @@
+use std::time::Instant;
+
+use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
+
+use stormflow::pressure_solver::boundary_conditions::PressureBoundaryConditions;
+use stormflow::grid::Grid;
+use stormflow::pressure_solver::multigrid_gpu::MultigridGPU;
+use stormflow::pressure_solver::multigrid_cpu::settings::{MultigridSettings, CoarsestLevelSolver, ZeroGradientOnWalls};
+use stormflow::pressure_solver::multigrid_cpu::zero_gradient_stencils::ZeroGradientInterpolationOrder;
+use stormflow::geometry::WallGeometries;
+
+#[test]
+fn gpu_pressure_solver_bench() {
+    let grid = Grid::new(
+        SpatialVector([0.0, 0.0, 0.0]),
+        SpatialVector([1.0, 1.0, 1.0]),
+        [96, 96, 96]
+    );
+
+    let boundary_conditions = PressureBoundaryConditions::new_from_up_direction(SpatialVector([0.0, 1.0, 0.0]));
+    let settings = MultigridSettings{
+        nr_smooth_iterations: 4,
+        nr_v_cycles: 2,
+        compute_residual_after_solve: true,
+        coarsest_level_solver: CoarsestLevelSolver::Exact,
+        zero_gradient_on_walls: ZeroGradientOnWalls::NotUsed,
+        zero_gradient_interpolation_order: ZeroGradientInterpolationOrder::default()
+    };
+
+    let mut gpu_solver = MultigridGPU::new(&grid, &boundary_conditions, settings, &WallGeometries::default(), &WallGeometries::default());
+
+    let n = grid.nr_interior_cells();
+    let mut rhs = vec![0.0 as Float; n];
+    for flat in 0..n {
+        let [i, j, k] = grid.interior_indices_from_flat_index(flat);
+        rhs[flat] = ((i + 1) as Float).sin() + ((j + 1) as Float).cos() * 0.5 - ((k + 1) as Float) * 0.01;
+    }
+    gpu_solver.rhs.copy_from_slice(&rhs);
+
+    // warm-up (pipeline creation etc. already happened in `new`, but first solve may still pay
+    // one-off driver costs)
+    gpu_solver.solve();
+
+    let start = Instant::now();
+    for _ in 0..5 {
+        gpu_solver.solve();
+    }
+    println!("[timing] avg solve() over 5 calls: {:?}", start.elapsed() / 5);
+}

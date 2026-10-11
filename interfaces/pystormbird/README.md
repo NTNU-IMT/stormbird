@@ -36,7 +36,7 @@ pip install .
 
 The interface is made using [PyO3](https://pyo3.rs/). The layout and structure of the code follow the source code in Stormbird as much as possible.
 
-The initialization of most classes is done using JSON strings, to avoid unnecessary maintenance of code. You can use Python's built-in `json` module for dictionaries, or use the [stormbird_setup](../stormbird_setup/) helper package.
+The initialization of most classes is done using JSON strings, to avoid unnecessary maintenance of code. You can use Python's built-in `json` module for dictionaries, or use the [stormbird_setup](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/stormbird_setup) helper package.
 
 It is not a goal to offer an interface to every aspect of the Stormbird library. Rather, an interface is only made when a specific use case has presented itself.
 

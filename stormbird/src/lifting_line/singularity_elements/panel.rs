@@ -10,11 +10,11 @@ use stormath::consts::PI;
 
 const FOUR_PI_INVERSE: Float = 1.0/ (4.0 * PI);
 
-use super::vortex_line;
+use super::vortex_line::VortexLine;
 
 #[derive(Clone, Debug, Default)]
 pub struct Panel {
-    points: [SpatialVector; 4],
+    vortex_lines: [VortexLine; 4],
     center: SpatialVector,
     normal: SpatialVector,
     far_field_length_squared: Float,
@@ -39,8 +39,20 @@ impl Panel {
 
         let far_field_length_squared = (representative_length * far_field_ratio).powi(2);
 
+        let vortex_lines: [VortexLine; 4] = std::array::from_fn(
+            |i_point| {
+                let line_points = if i_point == points.len() - 1 {
+                    [points[i_point], points[0]]
+                } else {
+                    [points[i_point], points[i_point + 1]]
+                };
+
+                VortexLine::new(line_points)
+            }
+        );
+
         Self {
-            points,
+            vortex_lines,
             center,
             normal,
             far_field_length_squared,
@@ -56,22 +68,14 @@ impl Panel {
         distance_to_ctrl_point_sq <= self.far_field_length_squared
     }
 
+    #[inline(always)]
     /// Function that calculates the induced velocity from a vortex panel, based on the corner points
     /// given as input
-    pub fn induced_velocity_with_unit_strength(
-        &self, 
-        ctrl_point: SpatialVector,
-    ) -> SpatialVector {
-        let full_computation_needed = self.necessary_with_full_vortex_line_computation(ctrl_point);
-
-        if full_computation_needed {
-            self.induced_velocity_as_vortex_lines_with_unit_strength(
-                ctrl_point,
-            )
+    pub fn induced_velocity_with_unit_strength(&self, ctrl_point: SpatialVector) -> SpatialVector {
+        if self.necessary_with_full_vortex_line_computation(ctrl_point) {
+            self.induced_velocity_as_vortex_lines_with_unit_strength(ctrl_point)
         } else {
-            self.induced_velocity_as_point_doublet_with_unit_strength(
-                ctrl_point, 
-            )
+            self.induced_velocity_as_point_doublet_with_unit_strength(ctrl_point)
         }
     }
 
@@ -100,20 +104,11 @@ impl Panel {
         &self, 
         ctrl_point: SpatialVector,
     ) -> SpatialVector {
-        let mut u_i: SpatialVector = SpatialVector::default();
-
-        for i_point in 0..self.points.len() {
-            let line_points: [SpatialVector; 2] = if i_point == self.points.len() - 1 {
-                [self.points[i_point], self.points[0]]
-            } else {
-                [self.points[i_point], self.points[i_point + 1]]
-            };
-
-            u_i += vortex_line::induced_velocity_from_line_with_unit_strength(
-                &line_points, ctrl_point, self.viscous_core_length
-            );
-        }
-
-        u_i
+        self.vortex_lines.iter().map(
+            |line| line.induced_velocity_from_line_with_unit_strength(
+                ctrl_point, 
+                self.viscous_core_length
+            )
+        ).sum::<SpatialVector>()
     }
 }

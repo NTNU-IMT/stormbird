@@ -7,14 +7,13 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from ..base_model import StormbirdSetupBaseModel
 
 class Gaussian(StormbirdSetupBaseModel):
-    chord_factor: float = 0.25
-    thickness_factor: float = 0.25
+    chord_factor: float = 0.4
+    thickness_factor: float = 0.4
 
 class ProjectionSettings(StormbirdSetupBaseModel):
     projection_function: Gaussian = Gaussian()
     realign_sectional_forces: bool = True
     realign_to_local_velocity_at_each_cell: bool = False
-    project_viscous_lift: bool = False
     project_sectional_drag: bool = False
 
 class SamplingSettings(StormbirdSetupBaseModel):

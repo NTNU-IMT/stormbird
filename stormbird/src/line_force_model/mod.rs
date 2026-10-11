@@ -204,7 +204,34 @@ impl LineForceModel {
         self.update_global_data_representations();
     }
 
-    
+    /// Returns the global index of the line element that corresponds to the input span point index. 
+    /// The span point index refers to an end point of the span lines. That means that each wing 
+    /// have one more span points than there is line elements, as both the first and last point of 
+    /// the wing is included. 
+    /// 
+    /// Each span point is mapped to the line element it is the start point of. The exception is the
+    /// last span point of each wing, which is mapped to the last line element of that wing, as it is
+    /// only the end point of a line element.
+    ///
+    /// Panics if the span point index is not part of any wing.
+    pub fn line_element_index_from_span_point_index(&self, span_point_index: usize) -> usize {
+        let mut first_span_point_index = 0;
+
+        for wing_indices in &self.wing_indices {
+            let nr_line_elements = wing_indices.len();
+            let nr_span_points = nr_line_elements + 1;
+
+            if span_point_index < first_span_point_index + nr_span_points {
+                let local_span_point_index = span_point_index - first_span_point_index;
+
+                return wing_indices.start + local_span_point_index.min(nr_line_elements - 1);
+            }
+
+            first_span_point_index += nr_span_points;
+        }
+
+        panic!("Line element index not found. The span point index is not part of any wing")
+    }
 
     /// Finds the wing index from the global index of a line element.
     pub fn wing_index_from_global(&self, global_index: usize) -> usize {
@@ -253,24 +280,25 @@ impl LineForceModel {
             .collect()
     }
 
-    /// Calculates the wake angle behind each line element.
-    pub fn wake_angles(&self, velocity: &[SpatialVector]) -> Vec<Float> {
-        (0..self.nr_span_lines())
-            .map(|index| {
-                let wing_index = self.wing_index_from_global(index);
+    /// Removes the velocity in the span direction from velocity vectors at the span points. The
+    /// span direction at each span point is taken from the line element given by
+    /// [LineForceModel::line_element_index_from_span_point_index].
+    pub fn remove_span_velocity_at_span_points(
+        &self,
+        span_points_velocity: &[SpatialVector],
+    ) -> Vec<SpatialVector> {
+        span_points_velocity
+            .iter()
+            .enumerate()
+            .map(|(span_point_index, vel)| {
+                let line_index = self.line_element_index_from_span_point_index(span_point_index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(_) => 0.0,
-                    SectionModel::VaryingFoil(_) => 0.0,
-                    SectionModel::RotatingCylinder(cylinder) => cylinder.wake_angle(
-                        self.chord_lengths[index],
-                        velocity[index].length(),
-                    ),
-                    SectionModel::EffectiveWindSensor => 0.0,
-                }
+                let span_velocity = vel.project(self.span_lines_global[line_index].relative_vector());
+
+                *vel - span_velocity
             })
             .collect()
-    }    
+    }
     
     /// Shorthand for quickly calculating the typical force factor used when presenting
     /// non-dimensional forces from a simulation (i.e., lift and drag coefficients)

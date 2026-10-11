@@ -246,7 +246,7 @@ if __name__ == "__main__":
             
             
             while optimizing and loading > min_loading:
-                model.apply_controller(
+                model.apply_controller_based_on_wind_condition(
                     time = 0, 
                     time_step = 1,
                     wind_condition = wind_condition,

@@ -79,3 +79,9 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 - Added proper sign for the residual calculation
 - Removed spanwise velocities in the linearized solver
 - Fixed issue in the actuator line when `realign_sectional_forces` where set to true. Previously this only worked when he lift was positive. Now it handles negative lift as well.
+
+## 0.10.0 - 2026-10-11
+### Highlights
+- New steady state mode for the dynamic wake, intended to find a steady solution faster when a very dynamic wake shape is expected
+- Small updates to the controller settings to simplify it
+- Many updates to the Stormflow crate, making it ready for first "official" version (v0.1.0)

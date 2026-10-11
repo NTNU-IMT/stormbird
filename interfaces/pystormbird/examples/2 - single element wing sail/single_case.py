@@ -149,7 +149,7 @@ if __name__ == "__main__":
     ax_angle = fig.add_subplot(122)
 
     dynamic = [False, False, False, True]
-    solver_types = [SolverType.Linearized, SolverType.SimpleIterative, SolverType.SimpleIterative, SolverType.SimpleIterative]
+    solver_types = [SolverType.Linearized, SolverType.Iterative, SolverType.Iterative, SolverType.Iterative]
     smoothing_length = [0.0, 0.0, 0.1, 0.1]
 
     for dyn, solver, smoothing in zip(dynamic, solver_types, smoothing_length):
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         print('Lift coefficient:', res['cl'])
         print('Drag coefficient:', res['cd'])
 
-        if solver == SolverType.SimpleIterative:
+        if solver == SolverType.Iterative:
             linestyle='--'
         else:
             linestyle='-'

@@ -1,26 +1,44 @@
 
 pub mod gpu_version;
 pub mod boundary_face;
+pub mod parallel_loops;
+pub mod interpolation;
+pub mod builder;
 
 use stormath::spatial_vector::SpatialVector;
 use stormath::type_aliases::Float;
 
 use gpu_version::GpuGrid;
 
-pub const INTERIOR_OFFSET: usize = 1;
+pub const INTERIOR_OFFSET: usize = 3;
+
+/// Coarsening stops once a coarsened grid's interior cell count in any dimension would drop
+/// to this value or below (used by geometric multigrid hierarchy construction).
+pub const SMALLEST_NR_CELLS_FOR_COARSENING: usize = 4;
 
 #[derive(Debug, Clone)]
-/// Structured grid definition
+/// A structured cartesian grid to be used for finite difference, staggered, CFD simulations
 pub struct Grid {
+    /// The corner with minimum values in x, y, z direction
     pub start_point: SpatialVector,
+    /// Fixed cell length that defines the spatial resolution
     pub cell_length: SpatialVector,
+    /// Stores the inverse cell length, to avoid having to recalculate it in kernels
     pub inv_cell_length: SpatialVector,
+    /// Stores the inverse cell length squared, to avoid having to recalculate it in kernels
     pub inv_cell_length_squared: SpatialVector,
-    pub poisson_diagonal: Float,
-    pub poisson_inv_diagonal: Float,
+    /// Diagonal coefficient of the 4th order accurate (5-point-per-axis) discrete Laplacian
+    pub poisson_diagonal4: Float,
+    /// Inverse of the poisson_diagonal4
+    pub poisson_inv_diagonal4: Float,
+    /// The shape of the extended grid, i.e., the number of cells
     pub extended_shape: [usize; 3],
+    /// The stride of the extended grid, i.e., values that can be used to jump to the next point in
+    /// a flat array in x, y, or z direction
     pub extended_stride: [usize; 3],
+    /// As "extended_shape", but for the interior grid
     pub interior_shape: [usize; 3],
+    /// As "extended_stride", but for the interior grid
     pub interior_stride: [usize; 3]
 }
 
@@ -42,14 +60,14 @@ impl Grid {
             inv_cell_length[2].powi(2),
         ]);
 
-        let poisson_diagonal = -2.0 * (
-            inv_cell_length_squared[0] + 
-            inv_cell_length_squared[1] + 
+        let poisson_diagonal4 = -2.5 * (
+            inv_cell_length_squared[0] +
+            inv_cell_length_squared[1] +
             inv_cell_length_squared[2]
         );
 
-        let poisson_inv_diagonal = 1.0 / poisson_diagonal;
-        
+        let poisson_inv_diagonal4 = 1.0 / poisson_diagonal4;
+
         let extended_shape = [
             interior_shape[0] + 2 * INTERIOR_OFFSET,
             interior_shape[1] + 2 * INTERIOR_OFFSET,
@@ -73,15 +91,15 @@ impl Grid {
             cell_length,
             inv_cell_length,
             inv_cell_length_squared,
-            poisson_diagonal,
-            poisson_inv_diagonal,
+            poisson_diagonal4,
+            poisson_inv_diagonal4,
             extended_shape,
             extended_stride,
             interior_shape,
             interior_stride
         }
     }
-    
+
     pub fn new(
         start_point: SpatialVector, 
         end_point: SpatialVector,
@@ -123,11 +141,15 @@ impl Grid {
                 self.inv_cell_length_squared[1], 
                 self.inv_cell_length_squared[2], 
                 0.0
-            ], 
-            poisson_diagonal: self.poisson_diagonal,
-            poisson_inv_diagonal: self.poisson_inv_diagonal,
-            _pad0: 0, 
-            _pad1: 0, 
+            ],
+            _pad0: 0,
+            _pad1: 0,
+            poisson_diagonal4: self.poisson_diagonal4,
+            poisson_inv_diagonal4: self.poisson_inv_diagonal4,
+            _pad2: 0,
+            _pad3: 0,
+            _pad4: 0,
+            _pad5: 0,
             extended_shape: [
                 self.extended_shape[0] as u32, 
                 self.extended_shape[1] as u32, 
@@ -240,9 +262,12 @@ impl Grid {
         )
     }
 
-    /// Returns the coordinate of the cell center from the indices given. 
+    /// Returns the coordinate of the cell center from the indices given.
     pub fn cell_center_extended(&self, extended_indices: [usize; 3]) -> SpatialVector {
-        let start_cell_center = self.start_point - 0.5 * self.cell_length;
+        // Extended index `INTERIOR_OFFSET` must land on the same physical location as interior
+        // index 0 (`cell_center`'s `start_point + 0.5 * cell_length`), so the origin here is
+        // shifted back by `INTERIOR_OFFSET` cells rather than by a hardcoded single ghost layer.
+        let start_cell_center = self.start_point + (0.5 - INTERIOR_OFFSET as Float) * self.cell_length;
         
         SpatialVector(
             [
@@ -302,5 +327,62 @@ impl Grid {
         ];
 
         Self::new_direct(self.start_point, cell_length, interior_shape)
+    }
+
+    /// Builds the hierarchy of grids used by geometric multigrid solvers, from the finest grid
+    /// (index 0, identical to `self`) down to the coarsest grid that can still be reached by
+    /// repeated even-factor-of-2 coarsening.
+    pub fn multigrid_hierarchy(&self) -> Vec<Grid> {
+        let mut grids: Vec<Grid> = Vec::new();
+
+        let mut current_grid = self.clone();
+        let mut grid_can_get_coarser = true;
+
+        while grid_can_get_coarser {
+            grids.push(current_grid.clone());
+
+            let interior_shape_current = current_grid.interior_shape;
+
+            if !interior_shape_current[0].is_multiple_of(2) ||
+                !interior_shape_current[1].is_multiple_of(2)||
+                !interior_shape_current[2].is_multiple_of(2) {
+                    grid_can_get_coarser = false
+            } else {
+                let coarser_grid = current_grid.coarsened();
+                let interior_shape = coarser_grid.interior_shape;
+
+                if interior_shape[0] > SMALLEST_NR_CELLS_FOR_COARSENING &&
+                    interior_shape[1] > SMALLEST_NR_CELLS_FOR_COARSENING &&
+                    interior_shape[2] > SMALLEST_NR_CELLS_FOR_COARSENING {
+                    current_grid = coarser_grid
+                } else {
+                    grid_can_get_coarser = false
+                }
+            }
+        }
+
+        grids
+    }
+
+    pub fn cell_centered_value_from_face_staggered(
+        &self,
+        interior_indices: [usize; 3],
+        staggered_value: &[SpatialVector]
+    ) -> SpatialVector {
+        let [i, j, k] = self.extended_indices_from_interior_indices(interior_indices);
+        
+        let i_0 = self.flat_index_on_extended_grid([i, j, k]);
+        
+        let i_n = [
+            self.flat_index_on_extended_grid([i-1, j, k]),
+            self.flat_index_on_extended_grid([i, j-1, k]),
+            self.flat_index_on_extended_grid([i, j, k-1])
+        ];
+        
+        let u = 0.5 * (staggered_value[i_0][0] + staggered_value[i_n[0]][0]);
+        let v = 0.5 * (staggered_value[i_0][1] + staggered_value[i_n[1]][1]);
+        let w = 0.5 * (staggered_value[i_0][2] + staggered_value[i_n[2]][2]);
+        
+        SpatialVector([u, v, w])
     }
 }

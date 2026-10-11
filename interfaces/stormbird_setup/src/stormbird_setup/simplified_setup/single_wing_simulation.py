@@ -9,7 +9,7 @@ from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings, DynamicSettings
 from stormbird_setup.section_models import SectionModel
 
-from stormbird_setup.lifting_line.solver import Linearized, SimpleIterative
+from stormbird_setup.lifting_line.solver import Linearized, Iterative
 from stormbird_setup.lifting_line.wake import QuasiSteadyWakeSettings, DynamicWakeBuilder, SymmetryCondition
 
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
@@ -20,7 +20,7 @@ from enum import Enum
 
 class SolverType(Enum):
     Linearized = "Linearized"
-    SimpleIterative = "SimpleIterative"
+    Iterative = "Iterative"
 
 class SingleWingSimulation(StormbirdSetupBaseModel):
     '''
@@ -79,12 +79,12 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
 
         symmetry_condition = SymmetryCondition.Z if self.z_symmetry else SymmetryCondition.NoSymmetry
 
-        solver: Linearized | SimpleIterative
+        solver: Linearized | Iterative
         simulation_settings: DynamicSettings | QuasiSteadySettings
         if self.dynamic:
             match self.solver_type:
-                case SolverType.SimpleIterative:
-                    solver = SimpleIterative(
+                case SolverType.Iterative:
+                    solver = Iterative(
                         max_iterations_per_time_step = 40,
                         damping_factor = 0.05,
                     )
@@ -101,8 +101,8 @@ class SingleWingSimulation(StormbirdSetupBaseModel):
             )
         else:
             match self.solver_type:
-                case SolverType.SimpleIterative:
-                    solver = SimpleIterative(
+                case SolverType.Iterative:
+                    solver = Iterative(
                         max_iterations_per_time_step = 1000,
                         damping_factor = 0.05,
                         start_with_linearized_solution = True

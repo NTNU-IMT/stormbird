@@ -13,13 +13,17 @@ class InducedVelocityCorrectionMethod(Enum):
     NoCorrection = "NoCorrection"
     FullCorrection = "FullCorrection"
 
+class VariableToUpdate(Enum):
+    CirculationStrength = "CirculationStrength"
+    AngleOfAttack = "AngleOfAttack"
+
 class Linearized(StormbirdSetupBaseModel):
     velocity_corrections: VelocityCorrections = VelocityCorrections()
     disable_viscous_corrections: bool = False
     induced_velocity_correction_method: InducedVelocityCorrectionMethod = InducedVelocityCorrectionMethod.FullCorrection
 
 
-class SimpleIterative(StormbirdSetupBaseModel):
+class Iterative(StormbirdSetupBaseModel):
     max_iterations_per_time_step: int = 20
     damping_factor: float = 0.1
     residual_tolerance_absolute: float = 1e-4
@@ -27,3 +31,4 @@ class SimpleIterative(StormbirdSetupBaseModel):
     velocity_corrections: VelocityCorrections = VelocityCorrections()
     start_with_linearized_solution: bool = False
     correction_factor_initial_solution: float = 1.0
+    variable_to_update: VariableToUpdate = VariableToUpdate.CirculationStrength

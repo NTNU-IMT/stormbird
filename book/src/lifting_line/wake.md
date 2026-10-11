@@ -1,9 +1,9 @@
 # Lifting line wake
 
-The vortex wakes from the wings are the most important part of a lifting line simulation. They are responsible for modeling how the velocity is affected by the wings themselves. How the velocity should be calculated depends on a several settings variables. Setting up a wake model is therefore done using "wake builders" which both contain settings used directly by the final wake structures and settings used for initializing the wake structures. An overview of the fields available in the wake builders are given in this section.
+The vortex wakes from the wings are the most important part of a lifting line simulation. They are responsible for modeling how the velocity is affected by the wings themselves. How the velocity should be calculated depends on several settings variables. Setting up a wake model is therefore done using "wake builders" which both contain settings used directly by the final wake structures and settings used for initializing the wake structures. An overview of the fields available in the wake builders are given in this section.
 
 ## Internal wake data
-Inside a simualtion structure, the wake is representing as a `WakeData` structure that looks like this:
+Inside a simulation structure, the wake is represented as a `WakeData` structure that looks like this:
 
 ```rust
 pub enum WakeData {
@@ -42,18 +42,18 @@ pub enum SymmetryCondition {
 }
 ```
 
-The value of the lift-induced velocity will go to infinity, according to potential theory, if one tries to evaluate it too close to the vortex line. This may cause issues in cases where vortex lines from one wing is potentially colliding with another. To handle such problems, Stormbird uses a viscous correction on the lift-induced velocity. When this correction should be applied is determined by a `ViscousCoreLength` structure. The value can be specified either as a value relative to the bound vortex length, or as an absolute value. This is handled by the enum below. `NoViscousCore` turns of the viscous core length. **Tip: turning it off may significantly speed up a simualtion**, but may also cause instabilities if multiple sails are present. The default value is `Relativ(0.1)`, which means that the viscous core length will be 10% of the bound vortex.
+The value of the lift-induced velocity will go to infinity, according to potential theory, if one tries to evaluate it too close to the vortex line. This may cause issues in cases where vortex lines from one wing is potentially colliding with another. To handle such problems, Stormbird uses a viscous correction on the lift-induced velocity. When this correction should be applied is determined by a `ViscousCoreLength` structure. The value can be specified either as a value relative to the bound vortex length, or as an absolute value. This is handled by the enum below. `NoViscousCore` turns off the viscous core length. **Tip: turning it off may significantly speed up a simulation**, but may also cause instabilities if multiple sails are present. The default value is `Relative(0.1)`, which means that the viscous core length will be 10% of the bound vortex.
 
 ```rust
 pub enum ViscousCoreLength {
     Relative(f64),
-    Absolute(f64),.
+    Absolute(f64),
     NoViscousCore,
 }
 ```
 
 ## Dynamic wake builder
-The settings for building a dynamic wake is shown below:
+The settings for building a dynamic wake are shown below:
 
 ```rust
 pub struct DynamicWakeBuilder {
@@ -62,17 +62,19 @@ pub struct DynamicWakeBuilder {
     pub viscous_core_length_evolution: ViscousCoreLengthEvolution,
     pub first_panel_relative_length: f64,
     pub last_panel_relative_length: f64,
-    pub use_chord_direction: bool,
+    pub first_wake_points_direction: FirstWakePointsDirection,
+    pub symmetry_condition: SymmetryCondition,
     pub ratio_of_wake_affected_by_induced_velocities: f64,
     pub far_field_ratio: f64,
     pub shape_damping_factor: f64,
     pub neglect_self_induced_velocities: bool,
+    pub steady_state_strength_update: bool,
     pub initial_relative_wake_length: f64,
     pub write_wake_data_to_file: bool,
     pub wake_files_folder_path: String,
 }
 ```
 
-All values have default values which should make sense in most situations. The most common variable to adjust will be `nr_panels_per_line_element`, the `write_wake_data_to_file`, and the `wake_files_folder_path`. The first determines the number of panels in the streamwise direction. The two second variables are used if you want to export the wake panels to a files for visualizations. If `write_wake_data_to_file` is set to true, the wake panels will be exported as `.vtk` files to the folder defined by the `wake_files_folder_path` string.
+All values have default values which should make sense in most situations. The most common variable to adjust will be `nr_panels_per_line_element`, the `write_wake_data_to_file`, and the `wake_files_folder_path`. The first determines the number of panels in the streamwise direction. The two second variables are used if you want to export the wake panels to files for visualizations. If `write_wake_data_to_file` is set to true, the wake panels will be exported as `.vtk` files to the folder defined by the `wake_files_folder_path` string.
 
-For the rest of the variables, see the explanation in the [code documentation](https://docs.rs/stormbird/0.7.0/stormbird/)
+For the rest of the variables, see the explanation in the [code documentation](https://docs.rs/stormbird/0.9.0/stormbird/).

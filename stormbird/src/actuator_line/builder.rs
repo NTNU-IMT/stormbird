@@ -16,6 +16,8 @@ use super::sampling::SamplingSettings;
 use super::solver::SolverSettings;
 use super::ActuatorLine;
 
+use super::spanflow_damper::SpanflowDamper;
+
 use super::corrections::{
     lifting_line::LiftingLineCorrectionBuilder,
     empirical_circulation::EmpiricalCirculationCorrection,
@@ -39,10 +41,12 @@ pub struct ActuatorLineBuilder {
     pub start_time: Float,
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
-    #[serde(default="ActuatorLineBuilder::default_lifting_line_correction")]
+    #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
     #[serde(default)]
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    #[serde(default)]
+    pub spanflow_damper: Option<SpanflowDamper>
 }
 
 impl ActuatorLineBuilder {
@@ -64,6 +68,7 @@ impl ActuatorLineBuilder {
             start_time: 0.0,
             lifting_line_correction: None,
             empirical_circulation_correction: None,
+            spanflow_damper: None,
         }
     }
 
@@ -74,7 +79,13 @@ impl ActuatorLineBuilder {
         let nr_span_lines = line_force_model.nr_span_lines();
 
         let controller = if let Some(controller_builder) = &self.controller {
-            Some(controller_builder.build())
+            // The actuator line builder cannot fail, so a controller that does not fit the line
+            // force model is reported the same way as the rest of the invalid input here
+            Some(
+                controller_builder
+                    .build(&line_force_model)
+                    .expect("Could not build the controller")
+            )
         } else {
             None
         };
@@ -107,6 +118,7 @@ impl ActuatorLineBuilder {
             sectional_drag_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             lifting_line_correction,
             empirical_circulation_correction: self.empirical_circulation_correction.clone(),
+            spanflow_damper: self.spanflow_damper.clone()
         }
     }
 }

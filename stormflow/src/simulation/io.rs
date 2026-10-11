@@ -1,11 +1,21 @@
 use super::Simulation;
-use crate::pressure_solver::PressureSolver;
+
+use stormath::type_aliases::Float;
+use stormath::spatial_vector::SpatialVector;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
 impl Simulation {
-    pub fn export_fields_as_vtk(&self, file_path: &str, binary: bool) {
+    /// Compute the VTK legacy file content for the current simulation fields.
+    ///
+    /// The `binary` switch selects between the ASCII and BINARY variants of the
+    /// VTK legacy format, exactly as in [`Simulation::export_fields_as_vtk`].
+    /// The content is returned as raw bytes: in ASCII mode these bytes are valid
+    /// UTF-8 text, while in binary mode they contain the big-endian binary data
+    /// blocks mandated by the format. `Vec<u8>` covers both cases uniformly and
+    /// lets callers obtain the VTK data without ever touching the disk.
+    pub fn fields_as_vtk(&self, binary: bool) -> Vec<u8> {
         let [nx, ny, nz] = self.grid.interior_shape;
         let [x0, y0, z0] = self.grid.start_point.0;
         let [dx, dy, dz] = self.grid.cell_length.0;
@@ -13,18 +23,17 @@ impl Simulation {
         let n_points = (nx + 1) * (ny + 1) * (nz + 1);
         let n_cells  = nx * ny * nz;
 
-        let file = File::create(file_path).expect("export_fields_as_vtk: could not create file");
-        let mut w = BufWriter::new(file);
+        let mut w: Vec<u8> = Vec::new();
 
         // ------------------------------------------------------------------ //
         // ASCII file header (always ASCII in the VTK legacy format)           //
         // ------------------------------------------------------------------ //
-        write!(w, "# vtk DataFile Version 3.0\n").unwrap();
-        write!(w, "Sveve CFD Simulation\n").unwrap();
-        write!(w, "{}\n", if binary { "BINARY" } else { "ASCII" }).unwrap();
-        write!(w, "DATASET STRUCTURED_GRID\n").unwrap();
-        write!(w, "DIMENSIONS {} {} {}\n", nx + 1, ny + 1, nz + 1).unwrap();
-        write!(w, "POINTS {} double\n", n_points).unwrap();
+        writeln!(w, "# vtk DataFile Version 3.0").unwrap();
+        writeln!(w, "Stormflow CFD Simulation").unwrap();
+        writeln!(w, "{}", if binary { "BINARY" } else { "ASCII" }).unwrap();
+        writeln!(w, "DATASET STRUCTURED_GRID").unwrap();
+        writeln!(w, "DIMENSIONS {} {} {}", nx + 1, ny + 1, nz + 1).unwrap();
+        writeln!(w, "POINTS {} double", n_points).unwrap();
 
         // ------------------------------------------------------------------ //
         // Cell-corner coordinates                                              //
@@ -46,52 +55,43 @@ impl Simulation {
                         w.write_all(&y.to_be_bytes()).unwrap();
                         w.write_all(&z.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", x, y, z).unwrap();
+                        writeln!(w, "{} {} {}", x, y, z).unwrap();
                     }
                 }
             }
         }
 
         // Newline separator required before the next ASCII keyword in binary mode.
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // ------------------------------------------------------------------ //
         // Cell data                                                            //
         // ------------------------------------------------------------------ //
-        write!(w, "CELL_DATA {}\n", n_cells).unwrap();
+        writeln!(w, "CELL_DATA {}", n_cells).unwrap();
 
         // --- Pressure (scalar, stored at cell centers on the extended grid) ---
-        write!(w, "SCALARS pressure double 1\n").unwrap();
-        write!(w, "LOOKUP_TABLE default\n").unwrap();
+        writeln!(w, "SCALARS pressure double 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
 
-        let pressure = match &self.pressure_solver {
-            PressureSolver::CPU(solver) => {
-                solver.x_at_levels[0].clone()
-            }
-        };
+        let pressure = self.pressure_solver.pressure_host();
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    // Convert interior indices to extended indices (offset by 1 ghost layer).
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
-
-                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
 
                     let p: f64 = pressure[flat] as f64;
 
                     if binary {
                         w.write_all(&p.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{}\n", p).unwrap();
+                        writeln!(w, "{}", p).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
         // --- Velocity (interpolated from staggered faces to cell centers) ---
         //
@@ -109,38 +109,40 @@ impl Simulation {
         //   v_c = 0.5 * (velocity_y[ex, ey-1, ez] + velocity_y[ex, ey, ez])
         //   w_c = 0.5 * (velocity_z[ex, ey, ez-1] + velocity_z[ex, ey, ez])
         //
-        write!(w, "VECTORS velocity double\n").unwrap();
+        writeln!(w, "VECTORS velocity double").unwrap();
+
+        let velocity = self.velocity_solver.velocity_host();
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
+                    let [ex, ey, ez] = self.grid.extended_indices_from_interior_indices([ix, iy, iz]);
 
                     let flat_c      = self.grid.flat_index_on_extended_grid([ex,     ey,     ez    ]);
                     let flat_x_left = self.grid.flat_index_on_extended_grid([ex - 1, ey,     ez    ]);
                     let flat_y_bot  = self.grid.flat_index_on_extended_grid([ex,     ey - 1, ez    ]);
                     let flat_z_back = self.grid.flat_index_on_extended_grid([ex,     ey,     ez - 1]);
 
-                    let u: f64 = (0.5 * (self.velocity[flat_x_left][0] + self.velocity[flat_c][0])) as f64;
-                    let v: f64 = (0.5 * (self.velocity[flat_y_bot][1]  + self.velocity[flat_c][1])) as f64;
-                    let ww: f64 = (0.5 * (self.velocity[flat_z_back][2] + self.velocity[flat_c][2])) as f64;
+                    let u: f64 = (0.5 * (velocity[flat_x_left][0] + velocity[flat_c][0])) as f64;
+                    let v: f64 = (0.5 * (velocity[flat_y_bot][1]  + velocity[flat_c][1])) as f64;
+                    let ww: f64 = (0.5 * (velocity[flat_z_back][2] + velocity[flat_c][2])) as f64;
 
                     if binary {
                         w.write_all(&u.to_be_bytes()).unwrap();
                         w.write_all(&v.to_be_bytes()).unwrap();
                         w.write_all(&ww.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", u, v, ww).unwrap();
+                        writeln!(w, "{} {} {}", u, v, ww).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
-        write!(w, "VECTORS body_force double\n").unwrap();
+        writeln!(w, "VECTORS body_force double").unwrap();
+
+        let body_force = self.velocity_solver.body_force_host();
 
         for iz in 0..nz {
             for iy in 0..ny {
@@ -149,49 +151,189 @@ impl Simulation {
                         [ix, iy, iz]
                     );
                     
-                    let fx = self.body_force[i_flat][0] as f64;
-                    let fy = self.body_force[i_flat][1] as f64;
-                    let fz = self.body_force[i_flat][2] as f64;
+                    let fx = body_force[i_flat][0] as f64;
+                    let fy = body_force[i_flat][1] as f64;
+                    let fz = body_force[i_flat][2] as f64;
 
                     if binary {
                         w.write_all(&fx.to_be_bytes()).unwrap();
                         w.write_all(&fy.to_be_bytes()).unwrap();
                         w.write_all(&fz.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{} {} {}\n", fx, fy, fz).unwrap();
+                        writeln!(w, "{} {} {}", fx, fy, fz).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
-        // --- Pressure (scalar, stored at cell centers on the extended grid) ---
-        write!(w, "SCALARS sdf double 1\n").unwrap();
-        write!(w, "LOOKUP_TABLE default\n").unwrap();
+        // --- Turbulence model fields, and the eddy viscosity used by the velocity solver ---
+        if let Some(turbulence_solver) = &self.turbulence_solver {
+            let fields = turbulence_solver.fields_host();
+            let nr_extended_cells = self.grid.nr_extended_cells();
+
+            for (field_index, name) in turbulence_solver.field_names().iter().enumerate() {
+                let field = &fields[field_index * nr_extended_cells..(field_index + 1) * nr_extended_cells];
+
+                self.write_cell_centered_scalar(&mut w, name, field, binary);
+            }
+        }
+
+        if let Some(eddy_viscosity) = self.velocity_solver.eddy_viscosity_host() {
+            self.write_cell_centered_scalar(&mut w, "eddy_viscosity", &eddy_viscosity, binary);
+        }
+
+        // --- Signed distance function for no-slip surfaces (scalar) ---
+        writeln!(w, "SCALARS sdf double 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
+
+        let signed_distance_function = &self.velocity_solver.setup().signed_distance_function;
 
         for iz in 0..nz {
             for iy in 0..ny {
                 for ix in 0..nx {
-                    // Convert interior indices to extended indices (offset by 1 ghost layer).
-                    let ex = ix + 1;
-                    let ey = iy + 1;
-                    let ez = iz + 1;
-
-                    let flat = self.grid.flat_index_on_extended_grid([ex, ey, ez]);
-                    let sdf: f64 = self.signed_distance_function[flat] as f64;
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+                    let sdf: f64 = signed_distance_function[flat] as f64;
 
                     if binary {
                         w.write_all(&sdf.to_be_bytes()).unwrap();
                     } else {
-                        write!(w, "{}\n", sdf).unwrap();
+                        writeln!(w, "{}", sdf).unwrap();
                     }
                 }
             }
         }
 
-        if binary { write!(w, "\n").unwrap(); }
+        if binary { writeln!(w).unwrap(); }
 
+        // --- Signed distance function for slip surfaces (scalar) ---
+        writeln!(w, "SCALARS sdf_slip double 1").unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
+
+        let signed_distance_function_slip = &self.velocity_solver.setup().signed_distance_function_slip;
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+                    let sdf_slip: f64 = signed_distance_function_slip[flat] as f64;
+
+                    if binary {
+                        w.write_all(&sdf_slip.to_be_bytes()).unwrap();
+                    } else {
+                        writeln!(w, "{}", sdf_slip).unwrap();
+                    }
+                }
+            }
+        }
+
+        if binary { writeln!(w).unwrap(); }
+
+        // --- Normals for slip surfaces (vector) ---
+        writeln!(w, "VECTORS normals_slip double").unwrap();
+
+        let normals_slip_surfaces = &self.velocity_solver.setup().normals_slip_surfaces;
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+
+                    let nx_val: f64 = normals_slip_surfaces[flat][0] as f64;
+                    let ny_val: f64 = normals_slip_surfaces[flat][1] as f64;
+                    let nz_val: f64 = normals_slip_surfaces[flat][2] as f64;
+
+                    if binary {
+                        w.write_all(&nx_val.to_be_bytes()).unwrap();
+                        w.write_all(&ny_val.to_be_bytes()).unwrap();
+                        w.write_all(&nz_val.to_be_bytes()).unwrap();
+                    } else {
+                        writeln!(w, "{} {} {}", nx_val, ny_val, nz_val).unwrap();
+                    }
+                }
+            }
+        }
+
+        if binary { writeln!(w).unwrap(); }
+
+        // --- Weight of the data immersion close to the sharp edges (staggered vector) ---
+        if let Some(sharp_edges) = &self.velocity_solver.setup().sharp_edges {
+            let weights = sharp_edges.weight_field(self.grid.nr_extended_cells());
+
+            self.write_cell_vector(&mut w, "sharp_edge_weight", &weights, binary);
+        }
+
+        w
+    }
+
+    /// Writes a vector field stored on the extended grid as VTK cell data, in the same format as
+    /// the other fields in [`Simulation::fields_as_vtk`].
+    fn write_cell_vector(&self, w: &mut Vec<u8>, name: &str, values: &[SpatialVector], binary: bool) {
+        let [nx, ny, nz] = self.grid.interior_shape;
+
+        writeln!(w, "VECTORS {} double", name).unwrap();
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+
+                    for component in 0..3 {
+                        let value = values[flat][component] as f64;
+
+                        if binary {
+                            w.write_all(&value.to_be_bytes()).unwrap();
+                        } else if component < 2 {
+                            write!(w, "{} ", value).unwrap();
+                        } else {
+                            writeln!(w, "{}", value).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+
+        if binary { writeln!(w).unwrap(); }
+    }
+
+    /// Writes a scalar field stored at the cell centers of the extended grid as VTK cell data, in
+    /// the same format as the other fields in [`Simulation::fields_as_vtk`].
+    fn write_cell_centered_scalar(&self, w: &mut Vec<u8>, name: &str, values: &[Float], binary: bool) {
+        let [nx, ny, nz] = self.grid.interior_shape;
+
+        writeln!(w, "SCALARS {} double 1", name).unwrap();
+        writeln!(w, "LOOKUP_TABLE default").unwrap();
+
+        for iz in 0..nz {
+            for iy in 0..ny {
+                for ix in 0..nx {
+                    let flat = self.grid.flat_index_on_extended_grid_from_interior_indices([ix, iy, iz]);
+                    let value = values[flat] as f64;
+
+                    if binary {
+                        w.write_all(&value.to_be_bytes()).unwrap();
+                    } else {
+                        writeln!(w, "{}", value).unwrap();
+                    }
+                }
+            }
+        }
+
+        if binary { writeln!(w).unwrap(); }
+    }
+
+    /// Export the current simulation fields to a VTK legacy file.
+    ///
+    /// This is a thin wrapper around [`Simulation::fields_as_vtk`]: it computes
+    /// the file content in memory and then writes it to `file_path`.
+    pub fn export_fields_as_vtk(&self, file_path: &str, binary: bool) {
+        let content = self.fields_as_vtk(binary);
+
+        let file = File::create(file_path).expect("export_fields_as_vtk: could not create file");
+        let mut w = BufWriter::new(file);
+
+        w.write_all(&content).expect("export_fields_as_vtk: failed to write output");
         w.flush().expect("export_fields_as_vtk: failed to flush output");
     }
 }

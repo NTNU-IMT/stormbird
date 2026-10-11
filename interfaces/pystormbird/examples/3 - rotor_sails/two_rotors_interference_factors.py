@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     test_index = 2
 
-    solver = SolverType.SimpleIterative
+    solver = SolverType.Iterative
     max_induced_velocity_ratio = 0.0
     smoothing_length = 0.0
 

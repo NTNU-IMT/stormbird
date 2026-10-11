@@ -12,6 +12,7 @@ pub mod sampling;
 pub mod builder;
 pub mod solver;
 pub mod corrections;
+pub mod spanflow_damper;
 
 use stormath::smoothing::gaussian::gaussian_kernel;
 
@@ -29,6 +30,8 @@ use projection::ProjectionSettings;
 use sampling::SamplingSettings;
 use builder::ActuatorLineBuilder;
 use solver::SolverSettings;
+
+use spanflow_damper::SpanflowDamper;
 
 use corrections::{
     lifting_line::LiftingLineCorrection,
@@ -68,6 +71,8 @@ pub struct ActuatorLine {
     pub lifting_line_correction: Option<LiftingLineCorrection>,
     /// Empirical correction for the circulation strength, also known as a tip loss factor
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    /// Optional model to dampen spanwise flow at the control points
+    pub spanflow_damper: Option<SpanflowDamper> 
 }
 
 impl ActuatorLine {
@@ -100,7 +105,7 @@ impl ActuatorLine {
         let chord_vector = self.line_force_model.chord_vectors_global[line_index];
 
         let projection_value_org = self.projection_settings.projection_value_at_point(
-            cell_center, chord_vector, &span_line
+            cell_center, chord_vector, &span_line, [false, false]
         );
 
         let projection_value = if projection_value_org > 0.0 {
@@ -172,7 +177,7 @@ impl ActuatorLine {
                     1.0,
                     &self.line_force_model,
                     &simulation_result,
-                    &controller.flow_measurement_settings,
+                    &controller.spanwise_measurement,
                     &wind_environment,
                     false
                 );
@@ -358,6 +363,7 @@ impl ActuatorLine {
     /// Function 
     pub fn update_sectional_forces_to_project(&mut self) {
         let nr_span_lines = self.line_force_model.nr_span_lines();
+        let ctrl_points_velocity = &self.ctrl_points_velocity; //self.corrected_ctrl_points_velocity(time);
         
         if let Some(simulation_result) = &self.simulation_result {
             for line_index in 0..nr_span_lines {
@@ -370,7 +376,9 @@ impl ActuatorLine {
                 
                 if self.projection_settings.realign_sectional_forces {
                     let line = self.line_force_model.span_lines_global[line_index];
-                    let velocity = self.ctrl_points_velocity[line_index];
+                    
+                    
+                    let velocity = ctrl_points_velocity[line_index];
     
                     let lift_direction = line
                         .relative_vector()
@@ -381,11 +389,7 @@ impl ActuatorLine {
 
                     let lift_dot = lift_direction.dot(lift_force);
 
-                    let lift_sign = if lift_dot >= 0.0 {
-                        1.0
-                    } else {
-                        -1.0
-                    };
+                    let lift_sign = if lift_dot >= 0.0 {1.0} else {-1.0};
                     
                     lift_force = lift_force.length() * lift_direction * lift_sign;
                     drag_force = drag_force.length() * drag_direction;
@@ -393,7 +397,6 @@ impl ActuatorLine {
                 
                 self.sectional_lift_forces_to_project[line_index] = lift_force;
                 self.sectional_drag_forces_to_project[line_index] = drag_force;
-                
             }
         } else {
             self.sectional_lift_forces_to_project = vec![SpatialVector::default(); nr_span_lines];
@@ -431,6 +434,23 @@ impl ActuatorLine {
         }
     }
 
+    pub fn spanwise_damping_flow(
+        &self,
+        line_index: usize,
+        velocity: SpatialVector
+    ) -> SpatialVector {
+        if let Some(spanflow_damper) = &self.spanflow_damper {
+            spanflow_damper.get_sectional_force(
+                self.line_force_model.chord_lengths[line_index], 
+                self.line_force_model.span_lines_global[line_index], 
+                velocity, 
+                self.line_force_model.density
+            )
+        } else {
+            SpatialVector::default()
+        }
+    }
+
     /// Computes the body force weights for each line element at a given point in space.
     pub fn line_segments_projection_weights_at_point(&self, point: SpatialVector) -> Vec<Float> {
         let span_lines = &self.line_force_model.span_lines_global;
@@ -439,11 +459,18 @@ impl ActuatorLine {
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 
         for i in 0..self.line_force_model.nr_span_lines() {
+            let wing_index = self.line_force_model.wing_index_from_global(i);
+            let wing_range = &self.line_force_model.wing_indices[wing_index];
+
+            let is_at_wing_start = i == wing_range.start;
+            let is_at_wing_end   = i == wing_range.end - 1;
+
             projection_values.push(
                 self.projection_settings.projection_value_at_point(
                     point,
                     chord_vectors[i],
-                    &span_lines[i]
+                    &span_lines[i],
+                    [is_at_wing_start, is_at_wing_end]
                 )
             );
         }
@@ -456,9 +483,15 @@ impl ActuatorLine {
         self.line_segments_projection_weights_at_point(point).iter().sum()
     }
 
-    /// Checks which line element is dominating at a given point in space by comparing the
-    /// projection weights of each line element.
-    pub fn dominating_line_element_index_at_point(&self, point: SpatialVector) -> usize {
+    /// Checks which line element is dominating at a given point in space, together with its own
+    /// projection weight, by comparing the projection weights of each line element.
+    ///
+    /// Only the dominating element's own weight is returned (not the sum over all line
+    /// elements), since only that element's force is ever projected at this point. Near a kink
+    /// between two line elements, both may have a non-negligible weight there; using the sum
+    /// would scale the dominating element's force by weight that actually belongs to its
+    /// neighbor.
+    pub fn dominating_line_element_and_weight_at_point(&self, point: SpatialVector) -> (usize, Float) {
         let projection_weights = self.line_segments_projection_weights_at_point(point);
 
         let mut max_weight = -1.0;
@@ -475,6 +508,12 @@ impl ActuatorLine {
             panic!("No dominating line element found!");
         }
 
-        max_index
+        (max_index, max_weight)
+    }
+
+    /// Checks which line element is dominating at a given point in space by comparing the
+    /// projection weights of each line element.
+    pub fn dominating_line_element_index_at_point(&self, point: SpatialVector) -> usize {
+        self.dominating_line_element_and_weight_at_point(point).0
     }
 }

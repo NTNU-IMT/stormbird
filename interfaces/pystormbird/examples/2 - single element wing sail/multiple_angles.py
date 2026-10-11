@@ -19,8 +19,8 @@ if __name__ == "__main__":
     n_angles = len(angles_of_attack_deg)
 
     dynamic = [False, False, False, True]
-    solver_types = [SolverType.Linearized, SolverType.SimpleIterative, 
-                    SolverType.SimpleIterative, SolverType.SimpleIterative]
+    solver_types = [SolverType.Linearized, SolverType.Iterative, 
+                    SolverType.Iterative, SolverType.Iterative]
     smoothing_length = [0.0, 0.0, 0.1, 0.1]
 
     w_plot = 18

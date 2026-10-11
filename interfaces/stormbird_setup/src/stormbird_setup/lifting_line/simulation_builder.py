@@ -10,17 +10,17 @@ from pydantic import model_serializer, model_validator
 from ..base_model import StormbirdSetupBaseModel
 from ..line_force_model import LineForceModelBuilder
 
-from .solver import Linearized, SimpleIterative
+from .solver import Linearized, Iterative
 from .wake import QuasiSteadyWakeSettings, DynamicWakeBuilder
 
 class QuasiSteadySettings(StormbirdSetupBaseModel):
-    solver: Linearized | SimpleIterative = Linearized()
+    solver: Linearized | Iterative = Linearized()
     wake: QuasiSteadyWakeSettings  = QuasiSteadyWakeSettings()
     
     @classmethod
     def new_steady_iterative(cls) -> "QuasiSteadySettings":
         return cls(
-            solver = SimpleIterative(
+            solver = Iterative(
                 max_iterations_per_time_step = 1000,
                 damping_factor = 0.05
             ),
@@ -35,8 +35,8 @@ class QuasiSteadySettings(StormbirdSetupBaseModel):
             if isinstance(solver_data, dict):
                 if 'Linearized' in solver_data:
                     data['solver'] = Linearized(**solver_data['Linearized'])
-                elif 'SimpleIterative' in solver_data:
-                    data['solver'] = SimpleIterative(**solver_data['SimpleIterative'])
+                elif 'Iterative' in solver_data:
+                    data['solver'] = Iterative(**solver_data['Iterative'])
         return data
 
     @model_serializer
@@ -51,16 +51,16 @@ class QuasiSteadySettings(StormbirdSetupBaseModel):
                 },
                 "wake": wake_dict
             }
-        elif isinstance(self.solver, SimpleIterative):
+        elif isinstance(self.solver, Iterative):
             return {
                 "solver": {
-                    "SimpleIterative": solver_dict
+                    "Iterative": solver_dict
                 },
                 "wake": wake_dict
             }
 
 class DynamicSettings(StormbirdSetupBaseModel):
-    solver: SimpleIterative | Linearized = SimpleIterative()
+    solver: Iterative | Linearized = Iterative()
     wake: DynamicWakeBuilder = DynamicWakeBuilder()
     
     @model_validator(mode='before')
@@ -71,8 +71,8 @@ class DynamicSettings(StormbirdSetupBaseModel):
             if isinstance(solver_data, dict):
                 if 'Linearized' in solver_data:
                     data['solver'] = Linearized(**solver_data['Linearized'])
-                elif 'SimpleIterative' in solver_data:
-                    data['solver'] = SimpleIterative(**solver_data['SimpleIterative'])
+                elif 'Iterative' in solver_data:
+                    data['solver'] = Iterative(**solver_data['Iterative'])
         return data
 
     @model_serializer
@@ -87,10 +87,10 @@ class DynamicSettings(StormbirdSetupBaseModel):
                 },
                 "wake": wake_dict
             }
-        elif isinstance(self.solver, SimpleIterative):
+        elif isinstance(self.solver, Iterative):
             return {
                 "solver": {
-                    "SimpleIterative": solver_dict
+                    "Iterative": solver_dict
                 },
                 "wake": wake_dict
             }

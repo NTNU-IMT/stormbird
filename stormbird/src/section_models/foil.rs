@@ -131,8 +131,8 @@ fn get_stall_angle(angle_of_attack: Float) -> Float {
 impl Foil {
     fn default_one() -> Float {1.0}
     pub fn default_cl_initial_slope()     -> Float {TAU}
-    pub fn default_mean_stall_angle()     -> Float {Float::from(20.0).to_radians()}
-    pub fn default_stall_range()          -> Float {Float::from(6.0).to_radians()}
+    pub fn default_mean_stall_angle()     -> Float {Float::from(20.0_f32).to_radians()}
+    pub fn default_stall_range()          -> Float {Float::from(6.0_f32).to_radians()}
     pub fn default_cd_power_after_stall() -> Float {1.6}
 
     pub fn new_from_string(string: &str) -> Result<Self, Error> {

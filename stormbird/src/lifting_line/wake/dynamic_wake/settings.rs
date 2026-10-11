@@ -54,9 +54,13 @@ impl WakeIndices {
 /// Enum to specify what type of direction to use when updating the first wake points, right behind 
 /// the wing
 pub enum FirstWakePointsDirection {
-    #[default]
+    /// The first panels behind the wing follows the chord direction. That is, the velocity 
+    /// direction is not considered at all.
     Chord,
+    #[default]
+    /// The first panels follow the freestream, but without any induced velocities. 
     Freestream,
+    /// The first panels follow the local velocity at each point, including induced velocities
     ActualVelocity
 }
 
@@ -76,6 +80,8 @@ pub struct WakeSettings {
     pub shape_damping_factor: Float,
     /// A variable to determine whether the self-induced velocities should be neglected or not
     pub neglect_self_induced_velocities: bool,
+    /// Switch to set the strength update to be "steady-state"
+    pub steady_state_strength_update: bool,
     /// A variable to determine whether the wake geometry and data should be written to a file
     pub write_wake_data_to_file: bool,
     /// The path to the folder where the wake data should be written to

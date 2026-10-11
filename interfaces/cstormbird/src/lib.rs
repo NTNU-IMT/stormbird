@@ -1,14 +1,105 @@
+pub mod error;
 pub mod lifting_line;
 pub mod results;
 pub mod wind;
 
 // Re-export all public C functions so cbindgen can find them
+pub use error::{
+    stormbird_last_error_message,
+    stormbird_clear_last_error,
+};
+
 pub use lifting_line::complete_sail_model::{
     CompleteSailModel,
     complete_sail_model_new,
     complete_sail_model_drop,
+    complete_sail_model_get_number_of_sails,
+    complete_sail_model_get_number_of_span_lines,
+    complete_sail_model_get_number_of_freestream_velocity_points,
+    complete_sail_model_simulate_optimal_steady_state_condition,
+    complete_sail_model_simulate_steady_state_condition,
+    complete_sail_model_simulate_steady_state_condition_simple_output,
+    complete_sail_model_simulate_optimal_steady_state_condition_simple_output,
+    complete_sail_model_do_multiple_steps,
+    complete_sail_model_do_step,
+    complete_sail_model_apply_controller_based_on_wind_condition,
+    complete_sail_model_freestream_velocity,
+    complete_sail_model_apply_controller_based_on_freestream,
+    complete_sail_model_apply_controller_based_on_simulation_result,
+    complete_sail_model_local_wing_angles,
+    complete_sail_model_set_local_wing_angles,
+    complete_sail_model_section_models_internal_state,
+    complete_sail_model_set_section_models_internal_state,
+};
+
+pub use lifting_line::simulation::{
+    LiftingLineSimulation,
+    lifting_line_simulation_new,
+    lifting_line_simulation_drop,
+    lifting_line_simulation_get_number_of_sails,
+    lifting_line_simulation_get_number_of_span_lines,
+    lifting_line_simulation_get_number_of_freestream_velocity_points,
+    lifting_line_simulation_has_dynamic_wake,
+    lifting_line_simulation_get_freestream_velocity_points,
+    lifting_line_simulation_set_translation_only,
+    lifting_line_simulation_set_rotation_only,
+    lifting_line_simulation_set_translation_and_rotation_with_finite_difference_for_the_velocity,
+    lifting_line_simulation_set_translation_with_velocity_using_finite_difference,
+    lifting_line_simulation_set_rotation_with_velocity_using_finite_difference,
+    lifting_line_simulation_set_velocity_linear,
+    lifting_line_simulation_set_velocity_angular,
+    lifting_line_simulation_local_wing_angles,
+    lifting_line_simulation_set_local_wing_angles,
+    lifting_line_simulation_section_models_internal_state,
+    lifting_line_simulation_set_section_models_internal_state,
+    lifting_line_simulation_reset_previous_circulation_strength,
+    lifting_line_simulation_do_step,
+    lifting_line_simulation_induced_velocities,
+};
+
+pub use results::{
+    SimulationResult,
+    SingleSailResult,
+    simulation_result_drop,
+    simulation_result_time,
+    simulation_result_nr_of_wings,
+    simulation_result_as_simplified,
+    simulation_result_integrated_forces_sum,
+    simulation_result_integrated_moments_sum,
+    simulation_result_input_power_sum,
 };
 
 pub use wind::{
     WindCondition,
+    wind_condition_new_constant,
+    wind_condition_new_power_model,
+    wind_condition_new_power_model_with_default_shape,
+    wind_condition_new_logarithmic_model,
+    wind_condition_new_from_json_string,
+    wind_condition_drop,
+    wind_condition_get_direction_coming_from,
+    wind_condition_set_direction_coming_from,
+    wind_condition_set_parallel_gust,
+    wind_condition_set_perpendicular_gust,
+    wind_condition_set_vertical_gust,
+    wind_condition_set_parallel_gust_from_json_string,
+    wind_condition_set_perpendicular_gust_from_json_string,
+    wind_condition_set_vertical_gust_from_json_string,
+    wind_condition_steady_true_wind_velocity_at_height,
+    wind_condition_unsteady_parallel_true_wind_velocity_at_height,
+    wind_condition_unsteady_perpendicular_true_wind_velocity,
+    wind_condition_unsteady_vertical_true_wind_velocity,
+    wind_condition_businger_dyer_unscaled_correction,
+    wind_condition_get_friction_velocity,
+    wind_condition_set_friction_velocity,
+    wind_condition_get_surface_roughness,
+    wind_condition_set_surface_roughness,
+    wind_condition_get_obukhov_length,
+    wind_condition_set_obukhov_length,
+    wind_condition_get_von_karman_constant,
+    wind_condition_set_von_karman_constant,
+    wind_condition_get_stable_coefficient,
+    wind_condition_set_stable_coefficient,
+    wind_condition_get_unstable_coefficient,
+    wind_condition_set_unstable_coefficient,
 };

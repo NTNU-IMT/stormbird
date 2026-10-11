@@ -7,7 +7,7 @@ from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.section_models import SectionModel
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings, DynamicSettings
-from stormbird_setup.lifting_line.solver import Linearized, SimpleIterative
+from stormbird_setup.lifting_line.solver import Linearized, Iterative
 from stormbird_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition, DynamicWakeBuilder, ViscousCoreLengthEvolution
 from stormbird_setup.utils import revolutions_per_second_from_spin_ratio
 
@@ -30,7 +30,7 @@ def simulate_single_case(
     rotor_y_locations: list[float],
     spin_ratio: float,
     solver_type: SolverType = SolverType.Linearized,
-    max_induced_velocity_ratio: float = 2.0,
+    max_induced_velocity_ratio: float = 0.0,
     smoothing_length: float = 0.0,
     wind_direction_deg: float = 0.0,
     virtual_extension_factor_top: float = 0.0,
@@ -99,7 +99,7 @@ def simulate_single_case(
         line_force_model.add_wing_builder(wing_builder)
 
     if dynamic:
-        solver = SimpleIterative(
+        solver = Iterative(
             max_iterations_per_time_step = 20,
             damping_factor = 0.2,
             start_with_linearized_solution = False
@@ -139,8 +139,8 @@ def simulate_single_case(
         )
     else:
         match solver_type:
-            case SolverType.SimpleIterative:
-                solver = SimpleIterative(
+            case SolverType.Iterative:
+                solver = Iterative(
                     max_iterations_per_time_step = 1000,
                     damping_factor = 0.05,
                     start_with_linearized_solution = True

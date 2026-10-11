@@ -73,6 +73,13 @@ class SpatialVector(StormbirdSetupBaseModel):
             z = self.z + other.z
         )
             
+    def __sub__(self, other: "SpatialVector") -> "SpatialVector":
+        return SpatialVector(
+            x = self.x - other.x,
+            y = self.y - other.y,
+            z = self.z - other.z
+        )
+            
     def normalize(self) -> "SpatialVector":
         length = self.length()
         

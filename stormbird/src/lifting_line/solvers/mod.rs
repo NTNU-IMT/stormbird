@@ -7,31 +7,31 @@
 use serde::{Deserialize, Serialize};
 
 //pub mod quasi_newton;
-pub mod simple_iterative;
+pub mod iterative;
 pub mod linearized;
 pub mod velocity_corrections;
 
-use simple_iterative::{
-    SimpleIterative,
-    QuasiSteadySimpleIterativeBuilder
+use iterative::{
+    Iterative,
+    QuasiSteadyIterativeBuilder
 };
 use linearized::Linearized;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Solver {
-    SimpleIterative(SimpleIterative),
+    Iterative(Iterative),
     Linearized(Linearized)
 }
 
 impl Default for Solver {
     fn default() -> Self {
-        Solver::SimpleIterative(SimpleIterative::default())
+        Solver::Iterative(Iterative::default())
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum QuasiSteadySolverBuilder {
-    SimpleIterative(QuasiSteadySimpleIterativeBuilder),
+    Iterative(QuasiSteadyIterativeBuilder),
     Linearized(Linearized)
 }
 
@@ -47,8 +47,8 @@ impl QuasiSteadySolverBuilder {
             Self::Linearized(settings) => {
                 Solver::Linearized(settings.clone())
             },
-            Self::SimpleIterative(builder) => {
-                Solver::SimpleIterative(builder.build())
+            Self::Iterative(builder) => {
+                Solver::Iterative(builder.build())
             }
         }
     }

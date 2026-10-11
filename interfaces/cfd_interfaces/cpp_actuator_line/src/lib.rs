@@ -9,6 +9,11 @@ use stormath::spatial_vector::SpatialVector;
 
 #[cxx::bridge(namespace="stormbird_interface")]
 mod ffi {
+    struct DominatingLineWeight {
+        line_index: usize,
+        weight: f64,
+    }
+
     extern "Rust" {
         type CppActuatorLine;
 
@@ -39,7 +44,7 @@ mod ffi {
 
         fn set_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]);
 
-        fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize;
+        fn dominating_line_element_and_weight_at_point(&self, point: &[f64; 3]) -> DominatingLineWeight;
 
         // ---- Force methods ----
         fn do_step(&mut self, time: f64, time_step: f64);
@@ -50,7 +55,6 @@ mod ffi {
             line_index: usize,
             velocity: &[f64; 3]
         ) -> [f64; 3];
-        fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64;
 
         // ---- Export data ----
         fn write_results(&self, folder_path: &str);
@@ -127,8 +131,12 @@ impl CppActuatorLine {
         self.model.ctrl_points_velocity[index] = SpatialVector::from(velocity);
     }
 
-    fn dominating_line_element_index_at_point(&self, point: &[f64; 3]) -> usize {
-        self.model.dominating_line_element_index_at_point(SpatialVector::from(*point))
+    fn dominating_line_element_and_weight_at_point(&self, point: &[f64; 3]) -> ffi::DominatingLineWeight {
+        let (line_index, weight) = self.model.dominating_line_element_and_weight_at_point(
+            SpatialVector::from(*point)
+        );
+
+        ffi::DominatingLineWeight { line_index, weight }
     }
 
     pub fn do_step(&mut self, time: f64, time_step: f64) {
@@ -150,10 +158,6 @@ impl CppActuatorLine {
         );
 
         body_force.into()
-    }
-
-    pub fn summed_projection_weights_at_point(&self, point: &[f64; 3]) -> f64 {
-        self.model.summed_projection_weights_at_point(SpatialVector::from(*point))
     }
 
     pub fn write_results(&self, folder_path: &str) {

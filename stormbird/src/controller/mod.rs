@@ -15,7 +15,7 @@ pub mod prelude;
 use input::ControllerInput;
 use output::ControllerOutput;
 use set_points::ControllerSetPoints;
-use measurements::FlowMeasurementSettings;
+use measurements::SpanwiseMeasurement;
 
 use stormath::type_aliases::Float;
 
@@ -24,7 +24,7 @@ pub struct Controller {
     /// Vector containing the set points for all the sails
     pub set_points: Vec<ControllerSetPoints>,
     /// Structure defining how to measure the representative flow conditions on the sail
-    pub flow_measurement_settings: FlowMeasurementSettings,
+    pub spanwise_measurement: SpanwiseMeasurement,
     /// How often to update the controller
     pub time_steps_between_updates: usize,
     /// When to start using the controller

@@ -20,9 +20,11 @@ impl DynamicWake {
         points: &[SpatialVector], 
     ) -> Vec<SpatialVector> {
         self.induced_velocities_local(
-            points, 0, 
+            points, 
+            0, 
             self.strengths.len(), 
-            false)
+            false
+        )
     }
 
     /// Calculates the induced velocity from the first panels in the stream wise direction only. This
@@ -85,26 +87,6 @@ impl DynamicWake {
         results
     }
 
-    #[cfg(not(feature = "parallel"))]
-    /// Calculate the induced velocities from panels on all points, including self-induced 
-    /// velocities
-    fn _induced_velocities_local_include_self_induced_old(
-        &self, 
-        points: &[SpatialVector], 
-        start_index: usize, 
-        end_index: usize
-    ) -> Vec<SpatialVector> {
-        // Parallelize over points instead of panels to avoid race conditions
-        (0..points.len()).into_iter()
-            .map(|point_index| {
-                let point = points[point_index];
-                (start_index..end_index)
-                    .map(|panel_index| self.induced_velocity_from_panel(panel_index, point))
-                    .fold(SpatialVector::default(), |acc, velocity| acc + velocity)
-            })
-            .collect()
-    }
-
     #[cfg(feature = "parallel")]
     /// Calculate the induced velocities from panels on all points, including self-induced 
     /// velocities
@@ -113,14 +95,26 @@ impl DynamicWake {
         points: &[SpatialVector], 
         start_index: usize, 
         end_index: usize
-    ) -> Vec<SpatialVector> {
-        // Parallelize over points instead of panels to avoid race conditions
-        (0..points.len()).into_par_iter()
-            .map(|point_index| {
-                let point = points[point_index];
-                (start_index..end_index)
-                    .map(|panel_index| self.induced_velocity_from_panel(panel_index, point))
-                    .fold(SpatialVector::default(), |acc, velocity| acc + velocity)
+    ) -> Vec<SpatialVector> {        
+        // Pre-collect active panels once (avoids repeated zero-checks per point)
+        let active_panels: Vec<(usize, Float)> = (start_index..end_index)
+            .filter_map(|i| {
+                let s = self.strengths[i];
+                if s != 0.0 { Some((i, s)) } else { None }
+            })
+            .collect();
+    
+        points.par_iter()
+            .map(|&point| {
+                active_panels.iter()
+                    .map(|&(panel_index, strength)| {
+                        strength * 
+                        self.unit_strength_induced_velocity_from_panel_flat_index(
+                            panel_index, 
+                            point
+                        )
+                    })
+                    .fold(SpatialVector::default(), |acc, v| acc + v)
             })
             .collect()
     }

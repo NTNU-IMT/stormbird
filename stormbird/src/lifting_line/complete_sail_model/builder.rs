@@ -11,6 +11,7 @@ use crate::controller::builder::ControllerBuilder;
 //use crate::empirical_models::input_power::InputPower;
 
 use super::CompleteSailModel;
+use super::settings::CompleteSailModelSettings;
 
 use crate::error::Error;
 
@@ -20,6 +21,8 @@ pub struct CompleteSailModelBuilder {
     lifting_line_simulation: SimulationBuilder,
     wind_environment: WindEnvironment,
     controller: ControllerBuilder,
+    #[serde(default)]
+    settings: CompleteSailModelSettings
 }
 
 impl CompleteSailModelBuilder {
@@ -35,11 +38,16 @@ impl CompleteSailModelBuilder {
         Self::new_from_string(&string)
     }
 
-    pub fn build(&self) -> CompleteSailModel {
-        CompleteSailModel {
-            lifting_line_simulation: self.lifting_line_simulation.build(),
+    pub fn build(&self) -> Result<CompleteSailModel, Error> {
+        let lifting_line_simulation = self.lifting_line_simulation.build();
+
+        let controller = self.controller.build(&lifting_line_simulation.line_force_model)?;
+
+        Ok(CompleteSailModel {
+            lifting_line_simulation,
             wind_environment: self.wind_environment.clone(),
-            controller: self.controller.build()
-        }
+            controller,
+            settings: self.settings.clone()
+        })
     }
 }

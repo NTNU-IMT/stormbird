@@ -5,6 +5,7 @@
 //! Interface to a dynamic simulation using a lifting line model.
 
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
 use stormath::spatial_vector::SpatialVector;
@@ -21,13 +22,9 @@ pub struct Simulation {
 #[pymethods]
 impl Simulation {
     #[new]
-    pub fn new(
-        setup_string: String
-    ) -> Self {
+    pub fn new(setup_string: String) -> Self {
         Self {
-            data: SimulationRust::new_from_string(
-                &setup_string
-            ).unwrap()
+            data: SimulationRust::new_from_string(&setup_string).unwrap()
         }
     }
     
@@ -146,6 +143,35 @@ impl Simulation {
                 &rust_freestream_velocity
             )
         }
+    }
+
+    /// Return the current dynamic wake as VTK PolyData bytes, ready to be fed
+    /// into pyvista for visualization, without touching the disk.
+    ///
+    /// Returns `None` when the simulation uses a static (quasi-steady) wake.
+    ///
+    /// The `binary` switch selects between the ASCII and BINARY variants of the
+    /// VTK legacy format. The returned `bytes` can be read straight into a mesh,
+    /// e.g. with pyvista:
+    ///
+    ///     import vtk
+    ///     import pyvista as pv
+    ///
+    ///     data = simulation.dynamic_wake_as_vtk(binary=True)
+    ///     if data is not None:
+    ///         reader = vtk.vtkPolyDataReader()
+    ///         reader.ReadFromInputStringOn()
+    ///         reader.SetBinaryInputString(data, len(data))  # use SetInputString for ASCII
+    ///         reader.ReadAllScalarsOn()
+    ///         reader.Update()
+    ///         mesh = pv.wrap(reader.GetOutput())
+    #[pyo3(signature=(binary=true))]
+    pub fn dynamic_wake_as_vtk<'py>(
+        &self,
+        py: Python<'py>,
+        binary: bool,
+    ) -> Option<Bound<'py, PyBytes>> {
+        self.data.dynamic_wake_as_vtk(binary).map(|bytes| PyBytes::new(py, &bytes))
     }
 
     #[pyo3(signature=(

@@ -1,5 +1,6 @@
 
 use crate::gpu_interface::context::GpuContext;
+use crate::grid::INTERIOR_OFFSET;
 
 use wgpu::util::DeviceExt;
 
@@ -30,11 +31,19 @@ pub struct BoundaryFace {
 }
 
 impl BoundaryFace {
+    /// `ghost_layer` selects which of the `INTERIOR_OFFSET` ghost layers on this face to
+    /// address: `0` is the layer immediately adjacent to the interior, `INTERIOR_OFFSET - 1` is
+    /// the outermost layer. Each layer is paired with the interior cell that mirrors it across
+    /// the domain boundary face (layer `0` with the nearest interior cell, layer `1` with the
+    /// next one in, and so on), so `neighbor_delta` always points at an interior cell, never at
+    /// another ghost layer — callers can therefore fill all `INTERIOR_OFFSET` layers in any
+    /// order.
     pub fn new(
         grid_shape: [usize; 3],
         grid_stride: [usize; 3],
         axis_index: usize,
         face_index: usize,
+        ghost_layer: usize,
     ) -> Self {
         let axis_length = grid_shape[axis_index] as u32;
         let axis_stride = grid_stride[axis_index] as u32;
@@ -49,12 +58,19 @@ impl BoundaryFace {
         let shape = [grid_shape[outer_axis] as u32, grid_shape[inner_axis] as u32];
         let stride = [grid_stride[outer_axis] as u32, grid_stride[inner_axis] as u32];
 
+        // Cell distance between this ghost layer and its mirrored interior neighbor: layer 0
+        // (nearest the interior) pairs with the nearest interior cell (distance 1), layer 1
+        // with the next interior cell in (distance 3), and so on.
+        let neighbor_distance = (2 * ghost_layer + 1) as u32;
+
         let (axis_offset, neighbor_delta) = if face_index == 0 {
-            // current layer 0, neighbor layer 1 -> neighbor = current + axis_stride
-            (0, axis_stride as i32)
+            let offset = (INTERIOR_OFFSET - 1 - ghost_layer) as u32;
+
+            (offset * axis_stride, (neighbor_distance * axis_stride) as i32)
         } else {
-            // current layer L-1, neighbor layer L-2 -> neighbor = current - axis_stride
-            ((axis_length - 1) * axis_stride, -(axis_stride as i32))
+            let offset = axis_length - INTERIOR_OFFSET as u32 + ghost_layer as u32;
+
+            (offset * axis_stride, -((neighbor_distance * axis_stride) as i32))
         };
 
         Self {

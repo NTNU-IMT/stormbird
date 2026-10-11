@@ -11,7 +11,13 @@ sys.modules['pystormbird._native.wind'] = _native.wind
 sys.modules['pystormbird._native.smoothing'] = _native.smoothing
 
 # Re-export top-level classes
-from pystormbird._native import SimulationResult, SectionalForcesInput
+from pystormbird._native import (
+    SimulationResult,
+    SingleSailResult,
+    SectionalForcesInput,
+    SectionalForces,
+    IntegratedValues,
+)
 
 # Make submodules available
 from pystormbird import lifting_line
@@ -22,7 +28,10 @@ from pystormbird import smoothing
 
 __all__ = [
     "SimulationResult",
+    "SingleSailResult",
     "SectionalForcesInput",
+    "SectionalForces",
+    "IntegratedValues",
     "lifting_line",
     "section_models",
     "line_force_model",
