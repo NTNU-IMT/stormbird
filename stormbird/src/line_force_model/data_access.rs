@@ -17,18 +17,19 @@ impl LineForceModel {
         self.span_lines_local.len()
     }
 
-    /// Returns the axis of rotation for the wing at the input index.
+    /// Returns the axis of rotation for the wing at the input wing index.
     pub fn wing_rotation_axis(&self, wing_index: usize) -> SpatialVector {
         self.span_lines_local[self.wing_indices[wing_index].start].relative_vector()
     }
 
+    /// Returns the axis of rotation for the wing at the input global index.
     pub fn wing_rotation_axis_from_global_index(&self, global_index: usize) -> SpatialVector {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_axis(wing_index)
     }
 
-    /// Returns both angle and axis of rotation for the wing at the input index.
+    /// Returns both angle and axis of rotation for the wing at the input wing index.
     pub fn wing_rotation_data(&self, wing_index: usize) -> (Float, SpatialVector) {
         let axis = self.wing_rotation_axis(wing_index);
         let angle = self.local_wing_angles[wing_index];
@@ -36,12 +37,14 @@ impl LineForceModel {
         (angle, axis)
     }
 
+    /// Returns both angle and axis of rotation for the wing at the input global index.
     pub fn wing_rotation_data_from_global_index(&self, global_index: usize) -> (Float, SpatialVector) {
         let wing_index = self.wing_index_from_global(global_index);
 
         self.wing_rotation_data(wing_index)
     }
 
+    /// Returns a vector with the projected area of the wings in the line force model
     pub fn projected_areas(&self) -> Vec<Float> {
         let mut areas = vec![0.0; self.nr_wings()];
 
@@ -68,6 +71,7 @@ impl LineForceModel {
         span_length
     }
 
+    /// Returns the *geometric* aspect ratios of each wing in the line force model
     pub fn aspect_ratios(&self) -> Vec<Float> {
         let areas = self.projected_areas();
         let span_lengths = self.span_lengths();

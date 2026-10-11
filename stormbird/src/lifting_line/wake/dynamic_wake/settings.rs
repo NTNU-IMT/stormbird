@@ -54,9 +54,13 @@ impl WakeIndices {
 /// Enum to specify what type of direction to use when updating the first wake points, right behind 
 /// the wing
 pub enum FirstWakePointsDirection {
-    #[default]
+    /// The first panels behind the wing follows the chord direction. That is, the velocity 
+    /// direction is not considered at all.
     Chord,
+    #[default]
+    /// The first panels follow the freestream, but without any induced velocities. 
     Freestream,
+    /// The first panels follow the local velocity at each point, including induced velocities
     ActualVelocity
 }
 

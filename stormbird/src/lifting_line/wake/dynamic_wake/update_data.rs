@@ -5,7 +5,7 @@
 
 use super::*;
 
-use crate::line_force_model::LineForceModel;
+use crate::{common_utils::forces_and_moments::CoordinateSystem, line_force_model::LineForceModel};
 
 /// This code block contains the logic to update the wake structure
 impl DynamicWake {
@@ -23,18 +23,18 @@ impl DynamicWake {
     /// # Arguments
     /// * `time_step` - The current value of the time step
     /// * `line_force_model` - The line force model that the wake is based on
-    /// * `wake_points_freestream` - The freestream velocity at the points in the wake for the
-    /// current time step
+    /// * `ctrl_points_freestream` - The freestream velocity at the ctrl points at the line force 
+    /// model current time step
     pub fn update_before_solving(
         &mut self,
         time_step: Float,
         line_force_model: &LineForceModel,
-        felt_span_points_freestream: &[SpatialVector]
+        ctrl_points_freestream: &[SpatialVector]
     ) {
         self.update_wake_points_before_solving(
             time_step,
             line_force_model,
-            felt_span_points_freestream
+            ctrl_points_freestream
         );
 
         self.update_panel_data();
@@ -66,19 +66,19 @@ impl DynamicWake {
         &mut self,
         time_step: Float,
         line_force_model: &LineForceModel,
-        felt_span_points_freestream: &[SpatialVector]
+        ctrl_points_freestream: &[SpatialVector]
     ) {
         self.synchronize_first_points_to_wing_geometry(line_force_model);
 
         self.stream_free_wake_points_based_on_stored_velocity(time_step);
 
         if self.settings.shape_damping_factor > 0.0 {
-            self.move_first_free_wake_points_with_damping(line_force_model, felt_span_points_freestream);
+            self.move_first_free_wake_points_with_damping(line_force_model, ctrl_points_freestream);
         } else {
-            self.move_first_free_wake_points_no_damping(line_force_model, felt_span_points_freestream);
+            self.move_first_free_wake_points_no_damping(line_force_model, ctrl_points_freestream);
         }
 
-        self.move_last_wake_points(felt_span_points_freestream);
+        self.move_last_wake_points();
     }
 
     /// Takes a line force vector as input, that might have a different position and orientation
@@ -148,71 +148,109 @@ impl DynamicWake {
             self.strengths[i] = new_circulation_strength[i];
         }
     }
+
+    fn first_free_wake_points_direction_chord(
+        &self,
+        line_force_model: &LineForceModel,
+    ) -> Vec<SpatialVector> {
+        line_force_model.chord_vectors_global_at_span_points
+            .iter()
+            .map(|v| v.normalize())
+            .collect()
+    }
+
+    /// Converts velocities at the ctrl points to normalized directions at the span points, after 
+    /// removing the velocity component along the span lines.
+    fn span_point_directions_from_ctrl_point_velocities(
+        &self,
+        line_force_model: &LineForceModel,
+        ctrl_points_velocity: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
+        let ctrl_points_velocity = line_force_model.remove_span_velocity(
+            ctrl_points_velocity, 
+            CoordinateSystem::Global
+        );
     
+        line_force_model.span_point_values_from_ctrl_point_values(&ctrl_points_velocity, false)
+            .iter()
+            .map(|v| v.normalize())
+            .collect()
+    }
+
+
+    fn first_free_wake_points_direction_freestream(
+        &self,
+        line_force_model: &LineForceModel,
+        ctrl_points_freestream: &[SpatialVector]
+    ) -> Vec<SpatialVector> {        
+        let felt_ctrl_points_freestream = line_force_model.felt_ctrl_points_velocity(
+            &ctrl_points_freestream
+        );
+
+        self.span_point_directions_from_ctrl_point_velocities(
+            line_force_model, 
+            &felt_ctrl_points_freestream
+        )
+    }
+
+    /// Calculates the direction of the first wake points from the average velocity along the first
+    /// wake panels, as stored from the previous time step. The stored velocities are in a
+    /// ground-fixed frame, so the motion velocity of the wing is removed to get the velocity felt
+    /// by the wing.
+    fn first_free_wake_points_direction_actual_velocity(
+        &self,
+        line_force_model: &LineForceModel,
+    ) -> Vec<SpatialVector> {
+        let nr_span_points = self.indices.nr_points_along_span;
+
+        // Uses the average velocity of the value at the line force model itself, and the next in 
+        // the wake. This is thought to be the most representative value
+        let span_points_velocity: Vec<SpatialVector> = (0..nr_span_points).map(|i| {
+            0.5 * (self.velocity_at_points[i] + self.velocity_at_points[nr_span_points + i])
+        }).collect();
+
+        let felt_span_points_velocity = line_force_model.felt_span_points_velocity(
+            &span_points_velocity
+        );
+
+        line_force_model.remove_span_velocity_at_span_points(&felt_span_points_velocity)
+            .iter()
+            .map(|v| v.normalize())
+            .collect()
+    }
+
+    /// Calculates the direction of the first panels behind the line force models. The values 
+    /// depends on the settings values for the `first_wake_points_direction`
     fn first_free_wake_points_direction(
         &self,
         line_force_model: &LineForceModel,
-        felt_span_points_freestream: &[SpatialVector]
+        ctrl_points_freestream: &[SpatialVector]
     ) -> Vec<SpatialVector> {
-        let nr_first_wake_points = self.indices.nr_points_along_span;
-        
-        let mut direction_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_first_wake_points);
-
         // Calculate the directions depending on what settings is used
         match self.settings.first_wake_points_direction {
             // Follow the chord direction
             FirstWakePointsDirection::Chord => {
-                for i in 0..nr_first_wake_points{                    
-                    direction_vectors.push(
-                        line_force_model.chord_vectors_global_at_span_points[i]
-                            .normalize()
-                    )
-                }
+                self.first_free_wake_points_direction_chord(line_force_model)
             },
             // Follow the freestream direction
             FirstWakePointsDirection::Freestream => {
-                for i in 0..nr_first_wake_points {
-                    direction_vectors.push(
-                        felt_span_points_freestream[i]
-                            .normalize()
-                    )
-                }
+                self.first_free_wake_points_direction_freestream(
+                    line_force_model,
+                    ctrl_points_freestream
+                )
             },
             // Follow the freestream + induced velocity
             FirstWakePointsDirection::ActualVelocity => {
                 if self.number_of_time_steps_completed > 2 {
-                    for i in 0..nr_first_wake_points {
-                        let local_velocity = 0.5 * (
-                            self.velocity_at_points[i] + 
-                            self.velocity_at_points[nr_first_wake_points + i]
-                        );
-                        
-                        direction_vectors.push(
-                            local_velocity.normalize()
-                        )
-                    }
+                    self.first_free_wake_points_direction_actual_velocity(line_force_model)
                 } else {
-                    for i in 0..nr_first_wake_points {
-                        direction_vectors.push(
-                            felt_span_points_freestream[i].normalize()
-                        )
-                    }
+                    self.first_free_wake_points_direction_freestream(
+                        line_force_model, 
+                        ctrl_points_freestream
+                    )
                 }
             }
         }
-
-        // Enforce the direction to be normal to the bound vortex at all points for stability 
-        // reasons. Commented out for now because it makes the tests fails for reasons not entirely
-        // understood
-        /*for i in 0..direction_vectors.len() {
-            let line_index = i.min(line_force_model.nr_span_lines()); Not correct. Need to find the right way
-
-            let line_direction = line_force_model.span_lines_global[line_index].relative_vector().normalize();
-
-            direction_vectors[i] = direction_vectors[i].project_on_plane(line_direction).normalize();
-        }*/
-        
-        direction_vectors
     }
 
     /// Moves the first wake points after the wing geometry itself.
@@ -222,11 +260,11 @@ impl DynamicWake {
     fn move_first_free_wake_points_no_damping(
         &mut self,
         line_force_model: &LineForceModel,
-        felt_span_points_freestream: &[SpatialVector]
+        ctrl_points_freestream: &[SpatialVector]
     ) {
         let direction_vectors = self.first_free_wake_points_direction(
             line_force_model, 
-            felt_span_points_freestream
+            ctrl_points_freestream
         );
 
         let first_panel_length = self.representative_chord_length * self.settings.first_panel_relative_length;
@@ -245,7 +283,7 @@ impl DynamicWake {
     fn move_first_free_wake_points_with_damping(
         &mut self,
         line_force_model: &LineForceModel,
-        felt_span_points_freestream: &[SpatialVector]
+        ctrl_points_freestream: &[SpatialVector]
     ) {
         let old_start_index = self.indices.nr_points_along_span;
         let old_end_index   = 2 * self.indices.nr_points_along_span;
@@ -254,7 +292,7 @@ impl DynamicWake {
 
         let direction_vectors = self.first_free_wake_points_direction(
             line_force_model, 
-            felt_span_points_freestream
+            ctrl_points_freestream
         );
 
         let first_panel_length = self.representative_chord_length * self.settings.first_panel_relative_length;
@@ -271,35 +309,21 @@ impl DynamicWake {
     /// Moves the last points in the wake.
     ///
     /// The length of the last panel is determined based on the `last_panel_relative_length`
-    /// parameter in the settings, plus the chord length. The direction of the last panel is taken
-    /// to be the same as the direction between the previous two points in the wake.
-    ///
-    /// # Arguments
-    /// * `line_force_model_data` - The line force model data that the should use for the update
-    pub fn move_last_wake_points(
-        &mut self,
-        felt_span_points_freestream: &[SpatialVector],
-    ) {
+    /// parameter in the settings, plus the representative chord length. The direction of the last 
+    /// panel is taken to be the same as the direction between the previous two points in the wake.
+    pub fn move_last_wake_points(&mut self) {
         let nr_points = self.points.len();
         let nr_points_along_span = self.indices.nr_points_along_span;
-
-        let multi_panel_wake = self.indices.nr_panels_per_line_element > 1;
 
         let start_index_last = nr_points - nr_points_along_span;
         let start_index_previous = start_index_last - nr_points_along_span;
 
-        let change_directions: Vec<SpatialVector> = if multi_panel_wake {
-            (0..self.indices.nr_points_along_span).map(|i| {
-                let previous_point        = self.points[start_index_previous + i];
-                let second_previous_point = self.points[start_index_previous - nr_points_along_span + i];
+        let change_directions: Vec<SpatialVector> = (0..self.indices.nr_points_along_span).map(|i| {
+            let previous_point        = self.points[start_index_previous + i];
+            let second_previous_point = self.points[start_index_previous - nr_points_along_span + i];
 
-                (previous_point - second_previous_point).normalize()
-            }).collect()
-        } else {
-            felt_span_points_freestream.iter()
-                .map(|v| v.normalize())
-                .collect()
-        };
+            (previous_point - second_previous_point).normalize()
+        }).collect();
 
         for i in 0..self.indices.nr_points_along_span {
             let change_vector = self.settings.last_panel_relative_length * self.representative_chord_length * change_directions[i];

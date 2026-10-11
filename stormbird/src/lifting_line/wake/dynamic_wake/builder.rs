@@ -13,6 +13,7 @@ use stormath::{
 };
 
 use crate::line_force_model::LineForceModel;
+use crate::error::Error;
 
 use crate::lifting_line::singularity_elements::prelude::*;
 use crate::lifting_line::wake::settings::ViscousCoreLength;
@@ -121,10 +122,35 @@ impl DynamicWakeBuilder {
     fn default_first_panel_relative_length() -> Float {0.75}
     fn default_last_panel_relative_length() -> Float {0.25}
 
+    /// Checks that the settings are valid for building a dynamic wake. All checks are executed, so
+    /// that the returned error lists every problem with the settings, not just the first.
+    pub fn settings_is_valid(&self) -> Result<(), Error> {
+        let mut error_messages: Vec<String> = Vec::new();
+
+        if self.nr_panels_per_line_element < 2 {
+            error_messages.push(format!(
+                "nr_panels_per_line_element must be at least 2 for a dynamic wake, but is {}. Use \
+                a quasi-steady wake for single-panel wakes.",
+                self.nr_panels_per_line_element
+            ));
+        }
+
+        if error_messages.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::CustomStringError(format!(
+                "Invalid dynamic wake settings: {}",
+                error_messages.join(" ")
+            )))
+        }
+    }
+
     pub fn build(
         &self,
         line_force_model: &LineForceModel,
     ) -> DynamicWake {
+        self.settings_is_valid().unwrap();
+
         let span_points = &line_force_model.span_points_global;
 
         let indices = self.get_wake_indices(line_force_model);

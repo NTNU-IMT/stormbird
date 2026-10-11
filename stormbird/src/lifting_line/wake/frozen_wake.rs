@@ -63,11 +63,11 @@ impl FrozenWake {
     }
 
     /// Function that updates the variable velocity factors assuming a steady wake, given a line
-    /// force model and the velocities at the span points.
+    /// force model and the free stream velocity at the ctrl points.
     pub fn update_as_steady_from_line_force_model_and_velocities(
         &mut self,
         line_force_model: &LineForceModel,
-        span_point_velocities: &[SpatialVector],
+        ctrl_points_freestream: &[SpatialVector],
         wake_settings: &QuasiSteadyWakeSettings,
     ) {
         let nr_span_lines = line_force_model.span_lines_global.len();
@@ -78,6 +78,16 @@ impl FrozenWake {
             (nr_span_lines as Float);
 
         let wake_length = wake_settings.wake_length_factor * average_chord_length;
+
+        // Add motion velocity
+        let felt_ctrl_points_freestream = line_force_model.felt_ctrl_points_velocity(
+            ctrl_points_freestream
+        ); 
+
+        let span_point_velocities = line_force_model.span_point_values_from_ctrl_point_values(
+            &felt_ctrl_points_freestream, 
+            false
+        );
 
         // Pre-calculate normalized wake vectors to avoid repeated normalization
         let nr_wake_vectors = span_point_velocities.len();

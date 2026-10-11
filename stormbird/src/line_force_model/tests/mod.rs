@@ -6,6 +6,7 @@
 
 
 pub mod motion;
+pub mod indexing;
 
 use crate::line_force_model::builder::single_wing::WingBuilder;
 use crate::line_force_model::builder::LineForceModelBuilder;

@@ -68,6 +68,29 @@ impl LineForceModel {
         ctrl_point_velocity
     }
 
+    /// Function used to calculate the *felt* velocity at each span point. That is, the input
+    /// velocity minus the motion velocity at each span point.
+    pub fn felt_span_points_velocity(
+        &self,
+        span_points_velocity_no_motion: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
+        let span_points = &self.span_points_global;
+
+        let mut span_point_velocity = Vec::with_capacity(span_points.len());
+
+        for i in 0..span_points.len() {
+            let motion_velocity = self.rigid_body_motion.velocity_at_point(
+                span_points[i]
+            );
+
+            span_point_velocity.push(
+                span_points_velocity_no_motion[i] - motion_velocity
+            );
+        }
+
+        span_point_velocity
+    }
+
     /// Return the angle of attack at each control point.
     ///
     /// The angle is defined as the rotation from the chord vector to the velocity vector, using the

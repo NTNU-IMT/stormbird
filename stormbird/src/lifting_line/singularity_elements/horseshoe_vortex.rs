@@ -27,13 +27,13 @@ pub struct HorseshoeVortex {
     /// 1) The first line goes from the end of the first free vortex to the "elbow vortex" (see next
     /// vortex definition)
     /// 2) The second line is the first "elbow vortex". It connect the bound vortex with the first 
-    /// free stream vortex in a direction normal to the bound vortex.However, the direction is from 
+    /// free stream vortex in a direction normal to the bound vortex. However, the direction is from 
     /// point closest to the bound vortex in the first free vortex, to the first point of the bound 
     /// vortex to maintain the right direction.
     /// 3) The third line is the bound vortex itself, going from the start of the span line to the
     /// end of the span line.
-    /// 4) The fourth line is the elbow vortex, connecting the end of the bound vortex to the second
-    /// free vortex in a direction normal to the bound vortex.
+    /// 4) The fourth line is the second elbow vortex, connecting the end of the bound vortex to the 
+    /// second free vortex in a direction normal to the bound vortex.
     /// 5) The fifth and last line is the second free vortex, going from the end of the second elbow
     /// vortex in the direction of the free stream
     vortex_lines: [VortexLine; 5],
