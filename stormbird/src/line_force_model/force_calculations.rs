@@ -23,7 +23,7 @@
 //! - [`sectional_drag_forces`](LineForceModel::sectional_drag_forces)
 //! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
 //! - [`sectional_gyroscopic_force`](LineForceModel::sectional_gyroscopic_force)
-//! - [`lift_from_circulation`](LineForceModel::lift_from_circulation)
+//! - [`lift_coefficient_from_circulation`](LineForceModel::lift_coefficient_from_circulation)
 //! - [`lift_from_coefficients`](LineForceModel::lift_from_coefficients)
 //! - [`residual`](LineForceModel::residual)
 //! - [`residual_absolute`](LineForceModel::residual_absolute)

@@ -97,7 +97,7 @@ impl DynamicWake {
         end_index: usize
     ) -> Vec<SpatialVector> {        
         // Pre-collect active panels once (avoids repeated zero-checks per point)
-        let active_panels: Vec<(usize, f64)> = (start_index..end_index)
+        let active_panels: Vec<(usize, Float)> = (start_index..end_index)
             .filter_map(|i| {
                 let s = self.strengths[i];
                 if s != 0.0 { Some((i, s)) } else { None }

@@ -44,5 +44,5 @@ impl CompleteSailModelSettings {
     fn default_max_controller_iterations() -> usize {10}
     fn default_allowed_angle_error() -> Float {0.1_f64.to_radians() as Float}
     fn default_nr_loadings_to_test_during_optimization() -> usize {10}
-    fn default_thrust_direction() -> SpatialVector {SpatialVector([-1.0, 0.0, 0.0])}
+    fn default_thrust_direction() -> SpatialVector {SpatialVector::new(-1.0, 0.0, 0.0)}
 }
