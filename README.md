@@ -5,8 +5,10 @@ The library is developed by the [Department of Marine Technology](https://www.nt
 
 ## Folder structure
 The content of the folders in this repository can be described as follows:
+
 - The [stormbird](/stormbird/) folder contains the core library written in Rust
 - The [stormath](/stormath/) folder contains implementation of various mathematical utility functions needed for the core library, but which are implemented in a general way so that they may also be useful for other purposes. This includes stuff like spatial vector and matrix data structures, interpolation functionality, solvers etc.
+- The [stormflow](/stormflow/) folder contains an experimental CFD solver built around the stormbird library. That is, it is not intended to be a general CFD solver, but one that is dedicated to only running lifting line simulations.
 - The [book](/book/) folder contains the source for an [mdbook book](https://rust-lang.github.io/mdBook/) that describes the library and theory more in detail
 - The [interfaces](/interfaces/) folder contains various interfaces to use the core library in other languages than Rust. They are generally *high-level*, in the sense that none of them contain access to the entirety of the core library, but some selected functionalities depending on the type of interface. Examples are two Python libraries (one to assist with the setup of models and one for actually running the core library), functional mockup units, and an interface to use the core library within OpenFOAM.
 
