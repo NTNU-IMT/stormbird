@@ -148,17 +148,9 @@ impl LineForceModel {
         }
     }
 
-    pub fn set_controller_output(&mut self, controller_output: &[ControllerOutput]) {
-        todo!("Controller internal state is out of sync with the new logic");
-        
-        let local_wing_angles: Vec<Float> = controller_output.iter()
-            .map(|v| v.local_wing_angle).collect();
-        
-        let internal_state: Vec<Float> = controller_output.iter()
-            .map(|v| v.section_model_internal_state).collect();
-        
-        self.set_local_wing_angles(&local_wing_angles);
-        self.set_internal_state(&internal_state);
+    pub fn set_controller_output(&mut self, controller_output: &ControllerOutput) {                
+        self.set_local_wing_angles(&controller_output.local_wing_angles);
+        self.set_internal_state(&controller_output.internal_states);
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {

@@ -7,37 +7,12 @@ use serde::{Deserialize, Serialize};
 use stormath::interpolation::linear_interpolation;
 
 use super::prelude::*;
+use crate::line_force_model::LineForceModel;
+use crate::section_models::SectionModel;
+use crate::section_models::rotating_cylinder::RotatingCylinder;
 
 use stormath::type_aliases::Float;
 use stormath::consts::{PI, TAU};
-
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpinRatioConversion {
-    diameter: Float,
-    max_rps: Float,
-}
-
-impl SpinRatioConversion {
-    pub fn get_rps_from_spin_ratio(&self, spin_ratio: Float, velocity: Float) -> Float {
-        let circumference = PI * self.diameter;
-
-        let rps_raw = spin_ratio * velocity / circumference;
-
-        if rps_raw.abs() > self.max_rps {
-            self.max_rps * rps_raw.signum()
-        } else {
-            rps_raw
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub enum InternalStateType {
-    #[default]
-    Generic,
-    SpinRatio(SpinRatioConversion),
-}
 
 /// Generic function to limit a value to a maximum magnitude
 pub fn limit_value(
@@ -64,17 +39,17 @@ pub struct ControllerSetPoints {
     #[serde(default)]
     pub section_model_internal_state_data: Option<Vec<Float>>,
     #[serde(default)]
-    pub internal_state_type: InternalStateType,
+    pub internal_state_max_value: Option<Float>,
     #[serde(default)]
     pub use_effective_angle_of_attack: bool,
     #[serde(default)]
     pub max_local_wing_angle_change_rate: Option<Float>,
     #[serde(default)]
-    pub max_internal_section_state_change_rate: Option<Float>
+    pub max_internal_state_change_rate: Option<Float>
 }
 
 impl ControllerSetPoints {
-    pub fn get_new_output(&self, input: &ControllerInput, time_step: Float) -> ControllerOutput {
+    pub fn get_local_wing_angle(&self, input: &ControllerInput, time_step: Float) -> Float {
         let mut local_wing_angle = if self.use_effective_angle_of_attack {
             self.get_local_wing_angle_effective(input)
         } else {
@@ -89,19 +64,18 @@ impl ControllerSetPoints {
             )
         }
 
-        let mut section_model_internal_state = self.get_section_model_internal_state(input);
-        
-        if self.max_internal_section_state_change_rate.is_some() {
-            section_model_internal_state = limit_value(
-                input.current_section_model_internal_state, 
-                section_model_internal_state, 
-                self.max_internal_section_state_change_rate.unwrap() * time_step
-            )
-        }
+        local_wing_angle
+    }
 
-        ControllerOutput {
-            local_wing_angle,
-            section_model_internal_state,
+    pub fn get_angle_of_attack_set_point(&self, apparent_wind_direction: Float) -> Float {
+        if let Some(angle_data) = &self.angle_of_attack_data {
+            linear_interpolation(
+                apparent_wind_direction,
+                &self.apparent_wind_directions_data,
+                angle_data,
+            )
+        } else {
+            0.0
         }
     }
 
@@ -138,21 +112,54 @@ impl ControllerSetPoints {
             0.0
         }
     }
+    
 
-    pub fn get_section_model_internal_state(&self, input: &ControllerInput) -> Float {
+    pub fn get_internal_state(
+        &self,
+        wing_index: usize,
+        line_force_model: &LineForceModel,
+        input: &ControllerInput,
+        time_step: Float
+    ) -> Float {
         if self.section_model_internal_state_data.is_some() {
-            let internal_state_raw = input.loading * self.get_internal_state_set_point(
+            let section_model_internal_state = input.loading * self.get_section_model_internal_state(
                 input.apparent_wind_direction
             );
 
-            let internal_state = match self.internal_state_type {
-                InternalStateType::Generic => {internal_state_raw}
-                InternalStateType::SpinRatio(ref conversion) => {
-                    let velocity = input.velocity;
+            // Convert the section internal state to internal state
+            let mut internal_state = match &line_force_model.section_models[wing_index] {
+                SectionModel::SingleElementFoil(_) | SectionModel::MultiElementFoil(_) | SectionModel::EffectiveWindSensor => {
+                    section_model_internal_state
+                },
+                SectionModel::RotatingCylinder(_) => {
+                    // TODO: find a more elegant way of getting the diameter
+                    let diameter = line_force_model.chord_lengths[line_force_model.wing_indices[wing_index].clone()][0];
 
-                    conversion.get_rps_from_spin_ratio(internal_state_raw, velocity)
+                    RotatingCylinder::revolutions_per_second_from_spin_ratio(
+                        section_model_internal_state, 
+                        diameter, 
+                        input.velocity
+                    )
+                },
+                SectionModel::ActiveAirFlowFoil(_) => {
+                    // TODO: find a more elegant way of reading the right projected area
+                    let area = line_force_model.projected_areas()[wing_index];
+
+                    section_model_internal_state * 0.5 * area * line_force_model.density * input.velocity.powi(3)
                 }
             };
+
+            if let Some(max_value) = self.internal_state_max_value {
+                internal_state = internal_state.abs().min(max_value) * internal_state.signum();
+            }
+
+            if let Some(max_change_rate) = self.max_internal_state_change_rate {
+                internal_state = limit_value(
+                    input.current_internal_state, 
+                    internal_state, 
+                    max_change_rate * time_step
+                )
+            }
 
             internal_state
         } else {
@@ -160,19 +167,9 @@ impl ControllerSetPoints {
         }
     }
 
-    pub fn get_angle_of_attack_set_point(&self, apparent_wind_direction: Float) -> Float {
-        if let Some(angle_data) = &self.angle_of_attack_data {
-            linear_interpolation(
-                apparent_wind_direction,
-                &self.apparent_wind_directions_data,
-                angle_data,
-            )
-        } else {
-            0.0
-        }
-    }
+    
 
-    pub fn get_internal_state_set_point(&self, apparent_wind_direction: Float) -> Float {
+    pub fn get_section_model_internal_state(&self, apparent_wind_direction: Float) -> Float {
         if let Some(internal_states_data) = &self.section_model_internal_state_data {
             linear_interpolation(
                 apparent_wind_direction,
@@ -197,6 +194,4 @@ impl ControllerSetPoints {
 
         corrected_angle
     }
-
-    
 }

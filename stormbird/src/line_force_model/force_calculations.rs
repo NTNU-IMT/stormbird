@@ -135,32 +135,49 @@ impl LineForceModel {
     /// the internal state set on each wing, and potentially from the local flow velocity, with the 
     /// appropriate conversion.
     pub fn section_models_internal_state(&self, velocity: &[SpatialVector]) -> Vec<Float> {
-        (0..self.nr_span_lines()).map(
-            |section_index| {
-                let wing_index = self.wing_index_from_global(section_index);
-                
-                match &self.section_models[wing_index] {
-                    SectionModel::SingleElementFoil(_) => self.internal_state[wing_index],
-                    SectionModel::MultiElementFoil(_) => self.internal_state[wing_index],
-                    SectionModel::ActiveAirFlowFoil(_) => {
-                        todo!()
-                    },
-                    SectionModel::RotatingCylinder(_) => {
-                        let diameter = self.chord_lengths[section_index];
-                        let rps = self.internal_state[wing_index];
-    
-                        let spin_ratio = RotatingCylinder::spin_ratio_from_revolutions_per_second(
-                            rps, 
-                            diameter, 
+        let mut internal_states: Vec<Float> = Vec::with_capacity(self.nr_span_lines());
+
+        for (wing_index, wing_range) in self.wing_indices.iter().enumerate() {
+            let wing_state = self.internal_state[wing_index];
+
+            match &self.section_models[wing_index] {
+                SectionModel::SingleElementFoil(_) |
+                SectionModel::MultiElementFoil(_) |
+                SectionModel::EffectiveWindSensor => {
+                    internal_states.extend(std::iter::repeat(wing_state).take(wing_range.len()));
+                },
+                SectionModel::ActiveAirFlowFoil(_) => {
+                    // The wing state is the total power, distributed to each strip proportional to
+                    // the strip area: P_strip = P * A_strip / A_wing. The strip power coefficient
+                    // is then P_strip / (0.5 * A_strip * density * U^3), where the strip area
+                    // cancels, giving P / (0.5 * A_wing * density * U^3).
+                    let wing_area: Float = wing_range.clone().map(|section_index| {
+                        self.chord_lengths[section_index] * self.span_lines_local[section_index].length()
+                    }).sum();
+
+                    internal_states.extend(wing_range.clone().map(|section_index| {
+                        let velocity_magnitude = velocity[section_index].length();
+
+                        if wing_area > MIN_POSITIVE && velocity_magnitude > MIN_POSITIVE {
+                            wing_state / (0.5 * wing_area * self.density * velocity_magnitude.powi(3))
+                        } else {
+                            0.0
+                        }
+                    }));
+                },
+                SectionModel::RotatingCylinder(_) => {
+                    internal_states.extend(wing_range.clone().map(|section_index| {
+                        RotatingCylinder::spin_ratio_from_revolutions_per_second(
+                            wing_state,
+                            self.chord_lengths[section_index],
                             velocity[section_index].length()
-                        );
-    
-                        spin_ratio
-                    },
-                    SectionModel::EffectiveWindSensor => self.internal_state[wing_index]
-                }
+                        )
+                    }));
+                },
             }
-        ).collect()
+        }
+
+        internal_states
     }
 
     /// Returns the local lift coefficient on each line element.

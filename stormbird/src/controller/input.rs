@@ -25,7 +25,7 @@ pub struct ControllerInput {
     /// The current local wing angles, so that the controller know what to change from
     pub current_local_wing_angle: Float,
     /// Current internal state
-    pub current_section_model_internal_state: Float,
+    pub current_internal_state: Float,
     /// Measured angles of attack according to the measurement settings
     pub angle_of_attack: Float,
     /// Measured velocity magnitude
@@ -45,12 +45,8 @@ impl ControllerInput {
         spanwise_measurement: &SpanwiseMeasurement,
         wind_environment: &WindEnvironment,
         use_input_velocity_for_apparent_wind_direction: bool,
-    ) -> Vec<Self> {
-        todo!("Internal state is out of sync with new logic");
-        
+    ) -> Vec<Self> {        
         let nr_wings = line_force_model.nr_wings();
-        
-        let section_models_internal_state = line_force_model.internal_state.clone();
         
         let angles_of_attack = spanwise_measurement.measure_angles_of_attack(simulation_result);
         
@@ -70,7 +66,7 @@ impl ControllerInput {
                 Self {
                     loading: loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
-                    current_section_model_internal_state: section_models_internal_state[i],
+                    current_internal_state: line_force_model.internal_state[i],
                     angle_of_attack: angles_of_attack[i],
                     velocity: velocities[i],
                     apparent_wind_direction: apparent_wind_directions[i]
@@ -91,7 +87,6 @@ impl ControllerInput {
         spanwise_measurement: &SpanwiseMeasurement,
         wind_environment: &WindEnvironment,
     ) -> Vec<Self> {
-        todo!("Internal state is out of sync with new logic");
         let nr_wings = line_force_model.nr_wings();
         let wing_indices = line_force_model.wing_indices.clone();
         
@@ -120,9 +115,6 @@ impl ControllerInput {
             wing_indices.clone(),
         );
         
-        let section_models_internal_state = line_force_model.internal_state.clone();
-
-
         let mut out: Vec<Self> = Vec::with_capacity(nr_wings);
         
         for i in 0..nr_wings {
@@ -130,7 +122,7 @@ impl ControllerInput {
                 Self {
                     loading: loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
-                    current_section_model_internal_state: section_models_internal_state[i],
+                    current_internal_state: line_force_model.internal_state[i],
                     angle_of_attack: angles_of_attack[i],
                     velocity: velocities[i],
                     apparent_wind_direction: apparent_wind_directions[i]

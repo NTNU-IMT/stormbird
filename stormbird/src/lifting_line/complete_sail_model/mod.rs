@@ -352,7 +352,7 @@ impl CompleteSailModel {
         
         let ctrl_points_velocity = &freestream_velocity[0..nr_ctrl_points];
         
-        let controller_input = ControllerInput::new_from_velocity(
+        let controller_inputs = ControllerInput::new_from_velocity(
             loading,
             &self.lifting_line_simulation.line_force_model,
             ctrl_points_velocity,
@@ -363,7 +363,8 @@ impl CompleteSailModel {
         let controller_output = self.controller.update(
             current_time,
             time_step,
-            &controller_input
+            &controller_inputs,
+            &self.lifting_line_simulation.line_force_model
         );
 
         if let Some(output) = &controller_output {
@@ -381,7 +382,7 @@ impl CompleteSailModel {
         simulation_result: &SimulationResult
     ) {
         
-        let controller_input = ControllerInput::new_from_simulation_result(
+        let controller_inputs = ControllerInput::new_from_simulation_result(
             loading,
             &self.lifting_line_simulation.line_force_model,
             simulation_result,
@@ -393,7 +394,8 @@ impl CompleteSailModel {
         let controller_output = self.controller.update(
             current_time,
             time_step,
-            &controller_input
+            &controller_inputs,
+            &self.lifting_line_simulation.line_force_model
         );
 
         if let Some(output) = &controller_output {

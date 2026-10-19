@@ -173,7 +173,7 @@ impl ActuatorLine {
 
                 let wind_environment = WindEnvironment::default();
 
-                let input = ControllerInput::new_from_simulation_result(
+                let inputs = ControllerInput::new_from_simulation_result(
                     1.0,
                     &self.line_force_model,
                     &simulation_result,
@@ -182,7 +182,7 @@ impl ActuatorLine {
                     false
                 );
 
-                controller.update(time, time_step, &input)
+                controller.update(time, time_step, &inputs, &self.line_force_model)
             } else {
                 None
             };

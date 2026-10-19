@@ -12,6 +12,7 @@ pub mod measurements;
 pub mod set_points;
 pub mod prelude;
 
+use crate::line_force_model::LineForceModel;
 use input::ControllerInput;
 use output::ControllerOutput;
 use set_points::ControllerSetPoints;
@@ -36,28 +37,60 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn update(
+    pub fn get_local_wing_angles(
         &self,
+        time_step: Float,
+        inputs: &[ControllerInput],
+        line_force_model: &LineForceModel,
+    ) -> Vec<Float> {
+        let nr_wings = line_force_model.nr_wings();
+
+        (0..nr_wings).map(
+            |wing_index| {
+                self.set_points[wing_index].get_local_wing_angle(&inputs[wing_index], time_step)
+            }
+        ).collect()
+    }
+
+    pub fn get_internal_states(
+        &self,
+        time_step: Float,
+        inputs: &[ControllerInput],
+        line_force_model: &LineForceModel,
+    ) -> Vec<Float> {
+        let nr_wings = line_force_model.nr_wings();
+
+        (0..nr_wings).map(
+            |wing_index| {
+                self.set_points[wing_index].get_internal_state(wing_index, line_force_model, &inputs[wing_index], time_step)
+            }
+        ).collect()
+    }
+    
+    pub fn update(
+        &mut self,
         time: Float,
         time_step: Float, 
-        input: &[ControllerInput],
-    ) -> Option<Vec<ControllerOutput>> {
+        inputs: &[ControllerInput],
+        line_force_model: &LineForceModel,
+    ) -> Option<ControllerOutput> {
         let initialization_done = time >= self.start_time;
-        let time_to_update =  self.time_step_index % self.time_steps_between_updates == 0;
-        let first_time_step = self.time_step_index == 1;
+        let time_to_update = self.time_step_index % self.time_steps_between_updates == 0;
+        let first_time_step = self.time_step_index == 0;
+        
+        // Increment the counter
+        self.time_step_index += 1;
         
         if first_time_step || (time_to_update && initialization_done) {
-            let nr_wings = self.set_points.len();
+            let local_wing_angles = self.get_local_wing_angles(time_step, inputs, line_force_model);
+            let internal_states = self.get_internal_states(time_step, inputs, line_force_model);
             
-            let mut out = Vec::with_capacity(nr_wings);
-            
-            for i in 0..nr_wings {
-                let output_single = self.set_points[i].get_new_output(&input[i], time_step);
-                
-                out.push(output_single)
-            }
-            
-            return Some(out)
+            return Some(
+                ControllerOutput {
+                    local_wing_angles,
+                    internal_states
+                }
+            )
         }
 
         None
