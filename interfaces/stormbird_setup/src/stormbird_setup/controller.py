@@ -6,43 +6,18 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from .base_model import StormbirdSetupBaseModel
 
-from enum import Enum
-
-from pydantic import field_serializer, model_validator, Field
+from pydantic import model_validator, Field
 
 import numpy as np
-
-class InternalStateType(Enum):
-    Generic = "Generic"
-    SpinRatio = "SpinRatio"
-
-class SpinRatioConversion(StormbirdSetupBaseModel):
-    diameter: float
-    max_rps: float
 
 class ControllerSetPoints(StormbirdSetupBaseModel):
     apparent_wind_directions_data: list[float]
     angle_of_attack_data: list[float] | None = None
     section_model_internal_state_data: list[float] | None = None
-    internal_state_type: InternalStateType = InternalStateType.Generic
-    internal_state_conversion: SpinRatioConversion | None = Field(default=None, exclude=True)
+    internal_state_max_value: float | None = None
     use_effective_angle_of_attack: bool = False
     max_local_wing_angle_change_rate: float | None = None
-    max_internal_section_state_change_rate: float | None = None
-
-    @field_serializer('internal_state_type')
-    def serialize_internal_state_type(self, value: InternalStateType):
-        match value:
-            case InternalStateType.Generic:
-                return "Generic"
-            case InternalStateType.SpinRatio:
-                if self.internal_state_conversion is None:
-                    raise ValueError("SpinRatioConversion must be provided for SpinRatio internal state type.")
-                return {
-                    "SpinRatio": self.internal_state_conversion.model_dump()
-                }
-            case _:
-                raise ValueError("Unsupported internal state type:", value)
+    max_internal_state_change_rate: float | None = None
                 
     @classmethod
     def new_default_wing_sail_single_element(cls, max_angle_deg: float = 15.0):
@@ -67,29 +42,43 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         )
         
     @classmethod
-    def new_default_rotor_sail(cls, *, diameter: float, max_rps: float):
+    def new_default_rotor_sail(cls, *, max_rps: float | None = None):
         '''
         Helper function to quickly set up a suitable controller for a rotor sail. Assumed to be
-        fairly general
+        fairly general.
+        
+        Args:
+            max_rps: Maximum revolutions per second. If provided, limits the rotor speed.
+                     The controller set points use spin ratio (non-dimensional), and the 
+                     conversion to RPS happens internally based on the local velocity and 
+                     cylinder diameter.
         '''
         apparent_wind_directions_data = np.radians([-180, -40, -15, 15, 40, 180])
+        # Set points are in spin ratio (non-dimensional)
         section_model_internal_state_data = [3.0, 3.0, 0.0, 0.0, -3.0, -3.0]
-
-        internal_state_type = InternalStateType.SpinRatio
-        internal_state_conversion = SpinRatioConversion(
-            diameter = diameter,
-            max_rps = max_rps
-        )
 
         return ControllerSetPoints(
             apparent_wind_directions_data = apparent_wind_directions_data.tolist(),
             section_model_internal_state_data = section_model_internal_state_data,
-            internal_state_type = internal_state_type,
-            internal_state_conversion = internal_state_conversion
+            internal_state_max_value = max_rps  # Max value is in RPS (wing state)
         )
         
     @classmethod
-    def new_default_suction_sail(cls, max_aoa_deg: float=30.0, max_ca: float = 0.3):        
+    def new_default_suction_sail(
+        cls, 
+        max_aoa_deg: float = 30.0, 
+        max_power_coefficient: float = 0.3,
+        max_power: float | None = None
+    ):
+        '''
+        Helper function to quickly set up a suitable controller for a suction sail.
+        
+        Args:
+            max_aoa_deg: Maximum angle of attack in degrees.
+            max_power_coefficient: Maximum power coefficient set point (non-dimensional).
+            max_power: Maximum power in Watts. If provided, limits the actual power 
+                       regardless of what the power coefficient set point would require.
+        '''        
         apparent_wind_directions_data = np.radians([-180, -15, -10, 10, 15, 180]).tolist()
         
         angle_of_attack_data = np.radians([
@@ -97,15 +86,17 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
             0.0, max_aoa_deg, max_aoa_deg
         ]).tolist()
         
+        # Set points are in power coefficient (non-dimensional)
         section_model_internal_state_data = [
-            -max_ca, -max_ca, 0.0, 
-            0.0, max_ca, max_ca
+            -max_power_coefficient, -max_power_coefficient, 0.0, 
+            0.0, max_power_coefficient, max_power_coefficient
         ]
 
         return ControllerSetPoints(
             apparent_wind_directions_data = apparent_wind_directions_data,
             angle_of_attack_data = angle_of_attack_data,
-            section_model_internal_state_data = section_model_internal_state_data
+            section_model_internal_state_data = section_model_internal_state_data,
+            internal_state_max_value = max_power  # Max value is in Watts (wing state)
         )
 
 
