@@ -409,9 +409,9 @@ impl CompleteSailModel {
             .set_local_wing_angles(local_wing_angles);
     }
     
-    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
+    pub fn set_internal_state(&mut self, internal_state: &[Float]) {
         self.lifting_line_simulation
             .line_force_model
-            .set_section_models_internal_state(internal_state);
+            .set_internal_state(internal_state);
     }
 }

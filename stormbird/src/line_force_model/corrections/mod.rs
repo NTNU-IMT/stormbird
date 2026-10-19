@@ -46,17 +46,20 @@ impl LineForceModel {
     pub fn circulation_strength_smoothed(
         &self, 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector],
         circulation_smoothing: &CirculationSmoothing,
     ) -> Vec<Float> {
         let raw_strength = self.circulation_strength_raw(
             angles_of_attack,
+            internal_states,
             velocity
         );
 
         let values_to_subtract = if let Some(prescribed_circulation) = &circulation_smoothing.prescribed_to_subtract_before_smoothing {
             self.circulation_strength_prescribed(
                 angles_of_attack,
+                internal_states,
                 velocity,
                 prescribed_circulation
             )
@@ -172,6 +175,7 @@ impl LineForceModel {
     pub fn circulation_strength_prescribed(
         &self, 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector], 
         prescribed_circulation: &PrescribedCirculation, 
     ) -> Vec<Float> {
@@ -180,6 +184,7 @@ impl LineForceModel {
 
         let raw_circulation_strength = self.circulation_strength_raw(
             angles_of_attack,
+            internal_states,
             velocity
         );
 

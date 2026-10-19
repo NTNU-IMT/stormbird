@@ -142,21 +142,6 @@ impl LineForceModel {
             ).collect();
     }
 
-    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
-        for wing_index in 0..self.nr_wings() {
-            match self.section_models[wing_index] {
-                SectionModel::Foil(_) => {}
-                SectionModel::VaryingFoil(ref mut foil) => {
-                    foil.current_internal_state = internal_state[wing_index];
-                }
-                SectionModel::RotatingCylinder(ref mut cylinder) => {
-                    cylinder.revolutions_per_second = internal_state[wing_index];
-                },
-                SectionModel::EffectiveWindSensor => {}
-            }
-        }
-    }
-
     pub fn set_internal_state(&mut self, internal_state: &[Float]) {
         for (index, value) in internal_state.iter().enumerate() {
             self.internal_state[index] = *value;
@@ -164,14 +149,16 @@ impl LineForceModel {
     }
 
     pub fn set_controller_output(&mut self, controller_output: &[ControllerOutput]) {
+        todo!("Controller internal state is out of sync with the new logic");
+        
         let local_wing_angles: Vec<Float> = controller_output.iter()
             .map(|v| v.local_wing_angle).collect();
         
-        let section_models_internal_state: Vec<Float> = controller_output.iter()
+        let internal_state: Vec<Float> = controller_output.iter()
             .map(|v| v.section_model_internal_state).collect();
         
         self.set_local_wing_angles(&local_wing_angles);
-        self.set_section_models_internal_state(&section_models_internal_state);
+        self.set_internal_state(&internal_state);
     }
 
     pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {

@@ -280,8 +280,13 @@ impl ActuatorLine {
             CoordinateSystem::Global
         );
 
+        let internal_states = self.line_force_model.section_models_internal_state(
+            &corrected_ctrl_points_velocity
+        );
+
         let mut new_estimated_circulation_strength = self.line_force_model.circulation_strength(
             &angles_of_attack,
+            &internal_states,
             &corrected_ctrl_points_velocity
         );
 
@@ -311,8 +316,9 @@ impl ActuatorLine {
         }
 
         let residual = self.line_force_model.average_residual_absolute(
-            &angles_of_attack,
             &circulation_strength,
+            &angles_of_attack,
+            &internal_states,
             &corrected_ctrl_points_velocity
         );
 

@@ -103,13 +103,15 @@ impl Linearized {
             CoordinateSystem::Global
         );
 
+        let internal_states = line_force_model.section_models_internal_state(&ctrl_points_velocity);
+
         let cl_linear = line_force_model.lift_coefficients_linear(
             &angles_of_attack,
-            &ctrl_points_velocity
+            &internal_states,
         );
 
         // Extract lift derivatives
-        let dcl_dalpha = line_force_model.lift_coefficients_derivatives();
+        let dcl_dalpha = line_force_model.lift_coefficients_derivatives(&internal_states);
 
         // Create equation system
         let mut equation_matrix = Matrix::new_default([nr_unknowns, nr_unknowns]);
@@ -162,14 +164,16 @@ impl Linearized {
                 CoordinateSystem::Global
             );
 
+            let internal_states = line_force_model.section_models_internal_state(&ctrl_points_velocity);
+
             let cl_linear = line_force_model.lift_coefficients_linear(
                 &angles_of_attack,
-                &ctrl_points_velocity
+                &internal_states,
             );
 
             let cl_full = line_force_model.lift_coefficients_pre_stall_with_stall_drop_off(
                 &angles_of_attack,
-                &ctrl_points_velocity,
+                &internal_states
             );
 
             for i in 0..circulation_strength.len() {
@@ -206,9 +210,12 @@ impl Linearized {
             CoordinateSystem::Global
         );
 
+        let internal_states = line_force_model.section_models_internal_state(&ctrl_points_velocity);
+
         let residual = line_force_model.average_residual_absolute(
             &circulation_strength,
             &angles_of_attack,
+            &internal_states,
             &ctrl_points_velocity
         );
 
@@ -233,9 +240,11 @@ impl Linearized {
             CoordinateSystem::Global
         );
 
+        let internal_states = line_force_model.section_models_internal_state(ctrl_points_velocity);
+
         let cl_linear_pre_solver = line_force_model.lift_coefficients_linear(
             &angles_of_attack,
-            ctrl_points_velocity
+            &internal_states
         );
 
         let mut cl_linear_pre_solver_is_large = true;

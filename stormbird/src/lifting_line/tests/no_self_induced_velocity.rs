@@ -65,7 +65,6 @@ fn no_self_induced_velocity() {
             ],
             section_model: SectionModel::RotatingCylinder(
                 RotatingCylinder {
-                    revolutions_per_second,
                     spin_ratio_data: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
                     cl_data: vec![0.0, 1.889, 4.638, 6.794, 7.680, 7.950],
                     ..Default::default()
@@ -98,6 +97,10 @@ fn no_self_induced_velocity() {
         SimulationSettings::Dynamic(settings)
     ).build();
 
+    sim.line_force_model.set_internal_state(
+        &vec![revolutions_per_second; wing_x_positions.len()]
+    );
+
     let force_factor = sim.line_force_model.total_force_factor(velocity.length());
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
@@ -118,7 +121,7 @@ fn no_self_induced_velocity() {
 
     dbg!(cd, cl);
 
-    let cd_data = 1.497;
+    //let cd_data = 1.497;
     let cl_data = 4.638;
 
     //let cd_error = cd - cd_data;  TODO make this work again

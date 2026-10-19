@@ -14,8 +14,6 @@ use super::*;
 pub struct VaryingFoil {
     pub internal_state_data: Vec<Float>,
     pub foils_data: Vec<Foil>,
-    #[serde(default)]
-    pub current_internal_state: Float,
 }
 
 impl VaryingFoil {
@@ -29,7 +27,7 @@ impl VaryingFoil {
         serde_json::to_string(self).unwrap()
     }
 
-    pub fn get_foil(&self) -> Foil {
+    pub fn get_foil(&self, internal_state: Float) -> Foil {
         let cl_zero_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
         let cl_initial_slope_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
         let cl_high_order_factor_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor_positive).collect();
@@ -52,7 +50,7 @@ impl VaryingFoil {
 
         let added_mass_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
 
-        let x = self.current_internal_state;
+        let x = internal_state;
         let x_data = &self.internal_state_data;
 
         Foil {
@@ -77,43 +75,43 @@ impl VaryingFoil {
         }
     }
 
-    pub fn set_internal_state(&mut self, internal_state: Float) {
-        self.current_internal_state = internal_state;
+    pub fn lift_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).lift_coefficient(angle_of_attack)
     }
 
-    pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient(angle_of_attack)
+    pub fn lift_coefficient_linear(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).lift_coefficient_linear(angle_of_attack)
     }
 
-    pub fn lift_coefficient_linear(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient_linear(angle_of_attack)
+    pub fn lift_coefficient_pre_stall_raw(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).lift_coefficient_pre_stall_raw(angle_of_attack)
     }
 
-    pub fn lift_coefficient_pre_stall_raw(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient_pre_stall_raw(angle_of_attack)
+    pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack)
     }
 
-    pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack)
+    pub fn lift_coefficient_post_stall_raw(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).lift_coefficient_post_stall_raw(angle_of_attack)
     }
 
-    pub fn lift_coefficient_post_stall_raw(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient_post_stall_raw(angle_of_attack)
+    pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).lift_coefficient_post_stall_with_stall_weight(angle_of_attack)
     }
 
-    pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().lift_coefficient_post_stall_with_stall_weight(angle_of_attack)
+    pub fn lift_coefficient_derivative(&self, internal_state: Float) -> Float {
+        self.get_foil(internal_state).cl_initial_slope
     }
 
-    pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().drag_coefficient(angle_of_attack)
+    pub fn drag_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).drag_coefficient(angle_of_attack)
     }
 
-    pub fn added_mass_coefficient(&self, heave_acceleration: Float) -> Float {
-        self.get_foil().added_mass_coefficient(heave_acceleration)
+    pub fn added_mass_coefficient(&self, heave_acceleration: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).added_mass_coefficient(heave_acceleration)
     }
 
-    pub fn amount_of_stall(&self, angle_of_attack: Float) -> Float {
-        self.get_foil().amount_of_stall(angle_of_attack)
+    pub fn amount_of_stall(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        self.get_foil(internal_state).amount_of_stall(angle_of_attack)
     }
 }

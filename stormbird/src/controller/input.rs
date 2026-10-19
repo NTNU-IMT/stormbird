@@ -46,9 +46,11 @@ impl ControllerInput {
         wind_environment: &WindEnvironment,
         use_input_velocity_for_apparent_wind_direction: bool,
     ) -> Vec<Self> {
+        todo!("Internal state is out of sync with new logic");
+        
         let nr_wings = line_force_model.nr_wings();
         
-        let section_models_internal_state = line_force_model.section_models_internal_state();
+        let section_models_internal_state = line_force_model.internal_state.clone();
         
         let angles_of_attack = spanwise_measurement.measure_angles_of_attack(simulation_result);
         
@@ -89,6 +91,7 @@ impl ControllerInput {
         spanwise_measurement: &SpanwiseMeasurement,
         wind_environment: &WindEnvironment,
     ) -> Vec<Self> {
+        todo!("Internal state is out of sync with new logic");
         let nr_wings = line_force_model.nr_wings();
         let wing_indices = line_force_model.wing_indices.clone();
         
@@ -117,7 +120,7 @@ impl ControllerInput {
             wing_indices.clone(),
         );
         
-        let section_models_internal_state = line_force_model.section_models_internal_state();
+        let section_models_internal_state = line_force_model.internal_state.clone();
 
 
         let mut out: Vec<Self> = Vec::with_capacity(nr_wings);

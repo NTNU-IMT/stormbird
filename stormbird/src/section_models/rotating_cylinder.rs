@@ -13,11 +13,7 @@ use stormath::interpolation;
 /// Model representing a rotating cylinder. The lift, drag and moment can be calculated based on how 
 /// fast the cylinder is spinning. 
 pub struct RotatingCylinder {
-    #[serde(default)]
-    /// The rotational speed of the rotor, in revolutions per second.
-    pub revolutions_per_second: Float,
-    #[serde(default = "RotatingCylinder::default_spin_ratio_data")]
-    
+    #[serde(default = "RotatingCylinder::default_spin_ratio_data")]    
     /// Spin ratio data used when interpolating lift and drag coefficients.
     pub spin_ratio_data: Vec<Float>,
     #[serde(default = "RotatingCylinder::default_cl_data")]
@@ -54,7 +50,6 @@ pub struct RotatingCylinder {
 impl Default for RotatingCylinder {
     fn default() -> Self {
         RotatingCylinder {
-            revolutions_per_second: 0.0,
             spin_ratio_data: Self::default_spin_ratio_data(),
             cl_data: Self::default_cl_data(),
             cd_start: Self::default_cd_start(),
@@ -88,16 +83,9 @@ impl RotatingCylinder {
         serde_json::from_str(input_string).unwrap()
     }
 
-    /// Calculates non-dimensional spin ratio, defined as the ratio of the surface velocity of the 
-    /// cylinder to the free stream velocity.
-    pub fn spin_ratio(&self, diameter: Float, velocity: Float) -> Float {
-        let circumference = PI * diameter;
-        let tangential_velocity = circumference * self.revolutions_per_second;
+    
 
-        -tangential_velocity / velocity
-    }
-
-    pub fn lift_coefficient_from_spin_ratio(&self, spin_ratio: Float) -> Float {
+    pub fn lift_coefficient(&self, spin_ratio: Float) -> Float {
         let len_data = self.spin_ratio_data.len();
 
         let spin_ratio_abs = spin_ratio.abs();
@@ -126,13 +114,13 @@ impl RotatingCylinder {
         cl * spin_ratio.signum()
     }
 
-    pub fn drag_coefficient_from_spin_ratio(&self, spin_ratio: Float) -> Float {   
+    pub fn drag_coefficient(&self, spin_ratio: Float) -> Float {   
         let angle0 = PI * spin_ratio.abs() / self.cd_spin_ratio_low_drag;
         let angle = angle0 + self.cd_angle_start;
 
         let angle_effective = PI * angle / (PI + self.cd_angle_start);
 
-        if angle_effective < PI {
+        let mut cd = if angle_effective < PI {
             let c1 = (1.0 + angle_effective.cos())/2.0;
             let c0 = (1.0 + self.cd_angle_start.cos())/2.0;
 
@@ -141,27 +129,15 @@ impl RotatingCylinder {
             self.cd_start * s + (1.0 - s) * self.cd_end
         } else {
             self.cd_end
-        }   
-    }
-
-    pub fn lift_coefficient(&self, diameter: Float, velocity: Float) -> Float {
-        let spin_ratio = self.spin_ratio(diameter, velocity);
-
-        self.lift_coefficient_from_spin_ratio(spin_ratio)
-    }
-
-    pub fn drag_coefficient(&self, diameter: Float, velocity: Float) -> Float {
-        let spin_ratio = self.spin_ratio(diameter, velocity);
-
-        let mut cd = self.drag_coefficient_from_spin_ratio(spin_ratio);
+        };
 
         if self.cdi_correction_factor != 0.0{
-            let cl = self.lift_coefficient_from_spin_ratio(spin_ratio);
+            let cl = self.lift_coefficient(spin_ratio);
 
             let cdi_correction = self.cdi_correction_factor * cl.abs().powi(2);
 
             cd += cdi_correction;
-        } 
+        }
 
         cd
     }
@@ -185,5 +161,22 @@ impl RotatingCylinder {
             
             tangential_velocity / circumference
         }
+    }
+
+    /// Calculates non-dimensional spin ratio, defined as the ratio of the surface velocity of the 
+    /// cylinder to the free stream velocity.
+    pub fn spin_ratio_from_revolutions_per_second(
+        revolutions_per_second: Float,
+        diameter: Float, 
+        velocity: Float
+    ) -> Float {
+        if velocity == 0.0 {
+            0.0
+        } else {
+            let circumference = PI * diameter;
+            let tangential_velocity = circumference * revolutions_per_second;
+    
+            -tangential_velocity / velocity
+        }   
     }
 }

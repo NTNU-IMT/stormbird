@@ -39,6 +39,9 @@ pub struct SectionalForcesInput {
     pub velocity: Vec<SpatialVector>,
     /// The estimated angle of attack at each control point.
     pub angles_of_attack: Vec<Float>,
+    /// The internal state as it should be supplied to the sectional forces. I.e., with any 
+    /// conversion from the wing internal state applied.
+    pub section_models_internal_state: Vec<Float>,
     /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
     /// the perspective of the wings, **not** the acceleration of the wings themselves.
     pub acceleration: Vec<SpatialVector>,

@@ -182,14 +182,18 @@ impl Iterative {
             angles_of_attack[i] = new_angles_of_attack[i];
         }
 
+        let internal_states = line_force_model.section_models_internal_state(ctrl_points_velocity);
+
         let new_estimated_strength = if self.use_raw_circulation_during_iterations {
             line_force_model.circulation_strength_raw(
                 &angles_of_attack,
+                &internal_states,
                 &ctrl_points_velocity
             )
         } else {
             line_force_model.circulation_strength(
                 &angles_of_attack,
+                &internal_states,
                 &ctrl_points_velocity
             )
         };
@@ -211,6 +215,7 @@ impl Iterative {
         let residual = line_force_model.average_residual_absolute(
             &circulation_strength,
             &angles_of_attack,
+            &internal_states,
             &ctrl_points_velocity
         );
 
@@ -246,14 +251,18 @@ impl Iterative {
             angles_of_attack[i] += self.damping_factor * angle_difference;
         }
 
+        let internal_states = line_force_model.section_models_internal_state(ctrl_points_velocity);
+
         let new_estimated_strength = if self.use_raw_circulation_during_iterations {
             line_force_model.circulation_strength_raw(
                 &angles_of_attack,
+                &internal_states,
                 &ctrl_points_velocity
             )
         } else {
             line_force_model.circulation_strength(
                 &angles_of_attack,
+                &internal_states,
                 &ctrl_points_velocity
             )
         };
@@ -275,6 +284,7 @@ impl Iterative {
         let residual = line_force_model.average_residual_absolute(
             &circulation_strength,
             &angles_of_attack,
+            &internal_states,
             &ctrl_points_velocity
         );
 
