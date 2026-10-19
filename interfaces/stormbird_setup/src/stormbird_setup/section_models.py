@@ -33,10 +33,22 @@ class Foil(StormbirdSetupBaseModel):
 class VaryingFoil(StormbirdSetupBaseModel):
     internal_state_data: list[float]
     foils_data: list[Foil]
-    current_internal_state: float | None = None
+
+class MultiElementFoil(VaryingFoil):
+    '''
+    Foil where the internal state typically represents the flap angle (or a number that implicitly 
+    sets the flap and leading edge slot angle)
+    '''
+    pass
+
+class ActiveAirFlowFoil(VaryingFoil):
+    '''
+    Foil with active flow control, where the internal state typically represents the power 
+    coefficient or the non-dimensional suction rate
+    '''
+    pass
 
 class RotatingCylinder(StormbirdSetupBaseModel):
-    revolutions_per_second: float  = 0.0
     spin_ratio_data: list[float] | None = None
     cl_data: list[float]| None = None
     cd_data: list[float] | None = None
@@ -47,7 +59,7 @@ class EffectiveWindSensor(StormbirdSetupBaseModel):
     pass
 
 class SectionModel(StormbirdSetupBaseModel):
-    model: Foil | VaryingFoil | RotatingCylinder | EffectiveWindSensor
+    model: Foil | MultiElementFoil | ActiveAirFlowFoil | RotatingCylinder | EffectiveWindSensor
     
     @classmethod
     def rotor_sail_deybach_2024(cls, linearized: bool = False) -> "SectionModel":
@@ -118,10 +130,9 @@ class SectionModel(StormbirdSetupBaseModel):
         ]
 
         return cls(
-            model=VaryingFoil(
+            model=MultiElementFoil(
                 internal_state_data = internal_state_data,
-                foils_data=foils_data,
-                current_internal_state = 0.0
+                foils_data=foils_data
             )
         )
     
@@ -180,7 +191,7 @@ class SectionModel(StormbirdSetupBaseModel):
             foils_data.append(foil)
                         
         return cls(
-            model = VaryingFoil(
+            model = ActiveAirFlowFoil(
                 internal_state_data = ca_values_full,
                 foils_data = foils_data
             )   
@@ -202,10 +213,12 @@ class SectionModel(StormbirdSetupBaseModel):
             return data
         
         # Rust externally-tagged enum format
-        if 'Foil' in data:
-            return {'model': Foil(**data['Foil'])}
-        elif 'VaryingFoil' in data:
-            return {'model': VaryingFoil(**data['VaryingFoil'])}
+        if 'SingleElementFoil' in data:
+            return {'model': Foil(**data['SingleElementFoil'])}
+        elif 'MultiElementFoil' in data:
+            return {'model': MultiElementFoil(**data['MultiElementFoil'])}
+        elif 'ActiveAirFlowFoil' in data:
+            return {'model': ActiveAirFlowFoil(**data['ActiveAirFlowFoil'])}
         elif 'RotatingCylinder' in data:
             return {'model': RotatingCylinder(**data['RotatingCylinder'])}
         else:
@@ -217,11 +230,15 @@ class SectionModel(StormbirdSetupBaseModel):
 
         if isinstance(self.model, Foil):
             return {
-                "Foil": model_dict
+                "SingleElementFoil": model_dict
             }
-        elif isinstance(self.model, VaryingFoil):
+        elif isinstance(self.model, MultiElementFoil):
             return {
-                "VaryingFoil": model_dict
+                "MultiElementFoil": model_dict
+            }
+        elif isinstance(self.model, ActiveAirFlowFoil):
+            return {
+                "ActiveAirFlowFoil": model_dict
             }
         elif isinstance(self.model, RotatingCylinder):
             return {

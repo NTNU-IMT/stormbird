@@ -35,7 +35,7 @@ impl Foil {
 
     pub fn as_section_model(&self) -> SectionModel {
         SectionModel {
-            data: SectionModelRust::Foil(self.data.clone())
+            data: SectionModelRust::SingleElementFoil(self.data.clone())
         }
     }
 

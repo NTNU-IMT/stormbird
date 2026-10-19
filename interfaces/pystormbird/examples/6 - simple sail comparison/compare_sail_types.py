@@ -114,12 +114,12 @@ if __name__ == "__main__":
             case SailType.WingSailSingleElement:
                 alpha_test = np.radians(np.linspace(0, 30, n_test))
             case SailType.WingSailTwoElement:
-                model.set_section_models_internal_state([max_internal_state])
+                model.set_internal_state([max_internal_state])
                 alpha_test = np.radians(np.linspace(0, 30, n_test))
             case SailType.RotorSail:
                 alpha_test = np.linspace(0, 5.0, n_test)
             case SailType.SuctionSail:
-                model.set_section_models_internal_state([max_internal_state])
+                model.set_internal_state([max_internal_state])
                 alpha_test = np.radians(np.linspace(0, 35, n_test))
             case _:
                 raise ValueError("Undefined sail type", sail_type)
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                     velocity = wind_velocity
                 )
                 
-                model.set_section_models_internal_state([rps])
+                model.set_internal_state([rps])
             else:
                 model.set_local_wing_angles([-alpha_test[i_alpha]])
             

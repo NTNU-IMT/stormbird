@@ -107,8 +107,12 @@ impl Simulation {
         self.data.line_force_model.update_global_data_representations();
     }
 
-    pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
-        self.data.line_force_model.set_section_models_internal_state(&internal_state);
+    pub fn internal_state(&self) -> Vec<f64> {
+        self.data.line_force_model.internal_state.clone()
+    }
+
+    pub fn set_internal_state(&mut self, internal_state: Vec<f64>) {
+        self.data.line_force_model.set_internal_state(&internal_state);
     }
 
     pub fn get_freestream_velocity_points(&self) -> Vec<[f64; 3]> {

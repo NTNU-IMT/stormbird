@@ -297,8 +297,8 @@ impl CompleteSailModel {
         out
     }
 
-    pub fn section_models_internal_state(&self) -> Vec<f64> {
-        self.data.lifting_line_simulation.line_force_model.section_models_internal_state()
+    pub fn internal_state(&self) -> Vec<f64> {
+        self.data.lifting_line_simulation.line_force_model.internal_state.clone()
     }
 
     pub fn local_wing_angles(&self) -> Vec<f64> {
@@ -309,8 +309,8 @@ impl CompleteSailModel {
         self.data.set_local_wing_angles(&local_wing_angles);
     }
 
-    pub fn set_section_models_internal_state(&mut self, internal_state: Vec<f64>) {
-        self.data.set_section_models_internal_state(&internal_state);
+    pub fn set_internal_state(&mut self, internal_state: Vec<f64>) {
+        self.data.set_internal_state(&internal_state);
     }
 
     pub fn get_wind_environment(&self) -> WindEnvironment {

@@ -24,24 +24,34 @@ impl RotatingCylinder {
         }
     }
 
-    pub fn spin_ratio(&self, diameter: f64, velocity: f64) -> f64 {
-        self.data.spin_ratio(diameter, velocity)
+    #[staticmethod]
+    pub fn spin_ratio_from_revolutions_per_second(
+        revolutions_per_second: f64,
+        diameter: f64,
+        velocity: f64
+    ) -> f64 {
+        RotatingCylinderRust::spin_ratio_from_revolutions_per_second(
+            revolutions_per_second, diameter, velocity
+        )
     }
 
-    pub fn lift_coefficient_from_spin_ratio(&self, spin_ratio: f64) -> f64 {
-        self.data.lift_coefficient_from_spin_ratio(spin_ratio)
+    #[staticmethod]
+    pub fn revolutions_per_second_from_spin_ratio(
+        spin_ratio: f64,
+        diameter: f64,
+        velocity: f64
+    ) -> f64 {
+        RotatingCylinderRust::revolutions_per_second_from_spin_ratio(
+            spin_ratio, diameter, velocity
+        )
     }
 
-    pub fn lift_coefficient(&self, diameter: f64, velocity: f64) -> f64 {
-        self.data.lift_coefficient(diameter, velocity)
+    pub fn lift_coefficient(&self, spin_ratio: f64) -> f64 {
+        self.data.lift_coefficient(spin_ratio)
     }
 
-    pub fn drag_coefficient(&self, diameter: f64, velocity: f64) -> f64 {
-        self.data.drag_coefficient(diameter, velocity)
-    }
-
-    pub fn drag_coefficient_from_spin_ratio(&self, spin_ratio: f64) -> f64 {
-        self.data.drag_coefficient_from_spin_ratio(spin_ratio)
+    pub fn drag_coefficient(&self, spin_ratio: f64) -> f64 {
+        self.data.drag_coefficient(spin_ratio)
     }
 
     pub fn as_section_model(&self) -> SectionModel {

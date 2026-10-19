@@ -182,13 +182,13 @@ def simulate_single_case(
         )
 
 
-    section_model_internal_state = revolutions_per_second_from_spin_ratio(
+    internal_state = revolutions_per_second_from_spin_ratio(
         spin_ratio=spin_ratio,
         diameter=diameter,
         velocity=velocity
     )
 
-    simulation.set_section_models_internal_state([section_model_internal_state] * nr_sails)
+    simulation.set_internal_state([internal_state] * nr_sails)
 
     if dynamic:
         dt = 0.25 * diameter / velocity

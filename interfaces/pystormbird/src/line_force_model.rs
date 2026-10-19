@@ -38,7 +38,9 @@ impl LineForceModel {
             .map(|v| SpatialVector::from(*v))
             .collect();
         
-        self.data.circulation_strength(&angles_of_attack, &rust_velocity)
+        let internal_states = self.data.section_models_internal_state(&rust_velocity);
+
+        self.data.circulation_strength(&angles_of_attack, &internal_states, &rust_velocity)
     }
 
     pub fn angles_of_attack(&self, velocity: Vec<[f64; 3]>) -> Vec<f64> {
