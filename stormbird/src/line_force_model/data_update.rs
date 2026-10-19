@@ -157,6 +157,12 @@ impl LineForceModel {
         }
     }
 
+    pub fn set_internal_state(&mut self, internal_state: &[Float]) {
+        for (index, value) in internal_state.iter().enumerate() {
+            self.internal_state[index] = *value;
+        }
+    }
+
     pub fn set_controller_output(&mut self, controller_output: &[ControllerOutput]) {
         let local_wing_angles: Vec<Float> = controller_output.iter()
             .map(|v| v.local_wing_angle).collect();

@@ -16,8 +16,6 @@ pub struct VaryingFoil {
     pub foils_data: Vec<Foil>,
     #[serde(default)]
     pub current_internal_state: Float,
-    #[serde(default)]
-    pub current_foil: Option<Foil>,
 }
 
 impl VaryingFoil {
@@ -81,7 +79,6 @@ impl VaryingFoil {
 
     pub fn set_internal_state(&mut self, internal_state: Float) {
         self.current_internal_state = internal_state;
-        self.current_foil = Some(self.get_foil());
     }
 
     pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {

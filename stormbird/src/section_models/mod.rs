@@ -22,8 +22,9 @@ use rotating_cylinder::RotatingCylinder;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Sectional model for a wing, that can be of multiple variants
 pub enum SectionModel {
-    Foil(Foil),
-    VaryingFoil(VaryingFoil),
+    SingleElementFoil(Foil),
+    MultiElementFoil(VaryingFoil),
+    ActiveAirFlowFoil(VaryingFoil),
     RotatingCylinder(RotatingCylinder),
     EffectiveWindSensor,
 }
@@ -31,11 +32,36 @@ pub enum SectionModel {
 impl SectionModel {
     pub fn amount_of_flow_separation(&self, angle_of_attack: Float) -> Float {
         match self {
-            SectionModel::Foil(foil) => foil.amount_of_stall(angle_of_attack),
-            SectionModel::VaryingFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
+            SectionModel::SingleElementFoil(foil) => foil.amount_of_stall(angle_of_attack),
+            SectionModel::MultiElementFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
+            SectionModel::ActiveAirFlowFoil(varying_foil) => varying_foil.amount_of_stall(angle_of_attack),
             SectionModel::RotatingCylinder(_) => 1.0,
             SectionModel::EffectiveWindSensor => 0.0
         }
+    }
+
+    pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
+        todo!();
+    }
+
+    pub fn lift_coefficients_linear(&self, angle_of_attack: Float) -> Float {
+        todo!()
+    }
+
+    pub fn lift_coefficients_pre_stall_with_stall_drop_off(&self) -> Float {
+        todo!();
+    }
+
+    pub fn lift_coefficients_post_stall_with_stall_weight(&self) -> Float {
+        todo!();
+    }
+
+    pub fn lift_coefficients_derivatives(&self) -> Float {
+        todo!();
+    }
+
+    pub fn drag_coefficient(&self) -> Float {
+        todo!();
     }
 
     pub fn from_string(setup_string: &str) -> Result<Self, String> {
@@ -52,7 +78,7 @@ impl SectionModel {
 
 impl Default for SectionModel {
     fn default() -> Self {
-        SectionModel::Foil(Foil::default())
+        SectionModel::SingleElementFoil(Foil::default())
     }
 }
 

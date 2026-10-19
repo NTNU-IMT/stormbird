@@ -41,7 +41,7 @@ pub fn get_example_model() -> LineForceModel {
                 chord_vector,
             ],
             line_segment_is_virtual: None,
-            section_model: SectionModel::Foil(Foil::default()),
+            section_model: SectionModel::SingleElementFoil(Foil::default()),
             non_zero_circulation_at_ends: [false, false],
             nr_sections: None,
             input_power_model: InputPowerModel::NoPower,

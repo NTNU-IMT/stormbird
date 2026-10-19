@@ -86,6 +86,8 @@ pub struct LineForceModel {
     pub output_coordinate_system: CoordinateSystem,
     /// Rigid body motion of the line force model
     pub rigid_body_motion: RigidBodyMotion,
+    /// Vector that stores the internal state of each wing
+    pub internal_state: Vec<Float>,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along
     /// the span axis during a dynamic simulation. The typical example is changing the angle of
     /// attack on a wing sail due to changing apparent wind conditions.
@@ -138,6 +140,7 @@ impl LineForceModel {
             section_models: Vec::new(),
             wing_indices: Vec::new(),
             rigid_body_motion: RigidBodyMotion::default(),
+            internal_state: Vec::new(),
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
             density,
@@ -197,6 +200,7 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
+        self.internal_state.push(0.0);
         self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
 
         self.input_power_models.push(wing.input_power_model.clone());

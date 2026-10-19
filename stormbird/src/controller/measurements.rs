@@ -232,7 +232,7 @@ mod tests {
                 ],
                 chord_vectors: vec![chord_vector, chord_vector],
                 line_segment_is_virtual: None,
-                section_model: SectionModel::Foil(Foil::default()),
+                section_model: SectionModel::SingleElementFoil(Foil::default()),
                 non_zero_circulation_at_ends: [false, false],
                 nr_sections: Some(*sections),
                 input_power_model: InputPowerModel::NoPower,
