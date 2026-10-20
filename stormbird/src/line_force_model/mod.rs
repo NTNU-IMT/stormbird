@@ -25,6 +25,7 @@ pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
 pub mod input_power;
+pub mod fan_system;
 
 pub mod corrections;
 pub mod prelude;
