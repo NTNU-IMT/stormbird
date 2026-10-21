@@ -45,6 +45,11 @@ pub struct RotatingCylinder {
     /// positive value to increase the drag, and a negative value to decrease the drag. The
     /// default is zero, which means no correction.
     pub cdi_correction_factor: Float,
+    #[serde(default = "RotatingCylinder::default_power_coefficient_polynomial")]
+    /// Coefficients of a polynomial in the absolute spin ratio, used to calculate the power 
+    /// coefficient, c_P = P / (0.5 * density * A * U^3), where A is the projected area. Given in 
+    /// increasing order, i.e., c_P = sum_i (coefficient_i * |SR|^i). 
+    pub power_coefficient_polynomial: Vec<Float>,
 }
 
 impl Default for RotatingCylinder {
@@ -58,7 +63,8 @@ impl Default for RotatingCylinder {
             cd_spin_ratio_low_drag: Self::default_cd_spin_ratio_low_drag(),
             added_mass_factor: 0.0,
             moment_of_inertia_2d: 0.0,
-            cdi_correction_factor: 0.0
+            cdi_correction_factor: 0.0,
+            power_coefficient_polynomial: Self::default_power_coefficient_polynomial(),
         }
     }
 }
@@ -78,6 +84,16 @@ impl RotatingCylinder {
     pub fn default_cd_end() -> Float {0.05}
     pub fn default_cd_angle_start() -> Float {Float::from(5.0_f32).to_radians()}
     pub fn default_cd_spin_ratio_low_drag() -> Float {2.7}
+
+    /// Default power coefficient polynomial, from equation (9) in:
+    /// Tillig, F., Ringsberg, J. W. (2020). Design, operation and analysis of wind-assisted cargo 
+    /// ships. Ocean Engineering, 211, 107603. <https://doi.org/10.1016/j.oceaneng.2020.107603>
+    /// 
+    /// The polynomial is valid for rotors with an aspect ratio of 6 and an end disk diameter of two 
+    /// times the rotor diameter.
+    pub fn default_power_coefficient_polynomial() -> Vec<Float> {
+        vec![0.0, 0.0234, -0.0168, 0.0143, -0.0004, 0.0001]
+    }
     
     pub fn new_from_string(input_string: &str) -> Self {
         serde_json::from_str(input_string).unwrap()
@@ -140,6 +156,17 @@ impl RotatingCylinder {
         }
 
         cd
+    }
+
+    /// Calculates the power coefficient from the polynomial model, using the absolute value of the
+    /// spin ratio, as the power does not depend on the direction of rotation.
+    pub fn power_coefficient(&self, spin_ratio: Float) -> Float {
+        let spin_ratio_abs = spin_ratio.abs();
+
+        // Horner's method
+        self.power_coefficient_polynomial.iter().rev().fold(0.0, |result, coefficient| {
+            result * spin_ratio_abs + coefficient
+        })
     }
 
     pub fn added_mass_coefficient(&self, acceleration_magnitude: Float) -> Float {

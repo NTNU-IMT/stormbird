@@ -32,6 +32,7 @@
 //! - [`calculate_simulation_result`](LineForceModel::calculate_simulation_result)
 
 use crate::section_models::rotating_cylinder::RotatingCylinder;
+use crate::section_models::active_air_flow_foil::SegmentFlowConditions;
 
 use super::*;
 
@@ -137,6 +138,9 @@ impl LineForceModel {
     pub fn section_models_internal_state(&self, velocity: &[SpatialVector]) -> Vec<Float> {
         let mut internal_states: Vec<Float> = Vec::with_capacity(self.nr_span_lines());
 
+        // Only needed for some section models, so computed lazily
+        let mut angles_of_attack: Option<Vec<Float>> = None;
+
         for (wing_index, wing_range) in self.wing_indices.iter().enumerate() {
             let wing_state = self.internal_state[wing_index];
 
@@ -146,24 +150,22 @@ impl LineForceModel {
                 SectionModel::EffectiveWindSensor => {
                     internal_states.extend(std::iter::repeat(wing_state).take(wing_range.len()));
                 },
-                SectionModel::ActiveAirFlowFoil(_) => {
-                    // The wing state is the total power, distributed to each strip proportional to
-                    // the strip area: P_strip = P * A_strip / A_wing. The strip power coefficient
-                    // is then P_strip / (0.5 * A_strip * density * U^3), where the strip area
-                    // cancels, giving P / (0.5 * A_wing * density * U^3).
-                    let wing_area: Float = wing_range.clone().map(|section_index| {
-                        self.chord_lengths[section_index] * self.span_lines_local[section_index].length()
-                    }).sum();
+                SectionModel::ActiveAirFlowFoil(active_air_flow_foil) => {
+                    let angles_of_attack = angles_of_attack.get_or_insert_with(
+                        || self.angles_of_attack(velocity, CoordinateSystem::Global)
+                    );
 
-                    internal_states.extend(wing_range.clone().map(|section_index| {
-                        let velocity_magnitude = velocity[section_index].length();
-
-                        if wing_area > MIN_POSITIVE && velocity_magnitude > MIN_POSITIVE {
-                            wing_state / (0.5 * wing_area * self.density * velocity_magnitude.powi(3))
-                        } else {
-                            0.0
+                    let segments: Vec<SegmentFlowConditions> = wing_range.clone().map(|section_index| {
+                        SegmentFlowConditions {
+                            angle_of_attack: angles_of_attack[section_index],
+                            velocity: velocity[section_index].length(),
+                            area: self.chord_lengths[section_index] * self.span_lines_local[section_index].length(),
                         }
-                    }));
+                    }).collect();
+
+                    internal_states.extend(active_air_flow_foil.section_internal_states(
+                        wing_state, &segments, self.density
+                    ));
                 },
                 SectionModel::RotatingCylinder(_) => {
                     internal_states.extend(wing_range.clone().map(|section_index| {
@@ -706,18 +708,39 @@ impl LineForceModel {
 
     /// Calculates the input power based on the models specified for each wing and the local 
     /// geometry and velocity
-    pub fn input_power(&self) -> Vec<Float> {
+    pub fn input_power(&self, force_input: &SectionalForcesInput) -> Vec<Float> {
         let nr_wings = self.nr_wings();
-        
+
         let mut out = vec![0.0; nr_wings];
-        
+
         for wing_index in 0..nr_wings {
             let power_model = &self.input_power_models[wing_index];
 
-            out[wing_index] += power_model.input_power(self.internal_state[wing_index]);
+            out[wing_index] += power_model.input_power(
+                self.internal_state[wing_index],
+                || self.section_models_power(wing_index, force_input)
+            );
         }
 
         out
+    }
+
+    /// Calculates the power for a wing by integrating the power coefficient of the section models:
+    /// P = sum(c_P * 0.5 * density * A * U^3)
+    pub fn section_models_power(&self, wing_index: usize, force_input: &SectionalForcesInput) -> Float {
+        let section_model = &self.section_models[wing_index];
+
+        self.wing_indices[wing_index].clone().map(|section_index| {
+            let power_coefficient = section_model.power_coefficient(
+                force_input.angles_of_attack[section_index],
+                force_input.section_models_internal_state[section_index]
+            );
+
+            let area = self.chord_lengths[section_index] * self.span_lines_local[section_index].length();
+            let velocity = force_input.velocity[section_index].length();
+
+            power_coefficient * 0.5 * self.density * area * velocity.powi(3)
+        }).sum()
     }
 
     pub fn calculate_simulation_result(
@@ -733,7 +756,7 @@ impl LineForceModel {
         let integrated_forces = sectional_forces.integrate_forces(&self);
         let integrated_moments = sectional_forces.integrate_moments(&self);
 
-        let input_power = self.input_power();
+        let input_power = self.input_power(&force_input);
 
         SimulationResult {
             time,

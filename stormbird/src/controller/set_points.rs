@@ -30,6 +30,18 @@ pub fn limit_value(
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// Defines the units of the internal state set point data
+pub enum InternalStateSetPointType {
+    #[default]
+    /// The data is given in the units of the section model, e.g., spin ratio for rotor sails or 
+    /// the suction coefficient for suction sails, and is converted to the wing internal state.
+    SectionModel,
+    /// The data is given directly as the wing internal state, e.g., the power (with the sign 
+    /// setting the direction) for suction sails, and is used without conversion.
+    Wing,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Set points for the sail that depends on the apparent wind direction
 pub struct ControllerSetPoints {
@@ -37,15 +49,28 @@ pub struct ControllerSetPoints {
     #[serde(default)]
     pub angle_of_attack_data: Option<Vec<Float>>,
     #[serde(default)]
-    pub section_model_internal_state_data: Option<Vec<Float>>,
+    /// Internal state set points, given in the units specified by `internal_state_set_point_type`
+    pub internal_state_data: Option<Vec<Float>>,
     #[serde(default)]
-    pub internal_state_max_value: Option<Float>,
+    /// Defines the units of the internal state set point data
+    pub internal_state_set_point_type: InternalStateSetPointType,
+    #[serde(default)]
+    /// Maximum absolute value of the wing internal state, applied after any conversion from the 
+    /// set point data. The sign of the internal state is preserved. The meaning depends on the 
+    /// section model: e.g., revolutions per second for rotor sails, or the power for suction 
+    /// sails where the wing state is the power. For suction sails using 
+    /// `SuctionCoefficientDirect`, the wing state, and therefore this value, is the suction 
+    /// coefficient.
+    pub wing_internal_state_max_value: Option<Float>,
     #[serde(default)]
     pub use_effective_angle_of_attack: bool,
     #[serde(default)]
     pub max_local_wing_angle_change_rate: Option<Float>,
     #[serde(default)]
-    pub max_internal_state_change_rate: Option<Float>
+    /// Maximum change rate of the wing internal state, per unit time. Applied after any
+    /// conversion from the set point data, so the units follow the wing internal state, e.g.,
+    /// power per second for suction sails where the wing state is the power.
+    pub wing_internal_state_max_change_rate: Option<Float>
 }
 
 impl ControllerSetPoints {
@@ -121,39 +146,23 @@ impl ControllerSetPoints {
         input: &ControllerInput,
         time_step: Float
     ) -> Float {
-        if self.section_model_internal_state_data.is_some() {
-            let section_model_internal_state = input.loading * self.get_section_model_internal_state(
+        if self.internal_state_data.is_some() {
+            let set_point = input.loading * self.get_internal_state_set_point(
                 input.apparent_wind_direction
             );
 
-            // Convert the section internal state to internal state
-            let mut internal_state = match &line_force_model.section_models[wing_index] {
-                SectionModel::SingleElementFoil(_) | SectionModel::MultiElementFoil(_) | SectionModel::EffectiveWindSensor => {
-                    section_model_internal_state
-                },
-                SectionModel::RotatingCylinder(_) => {
-                    // TODO: find a more elegant way of getting the diameter
-                    let diameter = line_force_model.chord_lengths[line_force_model.wing_indices[wing_index].clone()][0];
-
-                    RotatingCylinder::revolutions_per_second_from_spin_ratio(
-                        section_model_internal_state, 
-                        diameter, 
-                        input.velocity
-                    )
-                },
-                SectionModel::ActiveAirFlowFoil(_) => {
-                    // TODO: find a more elegant way of reading the right projected area
-                    let area = line_force_model.projected_areas()[wing_index];
-
-                    section_model_internal_state * 0.5 * area * line_force_model.density * input.velocity.powi(3)
-                }
+            let mut internal_state = match self.internal_state_set_point_type {
+                InternalStateSetPointType::Wing => set_point,
+                InternalStateSetPointType::SectionModel => Self::wing_state_from_section_state(
+                    set_point, wing_index, line_force_model, input
+                ),
             };
 
-            if let Some(max_value) = self.internal_state_max_value {
+            if let Some(max_value) = self.wing_internal_state_max_value {
                 internal_state = internal_state.abs().min(max_value) * internal_state.signum();
             }
 
-            if let Some(max_change_rate) = self.max_internal_state_change_rate {
+            if let Some(max_change_rate) = self.wing_internal_state_max_change_rate {
                 internal_state = limit_value(
                     input.current_internal_state, 
                     internal_state, 
@@ -167,10 +176,47 @@ impl ControllerSetPoints {
         }
     }
 
+    /// Converts an internal state given in the units of the section model to the wing internal
+    /// state, using the measured flow conditions as representative for the whole wing.
+    pub fn wing_state_from_section_state(
+        section_model_internal_state: Float,
+        wing_index: usize,
+        line_force_model: &LineForceModel,
+        input: &ControllerInput,
+    ) -> Float {
+        match &line_force_model.section_models[wing_index] {
+            SectionModel::SingleElementFoil(_) | SectionModel::MultiElementFoil(_) | SectionModel::EffectiveWindSensor => {
+                section_model_internal_state
+            },
+            SectionModel::RotatingCylinder(_) => {
+                // TODO: find a more elegant way of getting the diameter
+                let diameter = line_force_model.chord_lengths[line_force_model.wing_indices[wing_index].clone()][0];
+
+                RotatingCylinder::revolutions_per_second_from_spin_ratio(
+                    section_model_internal_state,
+                    diameter,
+                    input.velocity
+                )
+            },
+            SectionModel::ActiveAirFlowFoil(active_air_flow_foil) => {
+                // TODO: find a more elegant way of reading the right projected area
+                let area = line_force_model.projected_areas()[wing_index];
+
+                active_air_flow_foil.wing_state_from_section_state(
+                    section_model_internal_state,
+                    input.angle_of_attack,
+                    input.velocity,
+                    area,
+                    line_force_model.density
+                )
+            }
+        }
+    }
+
     
 
-    pub fn get_section_model_internal_state(&self, apparent_wind_direction: Float) -> Float {
-        if let Some(internal_states_data) = &self.section_model_internal_state_data {
+    pub fn get_internal_state_set_point(&self, apparent_wind_direction: Float) -> Float {
+        if let Some(internal_states_data) = &self.internal_state_data {
             linear_interpolation(
                 apparent_wind_direction,
                 &self.apparent_wind_directions_data,

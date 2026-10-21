@@ -11,6 +11,8 @@ pub mod foil;
 pub mod varying_foil;
 /// Section model of a rotating cylinder, for instance to be used when modelling rotor sails.
 pub mod rotating_cylinder;
+/// Section model of a foil that use active air flow, e.g. suction.
+pub mod active_air_flow_foil;
 
 use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
@@ -18,13 +20,14 @@ use stormath::type_aliases::Float;
 use foil::Foil;
 use varying_foil::VaryingFoil;
 use rotating_cylinder::RotatingCylinder;
+use active_air_flow_foil::ActiveAirFlowFoil;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Sectional model for a wing, that can be of multiple variants
 pub enum SectionModel {
     SingleElementFoil(Foil),
     MultiElementFoil(VaryingFoil),
-    ActiveAirFlowFoil(VaryingFoil),
+    ActiveAirFlowFoil(ActiveAirFlowFoil),
     RotatingCylinder(RotatingCylinder),
     EffectiveWindSensor,
 }
@@ -47,7 +50,7 @@ impl SectionModel {
             Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient(
                 angle_of_attack, internal_state
             ),
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.lift_coefficient(
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient(
                 angle_of_attack, internal_state
             ),
             Self::RotatingCylinder(rotating_cylinder) => rotating_cylinder.lift_coefficient(
@@ -63,7 +66,7 @@ impl SectionModel {
             Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient_linear(
                 angle_of_attack, internal_state
             ),
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.lift_coefficient_linear(
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient_linear(
                 angle_of_attack, internal_state
             ),
             Self::RotatingCylinder(cylinder) => cylinder.lift_coefficient(internal_state),
@@ -83,7 +86,7 @@ impl SectionModel {
             Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient_pre_stall_with_stall_drop_off(
                 angle_of_attack, internal_state
             ),
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.lift_coefficient_pre_stall_with_stall_drop_off(
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient_pre_stall_with_stall_drop_off(
                 angle_of_attack, internal_state
             ),
             Self::RotatingCylinder(cylinder) => cylinder.lift_coefficient(internal_state),
@@ -103,7 +106,7 @@ impl SectionModel {
             Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient_post_stall_with_stall_weight(
                 angle_of_attack, internal_state
             ),
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.lift_coefficient_post_stall_with_stall_weight(
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient_post_stall_with_stall_weight(
                 angle_of_attack, internal_state
             ),
             Self::RotatingCylinder(_) => 0.0,
@@ -115,7 +118,7 @@ impl SectionModel {
         match self {
             Self::SingleElementFoil(foil) => foil.cl_initial_slope,
             Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient_derivative(internal_state),
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.lift_coefficient_derivative(internal_state),
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient_derivative(internal_state),
             Self::RotatingCylinder(_) => 0.0,
             Self::EffectiveWindSensor => 0.0,
         }
@@ -127,7 +130,7 @@ impl SectionModel {
             Self::MultiElementFoil(varying_foil) => varying_foil.drag_coefficient(
                 angle_of_attack, internal_state
             ),
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.drag_coefficient(
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.drag_coefficient(
                 angle_of_attack, internal_state
             ),
             Self::RotatingCylinder(cylinder) => cylinder.drag_coefficient(internal_state),
@@ -139,9 +142,23 @@ impl SectionModel {
         match self {
             Self::SingleElementFoil(foil) => foil.added_mass_factor,
             Self::MultiElementFoil(varying_foil) => varying_foil.get_foil(internal_state).added_mass_factor,
-            Self::ActiveAirFlowFoil(varying_foil) => varying_foil.get_foil(internal_state).added_mass_factor,
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.added_mass_factor(internal_state),
             Self::RotatingCylinder(cylinder) => cylinder.added_mass_factor,
             Self::EffectiveWindSensor => 0.0
+        }
+    }
+
+    /// Computes the power coefficient, c_P = P / (0.5 * density * A * U^3), where A is the area of
+    /// the section and U is the local velocity. Section models that do not need power return zero.
+    pub fn power_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+        match self {
+            Self::SingleElementFoil(_) => 0.0,
+            Self::MultiElementFoil(_) => 0.0,
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.power_coefficient(
+                angle_of_attack, internal_state
+            ),
+            Self::RotatingCylinder(cylinder) => cylinder.power_coefficient(internal_state),
+            Self::EffectiveWindSensor => 0.0,
         }
     }
 

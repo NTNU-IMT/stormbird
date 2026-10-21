@@ -180,7 +180,7 @@ mod tests {
             ),
             non_zero_circulation_at_ends: [false, false],
             nr_sections: None,
-            input_power_model: InputPowerModel::NoPower
+            ..Default::default()
         };
 
         let single_wing = wing_builder.build(12);

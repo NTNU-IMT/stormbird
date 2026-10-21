@@ -4,3 +4,7 @@
 
 #[cfg(test)]
 mod foil;
+#[cfg(test)]
+mod active_air_flow_foil;
+#[cfg(test)]
+mod rotating_cylinder;

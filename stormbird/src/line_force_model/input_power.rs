@@ -19,25 +19,40 @@ pub struct InputPowerData {
 /// An empirical model to calculate the input power required for driving a wind propulsion device.
 /// It comes with different modes that represents different ways of calculating the power.
 pub enum InputPowerModel {
-    /// Default value. Represent a case where a sail does not need power at all, e.g., wing sails
+    /// Default value. The power is calculated from the power coefficient of the section models,
+    /// integrated over the wing: P = sum(c_P * 0.5 * density * A * U^3). Section models that do
+    /// not need power, such as regular foils, have a power coefficient of zero.
+    FromSectionModelPowerCoefficient,
+    /// Represent a case where a sail does not need power at all, e.g., wing sails
     NoPower,
     /// Assume the internal state is the input power. A simple solution for e.g. suction sails that
     /// is modeled without a fan model
     DirectFromInternalState,
-    /// Calculates the power using the internal state. This could, for instance, be a power model 
+    /// Calculates the power using the internal state. This could, for instance, be a power model
     /// where the power is calculated directly from the RPS of a rotor sail
     InterpolateFromInternalState(InputPowerData),
 }
 
 impl Default for InputPowerModel {
     fn default() -> Self {
-        InputPowerModel::NoPower
+        InputPowerModel::FromSectionModelPowerCoefficient
     }
 }
 
 impl InputPowerModel {
-    pub fn input_power(&self, internal_state: Float) -> Float {
+    /// Calculates the input power for a wing.
+    ///
+    /// # Arguments
+    /// * `internal_state` - the internal state of the wing
+    /// * `section_models_power` - function that returns the power integrated from the section
+    /// models. Only evaluated when needed.
+    pub fn input_power(
+        &self,
+        internal_state: Float,
+        section_models_power: impl FnOnce() -> Float
+    ) -> Float {
         match self {
+            InputPowerModel::FromSectionModelPowerCoefficient => section_models_power(),
             InputPowerModel::NoPower => 0.0,
             InputPowerModel::DirectFromInternalState => {
                 internal_state.abs()
@@ -48,7 +63,7 @@ impl InputPowerModel {
                     &data.internal_state_data,
                     &data.input_power_data,
                 )
-            },            
+            },
         }
     }
 }
