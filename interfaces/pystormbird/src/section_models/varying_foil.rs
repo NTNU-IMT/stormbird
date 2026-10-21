@@ -39,12 +39,6 @@ impl VaryingFoil {
         }
     }
 
-    pub fn as_active_air_flow_foil(&self) -> SectionModel {
-        SectionModel {
-            data: SectionModelRust::ActiveAirFlowFoil(self.data.clone())
-        }
-    }
-
     pub fn __str__(&self) -> String {
         self.data.to_string()
     }

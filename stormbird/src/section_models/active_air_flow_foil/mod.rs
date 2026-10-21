@@ -56,6 +56,14 @@ pub struct SegmentFlowConditions {
 }
 
 impl ActiveAirFlowFoil {
+    pub fn new_from_string(input_str: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(input_str)
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
     pub fn lift_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.varying_foil.lift_coefficient(angle_of_attack, internal_state)
     }

@@ -1,6 +1,8 @@
 # Varying foil model
 
-The `VaryingFoil` structure is a model of a foil where the output can be allowed to depend on some internal state. The typical example is a flap angle, for a two-element foil, or suction rate, for a suction sail. To achieve this, the varying foil model uses multiple `Foil` models, each belonging to a specific internal value. Linear interpolation is used for all `Foil` model parameters for each state between the input data. This interpolation is handled by the `VaryingFoil` structure whenever a new internal state is set.
+The `VaryingFoil` structure is a model of a foil where the output can be allowed to depend on some internal state. The typical example is a flap angle, for a two-element foil, or suction rate, for a suction sail. To achieve this, the varying foil model uses multiple `Foil` models, each belonging to a specific internal value. Linear interpolation is used for all `Foil` model parameters for each state between the input data.
+
+The `VaryingFoil` model is used by two of the variants in the [section model enum](sectional_models_intro.md): the `MultiElementFoil` variant uses it directly, while the `ActiveAirFlowFoil` variant uses it together with a conversion of the internal state. See the [active air flow foil chapter](active_air_flow_foil.md) for more on the latter.
 
 ## How to set up a VaryingFoil structure
 
@@ -23,9 +25,9 @@ The available parameters in the structure are shown below.
 pub struct VaryingFoil {
     pub internal_state_data: Vec<f64>,
     pub foils_data: Vec<Foil>,
-    pub current_internal_state: f64,
-    pub current_foil: Option<Foil>,
 }
 ```
 
-The `current_foil` field is used internally to store the interpolated `Foil` model for the current internal state, and does not need to be specified as input.
+The `internal_state_data` and `foils_data` must have the same length, where each `Foil` model belongs to the internal state value with the same index. 
+
+The internal state can also be negative. This is, for instance, used to switch the direction of a flap or the suction side of a suction sail, by giving mirrored `Foil` models for the negative internal state values. 

@@ -85,3 +85,31 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 - New steady state mode for the dynamic wake, intended to find a steady solution faster when a very dynamic wake shape is expected
 - Small updates to the controller settings to simplify it
 - Many updates to the Stormflow crate, making it ready for first "official" version (v0.1.0)
+
+## 0.11.0 - Unreleased
+### Highlights
+- New structure for the `ActiveAirFlowFoil` section model, intended for suction sails. It now consists of a `VaryingFoil` model for the lift and drag, together with an `InternalStateConversion` that defines how the wing internal state is converted to the internal state of the foil model. Three conversions are available:
+    - `SuctionCoefficientDirect`: the wing internal state is the suction coefficient, used directly. Mostly useful for testing.
+    - `PowerToPowerCoefficient`: the wing internal state is the power, converted to a power coefficient on each line element. This is the same behavior as for the `ActiveAirFlowFoil` in earlier versions.
+    - `PowerToInternalFlow`: the wing internal state is the fan input power, converted to a suction coefficient on each line element using a new, simplified model of the internal flow in the sail, including a constant fan efficiency.
+- All section models can now compute a power coefficient. Foils return zero, the `ActiveAirFlowFoil` returns a value consistent with the power given as the wing internal state, and the `RotatingCylinder` uses a polynomial model, with default values from Tillig and Ringsberg (2020).
+- New default input power model, `FromSectionModelPowerCoefficient`, which computes the power by integrating the power coefficient of the section models over the wing.
+- The controller can now take the internal state set points either in the units of the section model (e.g., spin ratio or suction coefficient), or directly as the wing internal state (e.g., power), through the new `internal_state_set_point_type` setting.
+
+### Breaking changes
+- The input format for the `ActiveAirFlowFoil` section model has changed. The `VaryingFoil` data must now be given in a `varying_foil` field, together with an `internal_state_conversion` field. To get the same behavior as before, use the `PowerToPowerCoefficient` conversion.
+- The default input power model has changed from `NoPower` to `FromSectionModelPowerCoefficient`. This gives the same result for wing sails, but rotor sails without an explicit input power model will now get the power from the polynomial power model in the `RotatingCylinder`. Set the input power model to `NoPower` explicitly to get the old behavior.
+- Fields in the controller set points were renamed to reflect that the set points are no longer always given in the units of the section model, and that the limits are applied to the wing internal state:
+    - `section_model_internal_state_data` -> `internal_state_data`
+    - `internal_state_max_value` -> `wing_internal_state_max_value`
+    - `max_internal_state_change_rate` -> `wing_internal_state_max_change_rate`
+- The `input_power` function on the line force model now takes the sectional force input as an argument, as the power can depend on the local flow conditions.
+
+### Changes to the Python library
+- pystormbird: new `ActiveAirFlowFoil` class, and a new `power_coefficient` function for the `RotatingCylinder` class. The `as_active_air_flow_foil` function on the `VaryingFoil` class was removed, as an active air flow foil now also needs an internal state conversion.
+- stormbird_setup: updated to the new data structures for the section models, input power models and controller set points. The input power model now matches the variants in the Rust library, and `new_polynomial_rotor_sail_model` gives the power directly, without the `area` argument. The suction sail in the simplified setup now uses the default input power model.
+
+### Bug fixes
+- The input power model and the `RotatingCylinder` model in stormbird_setup did not match the Rust library, and could produce input that the Rust library would not accept.
+- Setting up a rotor sail with the simplified setup in stormbird_setup failed, due to an unsupported argument to the controller set points.
+

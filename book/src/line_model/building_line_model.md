@@ -65,7 +65,7 @@ The `non_zero_circulation_at_ends` consists of boolean values that specify the e
 
 The `nr_sections` variable is optional but can be set for each wing to override the default parameters in the `LineForceModelBuilder`. Typically, it will not be used, as the most common scenario is to have the same number of sections for each wing.
 
-The `input_power_model` specifies an optional empirical model for the power needed to operate the wing, for instance for rotor sails or suction sails. The default is `NoPower`. See the [input power chapter](./input_power.md) for more.
+The `input_power_model` specifies an optional empirical model for the power needed to operate the wing, for instance for rotor sails or suction sails. The default is `FromSectionModelPowerCoefficient`, which computes the power from the section model, and gives zero power for section models that do not need power. See the [input power chapter](./input_power.md) for more.
 
 When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note].
 

@@ -83,10 +83,10 @@ where \\( Q \\) is the volume flow through the suction system, \\( A \\) is the 
     <figcaption>Figure 4: Three-dimensional lift and drag coefficients for the Turbosail at different suction coefficients, C<sub>Q</sub>. The data is digitized from the wind tunnel experiments presented in <a href="https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf">Fondation Cousteau and windship propulsion - 1980 - 1985</a> (Charrier et al., 1985).</figcaption>
 </figure>
 
-The figure below shows the lift coefficient of the same three-dimensional sail as a function of the power coefficient, \\( C_A \\), defined as:
+The figure below shows the lift coefficient of the same three-dimensional sail as a function of the power coefficient, \\( C_P \\), defined as:
 
 \\[
-C_A = \frac{P}{0.5 \rho A V^3}
+C_P = \frac{P}{0.5 \rho A V^3}
 \\]
 
 where \\( P \\) is the input power to the suction system and \\( \rho \\) is the air density. The article does not give details about how this data was obtained, for instance at which angle of attack it applies. It should therefore mainly be seen as an example of the power consumption of a suction sail, rather than as accurate data for model tuning.
@@ -94,7 +94,7 @@ where \\( P \\) is the input power to the suction system and \\( \rho \\) is the
 <figure>
     <div id="suction-sail-power"></div>
     <script src="plot_scripts/plot_suction_sail_power_data.js"></script>
-    <figcaption>Figure 5: Three-dimensional lift coefficient for the Turbosail as a function of the power coefficient, C<sub>A</sub>. The data is digitized from <a href="https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf">Fondation Cousteau and windship propulsion - 1980 - 1985</a> (Charrier et al., 1985).</figcaption>
+    <figcaption>Figure 5: Three-dimensional lift coefficient for the Turbosail as a function of the power coefficient, C<sub>P</sub>. The data is digitized from <a href="https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf">Fondation Cousteau and windship propulsion - 1980 - 1985</a> (Charrier et al., 1985).</figcaption>
 </figure>
 
 #### Two dimensional data

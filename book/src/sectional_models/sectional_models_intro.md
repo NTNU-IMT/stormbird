@@ -6,20 +6,45 @@ Different sectional models are necessary for different sail types. This is handl
 
 ```rust
 pub enum SectionModel {
-    Foil(Foil),
-    VaryingFoil(VaryingFoil),
+    SingleElementFoil(Foil),
+    MultiElementFoil(VaryingFoil),
+    ActiveAirFlowFoil(ActiveAirFlowFoil),
     RotatingCylinder(RotatingCylinder),
     EffectiveWindSensor,
 }
 ```
 
-Each of the first three variants in this enum has its own sub-chapter for more details. A short overview is given below:
+The variants use four different underlying models, which each have their own sub-chapter for more details. A short overview is given below:
 
-1) `Foil` represents a model for a single element foil profile, and is suitable for modelling single element wing sails.
-2) `VaryingFoil` is a model that extends the `Foil` model to allow the output to be dependent on some internal variable. The internal variable can for instance be a flap angle, for a two-element foil, a combination of multiple element configurations, for instance to model a three-element foil, or suction rate when modelling a suction sail.
-3) `RotatingCylinder` represents a cylinder where the rotational speed can be varied to alter the force output. This is intended to be used to model rotor sails.
-4) `EffectiveWindSensor` is a special model without any input parameters that always gives zero lift and drag. A wing with this model therefore does not produce any forces, but can be used to measure the effective wind velocity at its control points.
+1) `SingleElementFoil` uses the [`Foil`](foil_model.md) model, which represents a single element foil profile. It is suitable for modelling single element wing sails.
+2) `MultiElementFoil` uses the [`VaryingFoil`](varying_foil_model.md) model, which extends the `Foil` model to allow the output to be dependent on an internal state. The internal state is typically a flap angle, for a two-element foil, or a combination of multiple element configurations, for instance to model a three-element foil.
+3) `ActiveAirFlowFoil` uses the [`ActiveAirFlowFoil`](active_air_flow_foil.md) model, which is intended for foils with active flow control, such as suction sails. It also uses a `VaryingFoil` model for the lift and drag, but adds a conversion between the internal state set on the wing, such as the fan power, and the internal state used by the foil model, such as the suction coefficient.
+4) `RotatingCylinder` uses the [`RotatingCylinder`](rotating_cylinder.md) model, which represents a cylinder where the rotational speed can be varied to alter the force output. This is intended to be used to model rotor sails.
+5) `EffectiveWindSensor` is a special model without any input parameters that always gives zero lift and drag. A wing with this model therefore does not produce any forces, but can be used to measure the effective wind velocity at its control points.
 
-More sectional models can be added in the future. The only requirement is that each model must be able to compute the necessary force coefficients. However, the goal is to cover most use cases with these three core models. Since the models are handled through an enum, they may require different inputs in their own functions for calculating lift and drag. For instance, the `Foil` and `VaryingFoil` models require the angle of attack as input, while the `RotatingCylinder` takes the velocity magnitude and local chord length (or diameter) as input. The right input is managed by the line force model structure, and is not something the user needs to think about when running a simulation.
+More sectional models can be added in the future. The only requirement is that each model must be able to compute the necessary force coefficients. However, the goal is to cover most use cases with the current models. 
+
+## Internal states
+
+All wings in a line force model have an *internal state*, which is a single number that can be set for each wing, for instance by a [controller](../utils/control_system.md). What the internal state means depends on the section model:
+
+- `SingleElementFoil` and `EffectiveWindSensor`: the internal state is not used.
+- `MultiElementFoil`: the internal state is passed directly to the `VaryingFoil` model, and is typically the flap angle.
+- `ActiveAirFlowFoil`: the internal state is either the power or the suction coefficient, depending on the settings of the model. It is converted to the internal state of the `VaryingFoil` model on each line element. See the [active air flow foil chapter](active_air_flow_foil.md) for more.
+- `RotatingCylinder`: the internal state is the revolutions per second of the cylinder, which is converted to a spin ratio on each line element, using the local chord length (i.e., the diameter) and the local velocity.
+
+This means that the internal state given to the section model on each line element can be different from the internal state set on the wing. The conversion is managed by the line force model structure, and is not something the user needs to think about when running a simulation. However, it is important to know which units the internal state is given in when setting up the models and the controller.
+
+Since the models are handled through an enum, they may also require different inputs in their own functions for calculating lift and drag. For instance, the foil models require the angle of attack as input, while the `RotatingCylinder` only uses the spin ratio. Again, the right input is managed by the line force model structure.
+
+## Power coefficient
+
+In addition to lift and drag, each section model can compute a *power coefficient*, which is used to estimate the power needed to operate the sail. The power coefficient is defined as:
+
+\\[
+    C_P = \frac{P}{0.5 \rho A U^3}
+\\]
+
+where \\( P \\) is the power, \\( \rho \\) is the density, \\( A \\) is the area of the line element and \\( U \\) is the local velocity. Models that do not need power, such as regular foils, return zero. The power coefficient is integrated over each wing by the default [input power model](../line_model/input_power.md).
 
 To get an overview of how to set up the different variants, see the sub-chapters for each model.

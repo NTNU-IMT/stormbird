@@ -54,6 +54,10 @@ impl RotatingCylinder {
         self.data.drag_coefficient(spin_ratio)
     }
 
+    pub fn power_coefficient(&self, spin_ratio: f64) -> f64 {
+        self.data.power_coefficient(spin_ratio)
+    }
+
     pub fn as_section_model(&self) -> SectionModel {
         SectionModel {
             data: SectionModelRust::RotatingCylinder(self.data.clone())

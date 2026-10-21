@@ -8,6 +8,7 @@ use pythonize::pythonize;
 pub mod foil;
 pub mod rotating_cylinder;
 pub mod varying_foil;
+pub mod active_air_flow_foil;
 
 use stormbird::section_models::SectionModel as SectionModelRust;
 
@@ -42,6 +43,7 @@ pub fn section_models(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SectionModel>()?;
     m.add_class::<foil::Foil>()?;
     m.add_class::<varying_foil::VaryingFoil>()?;
+    m.add_class::<active_air_flow_foil::ActiveAirFlowFoil>()?;
     m.add_class::<rotating_cylinder::RotatingCylinder>()?;
     Ok(())
 }

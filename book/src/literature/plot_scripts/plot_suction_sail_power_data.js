@@ -30,7 +30,7 @@ for (var i = 0; i < literature_data.length; i++) {
 var layout = {
   height: 500,
   xaxis: {
-    title: 'Power Coefficient (CA)',
+    title: 'Power Coefficient (CP)',
     range: [0, 0.8]
   },
   yaxis: {

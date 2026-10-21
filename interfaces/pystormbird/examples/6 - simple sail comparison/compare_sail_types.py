@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
         controller_set_points = sail.controller_set_points()
         
-        max_internal_state = np.max(controller_set_points.section_model_internal_state_data)
+        max_internal_state = np.max(controller_set_points.internal_state_data)
         max_angle_of_attack = np.max(controller_set_points.angle_of_attack_data)
 
         model_builder = CompleteSailModelBuilder(
