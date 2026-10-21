@@ -2,13 +2,18 @@
 use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
 use stormath::consts::MIN_POSITIVE;
-use stormath::solvers::secant_solver;
+use stormath::solvers::{secant_solver, brent_solver};
 
 use super::varying_foil::VaryingFoil;
+use super::integrate_power_coefficient;
+
+pub use super::SegmentFlowConditions;
 
 pub mod internal_flow;
+pub mod fan;
 
 use internal_flow::{InternalFlow, InternalFlowInput};
+use fan::Fan;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Defines how the internal state set on the wing is converted to the internal state used by the
@@ -18,8 +23,8 @@ use internal_flow::{InternalFlow, InternalFlowInput};
 /// variant, as described below.
 ///
 /// For all variants, the sign of the wing state sets the direction of the suction/flap, and is
-/// preserved in the section internal states. The magnitude of the power or suction coefficient is
-/// therefore given by the absolute value of the wing state.
+/// preserved in the section internal states. The magnitude of the power, rotational speed or
+/// suction coefficient is therefore given by the absolute value of the wing state.
 pub enum InternalStateConversion {
     /// The wing state is the suction coefficient, C_Q = Q / (U * A), which is passed directly to
     /// the foil model. The foil data must be given as a function of C_Q.
@@ -30,11 +35,28 @@ pub enum InternalStateConversion {
     PowerToPowerCoefficient,
     /// The wing state is the fan input power, which is converted to a suction coefficient on each
     /// segment by solving for the internal suction that gives the specified power, using the
-    /// internal flow model, including the fan efficiency. The foil data must be given as a
+    /// internal flow model and a constant fan efficiency. The foil data must be given as a
     /// function of C_Q.
-    PowerToInternalFlow(InternalFlow),
+    PowerToInternalFlow {
+        internal_flow: InternalFlow,
+        #[serde(default = "InternalStateConversion::default_fan_efficiency")]
+        /// Efficiency of the fan, defined as the ratio between the power delivered to the flow,
+        /// P_flow = s * Q, and the input power to the fan. Must be larger than zero.
+        fan_efficiency: Float,
+    },
+    /// The wing state is the rotational speed of the fans, in revolutions per second, which is
+    /// converted to a suction coefficient on each segment by solving for the operating point
+    /// where the pressure rise over the fans balances the internal suction and the duct losses.
+    /// The power is given by the fan curves. The foil data must be given as a function of C_Q.
+    FanSpeedToInternalFlow {
+        internal_flow: InternalFlow,
+        fan: Fan,
+    },
 }
 
+impl InternalStateConversion {
+    pub fn default_fan_efficiency() -> Float {1.0}
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// A foil section with active air flow, e.g., suction.
@@ -44,15 +66,6 @@ pub enum InternalStateConversion {
 pub struct ActiveAirFlowFoil {
     pub varying_foil: VaryingFoil,
     pub internal_state_conversion: InternalStateConversion,
-}
-
-#[derive(Debug, Clone)]
-/// The local flow conditions on a single segment of a wing, as needed when converting the wing
-/// state to the internal state of the foil model
-pub struct SegmentFlowConditions {
-    pub angle_of_attack: Float,
-    pub velocity: Float,
-    pub area: Float,
 }
 
 impl ActiveAirFlowFoil {
@@ -95,30 +108,77 @@ impl ActiveAirFlowFoil {
     /// Computes the power coefficient, c_P = P / (0.5 * density * A * U^3), from the internal
     /// state of the foil model. The power is always positive, as the sign of the internal state
     /// only determines the direction of the suction/flap.
+    ///
+    /// For the `FanSpeedToInternalFlow` conversion, the efficiency of the fans depends on the
+    /// operating point of the whole wing, and can not be computed for a single segment. The
+    /// returned value is then the power delivered to the flow, without the losses in the fans.
+    /// Use [`wing_power`](ActiveAirFlowFoil::wing_power) to get the power for the whole wing.
     pub fn power_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         match &self.internal_state_conversion {
             InternalStateConversion::SuctionCoefficientDirect => 0.0,
             InternalStateConversion::PowerToPowerCoefficient => internal_state.abs(),
-            InternalStateConversion::PowerToInternalFlow(internal_flow) => {
-                let suction_coefficient = internal_state.abs();
-
-                if suction_coefficient < MIN_POSITIVE {
-                    return 0.0;
-                }
-
-                let direction = internal_state.signum();
-
-                let lift_coefficient = direction * self.lift_coefficient(
-                    angle_of_attack, internal_state
-                );
-
-                // P_flow = s * Q = (s / q) * C_Q * 0.5 * density * A * U^3
-                let flow_power_coefficient = suction_coefficient * internal_flow.internal_suction_coefficient(
-                    suction_coefficient, lift_coefficient
-                );
-
-                internal_flow.fan_power_from_flow_power(flow_power_coefficient)
+            InternalStateConversion::PowerToInternalFlow { internal_flow, fan_efficiency } => {
+                self.flow_power_coefficient(internal_flow, angle_of_attack, internal_state) /
+                    fan_efficiency
             },
+            InternalStateConversion::FanSpeedToInternalFlow { internal_flow, .. } => {
+                self.flow_power_coefficient(internal_flow, angle_of_attack, internal_state)
+            },
+        }
+    }
+
+    /// Computes the coefficient for the power delivered to the flow, P_flow = s * Q, from the
+    /// suction coefficient, by inverting the internal flow model.
+    fn flow_power_coefficient(
+        &self,
+        internal_flow: &InternalFlow,
+        angle_of_attack: Float,
+        internal_state: Float
+    ) -> Float {
+        let suction_coefficient = internal_state.abs();
+
+        if suction_coefficient < MIN_POSITIVE {
+            return 0.0;
+        }
+
+        let direction = internal_state.signum();
+
+        let lift_coefficient = direction * self.lift_coefficient(angle_of_attack, internal_state);
+
+        // P_flow = s * Q = (s / q) * C_Q * 0.5 * density * A * U^3
+        suction_coefficient * internal_flow.internal_suction_coefficient(
+            suction_coefficient, lift_coefficient
+        )
+    }
+
+    /// Computes the power needed to operate the wing.
+    ///
+    /// For the `FanSpeedToInternalFlow` conversion, the power is given by the fan curves, using the
+    /// rotational speed from the wing state and the total volume flow from the suction
+    /// coefficients on each segment. For the other conversions, the power coefficient is
+    /// integrated over the wing.
+    pub fn wing_power(
+        &self,
+        wing_state: Float,
+        segments: &[SegmentFlowConditions],
+        section_states: &[Float],
+        density: Float
+    ) -> Float {
+        match &self.internal_state_conversion {
+            InternalStateConversion::FanSpeedToInternalFlow { fan, .. } => {
+                let total_volume_flow: Float = segments.iter().zip(section_states).map(
+                    |(segment, &section_state)| {
+                        section_state.abs() * segment.velocity * segment.area
+                    }
+                ).sum();
+
+                fan.power(total_volume_flow, wing_state.abs(), density)
+            },
+            _ => integrate_power_coefficient(
+                segments, section_states, density, |angle_of_attack, section_state| {
+                    self.power_coefficient(angle_of_attack, section_state)
+                }
+            ),
         }
     }
 
@@ -152,8 +212,15 @@ impl ActiveAirFlowFoil {
                     }
                 }).collect()
             },
-            InternalStateConversion::PowerToInternalFlow(internal_flow) => {
-                self.suction_coefficients_from_power(internal_flow, wing_state, segments, density)
+            InternalStateConversion::PowerToInternalFlow { internal_flow, fan_efficiency } => {
+                self.suction_coefficients_from_power(
+                    internal_flow, *fan_efficiency, wing_state, segments, density
+                )
+            },
+            InternalStateConversion::FanSpeedToInternalFlow { internal_flow, fan } => {
+                self.suction_coefficients_from_fan_speed(
+                    internal_flow, fan, wing_state, segments, density
+                )
             },
         }
     }
@@ -164,7 +231,9 @@ impl ActiveAirFlowFoil {
     /// represented by a single angle of attack and velocity.
     ///
     /// For the power based conversions, the power is calculated from the power coefficient of the
-    /// section model: P = sign(state) * c_P(alpha, state) * 0.5 * density * A_wing * U^3.
+    /// section model: P = sign(state) * c_P(alpha, state) * 0.5 * density * A_wing * U^3. For the
+    /// fan based conversion, the rotational speed is found from the fan curves, at the operating
+    /// point given by the suction coefficient.
     pub fn wing_state_from_section_state(
         &self,
         section_state: Float,
@@ -176,11 +245,40 @@ impl ActiveAirFlowFoil {
         match &self.internal_state_conversion {
             InternalStateConversion::SuctionCoefficientDirect => section_state,
             InternalStateConversion::PowerToPowerCoefficient |
-            InternalStateConversion::PowerToInternalFlow(_) => {
+            InternalStateConversion::PowerToInternalFlow { .. } => {
                 let power_coefficient = self.power_coefficient(angle_of_attack, section_state);
 
                 section_state.signum() * power_coefficient *
                     0.5 * density * wing_area * velocity.abs().powi(3)
+            },
+            InternalStateConversion::FanSpeedToInternalFlow { internal_flow, fan } => {
+                let suction_coefficient = section_state.abs();
+                let velocity = velocity.abs();
+
+                if suction_coefficient < MIN_POSITIVE || velocity < MIN_POSITIVE {
+                    return 0.0;
+                }
+
+                let direction = section_state.signum();
+
+                let lift_coefficient = direction * self.lift_coefficient(
+                    angle_of_attack, section_state
+                );
+
+                let internal_suction = internal_flow.internal_suction_coefficient(
+                    suction_coefficient, lift_coefficient
+                ) * 0.5 * density * velocity.powi(2);
+
+                let total_volume_flow = suction_coefficient * velocity * wing_area;
+
+                let required_pressure_rise = internal_suction + fan.duct_loss(total_volume_flow);
+
+                direction * fan.rotational_speed_for_operating_point(
+                    total_volume_flow,
+                    required_pressure_rise,
+                    density,
+                    &internal_flow.solver_settings.wing_solver_settings()
+                )
             },
         }
     }
@@ -290,23 +388,49 @@ impl ActiveAirFlowFoil {
         }).sum()
     }
 
-    /// Solves for the internal suction that gives the specified fan input power, for a given
-    /// suction direction.
-    ///
-    /// All segments are assumed to share the same internal volume, so that the power delivered to
-    /// the flow is computed from the total volume flow: P_flow = s * sum(Q) = fan_efficiency * P.
-    /// Returns zero if the power is zero or negative.
-    pub fn internal_suction_from_power(
+    /// The internal suction where the first segment starts to get inflow. Below this value, there
+    /// is no flow into the wing. Returns `None` if no segment can get any flow, i.e., if all
+    /// segments have zero velocity or area.
+    pub fn threshold_internal_suction(
         &self,
         internal_flow: &InternalFlow,
-        fan_power: Float,
+        segments: &[SegmentFlowConditions],
+        density: Float,
+        direction: Float,
+    ) -> Option<Float> {
+        let threshold_suction = segments.iter()
+            .filter(|segment| segment.velocity > MIN_POSITIVE && segment.area > MIN_POSITIVE)
+            .map(|segment| {
+                let lift_coefficient = direction * self.lift_coefficient(
+                    segment.angle_of_attack, 0.0
+                );
+
+                -internal_flow.external_pressure(lift_coefficient, density, segment.velocity)
+            })
+            .fold(Float::INFINITY, Float::min);
+
+        if threshold_suction.is_finite() {
+            Some(threshold_suction.max(0.0))
+        } else {
+            None
+        }
+    }
+
+    /// Solves for the internal suction that gives the specified power delivered to the flow, for a
+    /// given suction direction.
+    ///
+    /// All segments are assumed to share the same internal volume, so that the power delivered to
+    /// the flow is computed from the total volume flow: P_flow = s * sum(Q). Returns zero if the
+    /// power is zero or negative.
+    pub fn internal_suction_from_flow_power(
+        &self,
+        internal_flow: &InternalFlow,
+        flow_power: Float,
         segments: &[SegmentFlowConditions],
         density: Float,
         direction: Float,
     ) -> Float {
-        let power = internal_flow.flow_power_from_fan_power(fan_power);
-
-        if power < MIN_POSITIVE {
+        if flow_power < MIN_POSITIVE {
             return 0.0;
         }
 
@@ -322,30 +446,18 @@ impl ActiveAirFlowFoil {
             return 0.0;
         }
 
-        // The internal suction where the first segment starts to get inflow. Below this value,
-        // there is no flow, and the power is zero independent of the suction.
-        let threshold_suction = segments.iter()
-            .filter(|segment| segment.velocity > MIN_POSITIVE && segment.area > MIN_POSITIVE)
-            .map(|segment| {
-                let lift_coefficient = direction * self.lift_coefficient(
-                    segment.angle_of_attack, 0.0
-                );
-
-                -internal_flow.external_pressure(lift_coefficient, density, segment.velocity)
-            })
-            .fold(Float::INFINITY, Float::min);
-
-        if !threshold_suction.is_finite() {
-            return 0.0;
-        }
-
-        let threshold_suction = threshold_suction.max(0.0);
+        let threshold_suction = match self.threshold_internal_suction(
+            internal_flow, segments, density, direction
+        ) {
+            Some(threshold_suction) => threshold_suction,
+            None => return 0.0,
+        };
 
         // The suction is written as s = s_threshold + x^2 so that the solver never ends up in the
         // region with zero flow, where the residual is constant and the secant method fails.
         let internal_suction = |x: Float| threshold_suction + x * x;
 
-        let first_guess = (power / flow_factor).powf(2.0 / 3.0).sqrt();
+        let first_guess = (flow_power / flow_factor).powf(2.0 / 3.0).sqrt();
         let second_guess = 1.1 * first_guess;
 
         let x = secant_solver(
@@ -354,17 +466,18 @@ impl ActiveAirFlowFoil {
 
                 internal_suction * self.total_volume_flow(
                     internal_flow, segments, density, internal_suction, direction
-                ) / power - 1.0
+                ) / flow_power - 1.0
             },
             first_guess,
             second_guess,
-            &internal_flow.solver_settings.power_solver_settings()
+            &internal_flow.solver_settings.wing_solver_settings()
         );
 
         internal_suction(x)
     }
 
-    /// Returns the suction coefficient on all segments, for a given fan input power.
+    /// Returns the suction coefficient on all segments, for a given fan input power and a constant
+    /// fan efficiency.
     ///
     /// The absolute value of the power is used to compute the suction, while the sign of the power
     /// sets the direction, which is applied to the returned suction coefficients. A power of zero
@@ -372,6 +485,7 @@ impl ActiveAirFlowFoil {
     pub fn suction_coefficients_from_power(
         &self,
         internal_flow: &InternalFlow,
+        fan_efficiency: Float,
         power: Float,
         segments: &[SegmentFlowConditions],
         density: Float
@@ -384,8 +498,95 @@ impl ActiveAirFlowFoil {
 
         let direction = power.signum();
 
-        let internal_suction = self.internal_suction_from_power(
-            internal_flow, power_abs, segments, density, direction
+        let internal_suction = self.internal_suction_from_flow_power(
+            internal_flow, fan_efficiency * power_abs, segments, density, direction
+        );
+
+        self.suction_coefficients(internal_flow, segments, density, internal_suction, direction)
+            .into_iter()
+            .map(|suction_coefficient| direction * suction_coefficient)
+            .collect()
+    }
+
+    /// Solves for the internal suction at the operating point of the fans, for a given rotational
+    /// speed and suction direction.
+    ///
+    /// The operating point is where the pressure rise over the fans balances the internal suction
+    /// and the duct losses, at the total volume flow through the wing:
+    /// dp_fan(Q(s), n) = s + dp_duct(Q(s)).
+    ///
+    /// The internal suction is always between the threshold where the flow into the wing starts
+    /// and the maximum pressure rise of the fans, which is used as a bracket for the solver. If
+    /// the fans can not overcome the threshold, there is no flow, and the threshold is returned.
+    pub fn internal_suction_from_fan_speed(
+        &self,
+        internal_flow: &InternalFlow,
+        fan: &Fan,
+        rotational_speed: Float,
+        segments: &[SegmentFlowConditions],
+        density: Float,
+        direction: Float,
+    ) -> Float {
+        if rotational_speed < MIN_POSITIVE {
+            return 0.0;
+        }
+
+        let threshold_suction = match self.threshold_internal_suction(
+            internal_flow, segments, density, direction
+        ) {
+            Some(threshold_suction) => threshold_suction,
+            None => return 0.0,
+        };
+
+        let max_pressure_rise = fan.max_pressure_rise(rotational_speed, density);
+
+        if max_pressure_rise <= threshold_suction {
+            return threshold_suction;
+        }
+
+        let residual = |internal_suction: Float| {
+            let total_volume_flow = self.total_volume_flow(
+                internal_flow, segments, density, internal_suction, direction
+            );
+
+            (
+                fan.pressure_rise(total_volume_flow, rotational_speed, density) -
+                internal_suction -
+                fan.duct_loss(total_volume_flow)
+            ) / max_pressure_rise
+        };
+
+        brent_solver(
+            residual,
+            threshold_suction,
+            max_pressure_rise,
+            &internal_flow.solver_settings.wing_solver_settings()
+        ).unwrap_or(threshold_suction)
+    }
+
+    /// Returns the suction coefficient on all segments, for a given rotational speed of the fans.
+    ///
+    /// The absolute value of the rotational speed is used to compute the suction, while the sign
+    /// sets the direction, which is applied to the returned suction coefficients. A rotational
+    /// speed of zero gives zero suction coefficient on all segments.
+    pub fn suction_coefficients_from_fan_speed(
+        &self,
+        internal_flow: &InternalFlow,
+        fan: &Fan,
+        rotational_speed: Float,
+        segments: &[SegmentFlowConditions],
+        density: Float
+    ) -> Vec<Float> {
+        let rotational_speed_abs = rotational_speed.abs();
+
+        if rotational_speed_abs < MIN_POSITIVE {
+            return vec![0.0; segments.len()];
+        }
+
+        let direction = rotational_speed.signum();
+
+        let internal_suction = self.internal_suction_from_fan_speed(
+            internal_flow, fan, rotational_speed_abs, segments, density, direction
         );
 
         self.suction_coefficients(internal_flow, segments, density, internal_suction, direction)

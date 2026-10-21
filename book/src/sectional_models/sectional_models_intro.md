@@ -30,7 +30,7 @@ All wings in a line force model have an *internal state*, which is a single numb
 
 - `SingleElementFoil` and `EffectiveWindSensor`: the internal state is not used.
 - `MultiElementFoil`: the internal state is passed directly to the `VaryingFoil` model, and is typically the flap angle.
-- `ActiveAirFlowFoil`: the internal state is either the power or the suction coefficient, depending on the settings of the model. It is converted to the internal state of the `VaryingFoil` model on each line element. See the [active air flow foil chapter](active_air_flow_foil.md) for more.
+- `ActiveAirFlowFoil`: the internal state is either the power, the rotational speed of the fans, or the suction coefficient, depending on the settings of the model. It is converted to the internal state of the `VaryingFoil` model on each line element. See the [active air flow foil chapter](active_air_flow_foil.md) for more.
 - `RotatingCylinder`: the internal state is the revolutions per second of the cylinder, which is converted to a spin ratio on each line element, using the local chord length (i.e., the diameter) and the local velocity.
 
 This means that the internal state given to the section model on each line element can be different from the internal state set on the wing. The conversion is managed by the line force model structure, and is not something the user needs to think about when running a simulation. However, it is important to know which units the internal state is given in when setting up the models and the controller.
@@ -45,6 +45,14 @@ In addition to lift and drag, each section model can compute a *power coefficien
     C_P = \frac{P}{0.5 \rho A U^3}
 \\]
 
-where \\( P \\) is the power, \\( \rho \\) is the density, \\( A \\) is the area of the line element and \\( U \\) is the local velocity. Models that do not need power, such as regular foils, return zero. The power coefficient is integrated over each wing by the default [input power model](../line_model/input_power.md).
+where \\( P \\) is the power, \\( \rho \\) is the density, \\( A \\) is the area of the line element and \\( U \\) is the local velocity. Models that do not need power, such as regular foils, return zero. 
+
+The power for a whole wing is computed by the section model, and is used by the default [input power model](../line_model/input_power.md). For most section models, this is simply the power coefficient integrated over the wing:
+
+\\[
+    P_{wing} = \sum_i C_{P, i} \, 0.5 \rho A_i U_i^3
+\\]
+
+However, some models need information about the whole wing to compute the power. For instance, for an [active air flow foil](active_air_flow_foil.md) where the fans are modeled with fan curves, the efficiency of the fans depends on the total volume flow through the wing. The power is then computed directly for the whole wing, rather than through the power coefficient on each line element.
 
 To get an overview of how to set up the different variants, see the sub-chapters for each model.

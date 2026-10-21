@@ -32,7 +32,7 @@
 //! - [`calculate_simulation_result`](LineForceModel::calculate_simulation_result)
 
 use crate::section_models::rotating_cylinder::RotatingCylinder;
-use crate::section_models::active_air_flow_foil::SegmentFlowConditions;
+use crate::section_models::SegmentFlowConditions;
 
 use super::*;
 
@@ -725,22 +725,26 @@ impl LineForceModel {
         out
     }
 
-    /// Calculates the power for a wing by integrating the power coefficient of the section models:
-    /// P = sum(c_P * 0.5 * density * A * U^3)
+    /// Calculates the power for a wing from the section model. For most section models, this is
+    /// the power coefficient integrated over the wing: P = sum(c_P * 0.5 * density * A * U^3). See
+    /// [`SectionModel::wing_power`] for more.
     pub fn section_models_power(&self, wing_index: usize, force_input: &SectionalForcesInput) -> Float {
-        let section_model = &self.section_models[wing_index];
+        let wing_range = self.wing_indices[wing_index].clone();
 
-        self.wing_indices[wing_index].clone().map(|section_index| {
-            let power_coefficient = section_model.power_coefficient(
-                force_input.angles_of_attack[section_index],
-                force_input.section_models_internal_state[section_index]
-            );
+        let segments: Vec<SegmentFlowConditions> = wing_range.clone().map(|section_index| {
+            SegmentFlowConditions {
+                angle_of_attack: force_input.angles_of_attack[section_index],
+                velocity: force_input.velocity[section_index].length(),
+                area: self.chord_lengths[section_index] * self.span_lines_local[section_index].length(),
+            }
+        }).collect();
 
-            let area = self.chord_lengths[section_index] * self.span_lines_local[section_index].length();
-            let velocity = force_input.velocity[section_index].length();
-
-            power_coefficient * 0.5 * self.density * area * velocity.powi(3)
-        }).sum()
+        self.section_models[wing_index].wing_power(
+            self.internal_state[wing_index],
+            &segments,
+            &force_input.section_models_internal_state[wing_range],
+            self.density
+        )
     }
 
     pub fn calculate_simulation_result(

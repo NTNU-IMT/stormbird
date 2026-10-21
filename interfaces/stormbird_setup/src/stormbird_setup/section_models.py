@@ -51,26 +51,213 @@ class InternalFlowSolverSettings(StormbirdSetupBaseModel):
     '''
     segment_tolerance: float | None = None
     segment_max_iterations: int | None = None
-    power_tolerance: float | None = None
-    power_max_iterations: int | None = None
+    wing_tolerance: float | None = None
+    wing_max_iterations: int | None = None
 
 class InternalFlow(StormbirdSetupBaseModel):
     '''
     Model of the flow through the porous surface of a foil with active air flow, e.g., a suction
     sail. The external pressure on the porous surface is modelled as a linear function of the lift
-    coefficient, while the flow through the surface is modelled with a loss coefficient.
+    coefficient, while the flow through the surface is modelled with a loss coefficient. The model
+    does not include the fan, which is part of the internal state conversion.
     '''
     cp_zero_cl: float
     cp_gradient: float
     loss_coefficient: float
     porous_fraction: float
-    fan_efficiency: float | None = None
     solver_settings: InternalFlowSolverSettings | None = None
+
+class FanCurveData(StormbirdSetupBaseModel):
+    '''
+    Data points for fan curves. The meaning of the values depends on the type of the fan curves:
+    volume flow, pressure rise and power for dimensional curves, and the flow, pressure and power
+    coefficients for non-dimensional curves.
+
+    The data must only cover the stable operating range of the fan, where the pressure decreases
+    with increasing flow.
+    '''
+    flow_data: list[float]
+    pressure_data: list[float]
+    power_data: list[float]
+
+    @model_validator(mode='after')
+    def check_data(self) -> "FanCurveData":
+        n = len(self.flow_data)
+
+        if n < 2:
+            raise ValueError("The fan curves must have at least two data points")
+
+        if len(self.pressure_data) != n or len(self.power_data) != n:
+            raise ValueError(
+                f"The fan curve data must have the same length. Flow: {n}, "
+                f"pressure: {len(self.pressure_data)}, power: {len(self.power_data)}"
+            )
+
+        if self.flow_data[0] < 0.0:
+            raise ValueError("The flow data for the fan curves can not be negative")
+
+        for i in range(1, n):
+            if self.flow_data[i] <= self.flow_data[i - 1]:
+                raise ValueError("The flow data for the fan curves must be strictly increasing")
+
+            if self.pressure_data[i] >= self.pressure_data[i - 1]:
+                raise ValueError(
+                    "The pressure data for the fan curves must be strictly decreasing with "
+                    "increasing flow. Only the stable operating range of the fan should be included"
+                )
+
+        if any(power < 0.0 for power in self.power_data):
+            raise ValueError("The power data for the fan curves can not be negative")
+
+        return self
+
+class FanCurvesType(Enum):
+    Dimensional = "Dimensional"
+    NonDimensional = "NonDimensional"
+
+class FanCurves(StormbirdSetupBaseModel):
+    '''
+    Fan curves for a single fan, giving the pressure rise and power as a function of the volume
+    flow. The curves are scaled to different rotational speeds and densities using the fan affinity
+    laws. The rotational speed is given in revolutions per second. There are two types:
+
+    - Dimensional: the data is given as volume flow [m^3/s], pressure rise [Pa] and power [W],
+      measured at a reference rotational speed and density, which must then be set.
+    - NonDimensional: the data is given as the flow coefficient, Q / (n D^3), the pressure
+      coefficient, dp / (rho n^2 D^2), and the power coefficient, P / (rho n^3 D^5), where D is the
+      fan diameter, which must then be set.
+    '''
+    curves_type: FanCurvesType
+    data: FanCurveData
+    reference_rotational_speed: float | None = None
+    reference_density: float | None = None
+    diameter: float | None = None
+
+    @classmethod
+    def new_dimensional(
+        cls,
+        *,
+        reference_rotational_speed: float,
+        reference_density: float,
+        volume_flow_data: list[float],
+        pressure_rise_data: list[float],
+        power_data: list[float]
+    ) -> "FanCurves":
+        return cls(
+            curves_type = FanCurvesType.Dimensional,
+            reference_rotational_speed = reference_rotational_speed,
+            reference_density = reference_density,
+            data = FanCurveData(
+                flow_data = volume_flow_data,
+                pressure_data = pressure_rise_data,
+                power_data = power_data
+            )
+        )
+
+    @classmethod
+    def new_non_dimensional(
+        cls,
+        *,
+        diameter: float,
+        flow_coefficient_data: list[float],
+        pressure_coefficient_data: list[float],
+        power_coefficient_data: list[float]
+    ) -> "FanCurves":
+        return cls(
+            curves_type = FanCurvesType.NonDimensional,
+            diameter = diameter,
+            data = FanCurveData(
+                flow_data = flow_coefficient_data,
+                pressure_data = pressure_coefficient_data,
+                power_data = power_coefficient_data
+            )
+        )
+
+    @model_validator(mode='before')
+    @classmethod
+    def deserialize_from_rust_enum(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        # Already in Python/Pydantic form
+        if 'curves_type' in data:
+            return data
+
+        # Rust externally-tagged enum format
+        for curves_type in FanCurvesType:
+            if curves_type.value in data:
+                return {'curves_type': curves_type, **data[curves_type.value]}
+
+        raise ValueError(f"Unknown fan curves variant: {list(data.keys())}")
+
+    @model_validator(mode='after')
+    def check_parameters(self) -> "FanCurves":
+        is_dimensional = self.curves_type == FanCurvesType.Dimensional
+
+        dimensional_parameters_set = self.reference_rotational_speed is not None and \
+            self.reference_density is not None
+
+        if is_dimensional and not dimensional_parameters_set:
+            raise ValueError(
+                "reference_rotational_speed and reference_density must be set for dimensional "
+                "fan curves"
+            )
+
+        if is_dimensional and self.diameter is not None:
+            raise ValueError("diameter is only used for non-dimensional fan curves")
+
+        if not is_dimensional and self.diameter is None:
+            raise ValueError("diameter must be set for non-dimensional fan curves")
+
+        if not is_dimensional and (
+            self.reference_rotational_speed is not None or self.reference_density is not None
+        ):
+            raise ValueError(
+                "reference_rotational_speed and reference_density are only used for dimensional "
+                "fan curves"
+            )
+
+        return self
+
+    @model_serializer
+    def ser_model(self) -> dict[str, object]:
+        data = self.data.model_dump(mode='json')
+
+        match self.curves_type:
+            case FanCurvesType.Dimensional:
+                return {
+                    "Dimensional": {
+                        "reference_rotational_speed": self.reference_rotational_speed,
+                        "reference_density": self.reference_density,
+                        "data": data
+                    }
+                }
+            case FanCurvesType.NonDimensional:
+                return {
+                    "NonDimensional": {
+                        "diameter": self.diameter,
+                        "data": data
+                    }
+                }
+            case _:
+                raise ValueError("Unknown fan curves type", self.curves_type)
+
+class Fan(StormbirdSetupBaseModel):
+    '''
+    Model of the fan system that drives the internal flow in a wing. The system can consist of
+    multiple identical fans in parallel, which share the total volume flow equally. The duct loss
+    coefficient, k, gives the pressure loss between the internal volume and the fans, as
+    dp_duct = k * Q^2, with Q being the total volume flow.
+    '''
+    curves: FanCurves
+    number_of_fans: int | None = None
+    duct_loss_coefficient: float | None = None
 
 class InternalStateConversionType(Enum):
     SuctionCoefficientDirect = "SuctionCoefficientDirect"
     PowerToPowerCoefficient = "PowerToPowerCoefficient"
     PowerToInternalFlow = "PowerToInternalFlow"
+    FanSpeedToInternalFlow = "FanSpeedToInternalFlow"
 
 class InternalStateConversion(StormbirdSetupBaseModel):
     '''
@@ -80,14 +267,44 @@ class InternalStateConversion(StormbirdSetupBaseModel):
     - SuctionCoefficientDirect: the wing state is the suction coefficient, used directly.
     - PowerToPowerCoefficient: the wing state is the power, converted to a power coefficient.
     - PowerToInternalFlow: the wing state is the fan input power, converted to a suction
-      coefficient using the internal flow model, which must then be set.
+      coefficient using the internal flow model and a constant fan efficiency. The internal flow
+      model must then be set, while the fan efficiency is optional (default 1.0).
+    - FanSpeedToInternalFlow: the wing state is the rotational speed of the fans, in revolutions
+      per second, converted to a suction coefficient using the internal flow model and the fan
+      curves. Both the internal flow model and the fan must then be set.
 
-    The foil data must be given as a function of the suction coefficient for the
-    SuctionCoefficientDirect and PowerToInternalFlow variants, and as a function of the power
-    coefficient for the PowerToPowerCoefficient variant.
+    The foil data must be given as a function of the power coefficient for the
+    PowerToPowerCoefficient variant, and as a function of the suction coefficient for the other
+    variants.
     '''
     conversion_type: InternalStateConversionType
     internal_flow: InternalFlow | None = None
+    fan_efficiency: float | None = None
+    fan: Fan | None = None
+
+    @classmethod
+    def new_power_to_internal_flow(
+        cls,
+        internal_flow: InternalFlow,
+        fan_efficiency: float | None = None
+    ) -> "InternalStateConversion":
+        return cls(
+            conversion_type = InternalStateConversionType.PowerToInternalFlow,
+            internal_flow = internal_flow,
+            fan_efficiency = fan_efficiency
+        )
+
+    @classmethod
+    def new_fan_speed_to_internal_flow(
+        cls,
+        internal_flow: InternalFlow,
+        fan: Fan
+    ) -> "InternalStateConversion":
+        return cls(
+            conversion_type = InternalStateConversionType.FanSpeedToInternalFlow,
+            internal_flow = internal_flow,
+            fan = fan
+        )
 
     @model_validator(mode='before')
     @classmethod
@@ -107,23 +324,41 @@ class InternalStateConversion(StormbirdSetupBaseModel):
         if 'PowerToInternalFlow' in data:
             return {
                 'conversion_type': InternalStateConversionType.PowerToInternalFlow,
-                'internal_flow': InternalFlow(**data['PowerToInternalFlow'])
+                **data['PowerToInternalFlow']
+            }
+        elif 'FanSpeedToInternalFlow' in data:
+            return {
+                'conversion_type': InternalStateConversionType.FanSpeedToInternalFlow,
+                **data['FanSpeedToInternalFlow']
             }
         else:
             raise ValueError(f"Unknown internal state conversion variant: {list(data.keys())}")
 
     @model_validator(mode='after')
-    def check_internal_flow(self) -> "InternalStateConversion":
-        uses_internal_flow = self.conversion_type == InternalStateConversionType.PowerToInternalFlow
+    def check_parameters(self) -> "InternalStateConversion":
+        uses_internal_flow = self.conversion_type in (
+            InternalStateConversionType.PowerToInternalFlow,
+            InternalStateConversionType.FanSpeedToInternalFlow
+        )
+        uses_fan_efficiency = self.conversion_type == InternalStateConversionType.PowerToInternalFlow
+        uses_fan = self.conversion_type == InternalStateConversionType.FanSpeedToInternalFlow
+
+        name = self.conversion_type.value
 
         if uses_internal_flow and self.internal_flow is None:
-            raise ValueError("internal_flow must be set for the PowerToInternalFlow conversion")
+            raise ValueError(f"internal_flow must be set for the {name} conversion")
 
         if not uses_internal_flow and self.internal_flow is not None:
-            raise ValueError(
-                f"internal_flow is only used by the PowerToInternalFlow conversion, not "
-                f"{self.conversion_type.value}"
-            )
+            raise ValueError(f"internal_flow is not used by the {name} conversion")
+
+        if uses_fan and self.fan is None:
+            raise ValueError(f"fan must be set for the {name} conversion")
+
+        if not uses_fan and self.fan is not None:
+            raise ValueError(f"fan is not used by the {name} conversion")
+
+        if not uses_fan_efficiency and self.fan_efficiency is not None:
+            raise ValueError(f"fan_efficiency is not used by the {name} conversion")
 
         return self
 
@@ -137,8 +372,25 @@ class InternalStateConversion(StormbirdSetupBaseModel):
                 if self.internal_flow is None:
                     raise ValueError("internal_flow must be set for the PowerToInternalFlow conversion")
 
+                variant_data: dict[str, object] = {
+                    "internal_flow": self.internal_flow.model_dump(exclude_none=True, mode='json')
+                }
+
+                if self.fan_efficiency is not None:
+                    variant_data["fan_efficiency"] = self.fan_efficiency
+
+                return {"PowerToInternalFlow": variant_data}
+            case InternalStateConversionType.FanSpeedToInternalFlow:
+                if self.internal_flow is None or self.fan is None:
+                    raise ValueError(
+                        "internal_flow and fan must be set for the FanSpeedToInternalFlow conversion"
+                    )
+
                 return {
-                    "PowerToInternalFlow": self.internal_flow.model_dump(exclude_none=True, mode='json')
+                    "FanSpeedToInternalFlow": {
+                        "internal_flow": self.internal_flow.model_dump(exclude_none=True, mode='json'),
+                        "fan": self.fan.model_dump(exclude_none=True, mode='json')
+                    }
                 }
             case _:
                 raise ValueError("Unknown internal state conversion", self.conversion_type)

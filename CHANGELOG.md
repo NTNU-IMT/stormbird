@@ -88,12 +88,14 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 
 ## 0.11.0 - Unreleased
 ### Highlights
-- New structure for the `ActiveAirFlowFoil` section model, intended for suction sails. It now consists of a `VaryingFoil` model for the lift and drag, together with an `InternalStateConversion` that defines how the wing internal state is converted to the internal state of the foil model. Three conversions are available:
+- New structure for the `ActiveAirFlowFoil` section model, intended for suction sails. It now consists of a `VaryingFoil` model for the lift and drag, together with an `InternalStateConversion` that defines how the wing internal state is converted to the internal state of the foil model. Four conversions are available:
     - `SuctionCoefficientDirect`: the wing internal state is the suction coefficient, used directly. Mostly useful for testing.
     - `PowerToPowerCoefficient`: the wing internal state is the power, converted to a power coefficient on each line element. This is the same behavior as for the `ActiveAirFlowFoil` in earlier versions.
-    - `PowerToInternalFlow`: the wing internal state is the fan input power, converted to a suction coefficient on each line element using a new, simplified model of the internal flow in the sail, including a constant fan efficiency.
+    - `PowerToInternalFlow`: the wing internal state is the fan input power, converted to a suction coefficient on each line element using a new, simplified model of the internal flow in the sail, together with a constant fan efficiency.
+    - `FanSpeedToInternalFlow`: the wing internal state is the rotational speed of the fans, converted to a suction coefficient on each line element using the same internal flow model, together with a fan model based on fan curves. The fan curves can be given either as dimensional curves at a reference rotational speed and density, or as non-dimensional coefficients, and are scaled with the fan affinity laws. The fan model also supports multiple fans in parallel and pressure losses in the ducts between the sail and the fans.
 - All section models can now compute a power coefficient. Foils return zero, the `ActiveAirFlowFoil` returns a value consistent with the power given as the wing internal state, and the `RotatingCylinder` uses a polynomial model, with default values from Tillig and Ringsberg (2020).
-- New default input power model, `FromSectionModelPowerCoefficient`, which computes the power by integrating the power coefficient of the section models over the wing.
+- Section models can also compute the power for a whole wing, through a new `wing_power` function. For most section models, this is the power coefficient integrated over the wing, while the `ActiveAirFlowFoil` with fan curves computes the power from the operating point of the fans.
+- New default input power model, `FromSectionModelPowerCoefficient`, which computes the power for each wing from the section model.
 - The controller can now take the internal state set points either in the units of the section model (e.g., spin ratio or suction coefficient), or directly as the wing internal state (e.g., power), through the new `internal_state_set_point_type` setting.
 
 ### Breaking changes
@@ -104,10 +106,11 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
     - `internal_state_max_value` -> `wing_internal_state_max_value`
     - `max_internal_state_change_rate` -> `wing_internal_state_max_change_rate`
 - The `input_power` function on the line force model now takes the sectional force input as an argument, as the power can depend on the local flow conditions.
+- Stormbird now depends on version 0.4.0 of Stormath, which adds a bracketed root-finding method (Brent's method), used to find the operating point of the fans.
 
 ### Changes to the Python library
-- pystormbird: new `ActiveAirFlowFoil` class, and a new `power_coefficient` function for the `RotatingCylinder` class. The `as_active_air_flow_foil` function on the `VaryingFoil` class was removed, as an active air flow foil now also needs an internal state conversion.
-- stormbird_setup: updated to the new data structures for the section models, input power models and controller set points. The input power model now matches the variants in the Rust library, and `new_polynomial_rotor_sail_model` gives the power directly, without the `area` argument. The suction sail in the simplified setup now uses the default input power model.
+- pystormbird: new `ActiveAirFlowFoil` class, including functions for the section internal states and the power for a whole wing, and a new `power_coefficient` function for the `RotatingCylinder` class. The `as_active_air_flow_foil` function on the `VaryingFoil` class was removed, as an active air flow foil now also needs an internal state conversion.
+- stormbird_setup: updated to the new data structures for the section models, input power models and controller set points, including the fan model with fan curves. The fan curve data is checked in the same way as in the Rust library. The input power model now matches the variants in the Rust library, and `new_polynomial_rotor_sail_model` gives the power directly, without the `area` argument. The suction sail in the simplified setup now uses the default input power model.
 
 ### Bug fixes
 - The input power model and the `RotatingCylinder` model in stormbird_setup did not match the Rust library, and could produce input that the Rust library would not accept.

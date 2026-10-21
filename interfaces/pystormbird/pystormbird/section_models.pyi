@@ -115,6 +115,15 @@ class ActiveAirFlowFoil:
         areas: list[float],
         density: float,
     ) -> list[float]: ...
+    def wing_power(
+        self,
+        wing_state: float,
+        angles_of_attack: list[float],
+        velocities: list[float],
+        areas: list[float],
+        section_states: list[float],
+        density: float,
+    ) -> float: ...
     def wing_state_from_section_state(
         self,
         section_state: float,

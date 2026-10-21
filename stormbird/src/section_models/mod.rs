@@ -22,6 +22,29 @@ use varying_foil::VaryingFoil;
 use rotating_cylinder::RotatingCylinder;
 use active_air_flow_foil::ActiveAirFlowFoil;
 
+#[derive(Debug, Clone)]
+/// The local flow conditions on a single segment of a wing. Used by section models where the
+/// relationship between the wing and the sections depends on the flow conditions along the whole
+/// wing, such as when converting the wing internal state or computing the power for a wing.
+pub struct SegmentFlowConditions {
+    pub angle_of_attack: Float,
+    pub velocity: Float,
+    pub area: Float,
+}
+
+/// Integrates a power coefficient over the segments of a wing: P = sum(c_P * 0.5 * density * A * U^3)
+pub fn integrate_power_coefficient(
+    segments: &[SegmentFlowConditions],
+    section_states: &[Float],
+    density: Float,
+    power_coefficient: impl Fn(Float, Float) -> Float,
+) -> Float {
+    segments.iter().zip(section_states).map(|(segment, &section_state)| {
+        power_coefficient(segment.angle_of_attack, section_state) *
+            0.5 * density * segment.area * segment.velocity.powi(3)
+    }).sum()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Sectional model for a wing, that can be of multiple variants
 pub enum SectionModel {
@@ -159,6 +182,36 @@ impl SectionModel {
             ),
             Self::RotatingCylinder(cylinder) => cylinder.power_coefficient(internal_state),
             Self::EffectiveWindSensor => 0.0,
+        }
+    }
+
+    /// Computes the power needed to operate a wing using this section model.
+    ///
+    /// For most section models, this is the power coefficient integrated over the wing. However,
+    /// some models need information about the whole wing to compute the power, such as an active
+    /// air flow foil where the power is given by a fan model that depends on the total flow.
+    ///
+    /// # Arguments
+    /// * `wing_state` - the internal state of the wing
+    /// * `segments` - the flow conditions on each segment of the wing
+    /// * `section_states` - the internal state of the section model on each segment
+    /// * `density` - the density of the fluid
+    pub fn wing_power(
+        &self,
+        wing_state: Float,
+        segments: &[SegmentFlowConditions],
+        section_states: &[Float],
+        density: Float
+    ) -> Float {
+        match self {
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.wing_power(
+                wing_state, segments, section_states, density
+            ),
+            _ => integrate_power_coefficient(
+                segments, section_states, density, |angle_of_attack, section_state| {
+                    self.power_coefficient(angle_of_attack, section_state)
+                }
+            ),
         }
     }
 

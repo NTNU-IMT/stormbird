@@ -14,17 +14,19 @@ pub struct InternalFlowSolverSettings {
     pub segment_tolerance: Float,
     #[serde(default="InternalFlowSolverSettings::default_max_iterations")]
     pub segment_max_iterations: usize,
-    #[serde(default="InternalFlowSolverSettings::default_power_tolerance")]
-    /// Tolerance on the power, relative to the target power, when solving for the internal suction
-    pub power_tolerance: Float,
-    #[serde(default="InternalFlowSolverSettings::default_max_iterations")]
-    pub power_max_iterations: usize,
+    #[serde(default="InternalFlowSolverSettings::default_wing_tolerance")]
+    /// Relative tolerance when solving for the internal suction of the whole wing, either from the
+    /// power or from the balance between the fan curves and the flow through the wing.
+    pub wing_tolerance: Float,
+    #[serde(default="InternalFlowSolverSettings::default_wing_max_iterations")]
+    pub wing_max_iterations: usize,
 }
 
 impl InternalFlowSolverSettings {
     fn default_segment_tolerance() -> Float {1e-8}
-    fn default_power_tolerance() -> Float {1e-6}
+    fn default_wing_tolerance() -> Float {1e-6}
     fn default_max_iterations() -> usize {20}
+    fn default_wing_max_iterations() -> usize {50}
 
     pub fn segment_solver_settings(&self) -> SolverSettings {
         SolverSettings {
@@ -33,10 +35,10 @@ impl InternalFlowSolverSettings {
         }
     }
 
-    pub fn power_solver_settings(&self) -> SolverSettings {
+    pub fn wing_solver_settings(&self) -> SolverSettings {
         SolverSettings {
-            tolerance: self.power_tolerance,
-            max_iterations: self.power_max_iterations,
+            tolerance: self.wing_tolerance,
+            max_iterations: self.wing_max_iterations,
         }
     }
 }
@@ -46,8 +48,8 @@ impl Default for InternalFlowSolverSettings {
         Self {
             segment_tolerance: Self::default_segment_tolerance(),
             segment_max_iterations: Self::default_max_iterations(),
-            power_tolerance: Self::default_power_tolerance(),
-            power_max_iterations: Self::default_max_iterations(),
+            wing_tolerance: Self::default_wing_tolerance(),
+            wing_max_iterations: Self::default_wing_max_iterations(),
         }
     }
 }
@@ -67,33 +69,19 @@ pub struct InternalFlowInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// Model for estimating the internal flow properties on a line segment
+/// Model for estimating the flow through the porous surface of a wing, where all segments share 
+/// the same internal volume. The model does not include the fan, which is part of the internal 
+/// state conversion in the active air flow foil.
 pub struct InternalFlow {
     pub cp_zero_cl: Float,
     pub cp_gradient: Float,
     pub loss_coefficient: Float,
     pub porous_fraction: Float,
-    #[serde(default="InternalFlow::default_fan_efficiency")]
-    /// Efficiency of the fan, defined as the ratio between the power delivered to the flow,
-    /// P_flow = s * Q, and the input power to the fan. Must be larger than zero.
-    pub fan_efficiency: Float,
     #[serde(default)]
     pub solver_settings: InternalFlowSolverSettings,
 }
 
 impl InternalFlow {
-    pub fn default_fan_efficiency() -> Float {1.0}
-
-    /// Converts the input power to the fan to the power delivered to the flow
-    pub fn flow_power_from_fan_power(&self, fan_power: Float) -> Float {
-        fan_power * self.fan_efficiency
-    }
-
-    /// Converts the power delivered to the flow to the input power to the fan
-    pub fn fan_power_from_flow_power(&self, flow_power: Float) -> Float {
-        flow_power / self.fan_efficiency
-    }
-
     /// Computes the external pressure on the suction side of a foil, as a function of the lift
     /// coefficient
     pub fn external_pressure_coefficient(&self, cl: Float) -> Float {
@@ -140,14 +128,14 @@ impl InternalFlow {
         self.segment_volume_flow(input) / normalization
     }
 
-    /// Computes the fan input power associated with the flow through the segment:
-    /// P = Q * s / fan_efficiency.
+    /// Computes the power delivered to the flow through the segment: P_flow = Q * s. This does not 
+    /// include losses in the fan.
     ///
     /// The value is negative if the flow goes out of the foil while the internal suction is
     /// positive. Only the sum over all segments sharing the same internal volume is physically
-    /// meaningful, as this is the power the fan must deliver.
-    pub fn segment_power(&self, input: &InternalFlowInput) -> Float {
-        self.fan_power_from_flow_power(self.segment_volume_flow(input) * input.internal_suction)
+    /// meaningful.
+    pub fn segment_flow_power(&self, input: &InternalFlowInput) -> Float {
+        self.segment_volume_flow(input) * input.internal_suction
     }
 
     /// Computes the non-dimensional internal suction, s / q, where q = 0.5 * density * U^2, that

@@ -46,7 +46,7 @@ The set points are given as a function of the apparent wind direction, and are l
 The [internal state](../sectional_models/sectional_models_intro.md) of a wing can be given in different units than the internal state of the section model on each line element. For instance, the internal state of a rotor sail wing is the revolutions per second, while the section model uses the spin ratio. The `internal_state_set_point_type` defines which units the `internal_state_data` is given in:
 
 - `SectionModel`: The data is given in the units of the section model, and is converted to the wing internal state using the measured flow conditions. This is the default. For a rotor sail, the data is then given as the spin ratio. For a suction sail, the data is given as the suction or power coefficient, depending on the internal state conversion in the [active air flow foil model](../sectional_models/active_air_flow_foil.md). 
-- `Wing`: The data is given directly as the wing internal state, and is used without any conversion. For a rotor sail, the data is then given as the revolutions per second. For a suction sail with a power based internal state conversion, the data is given as the power, where the sign sets the direction of the suction.
+- `Wing`: The data is given directly as the wing internal state, and is used without any conversion. For a rotor sail, the data is then given as the revolutions per second. For a suction sail with a power based internal state conversion, the data is given as the power, where the sign sets the direction of the suction. For a suction sail where the fans are modeled with fan curves, the data is given as the rotational speed of the fans.
 
 For section models where the wing internal state is used directly by the section model, such as for multi-element foils, the two options give the same result.
 
@@ -57,6 +57,7 @@ The `wing_internal_state_max_value` limits the absolute value of the wing intern
 
 - For rotor sails, the limits are given in revolutions per second, and revolutions per second per second.
 - For suction sails with a power based internal state conversion, the limits are given in power, and power per second. That is, the max value is the maximum power.
+- For suction sails where the fans are modeled with fan curves, the limits are given in revolutions per second for the fans, and revolutions per second per second.
 - For suction sails using the `SuctionCoefficientDirect` conversion, the limits are given as a suction coefficient.
 
 The `max_local_wing_angle_change_rate` limits how fast the local wing angle can change, in radians per second. 

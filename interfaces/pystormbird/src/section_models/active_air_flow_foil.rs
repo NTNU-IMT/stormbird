@@ -53,21 +53,32 @@ impl ActiveAirFlowFoil {
         areas: Vec<f64>,
         density: f64
     ) -> PyResult<Vec<f64>> {
-        if angles_of_attack.len() != velocities.len() || angles_of_attack.len() != areas.len() {
+        let segments = Self::segments(&angles_of_attack, &velocities, &areas)?;
+
+        Ok(self.data.section_internal_states(wing_state, &segments, density))
+    }
+
+    /// Computes the power needed to operate the wing, from the wing state and the internal state
+    /// of the foil model on each segment. All input lists must have the same length, with one 
+    /// value per segment.
+    pub fn wing_power(
+        &self,
+        wing_state: f64,
+        angles_of_attack: Vec<f64>,
+        velocities: Vec<f64>,
+        areas: Vec<f64>,
+        section_states: Vec<f64>,
+        density: f64
+    ) -> PyResult<f64> {
+        let segments = Self::segments(&angles_of_attack, &velocities, &areas)?;
+
+        if section_states.len() != segments.len() {
             return Err(PyValueError::new_err(
-                "angles_of_attack, velocities and areas must have the same length"
+                "section_states must have the same length as the other input lists"
             ));
         }
 
-        let segments: Vec<SegmentFlowConditions> = (0..angles_of_attack.len()).map(|i| {
-            SegmentFlowConditions {
-                angle_of_attack: angles_of_attack[i],
-                velocity: velocities[i],
-                area: areas[i],
-            }
-        }).collect();
-
-        Ok(self.data.section_internal_states(wing_state, &segments, density))
+        Ok(self.data.wing_power(wing_state, &segments, &section_states, density))
     }
 
     /// Estimates the wing state that gives a specified section internal state, assuming uniform
@@ -99,5 +110,27 @@ impl ActiveAirFlowFoil {
     /// Uses the built in json module to convert the string to a dictionary
     pub fn __dict__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         Ok(pythonize(py, &self.data)?)
+    }
+}
+
+impl ActiveAirFlowFoil {
+    fn segments(
+        angles_of_attack: &[f64],
+        velocities: &[f64],
+        areas: &[f64]
+    ) -> PyResult<Vec<SegmentFlowConditions>> {
+        if angles_of_attack.len() != velocities.len() || angles_of_attack.len() != areas.len() {
+            return Err(PyValueError::new_err(
+                "angles_of_attack, velocities and areas must have the same length"
+            ));
+        }
+
+        Ok((0..angles_of_attack.len()).map(|i| {
+            SegmentFlowConditions {
+                angle_of_attack: angles_of_attack[i],
+                velocity: velocities[i],
+                area: areas[i],
+            }
+        }).collect())
     }
 }
