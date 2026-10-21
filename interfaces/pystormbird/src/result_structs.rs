@@ -35,6 +35,12 @@ impl SectionalForcesInput {
     }
 
     #[getter]
+    /// The internal state given to the section model on each line element
+    pub fn section_models_internal_state(&self) -> Vec<f64> {
+        self.data.section_models_internal_state.clone()
+    }
+
+    #[getter]
     pub fn acceleration(&self) -> Vec<[f64; 3]> {
         self.data.acceleration.iter().map(|v| v.0).collect()
     }
