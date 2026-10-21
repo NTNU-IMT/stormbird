@@ -6,6 +6,7 @@ use stormath::solvers::{secant_solver, brent_solver};
 
 use super::varying_foil::VaryingFoil;
 use super::integrate_power_coefficient;
+use crate::line_force_model::wing_internal_state::{WingInternalState, InternalCompartments};
 
 pub use super::SegmentFlowConditions;
 
@@ -151,28 +152,46 @@ impl ActiveAirFlowFoil {
         )
     }
 
+    /// Returns true if the internal state conversion uses an internal flow model, and therefore
+    /// can have multiple internal compartments.
+    pub fn uses_internal_compartments(&self) -> bool {
+        matches!(
+            self.internal_state_conversion,
+            InternalStateConversion::PowerToInternalFlow { .. } |
+            InternalStateConversion::FanSpeedToInternalFlow { .. }
+        )
+    }
+
     /// Computes the power needed to operate the wing.
     ///
-    /// For the `FanSpeedToInternalFlow` conversion, the power is given by the fan curves, using the
-    /// rotational speed from the wing state and the total volume flow from the suction
-    /// coefficients on each segment. For the other conversions, the power coefficient is
-    /// integrated over the wing.
+    /// For the `FanSpeedToInternalFlow` conversion, the power is given by the fan curves in each
+    /// compartment, using the rotational speed for the compartment and the volume flow through it.
+    /// For the other conversions, the power coefficient is integrated over the wing.
     pub fn wing_power(
         &self,
-        wing_state: Float,
+        wing_state: &WingInternalState,
         segments: &[SegmentFlowConditions],
+        compartments: &InternalCompartments,
         section_states: &[Float],
         density: Float
     ) -> Float {
         match &self.internal_state_conversion {
             InternalStateConversion::FanSpeedToInternalFlow { fan, .. } => {
-                let total_volume_flow: Float = segments.iter().zip(section_states).map(
-                    |(segment, &section_state)| {
-                        section_state.abs() * segment.velocity * segment.area
-                    }
-                ).sum();
+                (0..compartments.nr_compartments()).map(|compartment_index| {
+                    let volume_flow: Float = segments.iter().zip(section_states)
+                        .filter(|(segment, _)| {
+                            !segment.is_virtual && segment.compartment_index == compartment_index
+                        })
+                        .map(|(segment, &section_state)| {
+                            section_state.abs() * segment.velocity * segment.area
+                        }).sum();
 
-                fan.power(total_volume_flow, wing_state.abs(), density)
+                    let rotational_speed = Self::compartment_rotational_speed(
+                        wing_state, compartments, compartment_index
+                    ).abs();
+
+                    fan.power(volume_flow, rotational_speed, density)
+                }).sum()
             },
             _ => integrate_power_coefficient(
                 segments, section_states, density, |angle_of_attack, section_state| {
@@ -187,40 +206,170 @@ impl ActiveAirFlowFoil {
     ///
     /// The sign of the wing state is preserved in the section internal states, so that it can be
     /// used to set the direction of the suction/flap.
+    ///
+    /// For a span varying wing state, the power based conversions interpret the values as power
+    /// per span length. Virtual segments get the same type of internal state as the rest of the
+    /// wing, but are not included in the power or in the flow through the wing.
+    ///
+    /// For the conversions with an internal flow model, each internal compartment is solved
+    /// separately, with its own internal pressure. A constant power is divided equally between the
+    /// compartments, while a power per span length is integrated over each compartment. The
+    /// rotational speed of the fans in each compartment is the mean value over the compartment.
     pub fn section_internal_states(
         &self,
-        wing_state: Float,
+        wing_state: &WingInternalState,
         segments: &[SegmentFlowConditions],
+        compartments: &InternalCompartments,
         density: Float
     ) -> Vec<Float> {
         match &self.internal_state_conversion {
             InternalStateConversion::SuctionCoefficientDirect => {
-                vec![wing_state; segments.len()]
+                segments.iter().map(|segment| {
+                    wing_state.value_at(segment.non_dim_span_location)
+                }).collect()
             },
             InternalStateConversion::PowerToPowerCoefficient => {
+                Self::power_coefficients_from_power(wing_state, segments, density)
+            },
+            InternalStateConversion::PowerToInternalFlow { internal_flow, fan_efficiency } => {
+                Self::solve_per_compartment(
+                    segments,
+                    compartments,
+                    |compartment_segments, compartment_index| {
+                        let power = Self::compartment_power(
+                            wing_state, segments, compartments, compartment_index
+                        );
+
+                        self.suction_coefficients_from_power(
+                            internal_flow, *fan_efficiency, power, compartment_segments, density
+                        )
+                    }
+                )
+            },
+            InternalStateConversion::FanSpeedToInternalFlow { internal_flow, fan } => {
+                Self::solve_per_compartment(
+                    segments,
+                    compartments,
+                    |compartment_segments, compartment_index| {
+                        let rotational_speed = Self::compartment_rotational_speed(
+                            wing_state, compartments, compartment_index
+                        );
+
+                        self.suction_coefficients_from_fan_speed(
+                            internal_flow, fan, rotational_speed, compartment_segments, density
+                        )
+                    }
+                )
+            },
+        }
+    }
+
+    /// Computes the section internal states for each compartment separately, using the segments
+    /// that belong to the compartment, and collects the result in the original order.
+    fn solve_per_compartment(
+        segments: &[SegmentFlowConditions],
+        compartments: &InternalCompartments,
+        solve: impl Fn(&[SegmentFlowConditions], usize) -> Vec<Float>,
+    ) -> Vec<Float> {
+        let mut section_states = vec![0.0; segments.len()];
+
+        for compartment_index in 0..compartments.nr_compartments() {
+            let indices: Vec<usize> = segments.iter().enumerate()
+                .filter(|(_, segment)| segment.compartment_index == compartment_index)
+                .map(|(index, _)| index)
+                .collect();
+
+            if indices.is_empty() {
+                continue;
+            }
+
+            let compartment_segments: Vec<SegmentFlowConditions> = indices.iter()
+                .map(|&index| segments[index].clone())
+                .collect();
+
+            let compartment_states = solve(&compartment_segments, compartment_index);
+
+            for (&index, state) in indices.iter().zip(compartment_states) {
+                section_states[index] = state;
+            }
+        }
+
+        section_states
+    }
+
+    /// The power for a compartment, for a wing state that represents power. A constant value is
+    /// the total power for the wing, which is divided equally between the compartments. A span
+    /// varying value is the power per span length, which is integrated over the compartment.
+    fn compartment_power(
+        wing_state: &WingInternalState,
+        segments: &[SegmentFlowConditions],
+        compartments: &InternalCompartments,
+        compartment_index: usize
+    ) -> Float {
+        match wing_state {
+            WingInternalState::Constant(power) => *power / compartments.nr_compartments() as Float,
+            WingInternalState::SpanVarying(_) => {
+                let span_length: Float = segments.iter().map(|segment| segment.span_length).sum();
+
+                let (start, end) = compartments.range(compartment_index);
+
+                wing_state.span_integral(start, end, span_length)
+            },
+        }
+    }
+
+    /// The rotational speed of the fans in a compartment, which is the mean value of the wing state
+    /// over the compartment
+    fn compartment_rotational_speed(
+        wing_state: &WingInternalState,
+        compartments: &InternalCompartments,
+        compartment_index: usize
+    ) -> Float {
+        let (start, end) = compartments.range(compartment_index);
+
+        wing_state.mean(start, end)
+    }
+
+    /// Converts a wing state that represents power to a power coefficient on each segment.
+    fn power_coefficients_from_power(
+        wing_state: &WingInternalState,
+        segments: &[SegmentFlowConditions],
+        density: Float
+    ) -> Vec<Float> {
+        match wing_state {
+            WingInternalState::Constant(power) => {
                 // The power is distributed to each segment proportional to the segment area:
                 // P_segment = P * A_segment / A_wing. The segment power coefficient is then
                 // P_segment / (0.5 * A_segment * density * U^3), where the segment area cancels,
                 // giving P / (0.5 * A_wing * density * U^3).
-                let wing_area: Float = segments.iter().map(|segment| segment.area).sum();
+                let wing_area: Float = segments.iter()
+                    .filter(|segment| !segment.is_virtual)
+                    .map(|segment| segment.area)
+                    .sum();
 
                 segments.iter().map(|segment| {
                     if wing_area > MIN_POSITIVE && segment.velocity > MIN_POSITIVE {
-                        wing_state / (0.5 * wing_area * density * segment.velocity.powi(3))
+                        power / (0.5 * wing_area * density * segment.velocity.powi(3))
                     } else {
                         0.0
                     }
                 }).collect()
             },
-            InternalStateConversion::PowerToInternalFlow { internal_flow, fan_efficiency } => {
-                self.suction_coefficients_from_power(
-                    internal_flow, *fan_efficiency, wing_state, segments, density
-                )
-            },
-            InternalStateConversion::FanSpeedToInternalFlow { internal_flow, fan } => {
-                self.suction_coefficients_from_fan_speed(
-                    internal_flow, fan, wing_state, segments, density
-                )
+            WingInternalState::SpanVarying(_) => {
+                // The power per span length gives the power on each segment as
+                // P_segment = power_per_span * L_segment. The power coefficient is then
+                // power_per_span / (0.5 * chord * density * U^3)
+                segments.iter().map(|segment| {
+                    let chord_length = segment.chord_length();
+
+                    if chord_length > MIN_POSITIVE && segment.velocity > MIN_POSITIVE {
+                        let power_per_span = wing_state.value_at(segment.non_dim_span_location);
+
+                        power_per_span / (0.5 * chord_length * density * segment.velocity.powi(3))
+                    } else {
+                        0.0
+                    }
+                }).collect()
             },
         }
     }
@@ -233,13 +382,15 @@ impl ActiveAirFlowFoil {
     /// For the power based conversions, the power is calculated from the power coefficient of the
     /// section model: P = sign(state) * c_P(alpha, state) * 0.5 * density * A_wing * U^3. For the
     /// fan based conversion, the rotational speed is found from the fan curves, at the operating
-    /// point given by the suction coefficient.
+    /// point given by the suction coefficient. With several internal compartments, the area of the
+    /// wing is assumed to be divided equally between them.
     pub fn wing_state_from_section_state(
         &self,
         section_state: Float,
         angle_of_attack: Float,
         velocity: Float,
         wing_area: Float,
+        nr_compartments: usize,
         density: Float
     ) -> Float {
         match &self.internal_state_conversion {
@@ -269,7 +420,9 @@ impl ActiveAirFlowFoil {
                     suction_coefficient, lift_coefficient
                 ) * 0.5 * density * velocity.powi(2);
 
-                let total_volume_flow = suction_coefficient * velocity * wing_area;
+                let compartment_area = wing_area / nr_compartments.max(1) as Float;
+
+                let total_volume_flow = suction_coefficient * velocity * compartment_area;
 
                 let required_pressure_rise = internal_suction + fan.duct_loss(total_volume_flow);
 
@@ -379,7 +532,7 @@ impl ActiveAirFlowFoil {
         internal_suction: Float,
         direction: Float,
     ) -> Float {
-        segments.iter().map(|segment| {
+        segments.iter().filter(|segment| !segment.is_virtual).map(|segment| {
             let suction_coefficient = self.segment_suction_coefficient(
                 internal_flow, segment, density, internal_suction, direction
             );
@@ -399,7 +552,9 @@ impl ActiveAirFlowFoil {
         direction: Float,
     ) -> Option<Float> {
         let threshold_suction = segments.iter()
-            .filter(|segment| segment.velocity > MIN_POSITIVE && segment.area > MIN_POSITIVE)
+            .filter(|segment| {
+                !segment.is_virtual && segment.velocity > MIN_POSITIVE && segment.area > MIN_POSITIVE
+            })
             .map(|segment| {
                 let lift_coefficient = direction * self.lift_coefficient(
                     segment.angle_of_attack, 0.0
@@ -436,7 +591,10 @@ impl ActiveAirFlowFoil {
 
         // Initial guess when neglecting the external pressure:
         // P = s * phi * A * sqrt(2 * s / (density * K)) => s = (P / (phi * A * sqrt(2 / (density * K))))^(2/3)
-        let total_area: Float = segments.iter().map(|segment| segment.area).sum();
+        let total_area: Float = segments.iter()
+            .filter(|segment| !segment.is_virtual)
+            .map(|segment| segment.area)
+            .sum();
 
         let flow_factor = internal_flow.porous_fraction * total_area * (
             2.0 / (density * internal_flow.loss_coefficient)

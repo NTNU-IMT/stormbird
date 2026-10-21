@@ -142,10 +142,21 @@ impl LineForceModel {
             ).collect();
     }
 
+    /// Sets a constant internal state for each wing
     pub fn set_internal_state(&mut self, internal_state: &[Float]) {
         for (index, value) in internal_state.iter().enumerate() {
-            self.internal_state[index] = *value;
+            self.internal_state[index] = WingInternalState::Constant(*value);
         }
+    }
+
+    /// Sets the internal state of a single wing, which can be constant or vary along the span
+    pub fn set_wing_internal_state(&mut self, wing_index: usize, internal_state: WingInternalState) {
+        self.internal_state[wing_index] = internal_state;
+    }
+
+    /// Sets an internal state that varies along the span for a single wing
+    pub fn set_internal_state_span_variation(&mut self, wing_index: usize, span_variation: SpanVariation) {
+        self.internal_state[wing_index] = WingInternalState::SpanVarying(span_variation);
     }
 
     pub fn set_controller_output(&mut self, controller_output: &ControllerOutput) {                

@@ -50,6 +50,7 @@ pub struct WingBuilder {
     pub non_zero_circulation_at_ends: [bool; 2],
     pub nr_sections: Option<usize>,
     pub input_power_model: InputPowerModel,
+    pub internal_compartment_boundaries: Option<Vec<f64>>,
 }
 ```
 
@@ -66,6 +67,8 @@ The `non_zero_circulation_at_ends` consists of boolean values that specify the e
 The `nr_sections` variable is optional but can be set for each wing to override the default parameters in the `LineForceModelBuilder`. Typically, it will not be used, as the most common scenario is to have the same number of sections for each wing.
 
 The `input_power_model` specifies an optional empirical model for the power needed to operate the wing, for instance for rotor sails or suction sails. The default is `FromSectionModelPowerCoefficient`, which computes the power from the section model, and gives zero power for section models that do not need power. See the [input power chapter](./input_power.md) for more.
+
+The `internal_compartment_boundaries` is an optional division of the internal volume of the wing into sealed compartments, for instance for a suction sail with several fans along the span. The boundaries are given as non-dimensional span locations, running from -0.5 at one end of the wing to 0.5 at the other, including both ends. For instance, `[-0.5, 0.0, 0.5]` gives two compartments of equal length. The compartments are only used by section models with an internal flow model, and setting more than one compartment for other section models gives an error. The default is a single compartment. See the [active air flow foil chapter](../sectional_models/active_air_flow_foil.md#internal-compartments) for more.
 
 When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note].
 

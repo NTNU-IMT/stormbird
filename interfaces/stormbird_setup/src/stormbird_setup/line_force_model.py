@@ -13,6 +13,7 @@ from .circulation_corrections import CirculationCorrectionBuilder
 from .input_power import InputPowerModel
 
 from enum import Enum
+from pydantic import model_validator
 from typing import Iterator
 
 class CoordinateSystem(Enum):
@@ -30,6 +31,40 @@ class WingBuilder(StormbirdSetupBaseModel):
     non_zero_circulation_at_ends: tuple[bool, bool] = (False, False)
     nr_sections: int | None = None
     input_power_model: InputPowerModel = InputPowerModel()
+    internal_compartment_boundaries: list[float] | None = None
+
+    @model_validator(mode='after')
+    def check_internal_compartments(self) -> "WingBuilder":
+        '''
+        The internal compartments divide the internal volume of the wing into sealed compartments,
+        defined by the non-dimensional span locations of their boundaries, including the ends of
+        the wing at -0.5 and 0.5. More than one compartment is only allowed for section models with
+        an internal flow model.
+        '''
+        boundaries = self.internal_compartment_boundaries
+
+        if boundaries is None:
+            return self
+
+        if len(boundaries) < 2:
+            raise ValueError(
+                "The internal compartment boundaries must at least contain the two ends of the wing"
+            )
+
+        if abs(boundaries[0] + 0.5) > 1e-12 or abs(boundaries[-1] - 0.5) > 1e-12:
+            raise ValueError("The internal compartment boundaries must start at -0.5 and end at 0.5")
+
+        if any(b <= a for a, b in zip(boundaries[:-1], boundaries[1:])):
+            raise ValueError("The internal compartment boundaries must be strictly increasing")
+
+        if len(boundaries) > 2 and not self.section_model.uses_internal_compartments():
+            raise ValueError(
+                "Internal compartments are only used by section models with an internal flow "
+                "model, i.e., an active air flow foil with the PowerToInternalFlow or "
+                "FanSpeedToInternalFlow conversion"
+            )
+
+        return self
 
     def real_line_segments(self) -> Iterator[int]:
         '''

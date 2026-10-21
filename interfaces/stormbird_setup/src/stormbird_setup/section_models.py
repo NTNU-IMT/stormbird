@@ -422,6 +422,19 @@ class EffectiveWindSensor(StormbirdSetupBaseModel):
 class SectionModel(StormbirdSetupBaseModel):
     model: Foil | MultiElementFoil | ActiveAirFlowFoil | RotatingCylinder | EffectiveWindSensor
     
+    def uses_internal_compartments(self) -> bool:
+        '''
+        Returns true if the section model has an internal flow model, and can therefore be used
+        with several internal compartments
+        '''
+        if not isinstance(self.model, ActiveAirFlowFoil):
+            return False
+
+        return self.model.internal_state_conversion.conversion_type in (
+            InternalStateConversionType.PowerToInternalFlow,
+            InternalStateConversionType.FanSpeedToInternalFlow
+        )
+
     @classmethod
     def rotor_sail_deybach_2024(cls, linearized: bool = False) -> "SectionModel":
         """

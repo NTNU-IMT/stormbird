@@ -21,6 +21,7 @@ use foil::Foil;
 use varying_foil::VaryingFoil;
 use rotating_cylinder::RotatingCylinder;
 use active_air_flow_foil::ActiveAirFlowFoil;
+use crate::line_force_model::wing_internal_state::{WingInternalState, InternalCompartments};
 
 #[derive(Debug, Clone)]
 /// The local flow conditions on a single segment of a wing. Used by section models where the
@@ -29,20 +30,47 @@ use active_air_flow_foil::ActiveAirFlowFoil;
 pub struct SegmentFlowConditions {
     pub angle_of_attack: Float,
     pub velocity: Float,
+    /// The area of the segment, i.e., the chord length times the span length
     pub area: Float,
+    /// The length of the segment along the span
+    pub span_length: Float,
+    /// The non-dimensional location of the control point along the span of the wing, running from
+    /// -0.5 to 0.5
+    pub non_dim_span_location: Float,
+    /// Virtual segments are part of the simulation, but not of the wing itself, for instance when 
+    /// modelling end plates. They are therefore not included in the power, or in the flow through
+    /// a wing with active air flow.
+    pub is_virtual: bool,
+    /// The index of the internal compartment the segment belongs to. Only used by section models
+    /// with an internal flow model.
+    pub compartment_index: usize,
 }
 
-/// Integrates a power coefficient over the segments of a wing: P = sum(c_P * 0.5 * density * A * U^3)
+impl SegmentFlowConditions {
+    /// The chord length of the segment
+    pub fn chord_length(&self) -> Float {
+        if self.span_length > 0.0 {
+            self.area / self.span_length
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Integrates a power coefficient over the segments of a wing: P = sum(c_P * 0.5 * density * A * U^3).
+/// Virtual segments are not included.
 pub fn integrate_power_coefficient(
     segments: &[SegmentFlowConditions],
     section_states: &[Float],
     density: Float,
     power_coefficient: impl Fn(Float, Float) -> Float,
 ) -> Float {
-    segments.iter().zip(section_states).map(|(segment, &section_state)| {
-        power_coefficient(segment.angle_of_attack, section_state) *
-            0.5 * density * segment.area * segment.velocity.powi(3)
-    }).sum()
+    segments.iter().zip(section_states)
+        .filter(|(segment, _)| !segment.is_virtual)
+        .map(|(segment, &section_state)| {
+            power_coefficient(segment.angle_of_attack, section_state) *
+                0.5 * density * segment.area * segment.velocity.powi(3)
+        }).sum()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,6 +213,40 @@ impl SectionModel {
         }
     }
 
+    /// Converts the internal state of a wing to the internal state of the section model on each 
+    /// segment of the wing.
+    ///
+    /// For most section models, the value of the wing state at the location of each segment is 
+    /// used directly, or with a local conversion, such as from revolutions per second to spin ratio
+    /// for a rotating cylinder. Active air flow foils can need information about the whole wing.
+    pub fn section_internal_states(
+        &self,
+        wing_state: &WingInternalState,
+        segments: &[SegmentFlowConditions],
+        compartments: &InternalCompartments,
+        density: Float
+    ) -> Vec<Float> {
+        match self {
+            Self::SingleElementFoil(_) | Self::MultiElementFoil(_) | Self::EffectiveWindSensor => {
+                segments.iter().map(|segment| {
+                    wing_state.value_at(segment.non_dim_span_location)
+                }).collect()
+            },
+            Self::RotatingCylinder(_) => {
+                segments.iter().map(|segment| {
+                    RotatingCylinder::spin_ratio_from_revolutions_per_second(
+                        wing_state.value_at(segment.non_dim_span_location),
+                        segment.chord_length(),
+                        segment.velocity
+                    )
+                }).collect()
+            },
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => {
+                active_air_flow_foil.section_internal_states(wing_state, segments, compartments, density)
+            },
+        }
+    }
+
     /// Computes the power needed to operate a wing using this section model.
     ///
     /// For most section models, this is the power coefficient integrated over the wing. However,
@@ -194,24 +256,37 @@ impl SectionModel {
     /// # Arguments
     /// * `wing_state` - the internal state of the wing
     /// * `segments` - the flow conditions on each segment of the wing
+    /// * `compartments` - the internal compartments of the wing
     /// * `section_states` - the internal state of the section model on each segment
     /// * `density` - the density of the fluid
     pub fn wing_power(
         &self,
-        wing_state: Float,
+        wing_state: &WingInternalState,
         segments: &[SegmentFlowConditions],
+        compartments: &InternalCompartments,
         section_states: &[Float],
         density: Float
     ) -> Float {
         match self {
             Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.wing_power(
-                wing_state, segments, section_states, density
+                wing_state, segments, compartments, section_states, density
             ),
             _ => integrate_power_coefficient(
                 segments, section_states, density, |angle_of_attack, section_state| {
                     self.power_coefficient(angle_of_attack, section_state)
                 }
             ),
+        }
+    }
+
+    /// Returns true if the section model uses internal compartments, i.e., if it has an internal
+    /// flow model.
+    pub fn uses_internal_compartments(&self) -> bool {
+        match self {
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => {
+                active_air_flow_foil.uses_internal_compartments()
+            },
+            _ => false,
         }
     }
 

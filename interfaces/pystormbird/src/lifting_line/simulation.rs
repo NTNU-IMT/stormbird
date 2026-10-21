@@ -13,6 +13,7 @@ use stormath::spatial_vector::SpatialVector;
 use crate::result_structs::SimulationResult;
 
 use crate::line_force_model::LineForceModel;
+use crate::span_varying_internal_state;
 
 #[pyclass]
 pub struct Simulation {
@@ -108,11 +109,38 @@ impl Simulation {
     }
 
     pub fn internal_state(&self) -> Vec<f64> {
-        self.data.line_force_model.internal_state.clone()
+        self.data.line_force_model.internal_state_representative_values()
     }
 
     pub fn set_internal_state(&mut self, internal_state: Vec<f64>) {
         self.data.line_force_model.set_internal_state(&internal_state);
+    }
+
+    /// Sets an internal state for a wing that is linearly interpolated between non-dimensional
+    /// span locations, running from -0.5 to 0.5.
+    pub fn set_internal_state_linear(
+        &mut self,
+        wing_index: usize,
+        locations: Vec<f64>,
+        values: Vec<f64>
+    ) -> PyResult<()> {
+        span_varying_internal_state::set_internal_state_linear(
+            &mut self.data.line_force_model, wing_index, locations, values
+        )
+    }
+
+    /// Sets an internal state for a wing that is constant within zones along the span. The zones
+    /// are defined by their boundaries, given as non-dimensional span locations, with one more
+    /// boundary than values.
+    pub fn set_internal_state_piecewise_constant(
+        &mut self,
+        wing_index: usize,
+        boundaries: Vec<f64>,
+        values: Vec<f64>
+    ) -> PyResult<()> {
+        span_varying_internal_state::set_internal_state_piecewise_constant(
+            &mut self.data.line_force_model, wing_index, boundaries, values
+        )
     }
 
     pub fn get_freestream_velocity_points(&self) -> Vec<[f64; 3]> {

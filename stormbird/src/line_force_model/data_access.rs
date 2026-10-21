@@ -58,6 +58,12 @@ impl LineForceModel {
         areas
     }
 
+    /// Returns a single value representing the internal state of each wing. For wings with an 
+    /// internal state that varies along the span, this is the mean value over the span.
+    pub fn internal_state_representative_values(&self) -> Vec<Float> {
+        self.internal_state.iter().map(|state| state.representative_value()).collect()
+    }
+
     /// returns the span length of each wing in the model
     pub fn span_lengths(&self) -> Vec<Float> {
         let mut span_length = vec![0.0; self.nr_wings()];

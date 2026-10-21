@@ -13,6 +13,11 @@ use crate::section_models::active_air_flow_foil::internal_flow::{
     InternalFlowSolverSettings
 };
 use crate::section_models::active_air_flow_foil::fan::{Fan, FanCurves, FanCurveData};
+use crate::line_force_model::wing_internal_state::{WingInternalState, SpanVariation, InternalCompartments};
+
+fn single_compartment() -> InternalCompartments {
+    InternalCompartments::default()
+}
 
 const FAN_EFFICIENCY: Float = 0.7;
 const DENSITY: Float = 1.225;
@@ -86,12 +91,30 @@ fn test_model(internal_state_conversion: InternalStateConversion) -> ActiveAirFl
     }
 }
 
+/// Shorthand for a constant wing state
+fn constant(value: Float) -> WingInternalState {
+    WingInternalState::Constant(value)
+}
+
+/// A segment with unit chord, so that the span length equals the area
+fn segment(angle_of_attack: Float, velocity: Float, area: Float) -> SegmentFlowConditions {
+    SegmentFlowConditions {
+        angle_of_attack,
+        velocity,
+        area,
+        span_length: area,
+        non_dim_span_location: 0.0,
+        is_virtual: false,
+        compartment_index: 0,
+    }
+}
+
+/// Five segments with unit area, evenly distributed along the span
 fn test_segments() -> Vec<SegmentFlowConditions> {
     (0..5).map(|i| {
         SegmentFlowConditions {
-            angle_of_attack: (5.0 + 2.0 * i as Float).to_radians(),
-            velocity: 10.0 + i as Float,
-            area: 1.0,
+            non_dim_span_location: -0.4 + 0.2 * i as Float,
+            ..segment((5.0 + 2.0 * i as Float).to_radians(), 10.0 + i as Float, 1.0)
         }
     }).collect()
 }
@@ -152,7 +175,7 @@ fn suction_from_power_matches_power_and_is_self_consistent() {
         &internal_flow, flow_power, &segments, DENSITY, 1.0
     );
 
-    let suction_coefficients = model.section_internal_states(power, &segments, DENSITY);
+    let suction_coefficients = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
 
     let computed_flow_power = internal_suction * total_volume_flow(&segments, &suction_coefficients);
 
@@ -171,8 +194,8 @@ fn negative_power_mirrors_the_suction_direction() {
 
     let segments = test_segments();
 
-    let positive = model.section_internal_states(power, &segments, DENSITY);
-    let negative = model.section_internal_states(-power, &mirrored(&segments), DENSITY);
+    let positive = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
+    let negative = model.section_internal_states(&constant(-power), &mirrored(&segments), &single_compartment(), DENSITY);
 
     for (cq_positive, cq_negative) in positive.iter().zip(&negative) {
         assert!((cq_positive + cq_negative).abs() < 1e-8);
@@ -192,9 +215,9 @@ fn section_model_power_equals_wing_power() {
         let model = test_model(conversion);
 
         for power in [500.0, -500.0] {
-            let internal_states = model.section_internal_states(power, &segments, DENSITY);
+            let internal_states = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
 
-            let computed_power = model.wing_power(power, &segments, &internal_states, DENSITY);
+            let computed_power = model.wing_power(&constant(power), &segments, &single_compartment(), &internal_states, DENSITY);
 
             dbg!(power, computed_power);
 
@@ -207,9 +230,9 @@ fn section_model_power_equals_wing_power() {
 fn zero_power_gives_zero_suction_coefficient() {
     let model = test_model(power_conversion(FAN_EFFICIENCY));
 
-    let segments = vec![SegmentFlowConditions { angle_of_attack: 0.1, velocity: 10.0, area: 1.0 }];
+    let segments = vec![segment(0.1, 10.0, 1.0)];
 
-    let suction_coefficients = model.section_internal_states(0.0, &segments, DENSITY);
+    let suction_coefficients = model.section_internal_states(&constant(0.0), &segments, &single_compartment(), DENSITY);
 
     assert_eq!(suction_coefficients, vec![0.0]);
 }
@@ -218,7 +241,7 @@ fn zero_power_gives_zero_suction_coefficient() {
 fn zero_velocity_gives_zero_suction_and_no_nan() {
     let internal_flow = test_internal_flow();
 
-    let segments = vec![SegmentFlowConditions { angle_of_attack: 0.1, velocity: 0.0, area: 1.0 }; 3];
+    let segments = vec![segment(0.1, 0.0, 1.0); 3];
 
     let model = test_model(power_conversion(FAN_EFFICIENCY));
 
@@ -227,11 +250,11 @@ fn zero_velocity_gives_zero_suction_and_no_nan() {
     );
 
     assert_eq!(internal_suction, 0.0);
-    assert_eq!(model.section_internal_states(500.0, &segments, DENSITY), vec![0.0; 3]);
+    assert_eq!(model.section_internal_states(&constant(500.0), &segments, &single_compartment(), DENSITY), vec![0.0; 3]);
 
     let fan_model = test_model(fan_conversion(test_fan(0.0)));
 
-    assert_eq!(fan_model.section_internal_states(20.0, &segments, DENSITY), vec![0.0; 3]);
+    assert_eq!(fan_model.section_internal_states(&constant(20.0), &segments, &single_compartment(), DENSITY), vec![0.0; 3]);
 }
 
 #[test]
@@ -240,11 +263,11 @@ fn suction_coefficient_direct_is_passed_through_with_zero_power() {
 
     let segments = test_segments();
 
-    let internal_states = model.section_internal_states(-0.02, &segments, DENSITY);
+    let internal_states = model.section_internal_states(&constant(-0.02), &segments, &single_compartment(), DENSITY);
 
     assert_eq!(internal_states, vec![-0.02; segments.len()]);
 
-    assert_eq!(model.wing_power(-0.02, &segments, &internal_states, DENSITY), 0.0);
+    assert_eq!(model.wing_power(&constant(-0.02), &segments, &single_compartment(), &internal_states, DENSITY), 0.0);
 }
 
 #[test]
@@ -257,7 +280,7 @@ fn power_to_power_coefficient_uses_wing_area_and_local_velocity() {
 
     let wing_area: Float = segments.iter().map(|segment| segment.area).sum();
 
-    let internal_states = model.section_internal_states(power, &segments, DENSITY);
+    let internal_states = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
 
     for (segment, &cp) in segments.iter().zip(&internal_states) {
         let expected = power / (0.5 * wing_area * DENSITY * segment.velocity.powi(3));
@@ -274,7 +297,7 @@ fn wing_state_from_section_state_inverts_section_internal_states() {
     let velocity = 12.0;
 
     let segments: Vec<SegmentFlowConditions> = (0..4).map(|_| {
-        SegmentFlowConditions { angle_of_attack, velocity, area: 1.5 }
+        segment(angle_of_attack, velocity, 1.5)
     }).collect();
 
     let wing_area: Float = segments.iter().map(|segment| segment.area).sum();
@@ -291,10 +314,10 @@ fn wing_state_from_section_state_inverts_section_internal_states() {
         let model = test_model(conversion);
 
         for wing_state in [wing_state_magnitude, -wing_state_magnitude] {
-            let section_state = model.section_internal_states(wing_state, &segments, DENSITY)[0];
+            let section_state = model.section_internal_states(&constant(wing_state), &segments, &single_compartment(), DENSITY)[0];
 
             let wing_state_back = model.wing_state_from_section_state(
-                section_state, angle_of_attack, velocity, wing_area, DENSITY
+                section_state, angle_of_attack, velocity, wing_area, 1, DENSITY
             );
 
             dbg!(&model.internal_state_conversion, wing_state, section_state, wing_state_back);
@@ -314,9 +337,9 @@ fn fan_efficiency_scales_the_flow_power() {
     let model = test_model(power_conversion(FAN_EFFICIENCY));
     let ideal_model = test_model(power_conversion(1.0));
 
-    let suction_coefficients = model.section_internal_states(power, &segments, DENSITY);
+    let suction_coefficients = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
     let ideal_suction_coefficients = ideal_model.section_internal_states(
-        FAN_EFFICIENCY * power, &segments, DENSITY
+        &constant(FAN_EFFICIENCY * power), &segments, &single_compartment(), DENSITY
     );
 
     for (cq, cq_ideal) in suction_coefficients.iter().zip(&ideal_suction_coefficients) {
@@ -341,7 +364,7 @@ fn fan_operating_point_balances_the_pressure() {
             &internal_flow, &fan, rotational_speed, &segments, DENSITY, 1.0
         );
 
-        let suction_coefficients = model.section_internal_states(rotational_speed, &segments, DENSITY);
+        let suction_coefficients = model.section_internal_states(&constant(rotational_speed), &segments, &single_compartment(), DENSITY);
 
         let flow = total_volume_flow(&segments, &suction_coefficients);
 
@@ -363,15 +386,15 @@ fn negative_fan_speed_mirrors_the_suction_direction() {
 
     let segments = test_segments();
 
-    let positive = model.section_internal_states(15.0, &segments, DENSITY);
-    let negative = model.section_internal_states(-15.0, &mirrored(&segments), DENSITY);
+    let positive = model.section_internal_states(&constant(15.0), &segments, &single_compartment(), DENSITY);
+    let negative = model.section_internal_states(&constant(-15.0), &mirrored(&segments), &single_compartment(), DENSITY);
 
     for (cq_positive, cq_negative) in positive.iter().zip(&negative) {
         assert!((cq_positive + cq_negative).abs() < 1e-8);
     }
 
-    let positive_power = model.wing_power(15.0, &segments, &positive, DENSITY);
-    let negative_power = model.wing_power(-15.0, &mirrored(&segments), &negative, DENSITY);
+    let positive_power = model.wing_power(&constant(15.0), &segments, &single_compartment(), &positive, DENSITY);
+    let negative_power = model.wing_power(&constant(-15.0), &mirrored(&segments), &single_compartment(), &negative, DENSITY);
 
     assert!(positive_power > 0.0);
     assert!((positive_power - negative_power).abs() < 1e-8);
@@ -388,15 +411,15 @@ fn fan_with_constant_efficiency_matches_the_power_model() {
 
     for rotational_speed in [10.0, 15.0, 20.0] {
         let fan_suction_coefficients = fan_model.section_internal_states(
-            rotational_speed, &segments, DENSITY
+            &constant(rotational_speed), &segments, &single_compartment(), DENSITY
         );
 
         let fan_power = fan_model.wing_power(
-            rotational_speed, &segments, &fan_suction_coefficients, DENSITY
+            &constant(rotational_speed), &segments, &single_compartment(), &fan_suction_coefficients, DENSITY
         );
 
         let power_suction_coefficients = power_model.section_internal_states(
-            fan_power, &segments, DENSITY
+            &constant(fan_power), &segments, &single_compartment(), DENSITY
         );
 
         dbg!(rotational_speed, fan_power, &fan_suction_coefficients, &power_suction_coefficients);
@@ -478,15 +501,15 @@ fn fans_in_parallel_share_the_flow() {
     let single_model = test_model(fan_conversion(test_fan(0.0)));
     let double_model = test_model(fan_conversion(double_fan));
 
-    let single = single_model.section_internal_states(15.0, &segments, DENSITY);
-    let double = double_model.section_internal_states(15.0, &segments, DENSITY);
+    let single = single_model.section_internal_states(&constant(15.0), &segments, &single_compartment(), DENSITY);
+    let double = double_model.section_internal_states(&constant(15.0), &segments, &single_compartment(), DENSITY);
 
     for (cq_single, cq_double) in single.iter().zip(&double) {
         assert!((cq_single - cq_double).abs() < 1e-8);
     }
 
-    let single_power = single_model.wing_power(15.0, &segments, &single, DENSITY);
-    let double_power = double_model.wing_power(15.0, &segments, &double, DENSITY);
+    let single_power = single_model.wing_power(&constant(15.0), &segments, &single_compartment(), &single, DENSITY);
+    let double_power = double_model.wing_power(&constant(15.0), &segments, &single_compartment(), &double, DENSITY);
 
     assert!((single_power - double_power).abs() / single_power < 1e-8);
 }
@@ -500,12 +523,12 @@ fn weak_fan_gives_no_flow() {
 
     // The maximum pressure rise at 1 RPS is 600 Pa / 400 = 1.5 Pa, which is less than the
     // external suction on all segments
-    let suction_coefficients = model.section_internal_states(1.0, &segments, DENSITY);
+    let suction_coefficients = model.section_internal_states(&constant(1.0), &segments, &single_compartment(), DENSITY);
 
     assert_eq!(suction_coefficients, vec![0.0; segments.len()]);
 
-    assert_eq!(model.section_internal_states(0.0, &segments, DENSITY), vec![0.0; segments.len()]);
-    assert_eq!(model.wing_power(0.0, &segments, &suction_coefficients, DENSITY), 0.0);
+    assert_eq!(model.section_internal_states(&constant(0.0), &segments, &single_compartment(), DENSITY), vec![0.0; segments.len()]);
+    assert_eq!(model.wing_power(&constant(0.0), &segments, &single_compartment(), &suction_coefficients, DENSITY), 0.0);
 }
 
 #[test]
@@ -535,4 +558,322 @@ fn fan_curves_from_json() {
     let error = serde_json::from_str::<Fan>(&unstable).unwrap_err();
 
     assert!(error.to_string().contains("strictly decreasing"));
+}
+
+fn span_length(segments: &[SegmentFlowConditions]) -> Float {
+    segments.iter().map(|segment| segment.span_length).sum()
+}
+
+/// A span varying power is power per span length. A constant power per span should therefore give
+/// the same result as the corresponding constant total power.
+#[test]
+fn constant_power_per_span_equals_constant_power() {
+    let segments = test_segments();
+
+    let power = 500.0;
+
+    let power_per_span = WingInternalState::SpanVarying(
+        SpanVariation::new_linear(vec![0.0], vec![power / span_length(&segments)]).unwrap()
+    );
+
+    for conversion in [InternalStateConversion::PowerToPowerCoefficient, power_conversion(FAN_EFFICIENCY)] {
+        let model = test_model(conversion);
+
+        let from_constant = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
+        let from_span_varying = model.section_internal_states(&power_per_span, &segments, &single_compartment(), DENSITY);
+
+        for (a, b) in from_constant.iter().zip(&from_span_varying) {
+            assert!((a - b).abs() < 1e-8);
+        }
+    }
+}
+
+/// With a power per span that varies along the span, the power on each segment is the local power
+/// per span times the span length of the segment
+#[test]
+fn power_per_span_for_power_coefficient() {
+    let segments = test_segments();
+
+    let state = WingInternalState::SpanVarying(
+        SpanVariation::new_piecewise_constant(vec![-0.5, 0.0, 0.5], vec![50.0, 150.0]).unwrap()
+    );
+
+    let model = test_model(InternalStateConversion::PowerToPowerCoefficient);
+
+    let section_states = model.section_internal_states(&state, &segments, &single_compartment(), DENSITY);
+
+    let expected_power: Float = segments.iter().map(|segment| {
+        state.value_at(segment.non_dim_span_location) * segment.span_length
+    }).sum();
+
+    let power = model.wing_power(&state, &segments, &single_compartment(), &section_states, DENSITY);
+
+    assert!((power - expected_power).abs() / expected_power < 1e-12);
+}
+
+/// A span varying fan speed uses the mean value over the span, as there is only one compartment 
+/// in the wing
+#[test]
+fn span_varying_fan_speed_uses_the_mean() {
+    let segments = test_segments();
+
+    let model = test_model(fan_conversion(test_fan(0.0)));
+
+    let state = WingInternalState::SpanVarying(
+        SpanVariation::new_linear(vec![-0.5, 0.5], vec![10.0, 20.0]).unwrap()
+    );
+
+    let from_mean = model.section_internal_states(&constant(15.0), &segments, &single_compartment(), DENSITY);
+    let from_span_varying = model.section_internal_states(&state, &segments, &single_compartment(), DENSITY);
+
+    for (a, b) in from_mean.iter().zip(&from_span_varying) {
+        assert!((a - b).abs() < 1e-10);
+    }
+}
+
+/// Virtual segments get the same type of internal state as the rest of the wing, but are not 
+/// included in the flow or the power
+#[test]
+fn virtual_segments_are_not_included_in_the_flow_or_power() {
+    let segments = test_segments();
+
+    let mut segments_with_virtual = segments.clone();
+
+    // A copy of the first segment, which has the largest inflow
+    segments_with_virtual.push(SegmentFlowConditions {
+        is_virtual: true,
+        ..segments[0].clone()
+    });
+
+    let power = 500.0;
+
+    let cases = [
+        (InternalStateConversion::PowerToPowerCoefficient, power),
+        (power_conversion(FAN_EFFICIENCY), power),
+        (fan_conversion(test_fan(0.0)), 15.0),
+    ];
+
+    for (conversion, wing_state) in cases {
+        let model = test_model(conversion);
+
+        let states = model.section_internal_states(&constant(wing_state), &segments, &single_compartment(), DENSITY);
+        let states_with_virtual = model.section_internal_states(
+            &constant(wing_state), &segments_with_virtual, &single_compartment(), DENSITY
+        );
+
+        // The real segments are not affected by the virtual segment
+        for (a, b) in states.iter().zip(&states_with_virtual) {
+            assert!((a - b).abs() < 1e-10);
+        }
+
+        // The virtual segment gets the same state as a real segment with the same conditions
+        assert!((states_with_virtual[5] - states[0]).abs() < 1e-10);
+        assert!(states_with_virtual[5].abs() > 0.0);
+
+        let power = model.wing_power(&constant(wing_state), &segments, &single_compartment(), &states, DENSITY);
+        let power_with_virtual = model.wing_power(
+            &constant(wing_state), &segments_with_virtual, &single_compartment(), &states_with_virtual, DENSITY
+        );
+
+        assert!((power - power_with_virtual).abs() / power < 1e-10);
+    }
+}
+
+/// Two compartments, with the boundary at the middle of the span. With the test segments, the
+/// first two segments are in the first compartment, and the last three in the second.
+fn two_compartments() -> InternalCompartments {
+    InternalCompartments::new(vec![-0.5, 0.0, 0.5]).unwrap()
+}
+
+fn assign_compartments(
+    segments: &[SegmentFlowConditions],
+    compartments: &InternalCompartments
+) -> Vec<SegmentFlowConditions> {
+    segments.iter().map(|segment| {
+        SegmentFlowConditions {
+            compartment_index: compartments.index_of(segment.non_dim_span_location),
+            ..segment.clone()
+        }
+    }).collect()
+}
+
+/// The segments in a compartment, as a separate wing with a single compartment
+fn compartment_segments(
+    segments: &[SegmentFlowConditions],
+    compartment_index: usize
+) -> Vec<SegmentFlowConditions> {
+    segments.iter()
+        .filter(|segment| segment.compartment_index == compartment_index)
+        .map(|segment| SegmentFlowConditions { compartment_index: 0, ..segment.clone() })
+        .collect()
+}
+
+/// Checks that each compartment gives the same result as solving the segments in the compartment
+/// alone, with the given wing state for each compartment
+fn assert_compartments_solved_independently(
+    model: &ActiveAirFlowFoil,
+    segments: &[SegmentFlowConditions],
+    section_states: &[Float],
+    compartment_states: &[Float],
+) {
+    for (compartment_index, &compartment_state) in compartment_states.iter().enumerate() {
+        let alone_segments = compartment_segments(segments, compartment_index);
+
+        let alone = model.section_internal_states(
+            &constant(compartment_state), &alone_segments, &single_compartment(), DENSITY
+        );
+
+        let in_wing: Vec<Float> = segments.iter().zip(section_states)
+            .filter(|(segment, _)| segment.compartment_index == compartment_index)
+            .map(|(_, &state)| state)
+            .collect();
+
+        dbg!(compartment_index, &alone, &in_wing);
+
+        for (a, b) in alone.iter().zip(&in_wing) {
+            assert!((a - b).abs() < 1e-10);
+        }
+    }
+}
+
+/// A constant power is divided equally between the compartments, which are solved independently
+#[test]
+fn constant_power_is_divided_equally_between_compartments() {
+    let compartments = two_compartments();
+    let segments = assign_compartments(&test_segments(), &compartments);
+
+    assert_eq!(
+        segments.iter().map(|segment| segment.compartment_index).collect::<Vec<usize>>(),
+        vec![0, 0, 1, 1, 1]
+    );
+
+    let model = test_model(power_conversion(FAN_EFFICIENCY));
+
+    let power = 500.0;
+
+    let section_states = model.section_internal_states(
+        &constant(power), &segments, &compartments, DENSITY
+    );
+
+    assert_compartments_solved_independently(
+        &model, &segments, &section_states, &[0.5 * power, 0.5 * power]
+    );
+
+    let total_power = model.wing_power(
+        &constant(power), &segments, &compartments, &section_states, DENSITY
+    );
+
+    assert!((total_power - power).abs() / power < 1e-4);
+}
+
+/// A span varying power is power per span length, which is integrated over each compartment. The
+/// sign sets the direction of the suction in each compartment.
+#[test]
+fn power_per_span_is_integrated_over_each_compartment() {
+    let compartments = two_compartments();
+    let segments = assign_compartments(&test_segments(), &compartments);
+
+    let model = test_model(power_conversion(FAN_EFFICIENCY));
+
+    let power_per_span = [60.0, -100.0];
+
+    let state = WingInternalState::SpanVarying(
+        SpanVariation::new_piecewise_constant(vec![-0.5, 0.0, 0.5], power_per_span.to_vec()).unwrap()
+    );
+
+    let section_states = model.section_internal_states(&state, &segments, &compartments, DENSITY);
+
+    let half_span = 0.5 * span_length(&segments);
+
+    let compartment_powers = [power_per_span[0] * half_span, power_per_span[1] * half_span];
+
+    assert_compartments_solved_independently(&model, &segments, &section_states, &compartment_powers);
+
+    // The direction of the suction follows the sign in each compartment
+    assert!(section_states[0] > 0.0);
+    assert!(section_states[3] < 0.0);
+
+    let total_power = model.wing_power(&state, &segments, &compartments, &section_states, DENSITY);
+    let expected_power = compartment_powers[0].abs() + compartment_powers[1].abs();
+
+    assert!((total_power - expected_power).abs() / expected_power < 1e-4);
+}
+
+/// Each compartment has its own fan, running at the mean rotational speed over the compartment
+#[test]
+fn fan_speed_per_compartment() {
+    let compartments = two_compartments();
+    let segments = assign_compartments(&test_segments(), &compartments);
+
+    let model = test_model(fan_conversion(test_fan(0.0)));
+
+    let speeds = [12.0, 18.0];
+
+    let state = WingInternalState::SpanVarying(
+        SpanVariation::new_piecewise_constant(vec![-0.5, 0.0, 0.5], speeds.to_vec()).unwrap()
+    );
+
+    let section_states = model.section_internal_states(&state, &segments, &compartments, DENSITY);
+
+    assert_compartments_solved_independently(&model, &segments, &section_states, &speeds);
+
+    // The power is the sum of the power of the fans in each compartment
+    let total_power = model.wing_power(&state, &segments, &compartments, &section_states, DENSITY);
+
+    let expected_power: Float = (0..2).map(|compartment_index| {
+        let alone_segments = compartment_segments(&segments, compartment_index);
+        let alone_states = model.section_internal_states(
+            &constant(speeds[compartment_index]), &alone_segments, &single_compartment(), DENSITY
+        );
+
+        model.wing_power(
+            &constant(speeds[compartment_index]),
+            &alone_segments,
+            &single_compartment(),
+            &alone_states,
+            DENSITY
+        )
+    }).sum();
+
+    assert!((total_power - expected_power).abs() / expected_power < 1e-10);
+}
+
+/// With uniform flow conditions and compartments of equal size, the conversion from section state
+/// to wing state should invert the conversion from wing state to section state
+#[test]
+fn wing_state_from_section_state_with_compartments() {
+    let compartments = two_compartments();
+
+    let angle_of_attack = (8.0 as Float).to_radians();
+    let velocity = 12.0;
+
+    let segments: Vec<SegmentFlowConditions> = (0..4).map(|i| {
+        SegmentFlowConditions {
+            non_dim_span_location: -0.375 + 0.25 * i as Float,
+            ..segment(angle_of_attack, velocity, 1.5)
+        }
+    }).collect();
+
+    let segments = assign_compartments(&segments, &compartments);
+
+    let wing_area: Float = segments.iter().map(|segment| segment.area).sum();
+
+    let cases = [
+        (power_conversion(FAN_EFFICIENCY), 500.0),
+        (fan_conversion(test_fan(0.0)), 15.0)
+    ];
+
+    for (conversion, wing_state) in cases {
+        let model = test_model(conversion);
+
+        let section_state = model.section_internal_states(
+            &constant(wing_state), &segments, &compartments, DENSITY
+        )[0];
+
+        let wing_state_back = model.wing_state_from_section_state(
+            section_state, angle_of_attack, velocity, wing_area, 2, DENSITY
+        );
+
+        assert!((wing_state_back - wing_state).abs() / wing_state < 1e-4);
+    }
 }

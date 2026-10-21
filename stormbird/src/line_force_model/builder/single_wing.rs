@@ -14,6 +14,7 @@ use stormath::{
 use crate::section_models::SectionModel;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
+use crate::line_force_model::wing_internal_state::InternalCompartments;
 
 #[derive(Debug, Clone)]
 /// Input struct to add a single wing to a line force model
@@ -25,6 +26,7 @@ pub struct SingleWing {
     pub section_model: SectionModel,
     pub non_zero_circulation_at_ends: [bool; 2],
     pub input_power_model: InputPowerModel,
+    pub internal_compartments: InternalCompartments,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -44,6 +46,12 @@ pub struct WingBuilder {
     pub nr_sections: Option<usize>,
     #[serde(default)]
     pub input_power_model: InputPowerModel,
+    #[serde(default)]
+    /// Optional division of the internal volume of the wing into sealed compartments, given as the
+    /// non-dimensional span locations of the boundaries between them, including the ends of the
+    /// wing at -0.5 and 0.5. Only used by section models with an internal flow model, such as
+    /// suction sails with several fans. The default is a single compartment.
+    pub internal_compartment_boundaries: Option<Vec<Float>>,
 }
 
 impl WingBuilder {
@@ -67,6 +75,31 @@ impl WingBuilder {
         }
 
         span_distance
+    }
+
+    /// Returns the internal compartments of the wing.
+    ///
+    /// # Panics
+    /// If the boundaries are not valid, or if more than one compartment is specified for a section
+    /// model that does not use internal compartments.
+    pub fn internal_compartments(&self) -> InternalCompartments {
+        let Some(boundaries) = &self.internal_compartment_boundaries else {
+            return InternalCompartments::default();
+        };
+
+        let compartments = InternalCompartments::new(boundaries.clone()).unwrap_or_else(|error| {
+            panic!("Invalid internal compartments for a wing: {}", error)
+        });
+
+        if compartments.nr_compartments() > 1 && !self.section_model.uses_internal_compartments() {
+            panic!(
+                "Internal compartments are only used by section models with an internal flow \
+                model, i.e., an active air flow foil with the PowerToInternalFlow or \
+                FanSpeedToInternalFlow conversion"
+            );
+        }
+
+        compartments
     }
 
     /// Builds the data for a single wing
@@ -146,6 +179,7 @@ impl WingBuilder {
             section_model,
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
             input_power_model: self.input_power_model.clone(),
+            internal_compartments: self.internal_compartments(),
         }
     }
 }

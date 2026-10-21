@@ -60,11 +60,20 @@ where \\( A_{wing} \\) is the total area of the wing and \\( U_i \\) is the loca
 
 The internal state of the wing can be both positive and negative for all conversions. The sign of the internal state is used to set the direction of the suction, i.e., which side of the foil is the suction side. The magnitude of the power, rotational speed or suction coefficient is given by the absolute value of the internal state. That is, setting a negative power does not mean that the fan *produces* power, but that the same amount of power is used to suck air in on the other side of the foil. The sign is kept in the internal state given to the `VaryingFoil` model, which should therefore contain mirrored foil data for the negative values.
 
+### Span varying internal states
+The internal state of the wing can also [vary along the span](sectional_models_intro.md#constant-and-span-varying-internal-states). For the power based conversions, a span varying internal state is interpreted as *power per span length*. For the `PowerToPowerCoefficient` conversion, the power on each line element is then the local power per span length times the length of the line element, and the power coefficient becomes:
+
+\\[
+    C_{P, i} = \frac{p'(y_i)}{0.5 \rho c_i U_i^3}
+\\]
+
+where \\( p'(y_i) \\) is the power per span length at the control point and \\( c_i \\) is the chord length. For the conversions with an internal flow model, the internal state is applied to each [internal compartment](#internal-compartments), as described below.
+
 ## The internal flow model
 
 The `PowerToInternalFlow` and `FanSpeedToInternalFlow` conversions use a simplified model of the flow through the porous surface of the sail. The model is based on a pressure balance between the outside and the inside of the sail, and the following assumptions:
 
-- All line elements on a wing share the same internal volume, with a uniform internal pressure.
+- All line elements in the same internal compartment share the same internal volume, with a uniform internal pressure. By default, the whole wing is a single compartment.
 - The external pressure on the porous surface can be estimated from the lift coefficient only.
 - The pressure loss through the porous surface is proportional to the velocity through the surface squared.
 
@@ -175,11 +184,30 @@ For a given rotational speed, the operating point of the fans is where the press
 
 The total volume flow increases with increasing internal suction, while the pressure rise over the fans decreases with increasing flow. There is therefore only one operating point. If the fans can not overcome the external suction on any of the line elements, there is no flow. When the operating point is found, the input power is given directly by the power curve of the fans. The efficiency of the fans is therefore a result of the model, rather than an input.
 
+## Internal compartments
+
+Most suction sails have a single fan, and a single internal volume. However, some have several fans along the span, where the internal volume is divided into separate compartments by bulkheads. This can be modeled by dividing the wing into *internal compartments*, through the `internal_compartment_boundaries` field in the [wing builder](../line_model/building_line_model.md). The compartments are defined on the wing, rather than in the section model, as they are a property of the layout of the wing, while the section model describes the flow through the porous surface and the type of fan.
+
+Each compartment is modeled as sealed from the others, with its own uniform internal pressure and its own fans. That is, each compartment is solved separately, in the same way as a whole wing with a single compartment. A line element belongs to the compartment that contains its control point. If a compartment boundary does not match the boundary between two line elements, the effective boundary will therefore be shifted to the closest line element boundary.
+
+The internal state of the wing is applied to each compartment as follows:
+
+- `PowerToInternalFlow`: A constant internal state is the total power for the wing, which is divided equally between the compartments. A span varying internal state is the power per span length, which is integrated over each compartment to give the power for the compartment.
+- `FanSpeedToInternalFlow`: The rotational speed of the fans in each compartment is the mean value of the internal state over the compartment. A constant internal state therefore gives the same rotational speed for all fans. All compartments use the same fan model.
+
+The sign of the internal state sets the direction of the suction for each compartment separately. A `PiecewiseConstant` span variation with the same boundaries as the compartments gives exactly one value per compartment, which is the most natural way to set the power or rotational speed of each fan individually.
+
+Note that, since the internal pressure is uniform within a compartment, it is only the total power for each compartment that matters for the `PowerToInternalFlow` conversion. A variation of the power per span length *within* a compartment does not affect the result, as the distribution of the flow, and therefore the power, along the span is given by the internal flow model.
+
+## Virtual line elements
+
+[Virtual line elements](../line_model/building_line_model.md), for instance used to model end plates, get the same type of internal state as the rest of the wing. For instance, they get the suction coefficient that follows from the internal suction in the compartment they belong to. This keeps the circulation on the virtual line elements consistent with the rest of the wing. However, virtual line elements are not part of the sail itself, and are therefore not included in the flow through the sail or in the power.
+
 ## Solving for the suction coefficient
 The internal suction is not known directly, and must be found from the internal state of the wing. This is done in two levels:
 
 1) For a given internal suction, the suction coefficient on each line element is found. This requires a solver since the suction coefficient affects the lift coefficient through the `VaryingFoil` model, which again affects the external pressure, and therefore the suction coefficient. The solver finds the value where the two are consistent, using the [secant method](https://en.wikipedia.org/wiki/Secant_method). 
-2) The internal suction is found for the whole wing. For the `PowerToInternalFlow` conversion, this is the value where the power equals the power given as the internal state of the wing, found with the secant method. For the `FanSpeedToInternalFlow` conversion, this is the operating point of the fans, found with [Brent's method](https://en.wikipedia.org/wiki/Brent%27s_method). Brent's method always keeps the solution within a bracket, which is known in this case: the internal suction is always between the value where the flow into the sail starts and the maximum pressure rise of the fans.
+2) The internal suction is found for each compartment. For the `PowerToInternalFlow` conversion, this is the value where the power equals the power given as the internal state of the wing, found with the secant method. For the `FanSpeedToInternalFlow` conversion, this is the operating point of the fans, found with [Brent's method](https://en.wikipedia.org/wiki/Brent%27s_method). Brent's method always keeps the solution within a bracket, which is known in this case: the internal suction is always between the value where the flow into the sail starts and the maximum pressure rise of the fans.
 
 The settings for both levels can be set through the `solver_settings` field, but the default values should normally be sufficient:
 
@@ -194,9 +222,9 @@ pub struct InternalFlowSolverSettings {
 
 ## Power consumption and control
 
-The power needed to operate the sail is computed by the section model for the whole wing, as described in the [section model overview](sectional_models_intro.md). For the power based conversions, this is done by integrating a power coefficient over the wing, which means that the default [input power model](../line_model/input_power.md) gives the same power as the internal state of the wing. For the `FanSpeedToInternalFlow` conversion, the efficiency of the fans depends on the operating point of the whole wing. The power is therefore computed from the power curve of the fans, using the total volume flow over the wing and the rotational speed. 
+The power needed to operate the sail is computed by the section model for the whole wing, as described in the [section model overview](sectional_models_intro.md). For the power based conversions, this is done by integrating a power coefficient over the wing, which means that the default [input power model](../line_model/input_power.md) gives the same power as the internal state of the wing. For the `FanSpeedToInternalFlow` conversion, the efficiency of the fans depends on the operating point in each compartment. The power is therefore computed from the power curve of the fans, using the volume flow and the rotational speed in each compartment, and summed over the compartments. 
 
-The [controller](../utils/control_system.md) can be used to set the internal state of a suction sail in two ways. Either the set points can be given directly as the wing internal state, i.e., as the power or the rotational speed of the fans, or they can be given in the units of the section model, i.e., as the suction or power coefficient. In the latter case, the set points are converted to the wing internal state based on the measured flow conditions on the wing, assuming the same suction or power coefficient along the whole span. This is an open loop estimate, so the actual suction coefficient along the wing will only approximately match the set point. 
+The [controller](../utils/control_system.md) can be used to set the internal state of a suction sail in two ways. Either the set points can be given directly as the wing internal state, i.e., as the power or the rotational speed of the fans, or they can be given in the units of the section model, i.e., as the suction or power coefficient. In the latter case, the set points are converted to the wing internal state based on the measured flow conditions on the wing, assuming the same suction or power coefficient along the whole span. This is an open loop estimate, so the actual suction coefficient along the wing will only approximately match the set point. With several internal compartments, the area of the wing is assumed to be divided equally between them. The controller sets a constant internal state for the wing, so internal states that vary along the span must currently be [set manually](../line_model/move_line_models.md#update-the-internal-state). 
 
 The maximum value of the internal state can be limited through the `wing_internal_state_max_value` setting in the controller. This is the maximum power for the power based conversions, and the maximum rotational speed of the fans for the `FanSpeedToInternalFlow` conversion.
 
@@ -207,7 +235,7 @@ The internal flow model is simplified, and the empirical parameters must be tune
 - Reynolds number effects are not modeled, neither for the external flow nor for the flow through the porous surface. The quadratic loss model is typical for perforated surfaces with relatively high through-flow velocities, while the losses through fine porous materials can be closer to linear in the velocity.
 - The `PowerToInternalFlow` conversion assumes a constant fan efficiency, while it will in reality depend on the operating point of the fans. The fans are also treated as a power source that can deliver any combination of suction and volume flow, which implicitly assumes fans with variable speed. The `FanSpeedToInternalFlow` conversion removes this simplification, if fan curves are available.
 - The external pressure is assumed to depend on the lift coefficient only. This is only approximately true, and mainly valid for attached flow. 
-- The internal pressure is assumed to be uniform along the span. Losses in the ducts between the internal volume and the fans can be included in the fan model, but losses inside the internal volume itself are not modeled.
+- The internal pressure is assumed to be uniform within each compartment. Losses in the ducts between the internal volume and the fans can be included in the fan model, but losses inside the internal volume itself are not modeled. Leakage between compartments is not modeled.
 - Outflow through the porous surface is not modeled, as described above.
 
 Another point to be aware of is the drag due to the momentum of the air that is sucked into the sail, often called *sink drag*. In coefficient form, it is approximately \\( 2 C_Q \\). This drag is not part of the internal flow model, but should be part of the drag data in the `VaryingFoil` model. Drag data from integrating the pressure and friction on the surface of the sail, for instance from CFD, will typically include this effect. Drag data from wake measurements will not, and must then be corrected.

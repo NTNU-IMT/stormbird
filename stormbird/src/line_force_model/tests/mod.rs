@@ -7,6 +7,8 @@
 
 pub mod motion;
 pub mod indexing;
+pub mod internal_state;
+pub mod wing_internal_state;
 
 use crate::line_force_model::builder::single_wing::WingBuilder;
 use crate::line_force_model::builder::LineForceModelBuilder;

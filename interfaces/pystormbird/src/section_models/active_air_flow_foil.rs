@@ -11,6 +11,7 @@ use stormbird::section_models::active_air_flow_foil::{
     SegmentFlowConditions
 };
 use stormbird::section_models::SectionModel as SectionModelRust;
+use stormbird::line_force_model::wing_internal_state::{WingInternalState, InternalCompartments};
 
 use super::SectionModel;
 
@@ -55,7 +56,9 @@ impl ActiveAirFlowFoil {
     ) -> PyResult<Vec<f64>> {
         let segments = Self::segments(&angles_of_attack, &velocities, &areas)?;
 
-        Ok(self.data.section_internal_states(wing_state, &segments, density))
+        Ok(self.data.section_internal_states(
+            &WingInternalState::Constant(wing_state), &segments, &InternalCompartments::default(), density
+        ))
     }
 
     /// Computes the power needed to operate the wing, from the wing state and the internal state
@@ -78,7 +81,13 @@ impl ActiveAirFlowFoil {
             ));
         }
 
-        Ok(self.data.wing_power(wing_state, &segments, &section_states, density))
+        Ok(self.data.wing_power(
+            &WingInternalState::Constant(wing_state), 
+            &segments, 
+            &InternalCompartments::default(), 
+            &section_states, 
+            density
+        ))
     }
 
     /// Estimates the wing state that gives a specified section internal state, assuming uniform
@@ -92,7 +101,7 @@ impl ActiveAirFlowFoil {
         density: f64
     ) -> f64 {
         self.data.wing_state_from_section_state(
-            section_state, angle_of_attack, velocity, wing_area, density
+            section_state, angle_of_attack, velocity, wing_area, 1, density
         )
     }
 
@@ -126,10 +135,16 @@ impl ActiveAirFlowFoil {
         }
 
         Ok((0..angles_of_attack.len()).map(|i| {
+            // The span length and location are only used for wing states that vary along the 
+            // span, which are not supported through this interface
             SegmentFlowConditions {
                 angle_of_attack: angles_of_attack[i],
                 velocity: velocities[i],
                 area: areas[i],
+                span_length: areas[i],
+                non_dim_span_location: 0.0,
+                is_virtual: false,
+                compartment_index: 0,
             }
         }).collect())
     }

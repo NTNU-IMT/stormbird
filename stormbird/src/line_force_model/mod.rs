@@ -25,6 +25,8 @@ pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
 pub mod input_power;
+/// The internal state of a wing, which can be constant or vary along the span
+pub mod wing_internal_state;
 
 pub mod corrections;
 pub mod prelude;
@@ -34,6 +36,7 @@ mod tests;
 
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
+use wing_internal_state::{WingInternalState, SpanVariation, InternalCompartments};
 use crate::controller::output::ControllerOutput;
 
 use corrections::{
@@ -86,8 +89,12 @@ pub struct LineForceModel {
     pub output_coordinate_system: CoordinateSystem,
     /// Rigid body motion of the line force model
     pub rigid_body_motion: RigidBodyMotion,
-    /// Vector that stores the internal state of each wing
-    pub internal_state: Vec<Float>,
+    /// Vector that stores the internal state of each wing, which can be constant or vary along the
+    /// span
+    pub internal_state: Vec<WingInternalState>,
+    /// The division of the internal volume of each wing into sealed compartments. Only used by
+    /// section models with an internal flow model.
+    pub internal_compartments: Vec<InternalCompartments>,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along
     /// the span axis during a dynamic simulation. The typical example is changing the angle of
     /// attack on a wing sail due to changing apparent wind conditions.
@@ -141,6 +148,7 @@ impl LineForceModel {
             wing_indices: Vec::new(),
             rigid_body_motion: RigidBodyMotion::default(),
             internal_state: Vec::new(),
+            internal_compartments: Vec::new(),
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
             density,
@@ -200,7 +208,8 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
-        self.internal_state.push(0.0);
+        self.internal_state.push(WingInternalState::default());
+        self.internal_compartments.push(wing.internal_compartments.clone());
         self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
 
         self.input_power_models.push(wing.input_power_model.clone());

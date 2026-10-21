@@ -35,6 +35,7 @@ use stormath::{
     array_generation,
 };
 use crate::error::Error;
+use crate::line_force_model::wing_internal_state::WingInternalState;
 
 #[derive(Debug, Clone)]
 /// Collection of the necessary functionality to simulate a *complete sail system* using the lifting
@@ -415,5 +416,15 @@ impl CompleteSailModel {
         self.lifting_line_simulation
             .line_force_model
             .set_internal_state(internal_state);
+    }
+
+    /// Sets the internal state of a single wing, which can be constant or vary along the span.
+    ///
+    /// **Note**: if the controller is active, it sets a constant internal state for all wings when
+    /// it updates, which overwrites the internal state set here.
+    pub fn set_wing_internal_state(&mut self, wing_index: usize, internal_state: WingInternalState) {
+        self.lifting_line_simulation
+            .line_force_model
+            .set_wing_internal_state(wing_index, internal_state);
     }
 }

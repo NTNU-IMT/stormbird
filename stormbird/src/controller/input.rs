@@ -66,7 +66,7 @@ impl ControllerInput {
                 Self {
                     loading: loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
-                    current_internal_state: line_force_model.internal_state[i],
+                    current_internal_state: line_force_model.internal_state[i].representative_value(),
                     angle_of_attack: angles_of_attack[i],
                     velocity: velocities[i],
                     apparent_wind_direction: apparent_wind_directions[i]
@@ -122,7 +122,7 @@ impl ControllerInput {
                 Self {
                     loading: loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
-                    current_internal_state: line_force_model.internal_state[i],
+                    current_internal_state: line_force_model.internal_state[i].representative_value(),
                     angle_of_attack: angles_of_attack[i],
                     velocity: velocities[i],
                     apparent_wind_direction: apparent_wind_directions[i]

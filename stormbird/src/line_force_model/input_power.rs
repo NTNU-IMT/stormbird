@@ -7,6 +7,8 @@ use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
 use stormath::interpolation::linear_interpolation;
 
+use crate::line_force_model::wing_internal_state::{WingInternalState, SPAN_START, SPAN_END};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InputPowerData {
@@ -26,10 +28,12 @@ pub enum InputPowerModel {
     /// Represent a case where a sail does not need power at all, e.g., wing sails
     NoPower,
     /// Assume the internal state is the input power. A simple solution for e.g. suction sails that
-    /// is modeled without a fan model
+    /// is modeled without a fan model. If the internal state varies along the span, it is assumed
+    /// to be the power per span length, which is integrated over the span.
     DirectFromInternalState,
     /// Calculates the power using the internal state. This could, for instance, be a power model
-    /// where the power is calculated directly from the RPS of a rotor sail
+    /// where the power is calculated directly from the RPS of a rotor sail. If the internal state
+    /// varies along the span, the mean of the absolute value over the span is used.
     InterpolateFromInternalState(InputPowerData),
 }
 
@@ -44,22 +48,30 @@ impl InputPowerModel {
     ///
     /// # Arguments
     /// * `internal_state` - the internal state of the wing
+    /// * `span_length` - the span length of the wing, used if the internal state varies along the
+    /// span
     /// * `section_models_power` - function that returns the power integrated from the section
     /// models. Only evaluated when needed.
     pub fn input_power(
         &self,
-        internal_state: Float,
+        internal_state: &WingInternalState,
+        span_length: Float,
         section_models_power: impl FnOnce() -> Float
     ) -> Float {
         match self {
             InputPowerModel::FromSectionModelPowerCoefficient => section_models_power(),
             InputPowerModel::NoPower => 0.0,
             InputPowerModel::DirectFromInternalState => {
-                internal_state.abs()
+                match internal_state {
+                    WingInternalState::Constant(power) => power.abs(),
+                    WingInternalState::SpanVarying(_) => {
+                        internal_state.span_integral_of_absolute_value(SPAN_START, SPAN_END, span_length)
+                    },
+                }
             },
             InputPowerModel::InterpolateFromInternalState(data) => {
                 linear_interpolation(
-                    internal_state.abs(),
+                    internal_state.representative_absolute_value(),
                     &data.internal_state_data,
                     &data.input_power_data,
                 )

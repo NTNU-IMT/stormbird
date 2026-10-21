@@ -97,6 +97,8 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
 - Section models can also compute the power for a whole wing, through a new `wing_power` function. For most section models, this is the power coefficient integrated over the wing, while the `ActiveAirFlowFoil` with fan curves computes the power from the operating point of the fans.
 - New default input power model, `FromSectionModelPowerCoefficient`, which computes the power for each wing from the section model.
 - The controller can now take the internal state set points either in the units of the section model (e.g., spin ratio or suction coefficient), or directly as the wing internal state (e.g., power), through the new `internal_state_set_point_type` setting.
+- The internal state of a wing can now vary along the span, through the new `WingInternalState` enum, which is either `Constant` or `SpanVarying`. The span variation is given as non-dimensional span locations and values, and is either linearly interpolated or piecewise constant. It does not need to match the resolution of the line elements. The old way of setting the internal state with one value per wing is kept, and is still what the controller uses. New functions are added for setting span varying internal states. For the power based conversions of the `ActiveAirFlowFoil`, a span varying internal state is interpreted as power per span length.
+- Wings can be divided into sealed internal compartments along the span, through the new `internal_compartment_boundaries` field in the `WingBuilder`, for instance to model suction sails with several fans. Each compartment has its own internal pressure and fans, and is solved separately. Compartments are only allowed for section models with an internal flow model.
 
 ### Breaking changes
 - The input format for the `ActiveAirFlowFoil` section model has changed. The `VaryingFoil` data must now be given in a `varying_foil` field, together with an `internal_state_conversion` field. To get the same behavior as before, use the `PowerToPowerCoefficient` conversion.
@@ -107,9 +109,13 @@ Internal rewrite of some functionality, with the goal of simplifying and speedin
     - `max_internal_state_change_rate` -> `wing_internal_state_max_change_rate`
 - The `input_power` function on the line force model now takes the sectional force input as an argument, as the power can depend on the local flow conditions.
 - Stormbird now depends on version 0.4.0 of Stormath, which adds a bracketed root-finding method (Brent's method), used to find the operating point of the fans.
+- The `internal_state` field in the line force model is now a vector of `WingInternalState` rather than a vector of floats. Use `set_internal_state` to set constant values as before, and `internal_state_representative_values` to get one value per wing.
+- Virtual line elements are no longer included in the power or in the flow through an `ActiveAirFlowFoil`. They still get the same type of internal state as the rest of the wing, so that the circulation stays consistent along the span. For the `PowerToPowerCoefficient` conversion, this means that the power is only distributed over the line elements that are not virtual.
 
 ### Changes to the Python library
 - pystormbird: new `ActiveAirFlowFoil` class, including functions for the section internal states and the power for a whole wing, and a new `power_coefficient` function for the `RotatingCylinder` class. The `as_active_air_flow_foil` function on the `VaryingFoil` class was removed, as an active air flow foil now also needs an internal state conversion.
+- pystormbird: new `set_internal_state_linear` and `set_internal_state_piecewise_constant` functions for the lifting line simulation and the complete sail model, for setting internal states that vary along the span. The `internal_state` functions return the mean value over the span for wings with a span varying internal state.
+- stormbird_setup: new `internal_compartment_boundaries` field in the `WingBuilder`, with the same checks as in the Rust library.
 - stormbird_setup: updated to the new data structures for the section models, input power models and controller set points, including the fan model with fan curves. The fan curve data is checked in the same way as in the Rust library. The input power model now matches the variants in the Rust library, and `new_polynomial_rotor_sail_model` gives the power directly, without the `area` argument. The suction sail in the simplified setup now uses the default input power model.
 
 ### Bug fixes

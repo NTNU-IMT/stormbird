@@ -207,6 +207,7 @@ impl ControllerSetPoints {
                     input.angle_of_attack,
                     input.velocity,
                     area,
+                    line_force_model.internal_compartments[wing_index].nr_compartments(),
                     line_force_model.density
                 )
             }

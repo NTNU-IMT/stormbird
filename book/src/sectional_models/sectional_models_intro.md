@@ -26,7 +26,7 @@ More sectional models can be added in the future. The only requirement is that e
 
 ## Internal states
 
-All wings in a line force model have an *internal state*, which is a single number that can be set for each wing, for instance by a [controller](../utils/control_system.md). What the internal state means depends on the section model:
+All wings in a line force model have an *internal state*, which can be set for each wing, for instance by a [controller](../utils/control_system.md). What the internal state means depends on the section model:
 
 - `SingleElementFoil` and `EffectiveWindSensor`: the internal state is not used.
 - `MultiElementFoil`: the internal state is passed directly to the `VaryingFoil` model, and is typically the flap angle.
@@ -34,6 +34,30 @@ All wings in a line force model have an *internal state*, which is a single numb
 - `RotatingCylinder`: the internal state is the revolutions per second of the cylinder, which is converted to a spin ratio on each line element, using the local chord length (i.e., the diameter) and the local velocity.
 
 This means that the internal state given to the section model on each line element can be different from the internal state set on the wing. The conversion is managed by the line force model structure, and is not something the user needs to think about when running a simulation. However, it is important to know which units the internal state is given in when setting up the models and the controller.
+
+### Constant and span varying internal states
+In most cases, the internal state is a single number for each wing, which is the same along the whole span. However, it is also possible to give an internal state that varies along the span, for instance to model a sail with several fans along the span, or a flap angle that varies along the span. The internal state of a wing is therefore represented by the following enums:
+
+```rust
+pub enum WingInternalState {
+    Constant(f64),
+    SpanVarying(SpanVariation),
+}
+
+pub enum SpanVariation {
+    Linear { locations: Vec<f64>, values: Vec<f64> },
+    PiecewiseConstant { boundaries: Vec<f64>, values: Vec<f64> },
+}
+```
+
+The locations along the span are given as non-dimensional span positions, running from -0.5 at one end of the wing to 0.5 at the other. The span variation does not have to match the resolution of the line elements. There are two ways to give the variation:
+
+1) `Linear`: The value is linearly interpolated between the given locations, and is constant outside of them.
+2) `PiecewiseConstant`: The value is constant within zones along the span, defined by the boundaries between them. There must be one more boundary than values.
+
+For each line element, the value of the span variation at the control point is used. The exception is section models where the internal state applies to a part of the wing rather than to a single line element, such as an [active air flow foil](active_air_flow_foil.md) with several internal compartments. The value is then averaged or integrated over each part of the wing, which is done exactly, without depending on the resolution of the line elements.
+
+When a single number is needed to represent a span varying internal state, for instance as the current state in the controller, the mean value over the span is used. See the chapter on how to [move and modify a line model](../line_model/move_line_models.md#update-the-internal-state) for how to set the internal state, both as constant values and as span variations.
 
 Since the models are handled through an enum, they may also require different inputs in their own functions for calculating lift and drag. For instance, the foil models require the angle of attack as input, while the `RotatingCylinder` only uses the spin ratio. Again, the right input is managed by the line force model structure.
 

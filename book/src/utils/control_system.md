@@ -60,7 +60,9 @@ The `wing_internal_state_max_value` limits the absolute value of the wing intern
 - For suction sails where the fans are modeled with fan curves, the limits are given in revolutions per second for the fans, and revolutions per second per second.
 - For suction sails using the `SuctionCoefficientDirect` conversion, the limits are given as a suction coefficient.
 
-The `max_local_wing_angle_change_rate` limits how fast the local wing angle can change, in radians per second. 
+The `max_local_wing_angle_change_rate` limits how fast the local wing angle can change, in radians per second.
+
+The controller always sets a constant [internal state](../sectional_models/sectional_models_intro.md#constant-and-span-varying-internal-states) for each wing, which overwrites any internal state that varies along the span. Internal states that vary along the span must therefore currently be [set manually](../line_model/move_line_models.md#update-the-internal-state), without the controller. When the controller needs the current internal state of a wing with a span varying internal state, the mean value over the span is used.
 
 ## Spanwise measurement
 
