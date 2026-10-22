@@ -581,73 +581,80 @@ class SectionModel(StormbirdSetupBaseModel):
                 foils_data=foils_data
             )
         )
-    
-    @classmethod
-    def default_suction_sail_turbosail(cls, scale_factor: float = 1.0) -> "SectionModel":
-        """
-        Default values from a suction sail, manually tuned so that they roughly represent the 
-        results of the originally suction sail, named TurboSail.
-        
-        The paper that presents TurboSail curves:
-        https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf
-        
-        The default values can also be scaled in a simplified way, through the input 
-        "scale_factor". This is intended to quickly be able to model "modern suction" sails, which
-        are generally thought to be a bit better, but where detailed lift drag curves for varying
-        power coefficients are generally not available. One example is the results in the link below,
-        which indicate that max lift as a function of power coefficient is about 18% higher with 
-        Bound4Blue's suction sail in 2024, compared to the original Turbosail. 
-        
-        Bound4Blue's paper: https://bound4blue.com/aerodynamic-optimization-of-the-esail/
 
-        The foil data is given as a function of the power coefficient, so the internal state
-        conversion is set to PowerToPowerCoefficient, meaning that the wing internal state is the
-        power.
+    @classmethod
+    def suction_sail_turbosail_charrier_1985(cls) -> "SectionModel":
         """
-        
-        # The power coefficient values used to represent the internal state
-        cp_values = [0.0, 0.1187, 0.2161, 0.3389]
-        
-        cl_zero_angle = (np.array([0.0, 2.6, 3.4, 3.8]) * scale_factor).tolist()
-        cl_initial_slope = [2 * np.pi, 2*np.pi * 1.4, 2*np.pi * 1.4, 2*np.pi * 1.4]
-        stall_angles = (np.radians([20.0, 23, 27, 29.0]) * scale_factor).tolist()
-        
-        # Create foil models from the input arrays. The data is only given for positive Cp values,
-        # as negative Cp values give the mirrored foils.
-        foils_data = []
-        for foil_index in range(len(cp_values)):
-            if cl_zero_angle[foil_index] > 0:
-                foil = Foil(
-                    cl_zero_angle = cl_zero_angle[foil_index],
-                    cl_initial_slope = cl_initial_slope[foil_index],
-                    cd_min = 0.01,
-                    mean_positive_stall_angle = stall_angles[foil_index],
-                    mean_negative_stall_angle = 2.0 * stall_angles[foil_index]
-                )
-            else:
-                foil = Foil(
-                    cl_zero_angle = cl_zero_angle[foil_index],
-                    cl_initial_slope = cl_initial_slope[foil_index],
-                    cd_min = 0.01,
-                    mean_positive_stall_angle = 2.0 * stall_angles[foil_index],
-                    mean_negative_stall_angle = stall_angles[foil_index]
-                )
-                
-            foils_data.append(foil)
-                        
+        Model of the original TurboSail suction sail, tuned to the wind tunnel data in: Charrier et
+        al., 1985, Fondation Cousteau and windship propulsion 1980 - 1985, System Cousteau -
+        Pechiney, Journal of Wind Engineering and Industrial Aerodynamics, 20, 39-60.
+
+        The foil data is given as a function of the suction coefficient, and the internal state
+        conversion is PowerToInternalFlow, meaning that the wing internal state is the input power
+        to the fan. The data is only given for positive suction coefficients, as negative values
+        give the mirrored foils.
+
+        The values are generated with the scripts in the pystormbird example
+        "interfaces/pystormbird/examples/9 - suction sail", and are hard coded here:
+
+        - The foils for the suction coefficients 0.027, 0.036 and 0.05 are tuned manually to the
+          3D lift and drag data (suction_sail_model.py and compare_3d_lift_and_drag.py).
+        - The foils for zero suction and for the threshold at 0.018 are based on the 2D data,
+          with the lift reduced to match the lowest points in the power curve
+          (suction_sail_model.py).
+        - The internal flow model is tuned to the power curve, with the porous fraction and fan
+          efficiency fixed, and cp_no_suction fixed at zero (tune_power_model.py).
+
+        The tuning was done with a lifting line model of the wind tunnel model, with an aspect
+        ratio of 4 and one end against the wind tunnel wall. The lift and drag of other sail
+        geometries will therefore include the uncertainty of transferring the 3D tuning to a new
+        geometry.
+        """
+        internal_state_data = [0.0, 0.018, 0.027, 0.036, 0.05]
+
+        cl_zero_angle = [1.4, 1.5, 2.5, 3.3, 3.55]
+        cl_initial_slope = (np.array([1.08, 1.1933, 1.25, 1.5, 1.65]) * 2 * np.pi).tolist()
+        cd_min = [0.4, 0.3333, 0.3, 0.2, 0.2]
+        mean_positive_stall_angle = np.radians([17.0, 16.0, 34.0, 37.0, 39.5]).tolist()
+        stall_range = np.radians([6.0, 8.6667, 10.0, 10.0, 10.0]).tolist()
+        cl_slope_reduction_factor_positive = [0.5, 0.4333, 0.4, 0.5, 0.5]
+        cl_slope_reduction_onset_angle_positive = np.radians([8.0, 12.6667, 15.0, 12.0, 12.0]).tolist()
+
+        foils_data = [
+            Foil(
+                cl_zero_angle = cl_zero_angle[i],
+                cl_initial_slope = cl_initial_slope[i],
+                cd_min = cd_min[i],
+                cd_second_order_factor = 0.12,
+                mean_positive_stall_angle = mean_positive_stall_angle[i],
+                mean_negative_stall_angle = float(np.radians(30.0)),
+                stall_range = stall_range[i],
+                cl_slope_reduction_factor_positive = cl_slope_reduction_factor_positive[i],
+                cl_slope_reduction_onset_angle_positive = cl_slope_reduction_onset_angle_positive[i],
+            ) for i in range(len(internal_state_data))
+        ]
+
+        internal_flow = InternalFlow(
+            cp_no_suction = 0.0,
+            cp_suction_gradient = -102.08,
+            loss_coefficient = 10.345,
+            porous_fraction = 0.25,
+        )
+
         return cls(
             model = ActiveAirFlowFoil(
                 varying_foil = VaryingFoil(
-                    internal_state_data = cp_values,
+                    internal_state_data = internal_state_data,
                     foils_data = foils_data
                 ),
-                internal_state_conversion = InternalStateConversion(
-                    conversion_type = InternalStateConversionType.PowerToPowerCoefficient
+                internal_state_conversion = InternalStateConversion.new_power_to_internal_flow(
+                    internal_flow = internal_flow,
+                    fan_efficiency = 0.7
                 )
             )
         )
-        
-    
+
+
     @model_validator(mode='before')
     @classmethod
     def deserialize_from_rust_enum(cls, data):

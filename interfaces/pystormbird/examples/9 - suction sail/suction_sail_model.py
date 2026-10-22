@@ -27,6 +27,18 @@ from pystormbird.lifting_line import Simulation
 
 from suction_sail_data import CQ_VALUES_3D
 
+# Suction coefficient where the 2D data shows that the suction starts to have a large effect on
+# the lift, and the stall angle at this suction coefficient, from the 2D data
+CQ_THRESHOLD = 0.018
+STALL_ANGLE_AT_THRESHOLD_DEG = 16.0
+
+# The lift at zero angle of attack without suction and at the threshold. The 2D data gives 1.8 and
+# 2.18. The values are reduced, so that the maximum lift of the 3D model at low suction matches the
+# lowest point in the power curve, which is below the maximum lift in the 2D data without suction.
+# The power curve also indicates that the lift increases very little below the threshold.
+CL_ZERO_ANGLE_NO_SUCTION = 1.4
+CL_ZERO_ANGLE_AT_THRESHOLD = 1.5
+
 @dataclass
 class SimulationResult:
     cl: float
@@ -35,7 +47,6 @@ class SimulationResult:
     section_internal_states: np.ndarray
     section_angles_of_attack: np.ndarray
     section_velocities: np.ndarray
-    section_lift_coefficients: np.ndarray
     section_is_virtual: np.ndarray
 
     def wing_suction_coefficient(self, velocity) -> float:
@@ -68,36 +79,44 @@ class SuctionSailModel:
         return self.chord_length * self.height
 
     def get_varying_foil(self) -> VaryingFoil:
-        # The first foil is for zero suction, which is needed for low power. There is no 3D data
-        # without suction, so the lift is fitted to the 2D data, while the drag is assumed to be
-        # high, as for the other suction coefficients.
+        # Foils for zero suction and for the suction coefficients in the 3D data. There is no 3D
+        # data without suction, so the lift for zero suction is based on the 2D data, while the
+        # drag is assumed to be high, as for the other suction coefficients.
         internal_state_data = [0.0] + CQ_VALUES_3D
-        cl_zero_angle = [1.8, 2.5, 3.3, 3.55]
-        cl_initial_slope = np.array([1.08, 1.25, 1.5, 1.65]) * 2*np.pi
-        cd_min = [0.4, 0.3, 0.2, 0.2]
-        mean_stall_angle = np.radians([17.0, 34, 37, 39.5])
-        stall_range = np.radians([6.0, 10.0, 10.0, 10])
-        cl_slope_reduction_factor_positive = [0.5, 0.4, 0.5, 0.5]
-        cl_slope_reduction_onset_angle_positive = np.radians([8.0, 15.0, 12.0, 12.0])
-        cd_second_order_factor = [0.12]*4
 
-        nr_data = len(internal_state_data)
+        parameters = {
+            "cl_zero_angle": [CL_ZERO_ANGLE_NO_SUCTION, 2.5, 3.3, 3.55],
+            "cl_initial_slope": list(np.array([1.08, 1.25, 1.5, 1.65]) * 2*np.pi),
+            "cd_min": [0.4, 0.3, 0.2, 0.2],
+            "mean_positive_stall_angle": list(np.radians([17.0, 34, 37, 39.5])),
+            "stall_range": list(np.radians([6.0, 10.0, 10.0, 10])),
+            "cl_slope_reduction_factor_positive": [0.5, 0.4, 0.5, 0.5],
+            "cl_slope_reduction_onset_angle_positive": list(np.radians([8.0, 15.0, 12.0, 12.0])),
+            "cd_second_order_factor": [0.12]*4,
+        }
 
-        foils_data = []
-        for i in range(nr_data):
-            foils_data.append(
-                Foil(
-                    cl_zero_angle = cl_zero_angle[i],
-                    cl_initial_slope = cl_initial_slope[i],
-                    cd_min = cd_min[i],
-                    mean_positive_stall_angle = mean_stall_angle[i],
-                    mean_negative_stall_angle = float(np.radians(30.0)),
-                    stall_range = stall_range[i],
-                    cl_slope_reduction_factor_positive = cl_slope_reduction_factor_positive[i],
-                    cl_slope_reduction_onset_angle_positive = cl_slope_reduction_onset_angle_positive[i],
-                    cd_second_order_factor = cd_second_order_factor[i]
-                )
-            )
+        # The 2D data shows that the suction has a small effect on the lift below a threshold, and
+        # a large effect above. A foil is therefore added at the threshold, between zero suction
+        # and the lowest suction coefficient in the 3D data. The lift at zero angle of attack and
+        # the stall angle are based on the 2D data, while the other parameters are interpolated.
+        # The 2D data shows that the stall angle is close to the value without suction at the
+        # threshold, and only increases for larger suction coefficients.
+        weight = CQ_THRESHOLD / internal_state_data[1]
+
+        for values in parameters.values():
+            values.insert(1, values[0] + weight * (values[1] - values[0]))
+
+        parameters["cl_zero_angle"][1] = CL_ZERO_ANGLE_AT_THRESHOLD
+        parameters["mean_positive_stall_angle"][1] = np.radians(STALL_ANGLE_AT_THRESHOLD_DEG)
+
+        internal_state_data.insert(1, CQ_THRESHOLD)
+
+        foils_data = [
+            Foil(
+                mean_negative_stall_angle = float(np.radians(30.0)),
+                **{name: float(values[i]) for name, values in parameters.items()}
+            ) for i in range(len(internal_state_data))
+        ]
 
         return VaryingFoil(
             internal_state_data = internal_state_data,
@@ -199,8 +218,6 @@ class SuctionSailModel:
     
         force = result.integrated_forces[0].total
 
-        section_velocities = np.linalg.norm(np.array(result.force_input.velocity), axis=1)
-        circulation_strength = np.array(result.force_input.circulation_strength)
     
         return SimulationResult(
             cl = force[1] / force_factor,
@@ -208,11 +225,7 @@ class SuctionSailModel:
             cp = result.input_power[0] / (force_factor * velocity),
             section_internal_states = np.array(result.force_input.section_models_internal_state),
             section_angles_of_attack = np.array(result.force_input.angles_of_attack),
-            section_velocities = section_velocities,
-            # From the Kutta-Joukowski theorem, as the magnitude, i.e., towards the suction side
-            section_lift_coefficients = np.abs(
-                2.0 * circulation_strength / (section_velocities * self.chord_length)
-            ),
+            section_velocities = np.linalg.norm(np.array(result.force_input.velocity), axis=1),
             section_is_virtual = np.array(result.ctrl_points)[:, 2] > self.height,
         )
 
