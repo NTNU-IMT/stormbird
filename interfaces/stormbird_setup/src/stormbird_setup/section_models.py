@@ -16,12 +16,13 @@ import numpy as np
 class Foil(StormbirdSetupBaseModel):
     cl_zero_angle: float | None = None
     cl_initial_slope: float | None = None
-    cl_high_order_factor_positive: float | None = None
-    cl_high_order_factor_negative: float | None = None
-    cl_high_order_power: float | None = None
+    cl_slope_reduction_factor_positive: float | None = None
+    cl_slope_reduction_factor_negative: float | None = None
+    cl_slope_reduction_onset_angle_positive: float | None = None
+    cl_slope_reduction_onset_angle_negative: float | None = None
+    cl_slope_reduction_range: float | None = None
     cl_max_after_stall: float | None = None
     cd_min: float | None = None
-    angle_cd_min: float | None = None
     cd_second_order_factor: float | None = None
     cd_max_after_stall: float | None = None
     cd_power_after_stall: float | None = None

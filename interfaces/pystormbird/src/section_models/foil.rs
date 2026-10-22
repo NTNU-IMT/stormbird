@@ -60,33 +60,53 @@ impl Foil {
     }
 
     #[getter]
-    pub fn get_cl_high_order_factor_positive(&self) -> f64 {
-        self.data.cl_high_order_factor_positive
+    pub fn get_cl_slope_reduction_factor_positive(&self) -> f64 {
+        self.data.cl_slope_reduction_factor_positive
     }
 
     #[setter]
-    pub fn set_cl_high_order_factor_positive(&mut self, value: f64) {
-        self.data.cl_high_order_factor_positive= value;
-    }
-    
-    #[getter]
-    pub fn get_cl_high_order_factor_negative(&self) -> f64 {
-        self.data.cl_high_order_factor_negative
-    }
-
-    #[setter]
-    pub fn set_cl_high_order_factor_negative(&mut self, value: f64) {
-        self.data.cl_high_order_factor_negative = value;
+    pub fn set_cl_slope_reduction_factor_positive(&mut self, value: f64) {
+        self.data.cl_slope_reduction_factor_positive = value;
     }
 
     #[getter]
-    pub fn get_cl_high_order_power(&self) -> f64 {
-        self.data.cl_high_order_power
+    pub fn get_cl_slope_reduction_factor_negative(&self) -> f64 {
+        self.data.cl_slope_reduction_factor_negative
     }
 
     #[setter]
-    pub fn set_cl_high_order_power(&mut self, value: f64) {
-        self.data.cl_high_order_power = value;
+    pub fn set_cl_slope_reduction_factor_negative(&mut self, value: f64) {
+        self.data.cl_slope_reduction_factor_negative = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_reduction_onset_angle_positive(&self) -> f64 {
+        self.data.cl_slope_reduction_onset_angle_positive
+    }
+
+    #[setter]
+    pub fn set_cl_slope_reduction_onset_angle_positive(&mut self, value: f64) {
+        self.data.cl_slope_reduction_onset_angle_positive = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_reduction_onset_angle_negative(&self) -> f64 {
+        self.data.cl_slope_reduction_onset_angle_negative
+    }
+
+    #[setter]
+    pub fn set_cl_slope_reduction_onset_angle_negative(&mut self, value: f64) {
+        self.data.cl_slope_reduction_onset_angle_negative = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_reduction_range(&self) -> f64 {
+        self.data.cl_slope_reduction_range
+    }
+
+    #[setter]
+    pub fn set_cl_slope_reduction_range(&mut self, value: f64) {
+        self.data.cl_slope_reduction_range = value;
     }
 
     #[getter]
@@ -107,16 +127,6 @@ impl Foil {
     #[setter]
     pub fn set_cd_min(&mut self, value: f64) {
         self.data.cd_min = value;
-    }
-
-    #[getter]
-    pub fn get_angle_cd_min(&self) -> f64 {
-        self.data.angle_cd_min
-    }
-
-    #[setter]
-    pub fn set_angle_cd_min(&mut self, value: f64) {
-        self.data.angle_cd_min = value;
     }
 
     #[getter]

@@ -30,13 +30,14 @@ impl VaryingFoil {
     pub fn get_foil(&self, internal_state: Float) -> Foil {
         let cl_zero_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
         let cl_initial_slope_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
-        let cl_high_order_factor_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor_positive).collect();
-        let cl_high_order_factor_negative_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_factor_negative).collect();
-        let cl_high_order_power_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_high_order_power).collect();
+        let cl_slope_reduction_factor_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_factor_positive).collect();
+        let cl_slope_reduction_factor_negative_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_factor_negative).collect();
+        let cl_slope_reduction_onset_angle_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_onset_angle_positive).collect();
+        let cl_slope_reduction_onset_angle_negative_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_onset_angle_negative).collect();
+        let cl_slope_reduction_range_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_range).collect();
         let cl_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
 
         let cd_min_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_min).collect();
-        let angle_cd_min_data: Vec<Float> = self.foils_data.iter().map(|x| x.angle_cd_min).collect();
         let cd_second_order_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
         let cd_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_max_after_stall).collect();
         let cd_power_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_power_after_stall).collect();
@@ -56,12 +57,13 @@ impl VaryingFoil {
         Foil {
             cl_zero_angle:             linear_interpolation(x, x_data, &cl_zero_angle_data),
             cl_initial_slope:          linear_interpolation(x, x_data, &cl_initial_slope_data),
-            cl_high_order_factor_positive: linear_interpolation(x, x_data, &cl_high_order_factor_positive_data),
-            cl_high_order_factor_negative: linear_interpolation(x, x_data, &cl_high_order_factor_negative_data),
-            cl_high_order_power:       linear_interpolation(x, x_data, &cl_high_order_power_data),
+            cl_slope_reduction_factor_positive: linear_interpolation(x, x_data, &cl_slope_reduction_factor_positive_data),
+            cl_slope_reduction_factor_negative: linear_interpolation(x, x_data, &cl_slope_reduction_factor_negative_data),
+            cl_slope_reduction_onset_angle_positive: linear_interpolation(x, x_data, &cl_slope_reduction_onset_angle_positive_data),
+            cl_slope_reduction_onset_angle_negative: linear_interpolation(x, x_data, &cl_slope_reduction_onset_angle_negative_data),
+            cl_slope_reduction_range:  linear_interpolation(x, x_data, &cl_slope_reduction_range_data),
             cl_max_after_stall:        linear_interpolation(x, x_data, &cl_max_after_stall_data),
             cd_min:                    linear_interpolation(x, x_data, &cd_min_data),
-            angle_cd_min:              linear_interpolation(x, x_data, &angle_cd_min_data),
             cd_second_order_factor:    linear_interpolation(x, x_data, &cd_second_order_factor_data),
             cd_max_after_stall:        linear_interpolation(x, x_data, &cd_max_after_stall_data),
             cd_power_after_stall:      linear_interpolation(x, x_data, &cd_power_after_stall_data),
