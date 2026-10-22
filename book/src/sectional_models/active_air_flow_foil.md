@@ -74,15 +74,15 @@ where \\( p'(y\_i) \\) is the power per span length at the control point and \\(
 The `PowerToInternalFlow` and `FanSpeedToInternalFlow` conversions use a simplified model of the flow through the porous surface of the sail. The model is based on a pressure balance between the outside and the inside of the sail, and the following assumptions:
 
 - All line elements in the same internal compartment share the same internal volume, with a uniform internal pressure. By default, the whole wing is a single compartment.
-- The external pressure on the porous surface can be estimated from the lift coefficient only.
+- The external pressure on the porous surface depends only on the suction coefficient, and not on the angle of attack or the lift.
 - The pressure loss through the porous surface is proportional to the velocity through the surface squared.
 
 The input parameters to the model are shown below. The model only describes the flow through the porous surface. The fans are part of the internal state conversion.
 
 ```rust
 pub struct InternalFlow {
-    pub cp_zero_cl: f64,
-    pub cp_gradient: f64,
+    pub cp_no_suction: f64,
+    pub cp_suction_gradient: f64,
     pub loss_coefficient: f64,
     pub porous_fraction: f64,
     pub solver_settings: InternalFlowSolverSettings,
@@ -90,13 +90,26 @@ pub struct InternalFlow {
 ```
 
 ### External pressure
-The external pressure coefficient on the porous surface is modeled as a linear function of the lift coefficient:
+The external pressure coefficient on the porous surface is modeled as a linear function of the suction coefficient:
 
 \\[
-    C\_{p, ext} = C\_{p, 0} + \frac{d C\_p}{d C\_L} C\_L
+    C\_{p, ext} = C\_{p, 0} + \frac{d C\_p}{d C\_Q} C\_Q
 \\]
 
-where \\( C\_{p, 0} \\) is given by `cp_zero_cl` and \\( d C\_p / d C\_L \\) is given by `cp_gradient`. Since the porous surface is on the suction side, both values will typically be negative. That is, the external pressure on the porous surface gets lower when the lift increases. The lift coefficient is defined as positive when the lift is directed towards the suction side. 
+where \\( C\_{p, 0} \\) is the pressure coefficient without suction, given by `cp_no_suction`, and \\( d C\_p / d C\_Q \\) is given by `cp_suction_gradient`. Since the porous surface is on the suction side, both values will typically be negative. That is, the external pressure on the porous surface gets lower when the suction increases. The gradient must be zero or negative, which is checked when the model is set up. The reason for this requirement is explained [below](#the-suction-coefficient-on-each-line-element).
+
+#### Why the pressure depends on the suction coefficient
+The external pressure is modeled as a function of the suction coefficient only, and not of the angle of attack or the lift coefficient. The reasoning behind this choice is as follows:
+
+- The porous surface is typically located on the aft part of the suction side, where the flow would separate without suction.
+- The part of the pressure distribution that is caused by the angle of attack is concentrated close to the leading edge. In thin airfoil theory, the loading due to the angle of attack is proportional to \\( \sqrt{(1 - x) / x} \\), where \\( x \\) is the non-dimensional chordwise position, which goes to zero at the trailing edge. A change in the angle of attack therefore mainly changes the suction peak at the leading edge, and has less effect on the pressure on the aft part of the foil.
+- The suction, on the other hand, acts more like a change in camber, or a *virtual flap*, similar to how lift is controlled on circulation control airfoils. The suction controls how far the flow stays attached around the aft part of the foil. Without suction, the pressure on the porous surface is close to the base pressure of the separated flow. When the suction increases, the flow stays attached further around the aft part, and the pressure on the porous surface becomes much lower. The lift increases as a consequence, so the lift and the external pressure are correlated, but it is the suction that is the cause.
+
+This is also consistent with pressure distributions for foils with boundary layer suction, where the pressure on the aft part of the suction side varies much more with the suction rate than with the angle of attack.
+
+The model is still a simplification. The angle of attack will have some effect on the external pressure, especially close to and beyond the maximum lift for a given suction coefficient. The flow then separates upstream of the porous surface, and the pressure increases towards the base pressure. This is not captured by the model. The dependency on the suction coefficient is also likely to be nonlinear in reality, for instance by leveling off when the flow is fully attached, so the linear function should be seen as an approximation that is valid over a limited range of suction coefficients. The parameters depend on the geometry of the sail and the location of the porous surface, and must be tuned to experimental or CFD data.
+
+A practical consequence of the choice is that the internal flow model does not depend on the `VaryingFoil` model. The suction coefficient on each line element can therefore be computed directly, as explained below, without an iteration between the internal flow model and the lift and drag model.
 
 ### Flow through the porous surface
 The fans create an internal suction, \\( s \\), which is the difference between the ambient pressure and the internal pressure in the sail. The pressure difference over the porous surface is then:
@@ -111,9 +124,20 @@ The flow through the surface is driven by this pressure difference, and is model
     Q = \phi A \sqrt{\frac{2 \Delta p}{\rho K}}
 \\]
 
-where \\( \phi \\) is the fraction of the area that is porous, given by `porous_fraction`. Note that only the ratio \\( \phi / \sqrt{K} \\) matters for the flow. The intention is that the porous fraction is set based on the geometry of the sail, while the loss coefficient is tuned to match experimental or CFD data.
+where \\( \phi \\) is the fraction of the area that is porous, given by `porous_fraction`. Both the porous fraction and the loss coefficient must be larger than zero. Note that only the ratio \\( \phi / \sqrt{K} \\) matters for the flow. The intention is that the porous fraction is set based on the geometry of the sail, while the loss coefficient is tuned to match experimental or CFD data.
 
-If the internal suction is too small to overcome the external suction, the pressure difference becomes negative, which in reality means that air flows out of the sail. Since the sign of the internal state is used for the direction of the suction, such outflow is not represented in Stormbird. Line elements with outflow are instead assumed to have zero flow.
+### The suction coefficient on each line element
+The internal suction is uniform within an [internal compartment](#internal-compartments), but the local velocity varies along the span, for instance due to the lift-induced velocities or a vertical wind gradient. It is therefore practical to use the non-dimensional internal suction for each line element, \\( \sigma = s / (0.5 \rho U^2) \\), which varies along the span. Combining the equations above, with \\( Q = C\_Q U A \\), gives a quadratic equation for the suction coefficient on each line element:
+
+\\[
+    \frac{K}{\phi^2} C\_Q^2 - \frac{d C\_p}{d C\_Q} C\_Q - \left( C\_{p, 0} + \sigma \right) = 0
+\\]
+
+When the gradient is zero or negative, the equation has exactly one positive solution when \\( C\_{p, 0} + \sigma \\) is positive, and no positive solution otherwise. The suction coefficient is therefore computed directly from the solution of the equation, without any iterations. The suction coefficient also increases monotonically with the internal suction, which makes the solution for the internal suction of the whole wing, described [below](#solving-for-the-internal-suction), robust. With a positive gradient, the equation could have two positive solutions or none, which is the reason why this is not allowed.
+
+The suction coefficient is lower on line elements with a high local velocity, as the same internal suction gives a lower value of \\( \sigma \\). A negative gradient acts as a negative feedback on the flow: more suction gives a lower external pressure, which counteracts the internal suction and reduces the pressure difference that drives the flow into the sail. The suction coefficient for a given value of \\( \sigma \\) is therefore lower than without the gradient. This feedback is also the reason why the solution is unique.
+
+If the internal suction is too small to overcome the external suction, i.e., if \\( C\_{p, 0} + \sigma \\) is negative, the pressure difference becomes negative, which in reality means that air flows out of the sail. Since the sign of the internal state is used for the direction of the suction, such outflow is not represented in Stormbird. Line elements with outflow are instead assumed to have zero flow.
 
 ### Power with a constant fan efficiency
 The power delivered to the flow is the internal suction times the total volume flow over the wing. For the `PowerToInternalFlow` conversion, the input power to the fans is found by dividing by a constant fan efficiency, \\( \eta \\), given by `fan_efficiency`:
@@ -203,28 +227,28 @@ Note that, since the internal pressure is uniform within a compartment, it is on
 
 [Virtual line elements](../line_model/building_line_model.md), for instance used to model end plates, get the same type of internal state as the rest of the wing. For instance, they get the suction coefficient that follows from the internal suction in the compartment they belong to. This keeps the circulation on the virtual line elements consistent with the rest of the wing. However, virtual line elements are not part of the sail itself, and are therefore not included in the flow through the sail or in the power.
 
-## Solving for the suction coefficient
-The internal suction is not known directly, and must be found from the internal state of the wing. This is done in two levels:
+## Solving for the internal suction
+The internal suction is not known directly, and must be found from the internal state of the wing, for each compartment. For a given internal suction, the suction coefficient on each line element is found directly, as described [above](#the-suction-coefficient-on-each-line-element). The total volume flow through the compartment, and therefore the power, is a nonlinear function of the internal suction, which means that a solver is needed:
 
-1) For a given internal suction, the suction coefficient on each line element is found. This requires a solver since the suction coefficient affects the lift coefficient through the `VaryingFoil` model, which again affects the external pressure, and therefore the suction coefficient. The solver finds the value where the two are consistent, using the [secant method](https://en.wikipedia.org/wiki/Secant_method). 
-2) The internal suction is found for each compartment. For the `PowerToInternalFlow` conversion, this is the value where the power equals the power given as the internal state of the wing, found with the secant method. For the `FanSpeedToInternalFlow` conversion, this is the operating point of the fans, found with [Brent's method](https://en.wikipedia.org/wiki/Brent%27s_method). Brent's method always keeps the solution within a bracket, which is known in this case: the internal suction is always between the value where the flow into the sail starts and the maximum pressure rise of the fans.
+- For the `PowerToInternalFlow` conversion, the internal suction is the value where the power equals the power given as the internal state of the wing, found with the [secant method](https://en.wikipedia.org/wiki/Secant_method).
+- For the `FanSpeedToInternalFlow` conversion, the internal suction is given by the operating point of the fans, found with [Brent's method](https://en.wikipedia.org/wiki/Brent%27s_method). Brent's method always keeps the solution within a bracket, which is known in this case: the internal suction is always between the value where the flow into the sail starts and the maximum pressure rise of the fans.
 
-The settings for both levels can be set through the `solver_settings` field, but the default values should normally be sufficient:
+The settings for the solver can be set through the `solver_settings` field, but the default values should normally be sufficient:
 
 ```rust
 pub struct InternalFlowSolverSettings {
-    pub segment_tolerance: f64,         // Default: 1e-8
-    pub segment_max_iterations: usize,  // Default: 20
     pub wing_tolerance: f64,            // Default: 1e-6, relative
     pub wing_max_iterations: usize,     // Default: 50
 }
 ```
 
+Note that the internal flow model is still coupled to the rest of the lifting line or actuator line simulation through the local velocity. The suction coefficient affects the lift, which affects the induced velocities, which again affect the local velocity, and therefore the suction coefficient. This coupling is handled by the iterations in the simulation, in the same way as for all other section models.
+
 ## Power consumption and control
 
 The power needed to operate the sail is computed by the section model for the whole wing, as described in the [section model overview](sectional_models_intro.md). For the power based conversions, this is done by integrating a power coefficient over the wing, which means that the default [input power model](../line_model/input_power.md) gives the same power as the internal state of the wing. For the `FanSpeedToInternalFlow` conversion, the efficiency of the fans depends on the operating point in each compartment. The power is therefore computed from the power curve of the fans, using the volume flow and the rotational speed in each compartment, and summed over the compartments. 
 
-The [controller](../utils/control_system.md) can be used to set the internal state of a suction sail in two ways. Either the set points can be given directly as the wing internal state, i.e., as the power or the rotational speed of the fans, or they can be given in the units of the section model, i.e., as the suction or power coefficient. In the latter case, the set points are converted to the wing internal state based on the measured flow conditions on the wing, assuming the same suction or power coefficient along the whole span. This is an open loop estimate, so the actual suction coefficient along the wing will only approximately match the set point. With several internal compartments, the area of the wing is assumed to be divided equally between them. The controller sets a constant internal state for the wing, so internal states that vary along the span must currently be [set manually](../line_model/move_line_models.md#update-the-internal-state). 
+The [controller](../utils/control_system.md) can be used to set the internal state of a suction sail in two ways. Either the set points can be given directly as the wing internal state, i.e., as the power or the rotational speed of the fans, or they can be given in the units of the section model, i.e., as the suction or power coefficient. In the latter case, the set points are converted to the wing internal state based on the measured velocity on the wing, assuming the same suction or power coefficient along the whole span. Since the internal flow model does not depend on the angle of attack, the measured angle of attack is not needed for this conversion. This is an open loop estimate, so the actual suction coefficient along the wing will only approximately match the set point. With several internal compartments, the area of the wing is assumed to be divided equally between them. The controller sets a constant internal state for the wing, so internal states that vary along the span must currently be [set manually](../line_model/move_line_models.md#update-the-internal-state). 
 
 The maximum value of the internal state can be limited through the `wing_internal_state_max_value` setting in the controller. This is the maximum power for the power based conversions, and the maximum rotational speed of the fans for the `FanSpeedToInternalFlow` conversion.
 
@@ -234,7 +258,7 @@ The internal flow model is simplified, and the empirical parameters must be tune
 
 - Reynolds number effects are not modeled, neither for the external flow nor for the flow through the porous surface. The quadratic loss model is typical for perforated surfaces with relatively high through-flow velocities, while the losses through fine porous materials can be closer to linear in the velocity.
 - The `PowerToInternalFlow` conversion assumes a constant fan efficiency, while it will in reality depend on the operating point of the fans. The fans are also treated as a power source that can deliver any combination of suction and volume flow, which implicitly assumes fans with variable speed. The `FanSpeedToInternalFlow` conversion removes this simplification, if fan curves are available.
-- The external pressure is assumed to depend on the lift coefficient only. This is only approximately true, and mainly valid for attached flow. 
+- The external pressure is assumed to depend linearly on the suction coefficient only, as discussed in the section on the [external pressure](#why-the-pressure-depends-on-the-suction-coefficient). The effect of the angle of attack is neglected, which is mainly valid when the flow is attached over the porous surface.
 - The internal pressure is assumed to be uniform within each compartment. Losses in the ducts between the internal volume and the fans can be included in the fan model, but losses inside the internal volume itself are not modeled. Leakage between compartments is not modeled.
 - Outflow through the porous surface is not modeled, as described above.
 
@@ -257,8 +281,8 @@ Below is an example of the input for a section model using the `PowerToInternalF
         "internal_state_conversion": {
             "PowerToInternalFlow": {
                 "internal_flow": {
-                    "cp_zero_cl": -0.5,
-                    "cp_gradient": -0.8,
+                    "cp_no_suction": -0.5,
+                    "cp_suction_gradient": -20.0,
                     "loss_coefficient": 10.0,
                     "porous_fraction": 0.3
                 },
@@ -285,8 +309,8 @@ The same model with two fans, modeled with dimensional fan curves measured at 20
         "internal_state_conversion": {
             "FanSpeedToInternalFlow": {
                 "internal_flow": {
-                    "cp_zero_cl": -0.5,
-                    "cp_gradient": -0.8,
+                    "cp_no_suction": -0.5,
+                    "cp_suction_gradient": -20.0,
                     "loss_coefficient": 10.0,
                     "porous_fraction": 0.3
                 },

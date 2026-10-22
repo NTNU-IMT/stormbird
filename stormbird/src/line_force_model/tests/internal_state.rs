@@ -84,13 +84,9 @@ mod compartments {
                 foils_data: vec![Foil::default(), Foil { cl_zero_angle: 1.0, ..Foil::default() }],
             },
             internal_state_conversion: InternalStateConversion::PowerToInternalFlow {
-                internal_flow: InternalFlow {
-                    cp_zero_cl: -0.5,
-                    cp_gradient: -0.8,
-                    loss_coefficient: 10.0,
-                    porous_fraction: 0.3,
-                    solver_settings: Default::default(),
-                },
+                internal_flow: InternalFlow::new(
+                    -0.5, -20.0, 10.0, 0.3, Default::default()
+                ).unwrap(),
                 fan_efficiency: 0.7,
             },
         })

@@ -131,7 +131,7 @@ class ActiveAirFlowFoil:
 
     def lift_coefficient(self, angle_of_attack: float, internal_state: float) -> float: ...
     def drag_coefficient(self, angle_of_attack: float, internal_state: float) -> float: ...
-    def power_coefficient(self, angle_of_attack: float, internal_state: float) -> float: ...
+    def power_coefficient(self, internal_state: float) -> float: ...
     def section_internal_states(
         self,
         wing_state: float,
@@ -152,7 +152,6 @@ class ActiveAirFlowFoil:
     def wing_state_from_section_state(
         self,
         section_state: float,
-        angle_of_attack: float,
         velocity: float,
         wing_area: float,
         density: float,

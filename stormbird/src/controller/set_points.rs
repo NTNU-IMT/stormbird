@@ -204,7 +204,6 @@ impl ControllerSetPoints {
 
                 active_air_flow_foil.wing_state_from_section_state(
                     section_model_internal_state,
-                    input.angle_of_attack,
                     input.velocity,
                     area,
                     line_force_model.internal_compartments[wing_index].nr_compartments(),

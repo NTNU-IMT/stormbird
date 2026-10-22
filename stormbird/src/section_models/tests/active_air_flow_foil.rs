@@ -9,7 +9,6 @@ use crate::section_models::active_air_flow_foil::{
 };
 use crate::section_models::active_air_flow_foil::internal_flow::{
     InternalFlow,
-    InternalFlowInput,
     InternalFlowSolverSettings
 };
 use crate::section_models::active_air_flow_foil::fan::{Fan, FanCurves, FanCurveData};
@@ -23,13 +22,7 @@ const FAN_EFFICIENCY: Float = 0.7;
 const DENSITY: Float = 1.225;
 
 fn test_internal_flow() -> InternalFlow {
-    InternalFlow {
-        cp_zero_cl: -0.5,
-        cp_gradient: -0.8,
-        loss_coefficient: 10.0,
-        porous_fraction: 0.3,
-        solver_settings: InternalFlowSolverSettings::default(),
-    }
+    InternalFlow::new(-0.5, -20.0, 10.0, 0.3, InternalFlowSolverSettings::default()).unwrap()
 }
 
 fn power_conversion(fan_efficiency: Float) -> InternalStateConversion {
@@ -134,29 +127,30 @@ fn total_volume_flow(segments: &[SegmentFlowConditions], suction_coefficients: &
     }).sum()
 }
 
-/// Checks that the suction coefficients are consistent with the internal flow model at the given
-/// internal suction
+/// Checks that the suction coefficients satisfy the pressure balance over the porous surface at
+/// the given internal suction, where the external pressure depends on the suction coefficient:
+/// Q = phi * A * sqrt(2 * (p_ext(C_Q) + s) / (density * K))
 fn assert_self_consistent(
-    model: &ActiveAirFlowFoil,
     internal_flow: &InternalFlow,
     segments: &[SegmentFlowConditions],
     suction_coefficients: &[Float],
     internal_suction: Float,
 ) {
     for (segment, &cq) in segments.iter().zip(suction_coefficients) {
-        assert!(cq >= 0.0);
+        let cq = cq.abs();
 
-        let input = InternalFlowInput {
-            lift_coefficient: model.lift_coefficient(segment.angle_of_attack, cq),
-            segment_area: segment.area,
-            density: DENSITY,
-            velocity: segment.velocity,
-            internal_suction,
-        };
+        let dynamic_pressure = 0.5 * DENSITY * segment.velocity.powi(2);
 
-        let cq_flow_model = internal_flow.suction_coefficient(&input).max(0.0);
+        let pressure_drop = internal_flow.external_pressure_coefficient(cq) * dynamic_pressure +
+            internal_suction;
 
-        assert!((cq_flow_model - cq).abs() < 1e-6);
+        let volume_flow = internal_flow.porous_fraction * segment.area * (
+            2.0 * pressure_drop.max(0.0) / (DENSITY * internal_flow.loss_coefficient)
+        ).sqrt();
+
+        let cq_flow_model = volume_flow / (segment.velocity * segment.area);
+
+        assert!((cq_flow_model - cq).abs() < 1e-10);
     }
 }
 
@@ -171,8 +165,8 @@ fn suction_from_power_matches_power_and_is_self_consistent() {
 
     let flow_power = FAN_EFFICIENCY * power;
 
-    let internal_suction = model.internal_suction_from_flow_power(
-        &internal_flow, flow_power, &segments, DENSITY, 1.0
+    let internal_suction = internal_flow.internal_suction_from_flow_power(
+        flow_power, &segments, DENSITY
     );
 
     let suction_coefficients = model.section_internal_states(&constant(power), &segments, &single_compartment(), DENSITY);
@@ -183,7 +177,7 @@ fn suction_from_power_matches_power_and_is_self_consistent() {
 
     assert!((computed_flow_power - flow_power).abs() / flow_power < 1e-4);
 
-    assert_self_consistent(&model, &internal_flow, &segments, &suction_coefficients, internal_suction);
+    assert_self_consistent(&internal_flow, &segments, &suction_coefficients, internal_suction);
 }
 
 #[test]
@@ -245,8 +239,8 @@ fn zero_velocity_gives_zero_suction_and_no_nan() {
 
     let model = test_model(power_conversion(FAN_EFFICIENCY));
 
-    let internal_suction = model.internal_suction_from_flow_power(
-        &internal_flow, 500.0, &segments, DENSITY, 1.0
+    let internal_suction = internal_flow.internal_suction_from_flow_power(
+        500.0, &segments, DENSITY
     );
 
     assert_eq!(internal_suction, 0.0);
@@ -317,7 +311,7 @@ fn wing_state_from_section_state_inverts_section_internal_states() {
             let section_state = model.section_internal_states(&constant(wing_state), &segments, &single_compartment(), DENSITY)[0];
 
             let wing_state_back = model.wing_state_from_section_state(
-                section_state, angle_of_attack, velocity, wing_area, 1, DENSITY
+                section_state, velocity, wing_area, 1, DENSITY
             );
 
             dbg!(&model.internal_state_conversion, wing_state, section_state, wing_state_back);
@@ -360,8 +354,8 @@ fn fan_operating_point_balances_the_pressure() {
 
         let rotational_speed = 15.0;
 
-        let internal_suction = model.internal_suction_from_fan_speed(
-            &internal_flow, &fan, rotational_speed, &segments, DENSITY, 1.0
+        let internal_suction = internal_flow.internal_suction_from_fan_speed(
+            &fan, rotational_speed, &segments, DENSITY
         );
 
         let suction_coefficients = model.section_internal_states(&constant(rotational_speed), &segments, &single_compartment(), DENSITY);
@@ -376,7 +370,7 @@ fn fan_operating_point_balances_the_pressure() {
         assert!(flow > 0.0);
         assert!((pressure_rise - internal_suction - duct_loss).abs() / pressure_rise < 1e-5);
 
-        assert_self_consistent(&model, &internal_flow, &segments, &suction_coefficients, internal_suction);
+        assert_self_consistent(&internal_flow, &segments, &suction_coefficients, internal_suction);
     }
 }
 
@@ -871,9 +865,115 @@ fn wing_state_from_section_state_with_compartments() {
         )[0];
 
         let wing_state_back = model.wing_state_from_section_state(
-            section_state, angle_of_attack, velocity, wing_area, 2, DENSITY
+            section_state, velocity, wing_area, 2, DENSITY
         );
 
         assert!((wing_state_back - wing_state).abs() / wing_state < 1e-4);
+    }
+}
+
+#[test]
+fn internal_flow_from_json() {
+    let valid = r#"{
+        "cp_no_suction": -0.5,
+        "cp_suction_gradient": -20.0,
+        "loss_coefficient": 10.0,
+        "porous_fraction": 0.3
+    }"#;
+
+    let internal_flow: InternalFlow = serde_json::from_str(valid).unwrap();
+
+    assert_eq!(internal_flow.cp_suction_gradient, -20.0);
+
+    // More suction can not increase the external pressure
+    let positive_gradient = valid.replace("-20.0", "20.0");
+
+    let error = serde_json::from_str::<InternalFlow>(&positive_gradient).unwrap_err();
+
+    assert!(error.to_string().contains("cp_suction_gradient"));
+
+    // The old lift based parameters are not accepted
+    let old_parameters = r#"{
+        "cp_zero_cl": -0.5,
+        "cp_gradient": -0.8,
+        "loss_coefficient": 10.0,
+        "porous_fraction": 0.3
+    }"#;
+
+    assert!(serde_json::from_str::<InternalFlow>(old_parameters).is_err());
+
+    // Nor are the old settings for the segment solver
+    let old_settings = valid.replace(
+        "\"porous_fraction\": 0.3",
+        "\"porous_fraction\": 0.3, \"solver_settings\": {\"segment_tolerance\": 1e-8}"
+    );
+
+    assert!(serde_json::from_str::<InternalFlow>(&old_settings).is_err());
+
+    for (loss_coefficient, porous_fraction) in [(0.0, 0.3), (10.0, 0.0)] {
+        assert!(InternalFlow::new(
+            -0.5, -20.0, loss_coefficient, porous_fraction, InternalFlowSolverSettings::default()
+        ).is_err());
+    }
+}
+
+/// The closed form solution for the suction coefficient should be the inverse of the internal
+/// suction needed for a given suction coefficient, and give no flow below the threshold
+#[test]
+fn suction_coefficient_inverts_internal_suction_coefficient() {
+    let gradients = [0.0, -20.0];
+
+    for gradient in gradients {
+        let internal_flow = InternalFlow::new(
+            -0.5, gradient, 10.0, 0.3, InternalFlowSolverSettings::default()
+        ).unwrap();
+
+        for i in 1..20 {
+            let cq = 0.005 * i as Float;
+
+            let sigma = internal_flow.internal_suction_coefficient(cq);
+
+            assert!((internal_flow.suction_coefficient(sigma) - cq).abs() < 1e-12);
+        }
+
+        // Below the threshold, the internal suction can not overcome the external suction
+        assert_eq!(internal_flow.suction_coefficient(0.4), 0.0);
+        assert_eq!(internal_flow.suction_coefficient(0.5), 0.0);
+    }
+}
+
+/// The suction coefficient only depends on the local velocity, and not on the angle of attack.
+/// Segments with lower velocity get a larger non-dimensional internal suction, and therefore a
+/// larger suction coefficient.
+#[test]
+fn suction_depends_on_velocity_and_not_on_angle_of_attack() {
+    let segments = test_segments();
+
+    let other_angles: Vec<SegmentFlowConditions> = segments.iter().map(|segment| {
+        SegmentFlowConditions {
+            angle_of_attack: 2.0 * segment.angle_of_attack + 0.1,
+            ..segment.clone()
+        }
+    }).collect();
+
+    let cases = [
+        (power_conversion(FAN_EFFICIENCY), 500.0),
+        (fan_conversion(test_fan(0.0)), 15.0),
+    ];
+
+    for (conversion, wing_state) in cases {
+        let model = test_model(conversion);
+
+        let states = model.section_internal_states(&constant(wing_state), &segments, &single_compartment(), DENSITY);
+        let states_other_angles = model.section_internal_states(
+            &constant(wing_state), &other_angles, &single_compartment(), DENSITY
+        );
+
+        assert_eq!(states, states_other_angles);
+
+        // The velocity increases along the test segments
+        for i in 1..states.len() {
+            assert!(states[i] < states[i - 1]);
+        }
     }
 }

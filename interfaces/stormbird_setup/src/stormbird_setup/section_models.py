@@ -76,26 +76,50 @@ class MultiElementFoil(VaryingFoil):
 
 class InternalFlowSolverSettings(StormbirdSetupBaseModel):
     '''
-    Settings for the numerical solvers used when computing the internal state from the internal
-    flow model. Values that are not set use the defaults in Stormbird.
+    Settings for the numerical solver used when computing the internal suction of the wing from the
+    internal state. Values that are not set use the defaults in Stormbird.
     '''
-    segment_tolerance: float | None = None
-    segment_max_iterations: int | None = None
     wing_tolerance: float | None = None
     wing_max_iterations: int | None = None
 
 class InternalFlow(StormbirdSetupBaseModel):
     '''
     Model of the flow through the porous surface of a foil with active air flow, e.g., a suction
-    sail. The external pressure on the porous surface is modelled as a linear function of the lift
-    coefficient, while the flow through the surface is modelled with a loss coefficient. The model
-    does not include the fan, which is part of the internal state conversion.
+    sail. The external pressure on the porous surface is modelled as a linear function of the
+    suction coefficient, C_p,ext = cp_no_suction + cp_suction_gradient * C_Q, while the flow
+    through the surface is modelled with a loss coefficient. The model does not include the fan,
+    which is part of the internal state conversion.
+
+    The gradient must be zero or negative, i.e., more suction can not increase the external
+    pressure, and the loss coefficient and the porous fraction must be larger than zero.
     '''
-    cp_zero_cl: float
-    cp_gradient: float
+    cp_no_suction: float
+    cp_suction_gradient: float
     loss_coefficient: float
     porous_fraction: float
     solver_settings: InternalFlowSolverSettings | None = None
+
+    @model_validator(mode='after')
+    def check_parameters(self) -> "InternalFlow":
+        if self.cp_suction_gradient > 0.0:
+            raise ValueError(
+                "The cp_suction_gradient in the internal flow model must be zero or negative, as "
+                f"more suction can not increase the external pressure. Value: {self.cp_suction_gradient}"
+            )
+
+        if self.loss_coefficient <= 0.0:
+            raise ValueError(
+                "The loss_coefficient in the internal flow model must be larger than zero. "
+                f"Value: {self.loss_coefficient}"
+            )
+
+        if self.porous_fraction <= 0.0:
+            raise ValueError(
+                "The porous_fraction in the internal flow model must be larger than zero. "
+                f"Value: {self.porous_fraction}"
+            )
+
+        return self
 
 class FanCurveData(StormbirdSetupBaseModel):
     '''

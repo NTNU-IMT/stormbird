@@ -40,8 +40,8 @@ impl ActiveAirFlowFoil {
         self.data.drag_coefficient(angle_of_attack, internal_state)
     }
 
-    pub fn power_coefficient(&self, angle_of_attack: f64, internal_state: f64) -> f64 {
-        self.data.power_coefficient(angle_of_attack, internal_state)
+    pub fn power_coefficient(&self, internal_state: f64) -> f64 {
+        self.data.power_coefficient(internal_state)
     }
 
     /// Converts the internal state set on the wing to the internal state of the foil model on each
@@ -95,13 +95,12 @@ impl ActiveAirFlowFoil {
     pub fn wing_state_from_section_state(
         &self,
         section_state: f64,
-        angle_of_attack: f64,
         velocity: f64,
         wing_area: f64,
         density: f64
     ) -> f64 {
         self.data.wing_state_from_section_state(
-            section_state, angle_of_attack, velocity, wing_area, 1, density
+            section_state, velocity, wing_area, 1, density
         )
     }
 

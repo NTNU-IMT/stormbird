@@ -83,12 +83,12 @@ pub fn integrate_power_coefficient(
     segments: &[SegmentFlowConditions],
     section_states: &[Float],
     density: Float,
-    power_coefficient: impl Fn(Float, Float) -> Float,
+    power_coefficient: impl Fn(Float) -> Float,
 ) -> Float {
     segments.iter().zip(section_states)
         .filter(|(segment, _)| !segment.is_virtual)
         .map(|(segment, &section_state)| {
-            power_coefficient(segment.angle_of_attack, section_state) *
+            power_coefficient(section_state) *
                 0.5 * density * segment.area * segment.velocity.powi(3)
         }).sum()
 }
@@ -221,12 +221,12 @@ impl SectionModel {
 
     /// Computes the power coefficient, c_P = P / (0.5 * density * A * U^3), where A is the area of
     /// the section and U is the local velocity. Section models that do not need power return zero.
-    pub fn power_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+    pub fn power_coefficient(&self, internal_state: Float) -> Float {
         match self {
             Self::SingleElementFoil(_) => 0.0,
             Self::MultiElementFoil(_) => 0.0,
             Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.power_coefficient(
-                angle_of_attack, internal_state
+                internal_state
             ),
             Self::RotatingCylinder(cylinder) => cylinder.power_coefficient(internal_state),
             Self::EffectiveWindSensor => 0.0,
@@ -292,8 +292,8 @@ impl SectionModel {
                 wing_state, segments, compartments, section_states, density
             ),
             _ => integrate_power_coefficient(
-                segments, section_states, density, |angle_of_attack, section_state| {
-                    self.power_coefficient(angle_of_attack, section_state)
+                segments, section_states, density, |section_state| {
+                    self.power_coefficient(section_state)
                 }
             ),
         }
