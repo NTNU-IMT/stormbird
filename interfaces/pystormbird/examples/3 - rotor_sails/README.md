@@ -10,7 +10,6 @@ Each example is compared against data from experiments that tested rotor sails i
 - `single_rotor_multiple_spin_ratios.py`: Runs a single rotor sail for a range of spin ratios, with different solver settings, and compares the lift and drag against the experiments by Deybach et al. (2024).
 - `single_rotor_single_case.py`: Runs a single rotor sail at one spin ratio, given with the `--spin-ratio` argument, and plots the circulation and the effective angle of attack along the span for the different solver settings.
 - `two_rotors_interference_factors.py`: Computes the interference factors for two rotor sails, where one rotor is placed at different angular positions around the other, and compares them against the experiments by Deybach et al. (2026). The interference factors are the lift and drag on the first rotor divided by the lift and drag on the same rotor when it stands alone. See the section below for more.
-- `two_rotors_wake_eksport.py`: Runs a dynamic simulation of two rotor sails and writes the wake to files in the `wake_files` folder, which can be used to visualize the wake, for instance in ParaView.
 
 ## The viscous core length evolution and rotor-to-rotor interaction
 

@@ -82,8 +82,4 @@ pub struct WakeSettings {
     pub neglect_self_induced_velocities: bool,
     /// Switch to set the strength update to be "steady-state"
     pub steady_state_strength_update: bool,
-    /// A variable to determine whether the wake geometry and data should be written to a file
-    pub write_wake_data_to_file: bool,
-    /// The path to the folder where the wake data should be written to
-    pub wake_files_folder_path: String,
 }

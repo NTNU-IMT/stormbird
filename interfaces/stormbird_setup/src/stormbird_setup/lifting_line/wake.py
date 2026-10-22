@@ -143,8 +143,6 @@ class DynamicWakeBuilder(StormbirdSetupBaseModel):
     neglect_self_induced_velocities: bool = False
     steady_state_strength_update: bool = False
     initial_relative_wake_length: float = 50.0
-    write_wake_data_to_file: bool = False
-    wake_files_folder_path: str = ""
     
     @classmethod
     def new_default(

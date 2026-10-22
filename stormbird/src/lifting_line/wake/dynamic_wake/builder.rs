@@ -109,12 +109,6 @@ pub struct DynamicWakeBuilder {
     #[serde(default="DynamicWakeBuilder::default_initial_relative_wake_length")]
     /// Length of wake during initialization, relative to the chord length
     pub initial_relative_wake_length: Float,
-    #[serde(default)]
-    /// A variable to determine whether the wake geometry and data should be written to a file
-    pub write_wake_data_to_file: bool,
-    #[serde(default)]
-    /// The path to the folder where the wake data should be written to
-    pub wake_files_folder_path: String,
 }
 
 impl DynamicWakeBuilder {
@@ -183,8 +177,6 @@ impl DynamicWakeBuilder {
             shape_damping_factor: self.shape_damping_factor,
             neglect_self_induced_velocities: self.neglect_self_induced_velocities,
             steady_state_strength_update: self.steady_state_strength_update,
-            write_wake_data_to_file: self.write_wake_data_to_file,
-            wake_files_folder_path: self.wake_files_folder_path.clone(),
         };
 
         let potential_theory_settings = PotentialTheorySettings {
@@ -327,8 +319,6 @@ impl Default for DynamicWakeBuilder {
             neglect_self_induced_velocities: false,
             steady_state_strength_update: false,
             initial_relative_wake_length: Self::default_initial_relative_wake_length(),
-            write_wake_data_to_file: false,
-            wake_files_folder_path: String::new(),
         }
     }
 }

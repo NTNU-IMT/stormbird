@@ -11,5 +11,6 @@ mod dynamic_simulation;
 mod steady_simulation;
 mod compare_models;
 mod no_self_induced_velocity;
+mod quasi_steady_wake;
 mod coordinate_systems;
 mod wing_sails_speed_test;

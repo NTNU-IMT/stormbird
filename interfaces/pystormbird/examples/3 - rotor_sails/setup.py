@@ -37,8 +37,7 @@ def simulate_single_case(
     dynamic: bool = False,
     dynamic_shape: bool = False,
     evolution_length_factor: float = 0.3,
-    steady_state_strength_update: bool = False,
-    write_wake: bool = False
+    steady_state_strength_update: bool = False
 ) -> list[dict]:
     velocity = 8.0
     density  = 1.225
@@ -130,10 +129,6 @@ def simulate_single_case(
             symmetry_condition = SymmetryCondition.Z,
             steady_state_strength_update = steady_state_strength_update
         )
-
-        if write_wake:
-            wake.wake_files_folder_path = "wake_files"
-            wake.write_wake_data_to_file = True
 
         simulation_builder = SimulationBuilder(
             line_force_model = line_force_model,

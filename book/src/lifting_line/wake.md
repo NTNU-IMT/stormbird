@@ -14,7 +14,7 @@ pub enum WakeData {
 
 That is, the exact nature of the data depends on whether the wake is quasi-steady or dynamic:
 
-- In the **quasi-steady** case, the wake is a set of horseshoe vortices, one for each line element, where the trailing vortices follow the velocity felt by the wings. The wake is rebuilt from scratch for every time step, so it has no memory of previous time steps. The quasi-steady wake is fast, but cannot model the dynamic variations in the lift-induced velocities, or a deformed wake shape.
+- In the **quasi-steady** case, the wake is a set of horseshoe vortices, one for each line element, where the trailing vortices follow the velocity felt by the wings. The wake is rebuilt from scratch for every time step, so it has no memory of previous time steps, but the wake from the last time step is kept for [post-processing](#wake-export-and-induced-velocities). The quasi-steady wake is fast, but cannot model the dynamic variations in the lift-induced velocities, or a deformed wake shape.
 - In the **dynamic** case, the wake consists of many vortex panels behind each line element, where both the strength and position of the panels evolve over time. This allows for modeling of the history of the wing motion, deformed wake shapes and viscous cores that change along the wake, but is more computationally expensive.
 
 The wake settings are given as part of the [simulation settings](./simulation_overview.md), as a `QuasiSteadyWakeSettings` structure for quasi-steady simulations and a `DynamicWakeBuilder` structure for dynamic simulations.
@@ -128,8 +128,6 @@ pub struct DynamicWakeBuilder {
     pub neglect_self_induced_velocities: bool,                // Default: false
     pub steady_state_strength_update: bool,                   // Default: false
     pub initial_relative_wake_length: f64,                    // Default: 50.0
-    pub write_wake_data_to_file: bool,                        // Default: false
-    pub wake_files_folder_path: String,                       // Default: ""
 }
 ```
 
@@ -179,7 +177,44 @@ where \\( i \\) is the streamwise index of the panel, \\( N \\) is the number of
 - `neglect_self_induced_velocities`: If true, the induced velocities on a wing from its own wake are neglected, so that only the velocities induced by other wings are included. This is useful if the effect of the self-induced velocities is accounted for in another way, for instance with CFD data, and the only reason for running the lifting line simulation is to calculate the wing-to-wing interaction. **Warning**: this should probably always be used in combination with a [prescribed circulation shape](../line_model/circulation_strength.md) in the line force model, to maintain a realistic circulation distribution.
 - `steady_state_strength_update`: If true, all panels in a streamwise row get the same strength as the first panel, rather than having the strength shifted downstream one panel per time step. The whole row is then treated as unknown by the solver, in the same way as a horseshoe vortex in the quasi-steady wake. This gives a steady state solution for the current wake shape, without having to wait for the strength to be convected down the wake. It is useful for steady cases where the dynamic wake is used for its other features, such as a deformed wake shape or a viscous core that grows along the wake, but should not be used for cases where the dynamic variations in the wake strength are of interest.
 
-#### Export of the wake
-- `write_wake_data_to_file` and `wake_files_folder_path`: If `write_wake_data_to_file` is true, the wake is written to a file after each time step, in the folder given by `wake_files_folder_path`. The folder must exist. The files are written in the VTK XML PolyData format, with the names `wake_<index>.vtp`, where the index is the time divided by the time step. The files contain the geometry of the panels, together with the strength and the viscous core length of each panel, and can be visualized in, for instance, [ParaView](https://www.paraview.org/).
+## Wake export and induced velocities
+
+After a time step, the wake can be used for post-processing, both for the quasi-steady and the dynamic wake. The wake always represents the state at the last completed time step. A quasi-steady wake is empty before the first time step.
+
+### Induced velocities at arbitrary points
+The `induced_velocities` function on the simulation calculates the velocity induced by the wake at any set of points, for instance to visualize the flow field around the sails, or to estimate the effect of the sails on other objects:
+
+```python
+points = [[50.0, 0.0, 10.0], [100.0, 0.0, 10.0]]
+
+induced_velocities = simulation.induced_velocities(points)
+```
+
+The induced velocities are computed with the same vortex elements and viscous core as in the simulation, including the symmetry condition. Note that the freestream velocity is not included.
+
+### Export of the wake geometry
+The `wake_as_vtk` function on the simulation returns the wake as a legacy VTK PolyData object, as raw bytes. The data contains the geometry of the wake, together with the `strength` and the `viscous_core_length` of each vortex element as cell data:
+
+- For a **dynamic wake**, each panel is exported as a quadrilateral.
+- For a **quasi-steady wake**, each horseshoe vortex is exported as a polygon with six corners, going along the trailing vortices and the bound vortex, and closed with a line between the far ends of the two trailing vortices. That is, the polygon represents the surface spanned by the horseshoe vortex.
+
+The `binary` argument selects between the binary and ASCII variants of the VTK format. The bytes can be read directly into a mesh, for instance with [pyvista](https://pyvista.org/), or written to files that can be opened in, for instance, [ParaView](https://www.paraview.org/). There is no automatic export of the wake during a simulation, so writing files for each time step must be done in the script that runs the simulation:
+
+```python
+from pathlib import Path
+
+output_folder = Path("wake_files")
+output_folder.mkdir(exist_ok=True)
+
+for time_step_index in range(nr_time_steps):
+    result = simulation.do_step(
+        time = time_step_index * time_step,
+        time_step = time_step,
+        freestream_velocity = freestream_velocity
+    )
+
+    with open(output_folder / f"wake_{time_step_index}.vtk", "wb") as wake_file:
+        wake_file.write(simulation.wake_as_vtk(binary=True))
+```
 
 For more details on the implementation, see the [code documentation](https://docs.rs/stormbird/latest/stormbird/).

@@ -6,13 +6,10 @@ use stormath::spatial_vector::SpatialVector;
 use crate::line_force_model::span_line::SpanLine;
 use crate::lifting_line::singularity_elements::horseshoe_vortex::HorseshoeVortex;
 use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondition;
-use crate::lifting_line::wake::settings::{QuasiSteadyWakeSettings, ViscousCoreLength};
+use crate::lifting_line::wake::quasi_steady_wake::QuasiSteadyWake;
 
 use stormath::matrix::Matrix;
 use stormath::type_aliases::Float;
-
-use crate::line_force_model::LineForceModel;
-
 
 use crate::lifting_line::wake::dynamic_wake::DynamicWake;
 
@@ -62,77 +59,23 @@ impl FrozenWake {
         }
     }
 
-    /// Function that updates the variable velocity factors assuming a steady wake, given a line
-    /// force model and the free stream velocity at the ctrl points.
-    pub fn update_as_steady_from_line_force_model_and_velocities(
+    /// Updates the variable velocity factors from a quasi-steady wake, where the geometry of the
+    /// horseshoe vortices is already updated for the current time step.
+    ///
+    /// The whole horseshoe vortex has the unknown strength, so the fixed velocities are zero.
+    pub fn update_from_quasi_steady_wake(
         &mut self,
-        line_force_model: &LineForceModel,
-        ctrl_points_freestream: &[SpatialVector],
-        wake_settings: &QuasiSteadyWakeSettings,
+        ctrl_points: &[SpatialVector],
+        wake: &QuasiSteadyWake,
     ) {
-        let nr_span_lines = line_force_model.span_lines_global.len();
-
-        let span_lines = &line_force_model.span_lines_global;
-
-        let average_chord_length = line_force_model.chord_lengths.iter().sum::<Float>() /
-            (nr_span_lines as Float);
-
-        let wake_length = wake_settings.wake_length_factor * average_chord_length;
-
-        // Add motion velocity
-        let felt_ctrl_points_freestream = line_force_model.felt_ctrl_points_velocity(
-            ctrl_points_freestream
-        ); 
-
-        let span_point_velocities = line_force_model.span_point_values_from_ctrl_point_values(
-            &felt_ctrl_points_freestream, 
-            false
-        );
-
-        // Pre-calculate normalized wake vectors to avoid repeated normalization
-        let nr_wake_vectors = span_point_velocities.len();
-        let mut wake_vectors: Vec<SpatialVector> = Vec::with_capacity(nr_wake_vectors);
-        for i in 0..span_point_velocities.len() {
-            wake_vectors.push(span_point_velocities[i].normalize() * wake_length);
-        }
-
-        let viscous_core_length = match wake_settings.viscous_core_length {
-            ViscousCoreLength::Relative(factor) => {
-                let average_bound_vortex_length = span_lines.iter()
-                    .map(|span_line| span_line.length())
-                    .sum::<Float>() / (nr_span_lines as Float);
-
-                factor * average_bound_vortex_length
-            },
-            ViscousCoreLength::Absolute(length) => length,
-            ViscousCoreLength::NoViscousCore => 0.0,
-        };
-
-        let horseshoe_vortices = HorseshoeVortex::vortices_from_line_force_model_and_wake_vectors(
-            line_force_model,
-            &wake_vectors,
-            viscous_core_length
-        );
+        let nr_span_lines = ctrl_points.len();
 
         for row_index in 0..nr_span_lines {
-            let ctrl_point = line_force_model.ctrl_points_global[row_index];
+            let ctrl_point = ctrl_points[row_index];
 
             for col_index in 0..nr_span_lines {
-                let vortex = &horseshoe_vortices[col_index];
-
-                let u_i = vortex.induced_velocity_with_unit_strength(ctrl_point);
-
-                let point_mirrored = wake_settings.symmetry_condition.mirrored_point(ctrl_point);
-
-                let u_i_corrected = if let Some(p_m) = point_mirrored {
-                    let u_i_mirrored = vortex.induced_velocity_with_unit_strength(p_m);
-                    
-                    wake_settings.symmetry_condition.corrected_velocity(u_i, u_i_mirrored)
-                } else {
-                    u_i
-                };
-
-                self.variable_velocity_factors[[row_index, col_index]] = u_i_corrected;
+                self.variable_velocity_factors[[row_index, col_index]] =
+                    wake.unit_strength_induced_velocity(col_index, ctrl_point);
             }
         }
     }

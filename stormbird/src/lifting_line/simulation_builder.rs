@@ -109,7 +109,7 @@ impl SimulationBuilder {
             },
             SimulationSettings::QuasiSteady(settings) => {
                 WakeData::QuasiSteady(
-                    settings.wake.clone()
+                    QuasiSteadyWake::new(settings.wake.clone())
                 )
             }
         };

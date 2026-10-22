@@ -4,5 +4,6 @@
 
 
 pub use super::dynamic_wake::DynamicWake;
+pub use super::quasi_steady_wake::QuasiSteadyWake;
 pub use super::frozen_wake::FrozenWake;
 pub use super::WakeData;

@@ -93,7 +93,26 @@ impl HorseshoeVortex {
             viscous_core_length
         }
     }
-    /// Calculates the induced velocity from all components of the horseshoe vortex, assuming the 
+    /// Returns the corner points of the horseshoe vortex, in the order they are connected:
+    /// the far end of the first free vortex, the start of the first free vortex, the start and end
+    /// of the bound vortex, and the start and far end of the second free vortex.
+    pub fn points(&self) -> [SpatialVector; 6] {
+        [
+            self.vortex_lines[0].points[0],
+            self.vortex_lines[1].points[0],
+            self.vortex_lines[2].points[0],
+            self.vortex_lines[2].points[1],
+            self.vortex_lines[3].points[1],
+            self.vortex_lines[4].points[1],
+        ]
+    }
+
+    /// The viscous core length used for all the vortex lines in the horseshoe vortex
+    pub fn viscous_core_length(&self) -> Float {
+        self.viscous_core_length
+    }
+
+    /// Calculates the induced velocity from all components of the horseshoe vortex, assuming the
     /// strength is unity.
     pub fn induced_velocity_with_unit_strength(&self, ctrl_point: SpatialVector) -> SpatialVector {
         self.vortex_lines.iter().map(
