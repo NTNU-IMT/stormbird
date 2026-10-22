@@ -25,9 +25,13 @@ fn no_self_induced_velocity() {
     let span      = 5.0;
     let velocity_mag = 1.2;
 
+    let spin_ratio = 2.0;
+
     let revolutions_per_second = -RotatingCylinder::revolutions_per_second_from_spin_ratio(
-        2.0, diameter, velocity_mag
+        spin_ratio, diameter, velocity_mag
     );
+
+    let section_model = RotatingCylinder::default();
 
     let mut line_force_model_builder = LineForceModelBuilder::new(nr_strips);
     
@@ -63,13 +67,7 @@ fn no_self_induced_velocity() {
                 chord_vector,
                 chord_vector,
             ],
-            section_model: SectionModel::RotatingCylinder(
-                RotatingCylinder {
-                    spin_ratio_data: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
-                    cl_data: vec![0.0, 1.889, 4.638, 6.794, 7.680, 7.950],
-                    ..Default::default()
-                }
-            ),
+            section_model: SectionModel::RotatingCylinder(section_model.clone()),
             non_zero_circulation_at_ends: [false, false],
             ..Default::default()
         };
@@ -122,7 +120,7 @@ fn no_self_induced_velocity() {
     dbg!(cd, cl);
 
     //let cd_data = 1.497;
-    let cl_data = 4.638;
+    let cl_data = section_model.lift_coefficient(spin_ratio);
 
     //let cd_error = cd - cd_data;  TODO make this work again
     let cl_error = cl - cl_data;

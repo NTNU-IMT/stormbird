@@ -27,22 +27,22 @@ The second solver is inspired by a simple approach outlined in [Anderson (2005),
 2) A new estimation of the [circulation strength on the line force model](./../line_model/circulation_strength.md) with the current estimate of the lift-induced velocities as input.
 3) An updated circulation strength for the next iteration which is based on a mix between the current circulation strength and the new estimated value, controlled by a damping factor.
 
-To write step 3 as an equation: The circulation strength at the iteration \\( i \\) is called \\( \Gamma_i \\). The previous circulation strength is called \\( \Gamma_{i-1} \\), and the circulation strength that is calculated using the current estimation of lift-induced velocities is called \\( \Gamma_{i, estimated} \\). With a damping factor labeled \\(d \\), the relationship between these values are as follows:
+To write step 3 as an equation: The circulation strength at the iteration \\( i \\) is called \\( \Gamma\_i \\). The previous circulation strength is called \\( \Gamma\_{i-1} \\), and the circulation strength that is calculated using the current estimation of lift-induced velocities is called \\( \Gamma\_{i, estimated} \\). With a damping factor labeled \\(d \\), the relationship between these values are as follows:
 
 \\[
-    \Gamma_i = \Gamma_{i-1} + d (\Gamma_{i, estimated} - \Gamma_{i-1})
+    \Gamma\_i = \Gamma\_{i-1} + d (\Gamma\_{i, estimated} - \Gamma\_{i-1})
 \\]
 
 The benefit of this solver is that it is simple and technically more correct than the linearized solver, as there are no assumptions about small lift-induced velocities. It will also handle non-linear effects on the lift directly, without any post-solver corrections, like in the case for the linearized solver. It is generally robust **if the damping factor is set low enough**, but may also give noise in the final results right at the stall point in some cases. This is typically handled by applying some [smoothing to the circulation strength](../line_model/circulation_strength.md) in the line force model. It is also the **most suitable solver for unsteady simulations**, which typically do not require many iterations for each time step, as the change in the circulation strength is small.
 
 ## Residual, damping factor, and convergence testing
 
-The residual is a measure on how close the solver is to the *correct solution*. It is calculated from the difference in the lift coefficient on each line element with the current best guess of the circulation distribution, \\( \Gamma_i \\) from the equations above, and the lift coefficient directly from the [sectional model](./../sectional_models/sectional_models_intro.md) using the current estimated lift-induced velocities. That is, this will also be the same as the lift coefficient calculated with the current estimated circulation distribution, or \\( \Gamma_{i, estimated} \\) from the equations above.
+The residual is a measure on how close the solver is to the *correct solution*. It is calculated from the difference in the lift coefficient on each line element with the current best guess of the circulation distribution, \\( \Gamma\_i \\) from the equations above, and the lift coefficient directly from the [sectional model](./../sectional_models/sectional_models_intro.md) using the current estimated lift-induced velocities. That is, this will also be the same as the lift coefficient calculated with the current estimated circulation distribution, or \\( \Gamma\_{i, estimated} \\) from the equations above.
 
-As an equation, the residual, \\(r\\), for a line element is calculated as follows, where \\(C_L(\Gamma) \\) is the lift coefficient based on the induced velocities due to \\( \Gamma \\):
+As an equation, the residual, \\(r\\), for a line element is calculated as follows, where \\(C\_L(\Gamma) \\) is the lift coefficient based on the induced velocities due to \\( \Gamma \\):
 
 \\[
-    r_i = C_L(\Gamma_{i}) - C_L(\Gamma_{i, estimated})
+    r\_i = C\_L(\Gamma\_{i}) - C\_L(\Gamma\_{i, estimated})
 \\]
 
 The value of this residual *should* go towards zero with successive iterations. Since the value is calculated from the lift-coefficients, it is not dependent on the geometrical dimensions or the freestream velocity. The solver will stop if the average absolute value of the residual over all line elements goes below the `residual_tolerance_absolute` value in the solver settings below. The solver will also stop if the maximum change in the circulation strength between two iterations goes below the `strength_difference_tolerance` value.

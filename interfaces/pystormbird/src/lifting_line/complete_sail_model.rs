@@ -5,6 +5,7 @@
 //! Interface to a complete simulation model for sails
 
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 
 use stormbird::lifting_line::complete_sail_model::CompleteSailModel as CompleteSailModelRust;
 use stormath::spatial_vector::SpatialVector;
@@ -24,14 +25,12 @@ pub struct CompleteSailModel {
 #[pymethods]
 impl CompleteSailModel {
     #[new]
-    pub fn new(
-        setup_string: String
-    ) -> Self {
-        Self {
-            data: CompleteSailModelRust::new_from_string(
-                &setup_string
-            ).unwrap()
-        }
+    pub fn new(setup_string: String) -> PyResult<Self> {
+        let data = CompleteSailModelRust::new_from_string(&setup_string).map_err(|e| {
+            PyValueError::new_err(format!("Failed to create complete sail model from string: {}", e))
+        })?;
+
+        Ok(Self { data })
     }
 
     /// The number of sails in the model

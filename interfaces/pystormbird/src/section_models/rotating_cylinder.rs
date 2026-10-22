@@ -3,6 +3,8 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
+use pythonize::pythonize;
 
 use stormbird::section_models::rotating_cylinder::RotatingCylinder as RotatingCylinderRust;
 use stormbird::section_models::SectionModel as SectionModelRust;
@@ -18,10 +20,12 @@ pub struct RotatingCylinder {
 #[pymethods]
 impl RotatingCylinder {
     #[new]
-    pub fn new(input_string: String) -> Self {
-        Self {
-            data: RotatingCylinderRust::new_from_string(&input_string)
-        }
+    pub fn new(input_string: String) -> PyResult<Self> {
+        let data = RotatingCylinderRust::new_from_string(&input_string).map_err(|e| {
+            PyValueError::new_err(format!("Failed to parse rotating cylinder from string: {}", e))
+        })?;
+
+        Ok(Self { data })
     }
 
     #[staticmethod]
@@ -62,5 +66,135 @@ impl RotatingCylinder {
         SectionModel {
             data: SectionModelRust::RotatingCylinder(self.data.clone())
         }
+    }
+
+    #[getter]
+    pub fn get_cl_initial_slope(&self) -> f64 {
+        self.data.cl_initial_slope
+    }
+
+    #[setter]
+    pub fn set_cl_initial_slope(&mut self, value: f64) {
+        self.data.cl_initial_slope = value;
+    }
+
+    #[getter]
+    pub fn get_cl_high_spin_ratio_slope(&self) -> f64 {
+        self.data.cl_high_spin_ratio_slope
+    }
+
+    #[setter]
+    pub fn set_cl_high_spin_ratio_slope(&mut self, value: f64) {
+        self.data.cl_high_spin_ratio_slope = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_transition_spin_ratio(&self) -> f64 {
+        self.data.cl_slope_transition_spin_ratio
+    }
+
+    #[setter]
+    pub fn set_cl_slope_transition_spin_ratio(&mut self, value: f64) {
+        self.data.cl_slope_transition_spin_ratio = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_transition_range(&self) -> f64 {
+        self.data.cl_slope_transition_range
+    }
+
+    #[setter]
+    pub fn set_cl_slope_transition_range(&mut self, value: f64) {
+        self.data.cl_slope_transition_range = value;
+    }
+
+    #[getter]
+    pub fn get_cd_start(&self) -> f64 {
+        self.data.cd_start
+    }
+
+    #[setter]
+    pub fn set_cd_start(&mut self, value: f64) {
+        self.data.cd_start = value;
+    }
+
+    #[getter]
+    pub fn get_cd_end(&self) -> f64 {
+        self.data.cd_end
+    }
+
+    #[setter]
+    pub fn set_cd_end(&mut self, value: f64) {
+        self.data.cd_end = value;
+    }
+
+    #[getter]
+    pub fn get_cd_angle_start(&self) -> f64 {
+        self.data.cd_angle_start
+    }
+
+    #[setter]
+    pub fn set_cd_angle_start(&mut self, value: f64) {
+        self.data.cd_angle_start = value;
+    }
+
+    #[getter]
+    pub fn get_cd_spin_ratio_low_drag(&self) -> f64 {
+        self.data.cd_spin_ratio_low_drag
+    }
+
+    #[setter]
+    pub fn set_cd_spin_ratio_low_drag(&mut self, value: f64) {
+        self.data.cd_spin_ratio_low_drag = value;
+    }
+
+    #[getter]
+    pub fn get_added_mass_factor(&self) -> f64 {
+        self.data.added_mass_factor
+    }
+
+    #[setter]
+    pub fn set_added_mass_factor(&mut self, value: f64) {
+        self.data.added_mass_factor = value;
+    }
+
+    #[getter]
+    pub fn get_moment_of_inertia_2d(&self) -> f64 {
+        self.data.moment_of_inertia_2d
+    }
+
+    #[setter]
+    pub fn set_moment_of_inertia_2d(&mut self, value: f64) {
+        self.data.moment_of_inertia_2d = value;
+    }
+
+    #[getter]
+    pub fn get_cdi_correction_factor(&self) -> f64 {
+        self.data.cdi_correction_factor
+    }
+
+    #[setter]
+    pub fn set_cdi_correction_factor(&mut self, value: f64) {
+        self.data.cdi_correction_factor = value;
+    }
+
+    #[getter]
+    pub fn get_power_coefficient_polynomial(&self) -> Vec<f64> {
+        self.data.power_coefficient_polynomial.clone()
+    }
+
+    #[setter]
+    pub fn set_power_coefficient_polynomial(&mut self, value: Vec<f64>) {
+        self.data.power_coefficient_polynomial = value;
+    }
+
+    pub fn __str__(&self) -> String {
+        self.data.to_string()
+    }
+
+    #[getter]
+    /// Uses the built in json module to convert the string to a dictionary
+    pub fn __dict__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(pythonize(py, &self.data)?)
     }
 }

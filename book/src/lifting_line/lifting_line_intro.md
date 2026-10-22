@@ -29,7 +29,7 @@ In the dynamic case, the wake model is extended to consist of many doublet panel
 
 For a single conventional wing, the shape of the vortex wake is typically not that important, which is why it is often assumed to be flat in simplified methods. However, we have found that this is not necessarily the case when the lift coefficient becomes very high - such as for rotor sails - or when several sails are placed so close together that the wakes get strongly deformed by other wings. When running dynamic simulations, the shape of the wake can be modified by the induced velocities in the simulation[^note]. This can also be used to simulate steady cases where a detailed wake shape is of interest.
 
-[^note]: It is also possible to turn this off to increase the computational speed. See the [wake section](./wake.md) for more.
+[^note]: This is turned off by default, as calculating the induced velocities at all the wake points increases the computational cost significantly. See the [wake section](./wake.md#shape-of-the-wake) for how to turn it on.
 
 ## References
 - Lanchester, F. W., 1907. Aerodynamics: Constituting the First Volume of a Complete Work on Aerial Flight

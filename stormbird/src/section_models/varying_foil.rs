@@ -6,6 +6,8 @@ use stormath::interpolation::linear_interpolation;
 
 use super::*;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// A foil profile where the parameters can vary depending on an internal state. 
 /// 
@@ -17,10 +19,10 @@ pub struct VaryingFoil {
 }
 
 impl VaryingFoil {
-    pub fn new_from_string(input_str: &str) -> Self {
-        let data: VaryingFoil = serde_json::from_str(input_str).unwrap();
-        
-        data
+    pub fn new_from_string(input_str: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(input_str)?;
+
+        Ok(serde_res)
     }
 
     pub fn to_string(&self) -> String {

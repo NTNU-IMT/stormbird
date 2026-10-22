@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 use pythonize::pythonize;
 
 use stormbird::section_models::foil::Foil as FoilRust;
@@ -19,10 +20,12 @@ pub struct Foil {
 #[pymethods]
 impl Foil {
     #[new]
-    pub fn new(input_string: String) -> Self {
-        Self {
-            data: FoilRust::new_from_string(&input_string).unwrap()
-        }
+    pub fn new(input_string: String) -> PyResult<Self> {
+        let data = FoilRust::new_from_string(&input_string).map_err(|e| {
+            PyValueError::new_err(format!("Failed to parse foil from string: {}", e))
+        })?;
+
+        Ok(Self { data })
     }
 
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
@@ -160,6 +163,16 @@ impl Foil {
     }
 
     #[getter]
+    pub fn get_cdi_correction_factor(&self) -> f64 {
+        self.data.cdi_correction_factor
+    }
+
+    #[setter]
+    pub fn set_cdi_correction_factor(&mut self, value: f64) {
+        self.data.cdi_correction_factor = value;
+    }
+
+    #[getter]
     pub fn get_mean_positive_stall_angle(&self) -> f64 {
         self.data.mean_positive_stall_angle
     }
@@ -187,6 +200,36 @@ impl Foil {
     #[setter]
     pub fn set_stall_range(&mut self, value: f64) {
         self.data.stall_range = value;
+    }
+
+    #[getter]
+    pub fn get_cd_bump_during_stall(&self) -> f64 {
+        self.data.cd_bump_during_stall
+    }
+
+    #[setter]
+    pub fn set_cd_bump_during_stall(&mut self, value: f64) {
+        self.data.cd_bump_during_stall = value;
+    }
+
+    #[getter]
+    pub fn get_cd_stall_angle_offset(&self) -> f64 {
+        self.data.cd_stall_angle_offset
+    }
+
+    #[setter]
+    pub fn set_cd_stall_angle_offset(&mut self, value: f64) {
+        self.data.cd_stall_angle_offset = value;
+    }
+
+    #[getter]
+    pub fn get_added_mass_factor(&self) -> f64 {
+        self.data.added_mass_factor
+    }
+
+    #[setter]
+    pub fn set_added_mass_factor(&mut self, value: f64) {
+        self.data.added_mass_factor = value;
     }
 
     pub fn __str__(&self) -> String {

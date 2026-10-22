@@ -30,6 +30,7 @@ use super::{
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SinIncreasedViscousCoreLength {
+    #[serde(default)]
     pub last_panel_value: ViscousCoreLength,
     #[serde(default="SinIncreasedViscousCoreLength::default_evolution_length_factor")]
     pub evolution_length_factor: Float,
@@ -120,7 +121,7 @@ impl DynamicWakeBuilder {
     fn default_number_of_panels_per_line_element() -> usize {100}
     fn default_initial_relative_wake_length() -> Float {50.0}
     fn default_first_panel_relative_length() -> Float {0.75}
-    fn default_last_panel_relative_length() -> Float {0.25}
+    fn default_last_panel_relative_length() -> Float {1.0}
 
     /// Checks that the settings are valid for building a dynamic wake. All checks are executed, so
     /// that the returned error lists every problem with the settings, not just the first.

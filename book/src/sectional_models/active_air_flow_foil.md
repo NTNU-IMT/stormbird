@@ -40,10 +40,10 @@ There are four different ways to convert the internal state, which have differen
 3) `PowerToInternalFlow`: The internal state of the wing is the input power to the fans. The power is converted to a suction coefficient on each line element, using a model of the internal flow in the sail and a constant fan efficiency. The foil data must therefore be given as a function of the suction coefficient. This is expected to be the most used model, and is described in more detail below.
 4) `FanSpeedToInternalFlow`: The internal state of the wing is the rotational speed of the fans, in revolutions per second. The suction coefficient on each line element is found from the same internal flow model, but the fans are modeled with fan curves rather than a constant efficiency. This is the most complete model, intended for cases where data for the fans is available. It is described in the [fan model](#fan-model) section below.
 
-The suction coefficient, \\( C_Q \\), and the power coefficient, \\( C_P \\), are defined as:
+The suction coefficient, \\( C\_Q \\), and the power coefficient, \\( C\_P \\), are defined as:
 
 \\[
-    C_Q = \frac{Q}{U A}, \quad C_P = \frac{P}{0.5 \rho A U^3}
+    C\_Q = \frac{Q}{U A}, \quad C\_P = \frac{P}{0.5 \rho A U^3}
 \\]
 
 where \\( Q \\) is the volume flow through the porous surface, \\( P \\) is the power, \\( \rho \\) is the density, \\( A \\) is the area and \\( U \\) is the velocity. In Stormbird, the area and velocity are always the local values on each line element, where the area is the chord length times the length of the line element. It is important that the data for the `VaryingFoil` model uses the same definitions. 
@@ -51,10 +51,10 @@ where \\( Q \\) is the volume flow through the porous surface, \\( P \\) is the 
 For the `PowerToPowerCoefficient` conversion, the power is distributed over the line elements proportional to their area. The power coefficient on each line element then becomes:
 
 \\[
-    C_{P, i} = \frac{P}{0.5 \rho A_{wing} U_i^3}
+    C\_{P, i} = \frac{P}{0.5 \rho A\_{wing} U\_i^3}
 \\]
 
-where \\( A_{wing} \\) is the total area of the wing and \\( U_i \\) is the local velocity.
+where \\( A\_{wing} \\) is the total area of the wing and \\( U\_i \\) is the local velocity.
 
 ### The direction of the suction
 
@@ -64,10 +64,10 @@ The internal state of the wing can be both positive and negative for all convers
 The internal state of the wing can also [vary along the span](sectional_models_intro.md#constant-and-span-varying-internal-states). For the power based conversions, a span varying internal state is interpreted as *power per span length*. For the `PowerToPowerCoefficient` conversion, the power on each line element is then the local power per span length times the length of the line element, and the power coefficient becomes:
 
 \\[
-    C_{P, i} = \frac{p'(y_i)}{0.5 \rho c_i U_i^3}
+    C\_{P, i} = \frac{p'(y\_i)}{0.5 \rho c\_i U\_i^3}
 \\]
 
-where \\( p'(y_i) \\) is the power per span length at the control point and \\( c_i \\) is the chord length. For the conversions with an internal flow model, the internal state is applied to each [internal compartment](#internal-compartments), as described below.
+where \\( p'(y\_i) \\) is the power per span length at the control point and \\( c\_i \\) is the chord length. For the conversions with an internal flow model, the internal state is applied to each [internal compartment](#internal-compartments), as described below.
 
 ## The internal flow model
 
@@ -93,16 +93,16 @@ pub struct InternalFlow {
 The external pressure coefficient on the porous surface is modeled as a linear function of the lift coefficient:
 
 \\[
-    C_{p, ext} = C_{p, 0} + \frac{d C_p}{d C_L} C_L
+    C\_{p, ext} = C\_{p, 0} + \frac{d C\_p}{d C\_L} C\_L
 \\]
 
-where \\( C_{p, 0} \\) is given by `cp_zero_cl` and \\( d C_p / d C_L \\) is given by `cp_gradient`. Since the porous surface is on the suction side, both values will typically be negative. That is, the external pressure on the porous surface gets lower when the lift increases. The lift coefficient is defined as positive when the lift is directed towards the suction side. 
+where \\( C\_{p, 0} \\) is given by `cp_zero_cl` and \\( d C\_p / d C\_L \\) is given by `cp_gradient`. Since the porous surface is on the suction side, both values will typically be negative. That is, the external pressure on the porous surface gets lower when the lift increases. The lift coefficient is defined as positive when the lift is directed towards the suction side. 
 
 ### Flow through the porous surface
 The fans create an internal suction, \\( s \\), which is the difference between the ambient pressure and the internal pressure in the sail. The pressure difference over the porous surface is then:
 
 \\[
-    \Delta p = C_{p, ext} \, 0.5 \rho U^2 + s
+    \Delta p = C\_{p, ext} \\, 0.5 \rho U^2 + s
 \\]
 
 The flow through the surface is driven by this pressure difference, and is modelled using a loss coefficient, \\( K \\), given by `loss_coefficient`:
@@ -119,14 +119,14 @@ If the internal suction is too small to overcome the external suction, the press
 The power delivered to the flow is the internal suction times the total volume flow over the wing. For the `PowerToInternalFlow` conversion, the input power to the fans is found by dividing by a constant fan efficiency, \\( \eta \\), given by `fan_efficiency`:
 
 \\[
-    P = \frac{s \sum_i Q_i}{\eta}
+    P = \frac{s \sum\_i Q\_i}{\eta}
 \\]
 
 The default value of the fan efficiency is 1.0.
 
 ## Fan model
 
-The `FanSpeedToInternalFlow` conversion replaces the constant fan efficiency with a model of the fans, based on fan curves. The fan curves give the pressure rise over a fan, \\( \Delta p_{fan} \\), and the input power to the fan, \\( P_{fan} \\), as a function of the volume flow and the rotational speed. The model is set up with the following structures:
+The `FanSpeedToInternalFlow` conversion replaces the constant fan efficiency with a model of the fans, based on fan curves. The fan curves give the pressure rise over a fan, \\( \Delta p\_{fan} \\), and the input power to the fan, \\( P\_{fan} \\), as a function of the volume flow and the rotational speed. The model is set up with the following structures:
 
 ```rust
 pub struct Fan {
@@ -157,11 +157,11 @@ pub struct FanCurveData {
 ### Fan curves
 The fan curves can be given in two ways, depending on what data is available:
 
-1) `Dimensional`: The data is given as volume flow in m³/s, pressure rise in Pa and power in W, measured at a reference rotational speed, \\( n_{ref} \\), and density, \\( \rho_{ref} \\). This is typically the format used in data sheets from fan manufacturers. 
+1) `Dimensional`: The data is given as volume flow in m³/s, pressure rise in Pa and power in W, measured at a reference rotational speed, \\( n\_{ref} \\), and density, \\( \rho\_{ref} \\). This is typically the format used in data sheets from fan manufacturers. 
 2) `NonDimensional`: The data is given as the flow coefficient, the pressure coefficient and the power coefficient, using the diameter of the fan, \\( D \\), and the rotational speed in revolutions per second, \\( n \\):
 
 \\[
-    \phi_{fan} = \frac{Q}{n D^3}, \quad \psi_{fan} = \frac{\Delta p_{fan}}{\rho n^2 D^2}, \quad \lambda_{fan} = \frac{P_{fan}}{\rho n^3 D^5}
+    \phi\_{fan} = \frac{Q}{n D^3}, \quad \psi\_{fan} = \frac{\Delta p\_{fan}}{\rho n^2 D^2}, \quad \lambda\_{fan} = \frac{P\_{fan}}{\rho n^3 D^5}
 \\]
 
 In both cases, the curves are scaled to other rotational speeds and densities using the fan affinity laws, which state that the flow scales with \\( n \\), the pressure rise with \\( \rho n^2 \\) and the power with \\( \rho n^3 \\). For the non-dimensional curves, this scaling is built into the definition of the coefficients. For the dimensional curves, the scaling is done relative to the reference values. 
@@ -172,14 +172,14 @@ The data must only cover the stable operating range of the fan, where the pressu
 The `number_of_fans` field specifies the number of identical fans in parallel, which share the total volume flow equally. The `duct_loss_coefficient`, \\( k \\), can be used to model the pressure loss in the ducts between the internal volume of the sail and the fans, as a function of the total volume flow:
 
 \\[
-    \Delta p_{duct} = k \left( \sum_i Q_i \right)^2
+    \Delta p\_{duct} = k \left( \sum\_i Q\_i \right)^2
 \\]
 
 ### Operating point
 For a given rotational speed, the operating point of the fans is where the pressure rise over the fans balances the internal suction and the duct losses, at the total volume flow through the porous surface:
 
 \\[
-    \Delta p_{fan} \left(\sum_i Q_i(s), n \right) = s + \Delta p_{duct}
+    \Delta p\_{fan} \left(\sum\_i Q\_i(s), n \right) = s + \Delta p\_{duct}
 \\]
 
 The total volume flow increases with increasing internal suction, while the pressure rise over the fans decreases with increasing flow. There is therefore only one operating point. If the fans can not overcome the external suction on any of the line elements, there is no flow. When the operating point is found, the input power is given directly by the power curve of the fans. The efficiency of the fans is therefore a result of the model, rather than an input.
@@ -238,7 +238,7 @@ The internal flow model is simplified, and the empirical parameters must be tune
 - The internal pressure is assumed to be uniform within each compartment. Losses in the ducts between the internal volume and the fans can be included in the fan model, but losses inside the internal volume itself are not modeled. Leakage between compartments is not modeled.
 - Outflow through the porous surface is not modeled, as described above.
 
-Another point to be aware of is the drag due to the momentum of the air that is sucked into the sail, often called *sink drag*. In coefficient form, it is approximately \\( 2 C_Q \\). This drag is not part of the internal flow model, but should be part of the drag data in the `VaryingFoil` model. Drag data from integrating the pressure and friction on the surface of the sail, for instance from CFD, will typically include this effect. Drag data from wake measurements will not, and must then be corrected.
+Another point to be aware of is the drag due to the momentum of the air that is sucked into the sail, often called *sink drag*. In coefficient form, it is approximately \\( 2 C\_Q \\). This drag is not part of the internal flow model, but should be part of the drag data in the `VaryingFoil` model. Drag data from integrating the pressure and friction on the surface of the sail, for instance from CFD, will typically include this effect. Drag data from wake measurements will not, and must then be corrected.
 
 ## Examples
 Below is an example of the input for a section model using the `PowerToInternalFlow` conversion, given as JSON. The foil data is simplified to only include three internal states, with mirrored data for the negative suction coefficient. The values for the internal flow model are only examples, and are not tuned to any data.

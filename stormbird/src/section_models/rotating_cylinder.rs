@@ -6,20 +6,35 @@ use stormath::consts::PI;
 
 use super::*;
 
-use stormath::interpolation;
+use crate::error::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Model representing a rotating cylinder. The lift, drag and moment can be calculated based on how 
-/// fast the cylinder is spinning. 
+/// Parametric model representing a rotating cylinder. The lift, drag and moment can be calculated
+/// based on how fast the cylinder is spinning.
+///
+/// The lift has an initial slope with respect to the spin ratio, which changes smoothly to a
+/// different slope at high spin ratios. The transition is the integral of a sigmoid function, and
+/// is applied symmetrically, so that the lift is an odd function of the spin ratio: the sign of the
+/// spin ratio only determines the sign of the lift.
 pub struct RotatingCylinder {
-    #[serde(default = "RotatingCylinder::default_spin_ratio_data")]    
-    /// Spin ratio data used when interpolating lift and drag coefficients.
-    pub spin_ratio_data: Vec<Float>,
-    #[serde(default = "RotatingCylinder::default_cl_data")]
-    /// Lift coefficient data as a function of spin ratio
-    pub cl_data: Vec<Float>,
-    
+    #[serde(default = "RotatingCylinder::default_cl_initial_slope")]
+    /// How fast the lift coefficient increases with the spin ratio, when the spin ratio is small.
+    pub cl_initial_slope: Float,
+    #[serde(default = "RotatingCylinder::default_cl_high_spin_ratio_slope")]
+    /// How fast the lift coefficient increases with the spin ratio, when the spin ratio is well
+    /// above the transition spin ratio.
+    pub cl_high_spin_ratio_slope: Float,
+    #[serde(default = "RotatingCylinder::default_cl_slope_transition_spin_ratio")]
+    /// The absolute value of the spin ratio where the transition from the initial slope to the high
+    /// spin ratio slope is half-way developed.
+    pub cl_slope_transition_spin_ratio: Float,
+    #[serde(default = "RotatingCylinder::default_cl_slope_transition_range")]
+    /// The range of the transition between the two slopes, with the same definition as the
+    /// `stall_range` in the foil model. That is, the transition is 1% developed at the transition
+    /// spin ratio minus the range, and 99% developed at the transition spin ratio plus the range.
+    pub cl_slope_transition_range: Float,
+
     #[serde(default = "RotatingCylinder::default_cd_start")]
     /// Drag at spin ratio = 0.0
     pub cd_start: Float,
@@ -55,8 +70,10 @@ pub struct RotatingCylinder {
 impl Default for RotatingCylinder {
     fn default() -> Self {
         RotatingCylinder {
-            spin_ratio_data: Self::default_spin_ratio_data(),
-            cl_data: Self::default_cl_data(),
+            cl_initial_slope: Self::default_cl_initial_slope(),
+            cl_high_spin_ratio_slope: Self::default_cl_high_spin_ratio_slope(),
+            cl_slope_transition_spin_ratio: Self::default_cl_slope_transition_spin_ratio(),
+            cl_slope_transition_range: Self::default_cl_slope_transition_range(),
             cd_start: Self::default_cd_start(),
             cd_end: Self::default_cd_end(),
             cd_angle_start: Self::default_cd_angle_start(),
@@ -70,15 +87,13 @@ impl Default for RotatingCylinder {
 }
 
 impl RotatingCylinder {
-    /// Default values for spin ratio data based on two dimensional CFD simulations
-    pub fn default_spin_ratio_data() -> Vec<Float> {
-        vec![0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0]
-    }
-
-    /// Default values for cl data based on two dimensional CFD simulations
-    pub fn default_cl_data() -> Vec<Float> {
-        vec![0.0, 1.22, 2.56, 5.93, 9.10, 10.77, 12.80, 13.71, 16.90]
-    }
+    // The default lift parameters are fitted to two dimensional CFD simulations, from:
+    // Ostman et al. (2023). Calculation of Flettner rotor forces using lifting line and CFD
+    // methods. NuTTS conference.
+    pub fn default_cl_initial_slope() -> Float {3.0}
+    pub fn default_cl_high_spin_ratio_slope() -> Float {1.5}
+    pub fn default_cl_slope_transition_spin_ratio() -> Float {3.4}
+    pub fn default_cl_slope_transition_range() -> Float {1.0}
 
     pub fn default_cd_start() -> Float {0.457}
     pub fn default_cd_end() -> Float {0.05}
@@ -95,39 +110,34 @@ impl RotatingCylinder {
         vec![0.0, 0.0234, -0.0168, 0.0143, -0.0004, 0.0001]
     }
     
-    pub fn new_from_string(input_string: &str) -> Self {
-        serde_json::from_str(input_string).unwrap()
+    pub fn new_from_string(input_string: &str) -> Result<Self, Error> {
+        let serde_res = serde_json::from_str(input_string)?;
+
+        Ok(serde_res)
     }
 
-    
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
 
+
+    /// Calculates the lift coefficient for a given spin ratio.
+    ///
+    /// The slope of the lift with respect to the spin ratio changes from the initial slope to the
+    /// high spin ratio slope through sigmoid functions centered at plus and minus the transition
+    /// spin ratio. The lift is the integral of the slope from zero spin ratio, which makes it an odd
+    /// and smooth function of the spin ratio.
     pub fn lift_coefficient(&self, spin_ratio: Float) -> Float {
-        let len_data = self.spin_ratio_data.len();
+        let transition_spin_ratio = self.cl_slope_transition_spin_ratio.abs();
 
-        let spin_ratio_abs = spin_ratio.abs();
-        
-        let cl = if spin_ratio_abs > self.spin_ratio_data[len_data-1] {
-            // Linearly extrapolate from the last available data point if input spin ratio is larger 
-            // than what the model specifies directly
-            let delta_s = self.spin_ratio_data[len_data-1] - self.spin_ratio_data[len_data-2];
-            let delta_cl = self.cl_data[len_data-1] - self.cl_data[len_data-2];
+        let transition = integrated_sigmoid_from_zero(
+            spin_ratio, transition_spin_ratio, self.cl_slope_transition_range
+        ) - integrated_sigmoid_from_zero(
+            -spin_ratio, transition_spin_ratio, self.cl_slope_transition_range
+        );
 
-            let extrapolate = (
-                spin_ratio_abs - 
-                self.spin_ratio_data[len_data-1]
-            ) * delta_cl / delta_s;
-
-            self.cl_data[len_data-1] + extrapolate
-        } else {
-            // Linear interpolation on the specified data
-            interpolation::linear_interpolation(
-                spin_ratio_abs,
-                &self.spin_ratio_data, 
-                &self.cl_data
-            )
-        };
-
-        cl * spin_ratio.signum()
+        self.cl_initial_slope * spin_ratio -
+            (self.cl_initial_slope - self.cl_high_spin_ratio_slope) * transition
     }
 
     pub fn drag_coefficient(&self, spin_ratio: Float) -> Float {   

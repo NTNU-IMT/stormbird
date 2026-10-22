@@ -1,0 +1,296 @@
+/* Styles for the interactive plots of the section models. Light values are used for the light and
+   rust themes in mdbook, and dark values for the coal, navy and ayu themes. */
+
+.model-explorer {
+    --me-text-primary: #0b0b0b;
+    --me-text-secondary: #52514e;
+    --me-text-muted: #6f6e69;
+    --me-grid: #e4e3df;
+    --me-axis: #a3a29c;
+    --me-border: #d6d5d0;
+    --me-panel: rgba(0, 0, 0, 0.025);
+    --me-band: rgba(0, 0, 0, 0.05);
+    --me-series-primary: #2a78d6;
+    --me-series-secondary: #eb6834;
+    --me-component: #6f6e69;
+    --me-surface: #ffffff;
+
+    color: var(--me-text-primary);
+    margin: 1.5em 0;
+    font-size: 0.9em;
+}
+
+html.coal .model-explorer,
+html.navy .model-explorer,
+html.ayu .model-explorer {
+    --me-text-primary: #f0efec;
+    --me-text-secondary: #c3c2b7;
+    --me-text-muted: #9a9991;
+    --me-grid: #34342f;
+    --me-axis: #6a6964;
+    --me-border: #44443f;
+    --me-panel: rgba(255, 255, 255, 0.03);
+    --me-band: rgba(255, 255, 255, 0.06);
+    --me-series-primary: #3987e5;
+    --me-series-secondary: #d95926;
+    --me-component: #b5b4ac;
+    --me-surface: #1a1a19;
+}
+
+.model-explorer .me-readout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em 1.4em;
+    min-height: 2.6em;
+    align-items: center;
+    padding: 0.3em 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.model-explorer .me-readout-item {
+    display: inline-flex;
+    gap: 0.4em;
+}
+
+.model-explorer .me-readout-name {
+    color: var(--me-text-secondary);
+}
+
+.model-explorer .me-readout-value {
+    font-weight: 600;
+}
+
+.model-explorer .me-readout-hint {
+    color: var(--me-text-muted);
+    font-size: 0.95em;
+}
+
+.model-explorer .me-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2em 1.2em;
+    color: var(--me-text-secondary);
+    margin-top: 0.4em;
+}
+
+.model-explorer .me-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.model-explorer .me-plot {
+    display: block;
+    width: 100%;
+    height: auto;
+    touch-action: pan-y;
+    cursor: crosshair;
+}
+
+/* Axes */
+.model-explorer .me-grid {
+    stroke: var(--me-grid);
+    stroke-width: 1;
+}
+
+.model-explorer .me-zero-line {
+    stroke: var(--me-axis);
+    stroke-width: 1;
+}
+
+.model-explorer .me-tick-label {
+    fill: var(--me-text-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.model-explorer .me-axis-label {
+    fill: var(--me-text-secondary);
+    font-size: 12px;
+}
+
+/* Markers */
+.model-explorer .me-band {
+    fill: var(--me-band);
+}
+
+.model-explorer .me-dashed-line {
+    stroke: var(--me-text-muted);
+    stroke-width: 1;
+    stroke-dasharray: 5 4;
+}
+
+.model-explorer .me-dotted-line {
+    stroke: var(--me-text-muted);
+    stroke-width: 1;
+    stroke-dasharray: 1.5 3;
+}
+
+/* Lines */
+.model-explorer .me-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.model-explorer .me-series-primary {
+    stroke: var(--me-series-primary);
+}
+
+.model-explorer .me-series-secondary {
+    stroke: var(--me-series-secondary);
+}
+
+.model-explorer .me-dashed {
+    stroke-dasharray: 6 4;
+}
+
+.model-explorer .me-component-dashed {
+    stroke: var(--me-component);
+    stroke-width: 1.5;
+    stroke-dasharray: 8 5;
+}
+
+.model-explorer .me-component-dotted {
+    stroke: var(--me-component);
+    stroke-width: 2.5;
+    stroke-dasharray: 0.1 5;
+}
+
+/* Hover */
+.model-explorer .me-crosshair {
+    stroke: var(--me-axis);
+    stroke-width: 1;
+}
+
+.model-explorer .me-dot {
+    fill: var(--me-surface);
+    stroke-width: 2;
+    stroke-dasharray: none;
+}
+
+.model-explorer .me-dot.me-series-primary {
+    fill: var(--me-series-primary);
+    stroke: var(--me-surface);
+}
+
+.model-explorer .me-dot.me-series-secondary {
+    fill: var(--me-series-secondary);
+    stroke: var(--me-surface);
+}
+
+/* Controls */
+.model-explorer .me-controls {
+    margin-top: 1em;
+    border: 1px solid var(--me-border);
+    border-radius: 6px;
+    background: var(--me-panel);
+    padding: 0.6em 0.9em 0.8em;
+}
+
+.model-explorer .me-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    border-bottom: 1px solid var(--me-border);
+    margin-bottom: 0.7em;
+}
+
+.model-explorer .me-spacer {
+    flex: 1;
+}
+
+.model-explorer .me-tab {
+    font: inherit;
+    color: var(--me-text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.35em 0.7em;
+    margin-bottom: -1px;
+    cursor: pointer;
+}
+
+.model-explorer .me-tab[aria-selected="true"] {
+    color: var(--me-text-primary);
+    border-bottom-color: var(--me-series-primary);
+    font-weight: 600;
+}
+
+.model-explorer .me-button {
+    font: inherit;
+    font-size: 0.9em;
+    color: var(--me-text-primary);
+    background: none;
+    border: 1px solid var(--me-border);
+    border-radius: 4px;
+    padding: 0.2em 0.7em;
+    margin-bottom: 0.3em;
+    cursor: pointer;
+}
+
+.model-explorer .me-tab-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 0.6em 1.4em;
+}
+
+.model-explorer .me-tab-panel[hidden] {
+    display: none;
+}
+
+.model-explorer .me-slider label {
+    display: block;
+    font-family: var(--mono-font, monospace);
+    font-size: 0.85em;
+    color: var(--me-text-secondary);
+    margin-bottom: 0.1em;
+    overflow-wrap: anywhere;
+}
+
+.model-explorer .me-slider-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.model-explorer .me-slider input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--me-series-primary);
+}
+
+.model-explorer .me-number {
+    width: 5.5em;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    color: var(--me-text-primary);
+    background: transparent;
+    border: 1px solid var(--me-border);
+    border-radius: 4px;
+    padding: 0.1em 0.3em;
+}
+
+.model-explorer .me-unit {
+    width: 0.6em;
+    color: var(--me-text-secondary);
+}
+
+.model-explorer .me-details {
+    margin-top: 0.9em;
+}
+
+.model-explorer .me-details summary {
+    cursor: pointer;
+    color: var(--me-text-secondary);
+}
+
+.model-explorer .me-details .me-button {
+    margin-top: 0.5em;
+}
+
+.model-explorer .me-json {
+    margin-top: 0.4em;
+    font-size: 0.85em;
+}

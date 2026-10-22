@@ -406,8 +406,17 @@ class ActiveAirFlowFoil(StormbirdSetupBaseModel):
     internal_state_conversion: InternalStateConversion
 
 class RotatingCylinder(StormbirdSetupBaseModel):
-    spin_ratio_data: list[float] | None = None
-    cl_data: list[float]| None = None
+    '''
+    Parametric model of a rotating cylinder, e.g., a rotor sail. The lift has an initial slope with
+    respect to the spin ratio, which changes smoothly to a different slope at high spin ratios. The
+    transition is half-way developed at the transition spin ratio, and takes place over a range
+    around it. The lift is an odd function of the spin ratio. Values that are not set use the
+    defaults in Stormbird.
+    '''
+    cl_initial_slope: float | None = None
+    cl_high_spin_ratio_slope: float | None = None
+    cl_slope_transition_spin_ratio: float | None = None
+    cl_slope_transition_range: float | None = None
     cd_start: float | None = None
     cd_end: float | None = None
     cd_angle_start: float | None = None
@@ -441,23 +450,26 @@ class SectionModel(StormbirdSetupBaseModel):
         """
         Model of a rotor sail that is tuned based on the data in: Deybach, 2024, Aerodynamics of the 
         Flettner rotor at high Reynolds number, RINA Wind propulsion conference
+
+        The parameters are fitted to the lift data in the paper. The linearized version uses the
+        lift slope at a spin ratio of 1.0 for all spin ratios.
         """
-
-        spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0]
-        
         if linearized:
-            cl_1 = 2.6596
+            cl_slope = 2.6596
 
-            cl_data = []
-            for sigma in spin_ratio_data:
-                cl_data.append(sigma * cl_1)
-        else:
-            cl_data = [0.0, 1.3484, 2.6596, 4.6177, 7.1980, 7.9874, 8.0, 9.0, 9.00]
-        
+            return cls(
+                model = RotatingCylinder(
+                    cl_initial_slope = cl_slope,
+                    cl_high_spin_ratio_slope = cl_slope
+                )
+            )
+
         return cls(
             model = RotatingCylinder(
-                spin_ratio_data = spin_ratio_data,
-                cl_data = cl_data
+                cl_initial_slope = 2.4,
+                cl_high_spin_ratio_slope = 0.3,
+                cl_slope_transition_spin_ratio = 3.2,
+                cl_slope_transition_range = 1.0
             )
         )
         
@@ -466,11 +478,15 @@ class SectionModel(StormbirdSetupBaseModel):
         """
         Model of a rotor sail that is tuned based on data in: Ostman, 2023, Calculation of Flettner 
         rotor forces using lifting line and CFD methods, NuTTS conference
+
+        The parameters are fitted to the lift data in the paper.
         """
         return cls(
             model = RotatingCylinder(
-                spin_ratio_data = [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0],
-                cl_data = [0.0, 1.22, 2.56, 5.93, 8.87, 9.56, 10.22, 12.0, 13.00]
+                cl_initial_slope = 2.95,
+                cl_high_spin_ratio_slope = 0.85,
+                cl_slope_transition_spin_ratio = 3.0,
+                cl_slope_transition_range = 1.0
             )
         )
     

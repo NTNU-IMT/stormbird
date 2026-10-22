@@ -18,7 +18,7 @@ if __name__ == '__main__':
                     {"x": 1.0, "y": 0.0, "z": 10.0}
                 ],
                 "section_model": {
-                    "Foil": {}
+                    "SingleElementFoil": {}
                 }
             }
         ],

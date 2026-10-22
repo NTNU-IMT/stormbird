@@ -45,7 +45,7 @@ An example of a complete input string to Stormbird can be seen below. More expla
                     {"x": -8.0, "y": 0.0, "z": 0.0}
                 ],
                 "section_model": {
-                    "Foil": {}
+                    "SingleElementFoil": {}
                 }
             },
             {
@@ -58,7 +58,7 @@ An example of a complete input string to Stormbird can be seen below. More expla
                     {"x": -8.0, "y": 0.0, "z": 0.0}
                 ],
                 "section_model": {
-                    "Foil": {}
+                    "SingleElementFoil": {}
                 }
             }
         ],

@@ -38,4 +38,4 @@ pub struct LineForceModel {
 }
 ```
 
-More details on each field can be found in the code [documentation](https://docs.rs/stormbird/0.9.0/stormbird/). The construction of a line force model is generally not done with the structure directly, but rather through a [builder](/line_model/building_line_model.md).
+More details on each field can be found in the code [documentation](https://docs.rs/stormbird/latest/stormbird/). The construction of a line force model is generally not done with the structure directly, but rather through a [builder](/line_model/building_line_model.md).

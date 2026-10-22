@@ -36,6 +36,8 @@ def simulate_single_case(
     virtual_extension_factor_top: float = 0.0,
     dynamic: bool = False,
     dynamic_shape: bool = False,
+    evolution_length_factor: float = 0.3,
+    steady_state_strength_update: bool = False,
     write_wake: bool = False
 ) -> list[dict]:
     velocity = 8.0
@@ -108,7 +110,9 @@ def simulate_single_case(
         # Dynamic wake with full dynamic shape, but also with some stabilizing numerical techniques
         # This includes
         # - Strong "shape_damping", to limit how quickly the wake shape reacts to new induced velocities
-        # - A viscous core length that increases rapidly as the wake panels move away from the wings
+        # - A viscous core length that increases as the wake panels move away from the wings. The
+        #   evolution length factor sets how far into the wake the viscous core reaches its final
+        #   value, as a fraction of the wake length. A lower value gives a faster increase.
 
         if dynamic_shape:
             ratio_of_wake_affected_by_induced_velocities = 1.0
@@ -121,9 +125,10 @@ def simulate_single_case(
             nr_panels_per_line_element=200,
             viscous_core_length_evolution=ViscousCoreLengthEvolution.new_sin_increase(
                 last_panel_value_absolute=1.5 * diameter,
-                evolution_length_factor=0.3
+                evolution_length_factor=evolution_length_factor
             ),
-            symmetry_condition = SymmetryCondition.Z
+            symmetry_condition = SymmetryCondition.Z,
+            steady_state_strength_update = steady_state_strength_update
         )
 
         if write_wake:

@@ -138,26 +138,6 @@ fn get_stall_angle(angle_of_attack: Float) -> Float {
     effective
 }
 
-/// The integral from 0 to `x` of the sigmoid function in
-/// [`transition_functions::sigmoid_zero_to_one`], with the same definition of `x0` and
-/// `transition_range`.
-///
-/// The integral of a logistic sigmoid is the softplus function, which is evaluated in a
-/// numerically stable way. If the transition range is zero or negative, the sigmoid is treated as
-/// a step function.
-fn integrated_sigmoid_from_zero(x: Float, x0: Float, transition_range: Float) -> Float {
-    if transition_range <= 0.0 {
-        return (x - x0).max(0.0) - (-x0).max(0.0);
-    }
-
-    // Same slope constant as in `sigmoid_zero_to_one`
-    let slope = 4.5951212 / transition_range;
-
-    let softplus = |z: Float| z.max(0.0) + (-z.abs()).exp().ln_1p();
-
-    (softplus(slope * (x - x0)) - softplus(-slope * x0)) / slope
-}
-
 impl Foil {
     fn default_one() -> Float {1.0}
     pub fn default_cl_initial_slope()     -> Float {TAU}

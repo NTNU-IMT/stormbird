@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 use pythonize::pythonize;
 
 pub mod foil;
@@ -21,10 +22,10 @@ pub struct SectionModel{
 #[pymethods]
 impl SectionModel {
     #[new]
-    pub fn new(setup_string: String) -> Self {
-        Self {
-            data: SectionModelRust::from_string(&setup_string).unwrap()
-        }
+    pub fn new(setup_string: String) -> PyResult<Self> {
+        let data = SectionModelRust::from_string(&setup_string).map_err(PyValueError::new_err)?;
+
+        Ok(Self { data })
     }
 
     pub fn __str__(&self) -> String {

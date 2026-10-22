@@ -57,6 +57,26 @@ impl SegmentFlowConditions {
     }
 }
 
+/// The integral from 0 to `x` of the sigmoid function in
+/// [`stormath::transition_functions::sigmoid_zero_to_one`], with the same definition of `x0` and
+/// `transition_range`.
+///
+/// The integral of a logistic sigmoid is the softplus function, which is evaluated in a
+/// numerically stable way. If the transition range is zero or negative, the sigmoid is treated as
+/// a step function.
+pub fn integrated_sigmoid_from_zero(x: Float, x0: Float, transition_range: Float) -> Float {
+    if transition_range <= 0.0 {
+        return (x - x0).max(0.0) - (-x0).max(0.0);
+    }
+
+    // Same slope constant as in `sigmoid_zero_to_one`
+    let slope = 4.5951212 / transition_range;
+
+    let softplus = |z: Float| z.max(0.0) + (-z.abs()).exp().ln_1p();
+
+    (softplus(slope * (x - x0)) - softplus(-slope * x0)) / slope
+}
+
 /// Integrates a power coefficient over the segments of a wing: P = sum(c_P * 0.5 * density * A * U^3).
 /// Virtual segments are not included.
 pub fn integrate_power_coefficient(

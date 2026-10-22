@@ -58,10 +58,10 @@ Experience from this correction technique is that it works very well for actuato
 
 A more classical correction technique for actuator line simulations is to use an empirical correction factor to the calculated circulation on each wing. As mentioned, the *raw circulation at the tips* is often predicted to be too large. A simple solution is, then, to artificially reduce it based on an analytical correction. There are many small variations in how this is done. A recent discussion about the topic can be found in the paper by [Wimshurst and Willden, 2018](../literature/simulation_methods.md#spanwise-flow-corrections-for-tidal-turbines-2018). The correction in Stormbird follows the following principle:
 
-The raw circulation distribution, \\( \Gamma_{raw} \\), estimated directly from the sampled velocity, is multiplied by a correction function, \\( f_{cor}(s) \\), that takes the non-dimensional span distance at each wing, \\( s \\) as input, as well as a shape parameter \\( \beta \\). The function has the following shape:
+The raw circulation distribution, \\( \Gamma\_{raw} \\), estimated directly from the sampled velocity, is multiplied by a correction function, \\( f\_{cor}(s) \\), that takes the non-dimensional span distance at each wing, \\( s \\) as input, as well as a shape parameter \\( \beta \\). The function has the following shape:
 
 \\[
-  f_{cor}(s) = \frac{2.0}{\pi}\cos^{-1}(e^{-\beta (0.5 - |s|)})
+  f\_{cor}(s) = \frac{2.0}{\pi}\cos^{-1}(e^{-\beta (0.5 - |s|)})
 \\]
 
 The plot below shows how the correction function looks for different values of \\( \beta \\). In general, any value of \\( \beta \\) will force the circulation towards zero at the tips. However, the larger the value, the steeper the reduction towards the tip, and the less effect it has on the inner part of the wing.

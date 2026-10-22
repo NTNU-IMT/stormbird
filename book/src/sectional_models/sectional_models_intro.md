@@ -66,7 +66,7 @@ Since the models are handled through an enum, they may also require different in
 In addition to lift and drag, each section model can compute a *power coefficient*, which is used to estimate the power needed to operate the sail. The power coefficient is defined as:
 
 \\[
-    C_P = \frac{P}{0.5 \rho A U^3}
+    C\_P = \frac{P}{0.5 \rho A U^3}
 \\]
 
 where \\( P \\) is the power, \\( \rho \\) is the density, \\( A \\) is the area of the line element and \\( U \\) is the local velocity. Models that do not need power, such as regular foils, return zero. 
@@ -74,7 +74,7 @@ where \\( P \\) is the power, \\( \rho \\) is the density, \\( A \\) is the area
 The power for a whole wing is computed by the section model, and is used by the default [input power model](../line_model/input_power.md). For most section models, this is simply the power coefficient integrated over the wing:
 
 \\[
-    P_{wing} = \sum_i C_{P, i} \, 0.5 \rho A_i U_i^3
+    P\_{wing} = \sum\_i C\_{P, i} \\, 0.5 \rho A\_i U\_i^3
 \\]
 
 However, some models need information about the whole wing to compute the power. For instance, for an [active air flow foil](active_air_flow_foil.md) where the fans are modeled with fan curves, the efficiency of the fans depends on the total volume flow through the wing. The power is then computed directly for the whole wing, rather than through the power coefficient on each line element.

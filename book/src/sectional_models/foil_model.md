@@ -83,10 +83,10 @@ An explanation of the parameters is given below:
 The pre-stall lift consists of a linear part and an optional reduction of the lift slope. The linear part is given as:
 
 \\[
-    C_{L, linear} = C_{L, 0} + a \sin(\alpha)
+    C\_{L, linear} = C\_{L, 0} + a \sin(\alpha)
 \\]
 
-where \\( C_{L, 0} \\) is `cl_zero_angle` and \\( a \\) is `cl_initial_slope`. The sine of the angle of attack is used rather than the angle itself, which is practically the same for small angles, but makes the lift periodic for large angles.
+where \\( C\_{L, 0} \\) is `cl_zero_angle` and \\( a \\) is `cl_initial_slope`. The sine of the angle of attack is used rather than the angle itself, which is practically the same for small angles, but makes the lift periodic for large angles.
 
 ### Slope reduction
 
@@ -95,27 +95,27 @@ Many foils have a lift curve where the slope is gradually reduced before the ful
 This is modeled by letting the slope of the lift, with respect to \\( x = \sin(\alpha) \\), be reduced by sigmoid functions:
 
 \\[
-    \frac{d C_{L, pre-stall}}{dx} = a \left( 1 - r_+ \sigma_+(x) - r_- \sigma_-(-x) \right)
+    \frac{d C\_{L, pre-stall}}{dx} = a \left( 1 - r\_+ \sigma\_+(x) - r\_- \sigma\_-(-x) \right)
 \\]
 
-where \\( r_+ \\) and \\( r_- \\) are `cl_slope_reduction_factor_positive` and `cl_slope_reduction_factor_negative`. The sigmoid function is the same as the one used in the [stall model](#stall-model):
+where \\( r\_+ \\) and \\( r\_- \\) are `cl_slope_reduction_factor_positive` and `cl_slope_reduction_factor_negative`. The sigmoid function is the same as the one used in the [stall model](#stall-model):
 
 \\[
-    \sigma(x) = \frac{1}{1 + e^{-k (x - x_{0})}}, \quad k = \frac{4.595}{\Delta_r}, \quad x_{0} = \sin(\alpha_{r})
+    \sigma(x) = \frac{1}{1 + e^{-k (x - x\_{0})}}, \quad k = \frac{4.595}{\Delta\_r}, \quad x\_{0} = \sin(\alpha\_{r})
 \\]
 
-where \\( \alpha_r \\) is the onset angle, given by `cl_slope_reduction_onset_angle_positive` or `cl_slope_reduction_onset_angle_negative`, and \\( \Delta_r \\) is `cl_slope_reduction_range`. With this definition, the sigmoid function is 0.01 at \\( x_0 - \Delta_r \\), 0.5 at \\( x_0 \\) and 0.99 at \\( x_0 + \Delta_r \\). That is, the onset angle is where the slope is half-way reduced.
+where \\( \alpha\_r \\) is the onset angle, given by `cl_slope_reduction_onset_angle_positive` or `cl_slope_reduction_onset_angle_negative`, and \\( \Delta\_r \\) is `cl_slope_reduction_range`. With this definition, the sigmoid function is 0.01 at \\( x\_0 - \Delta\_r \\), 0.5 at \\( x\_0 \\) and 0.99 at \\( x\_0 + \Delta\_r \\). That is, the onset angle is where the slope is half-way reduced.
 
 The pre-stall lift is found by integrating the slope from zero angle of attack:
 
 \\[
-    C_{L, pre-stall} = C_{L, linear} - a \, r_+ R_+(x) + a \, r_- R_-(-x)
+    C\_{L, pre-stall} = C\_{L, linear} - a \\, r\_+ R\_+(x) + a \\, r\_- R\_-(-x)
 \\]
 
 where \\( R(x) \\) is the integral of the sigmoid function, which can be computed exactly:
 
 \\[
-    R(x) = \int_0^x \sigma(t) \, dt = \frac{1}{k} \left[ \ln \left( 1 + e^{k (x - x_0)} \right) - \ln \left( 1 + e^{-k x_0} \right) \right]
+    R(x) = \int\_0^x \sigma(t) \\, dt = \frac{1}{k} \left[ \ln \left( 1 + e^{k (x - x\_0)} \right) - \ln \left( 1 + e^{-k x\_0} \right) \right]
 \\]
 
 The model has the following properties:
@@ -130,13 +130,13 @@ The slope reduction is meant to be used together with the stall model, which red
 
 ## Pre-stall drag
 
-The pre-stall drag is modeled as a second order polynomial, where the minimum drag is assumed to occur when the lift is zero. The zero-lift angle is found from the linear part of the lift, \\( C_{L, linear} \\), as defined in the [pre-stall lift](#pre-stall-lift) section, so that the drag model automatically follows any changes in the zero-lift angle due to camber, flap angle or boundary layer suction. The pre-stall drag is given as:
+The pre-stall drag is modeled as a second order polynomial, where the minimum drag is assumed to occur when the lift is zero. The zero-lift angle is found from the linear part of the lift, \\( C\_{L, linear} \\), as defined in the [pre-stall lift](#pre-stall-lift) section, so that the drag model automatically follows any changes in the zero-lift angle due to camber, flap angle or boundary layer suction. The pre-stall drag is given as:
 
 \\[
-    C_{D, pre-stall} = C_{D, min} + k_{D} \left( \frac{C_{L, linear}}{a} \right)^2
+    C\_{D, pre-stall} = C\_{D, min} + k\_{D} \left( \frac{C\_{L, linear}}{a} \right)^2
 \\]
 
-where \\( C_{D, min} \\) is `cd_min` and \\( k_D \\) is `cd_second_order_factor`. The lift is divided by the initial slope so that the term inside the parenthesis is approximately the angle of attack relative to the zero-lift angle, in radians. A foil without camber therefore gets a drag that varies with \\( \sin^2(\alpha) \approx \alpha^2 \\). The slope reduction in the lift is not included, as the purpose is only to find where the minimum drag occurs. If `cl_initial_slope` is zero, the zero-lift angle is undefined, and \\( \sin(\alpha) \\) is used instead.
+where \\( C\_{D, min} \\) is `cd_min` and \\( k\_D \\) is `cd_second_order_factor`. The lift is divided by the initial slope so that the term inside the parenthesis is approximately the angle of attack relative to the zero-lift angle, in radians. A foil without camber therefore gets a drag that varies with \\( \sin^2(\alpha) \approx \alpha^2 \\). The slope reduction in the lift is not included, as the purpose is only to find where the minimum drag occurs. If `cl_initial_slope` is zero, the zero-lift angle is undefined, and \\( \sin(\alpha) \\) is used instead.
 
 Note that this is a simplification, as the minimum drag does not necessarily occur exactly at zero lift. However, it removes the need to tune the location of the minimum drag separately for each camber, flap angle or suction rate.
 
@@ -146,10 +146,10 @@ Note that this is a simplification, as the minimum drag does not necessarily occ
 The transition from pre-stall to post-stall behavior is controlled by the *amount of stall*, \\( s \\), which varies smoothly from 0, meaning no stall, to 1, meaning full stall. It is computed with a sigmoid function of the absolute value of the angle of attack:
 
 \\[
-    s(\alpha) = \frac{1}{1 + e^{-k_s (|\alpha| - \alpha_s)}}, \quad k_s = \frac{4.595}{\Delta_s}
+    s(\alpha) = \frac{1}{1 + e^{-k\_s (|\alpha| - \alpha\_s)}}, \quad k\_s = \frac{4.595}{\Delta\_s}
 \\]
 
-where \\( \Delta_s \\) is `stall_range` and \\( \alpha_s \\) is the mean stall angle, given by `mean_positive_stall_angle` for positive angles of attack and `mean_negative_stall_angle` for negative angles of attack. Both stall angles are given as positive values. The amount of stall is 0.01 at \\( |\alpha| = \alpha_s - \Delta_s \\), 0.5 at the mean stall angle, and 0.99 at \\( |\alpha| = \alpha_s + \Delta_s \\). The full transition therefore takes place over an interval of \\( 2 \Delta_s \\) around the mean stall angle.
+where \\( \Delta\_s \\) is `stall_range` and \\( \alpha\_s \\) is the mean stall angle, given by `mean_positive_stall_angle` for positive angles of attack and `mean_negative_stall_angle` for negative angles of attack. Both stall angles are given as positive values. The amount of stall is 0.01 at \\( |\alpha| = \alpha\_s - \Delta\_s \\), 0.5 at the mean stall angle, and 0.99 at \\( |\alpha| = \alpha\_s + \Delta\_s \\). The full transition therefore takes place over an interval of \\( 2 \Delta\_s \\) around the mean stall angle.
 
 Note that the stall angles are measured from zero angle of attack, and not from the zero-lift angle. For a foil with camber, flap or suction, the stall angles for positive and negative angles of attack will therefore typically be different.
 
@@ -157,47 +157,48 @@ Note that the stall angles are measured from zero angle of attack, and not from 
 The total lift coefficient is a weighted sum of the pre-stall and post-stall lift:
 
 \\[
-    C_L = (1 - s) \, C_{L, pre-stall} + s \, C_{L, max} \sin(2 \alpha)
+    C\_L = (1 - s) \\, C\_{L, pre-stall} + s \\, C\_{L, max} \sin(2 \alpha)
 \\]
 
-where \\( C_{L, pre-stall} \\) is described in the [pre-stall lift](#pre-stall-lift) section and \\( C_{L, max} \\) is `cl_max_after_stall`. The post-stall lift has its maximum value at 45 degrees, and is zero at 90 degrees, which is a typical behavior for a fully stalled foil, similar to a flat plate.
+where \\( C\_{L, pre-stall} \\) is described in the [pre-stall lift](#pre-stall-lift) section and \\( C\_{L, max} \\) is `cl_max_after_stall`. The post-stall lift has its maximum value at 45 degrees, and is zero at 90 degrees, which is a typical behavior for a fully stalled foil, similar to a flat plate.
 
 ### Drag
 The post-stall drag is given as:
 
 \\[
-    C_{D, post-stall} = C_{D, max} |\sin(\alpha)|^{p}
+    C\_{D, post-stall} = C\_{D, max} |\sin(\alpha)|^{p}
 \\]
 
-where \\( C_{D, max} \\) is `cd_max_after_stall` and \\( p \\) is `cd_power_after_stall`. The maximum drag is therefore reached at 90 degrees.
+where \\( C\_{D, max} \\) is `cd_max_after_stall` and \\( p \\) is `cd_power_after_stall`. The maximum drag is therefore reached at 90 degrees.
 
-The drag uses its own amount of stall, \\( s_D \\), which can be shifted relative to the amount of stall used for the lift:
+The drag uses its own amount of stall, \\( s\_D \\), which can be shifted relative to the amount of stall used for the lift:
 
 \\[
-    s_D = s \left(\alpha + \delta_D \, \text{sign}(\alpha) \right)
+    s\_D = s \left(\alpha + \delta\_D \\, \text{sign}(\alpha) \right)
 \\]
 
-where \\( \delta_D \\) is `cd_stall_angle_offset`. A positive offset makes the stall effects on the drag start at lower angles of attack than for the lift. The total drag coefficient is then:
+where \\( \delta\_D \\) is `cd_stall_angle_offset`. A positive offset makes the stall effects on the drag start at lower angles of attack than for the lift. The total drag coefficient is then:
 
 \\[
-    C_D = (1 - s_D) \, C_{D, pre-stall} + s_D \, C_{D, post-stall} + C_{D, bump} \frac{1 - \cos(2 \pi s_D)}{2} + k_{i} C_L^2
+    C\_D = (1 - s\_D) \\, C\_{D, pre-stall} + s\_D \\, C\_{D, post-stall} + C\_{D, bump} \frac{1 - \cos(2 \pi s\_D)}{2} + k\_{i} C\_L^2
 \\]
 
-where \\( C_{D, pre-stall} \\) is described in the [pre-stall drag](#pre-stall-drag) section. The third term models additional drag during the stall transition, where \\( C_{D, bump} \\) is `cd_bump_during_stall`. It is zero before and after the stall, and reaches its maximum value of \\( C_{D, bump} \\) when \\( s_D = 0.5 \\). The last term is the correction of the lift-induced drag, where \\( k_i \\) is `cdi_correction_factor` and \\( C_L \\) is the total lift coefficient.
+where \\( C\_{D, pre-stall} \\) is described in the [pre-stall drag](#pre-stall-drag) section. The third term models additional drag during the stall transition, where \\( C\_{D, bump} \\) is `cd_bump_during_stall`. It is zero before and after the stall, and reaches its maximum value of \\( C\_{D, bump} \\) when \\( s\_D = 0.5 \\). The last term is the correction of the lift-induced drag, where \\( k\_i \\) is `cdi_correction_factor` and \\( C\_L \\) is the total lift coefficient.
 
 ## Interactive example
 
 The plot below shows the output of the foil model, and can be used to explore how the parameters affect the lift and drag. The parameters are adjusted with the sliders, or by typing in values, below the plot. The angles are given in degrees in the sliders, but must be given in radians in the actual input to Stormbird. The current parameters can be copied as JSON input, with angles in radians, from the bottom of the plot.
 
-The thin gray lines show the pre-stall and post-stall models before they are combined using the amount of stall. The lowest panel shows the amount of stall for the lift, \\( s \\), and for the drag, \\( s_D \\), which are only different when `cd_stall_angle_offset` is non-zero. The parameters that are not available in the plot, such as `cdi_correction_factor` and `added_mass_factor`, are set to their default values.
+The thin gray lines show the pre-stall and post-stall models before they are combined using the amount of stall. The lowest panel shows the amount of stall for the lift, \\( s \\), and for the drag, \\( s\_D \\), which are only different when `cd_stall_angle_offset` is non-zero. The parameters that are not available in the plot, such as `cdi_correction_factor` and `added_mass_factor`, are set to their default values.
 
-<link rel="stylesheet" href="interactive/foil_model_explorer.css">
+<link rel="stylesheet" href="interactive/model_explorer.css">
 
 <div data-foil-model-explorer>
     <noscript>The interactive plot requires JavaScript.</noscript>
 </div>
 
 <script src="interactive/foil_model.js"></script>
+<script src="interactive/model_explorer.js"></script>
 <script src="interactive/foil_model_explorer.js"></script>
 
 The plot uses a JavaScript copy of the Rust implementation of the `Foil` model, which can be found in `book/src/sectional_models/interactive/foil_model.js`.

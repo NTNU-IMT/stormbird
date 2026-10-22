@@ -11,16 +11,16 @@ The calculation of the circulation strength on each line element follows the [Ku
     \Gamma = L / (U \rho)
 \\]
 
-The lift per unit span is further computed from the sectional lift coefficient, \\(C_L\\) as follows, where \\(\rho\\) is the density and \\(c \\) the chord length:
+The lift per unit span is further computed from the sectional lift coefficient, \\(C\_L\\) as follows, where \\(\rho\\) is the density and \\(c \\) the chord length:
 
 \\[
-    L = 0.5 \cdot \rho \cdot c \cdot C_L \cdot U^2
+    L = 0.5 \cdot \rho \cdot c \cdot C\_L \cdot U^2
 \\]
 
 When these equations are combined, we get the following equation for the circulation strength:
 
 \\[
-    \Gamma = 0.5 \cdot c \cdot C_L \cdot U
+    \Gamma = 0.5 \cdot c \cdot C\_L \cdot U
 \\]
 
 The actual source code looks like the following (the negative values are to account for directional definitions)
@@ -146,7 +146,7 @@ The option to `curve_fit_shape_parameters` is currently experimental. It will cu
 The `PrescribedCirculationShape` parameters in the structure are used to force the circulation to always follow a mathematical shape that looks like the equation below, where \\(s\\) is the local non-dimensional span distance, varying from -0.5 to 0.5 along each wing:
 
 \\[
-    \Gamma(s) = \Gamma_0 (1.0 - (2 s)^{\text{inner_power}})^{\text{outer_power}}
+    \Gamma(s) = \Gamma\_0 (1.0 - (2 s)^{\text{inner\_power}})^{\text{outer\_power}}
 \\]
 
 The default values are to set `inner_power` to 2.0 and `outer_power` to 0.5. This corresponds to an elliptic distribution.

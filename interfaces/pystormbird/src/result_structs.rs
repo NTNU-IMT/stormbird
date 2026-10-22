@@ -4,6 +4,9 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pyo3::exceptions::{PyIOError, PyValueError};
+
+use stormbird::error::Error;
 
 use stormbird::common_utils::results::simulation::SimulationResult as SimulationResultRust;
 use stormbird::common_utils::results::simplfied::SingleSailResult as SingleSailResultRust;
@@ -128,17 +131,21 @@ pub struct SimulationResult {
 #[pymethods]
 impl SimulationResult {
     #[classmethod]
-    pub fn from_json_file(_cls: &Bound<'_, PyType>, file_path: String) -> SimulationResult {
-        let data = SimulationResultRust::from_json(&file_path).unwrap();
-        
-        SimulationResult { data }
+    pub fn from_json_file(_cls: &Bound<'_, PyType>, file_path: String) -> PyResult<SimulationResult> {
+        let data = SimulationResultRust::from_json(&file_path).map_err(|e| {
+            Self::read_file_error(&file_path, e)
+        })?;
+
+        Ok(SimulationResult { data })
     }
     
     #[classmethod]
-    pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> Vec<SimulationResult> {
-        let rust_vector = SimulationResultRust::result_history_from_file(&file_path).unwrap();
+    pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> PyResult<Vec<SimulationResult>> {
+        let rust_vector = SimulationResultRust::result_history_from_file(&file_path).map_err(|e| {
+            Self::read_file_error(&file_path, e)
+        })?;
 
-        rust_vector.iter().map(|v| SimulationResult { data: v.clone() }).collect()
+        Ok(rust_vector.iter().map(|v| SimulationResult { data: v.clone() }).collect())
     }
 
     #[getter]
@@ -208,6 +215,19 @@ impl SimulationResult {
 
     pub fn input_power_sum(&self) -> f64 {
         self.data.input_power.iter().sum()
+    }
+}
+
+impl SimulationResult {
+    /// Converts an error from reading a result file to a Python error. Errors from reading the
+    /// file become an OSError, while errors from parsing the content become a ValueError.
+    fn read_file_error(file_path: &str, error: Error) -> PyErr {
+        let message = format!("Failed to read simulation result from file {}: {}", file_path, error);
+
+        match error {
+            Error::IoError(_) => PyIOError::new_err(message),
+            _ => PyValueError::new_err(message),
+        }
     }
 }
 
