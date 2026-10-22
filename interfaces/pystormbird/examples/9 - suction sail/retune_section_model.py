@@ -1,41 +1,20 @@
 '''
-TODO: This script is currently not part of the example, and does not work with the current foil
-model. It uses the higher order term in the pre-stall lift (`cl_high_order_factor_positive`,
-`cl_high_order_factor_negative` and `cl_high_order_power`), which has been replaced by a reduction
-of the lift slope (`cl_slope_reduction_*`). The corrections must be updated to the slope reduction
-before the script can be used again. When this is done, set `USE_RETUNED_SECTION_MODEL` in
-suction_sail_model.py to use the retuned model in the other steps.
-
 Optional step in the suction sail example: retunes the section model from the first step, so that
 the three-dimensional simulations match the three-dimensional data better.
 
-The three-dimensional data for each suction coefficient is first divided into three categories,
-based on the angle of attack with the maximum lift: well below stall, close to stall but before the
-maximum lift, and after stall. A linear curve is fitted to the lift well below stall, and this
-curve is used when comparing to the simulations, as it is smooth and not affected by noise in the
-digitized data.
-
-The following parameters are corrected, while the rest are kept as fitted to the two-dimensional
-data:
+The following parameters are tuned:
 
 - The lift at zero angle of attack, `cl_zero_angle`, with an offset, and the lift slope,
-  `cl_initial_slope`, with a factor.
-- A higher order term in the lift, through `cl_high_order_factor_positive` and
-  `cl_high_order_factor_negative`, which makes the lift curve bend over before stall, as in the
-  data. The same factor is used for positive and negative angles of attack. The power of the term,
-  `cl_high_order_power`, is fixed.
-- The stall angle, `mean_positive_stall_angle` and `mean_negative_stall_angle`, with an offset.
+  `cl_initial_slope`, with a factor. These are tuned to match a linear fit of the three-dimensional
+  data well below stall, which avoids noise in the data close to stall.
 
-The tuning is done in two steps:
+- The slope reduction parameters, `cl_slope_reduction_factor` and `cl_slope_reduction_onset_angle`,
+  are tuned to match the lift data close to stall (but before the stall transition). This captures
+  the bending of the lift curve before stall. The correction is applied to the positive or negative
+  side based on the sign of `cl_zero_angle`.
 
-1) The stall is moved to a very large angle of attack, so that it does not affect the lift in the
-   range of the data. The lift corrections are then tuned to the linear curve well below stall and
-   to the data close to stall, at the same time. As the power of the higher order term is fixed,
-   the lift from the simulations is close to linear in the corrections. They are therefore found
-   with a few Gauss-Newton iterations, where the sensitivity of the lift to each correction is found
-   with finite differences.
-2) The stall angle offset is tuned for each suction coefficient, so that the maximum lift is the
-   same as in the data, with a bracketed root finding method.
+- The minimum drag, `cd_min`, is tuned by comparing the total drag from simulations (profile drag
+  plus induced drag) to the lowest drag points in the three-dimensional data.
 
 To get a smooth variation with the suction coefficient, the corrections are not tuned for each foil
 model separately. Instead, each correction is a function of the suction coefficient, defined by its
@@ -52,105 +31,102 @@ that it can be tuned directly to the three-dimensional data.
 
 from dataclasses import dataclass
 
-import numpy as np
-import scipy.optimize as opt
 import matplotlib.pyplot as plt
-
+import numpy as np
 from stormbird_setup.section_models import Foil as FoilSetup, VaryingFoil as VaryingFoilSetup
 
 from plot_sectional_data import positive_foils, varying_foil_with_mirrored_foils
-from suction_sail_data import CQ_VALUES_3D, lift_data
+from suction_sail_data import CQ_VALUES_3D, drag_data, lift_data
 from suction_sail_model import (
     RETUNED_VARYING_FOIL_FILE,
-    load_raw_varying_foil,
-    create_simulation,
-    suction_coefficient_direct,
     angle_sweep,
-    run_case,
+    create_simulation,
+    load_raw_varying_foil,
+    suction_coefficient_direct,
 )
 
 # Data more than this below the angle of attack with the maximum lift is well below stall
 WELL_BELOW_STALL_MARGIN_DEG = 10.0
 
-# Number of angles of attack well below stall, and close to stall, used when comparing to the
-# simulations
-NR_COMPARISON_ANGLES_WELL_BELOW_STALL = 5
-NR_COMPARISON_ANGLES_CLOSE_TO_STALL = 6
-
 # Data closer than this to the angle of attack with the maximum lift is part of the stall
-# transition, and is not used when tuning the higher order lift term
+# transition, and is not used when tuning the slope reduction
 STALL_TRANSITION_MARGIN_DEG = 3.0
 
-# Stall angle used when tuning the lift, so that the stall does not affect the lift in the range of
-# the data
-DISABLED_STALL_ANGLE = np.radians(80.0)
+# Number of angles of attack well below stall used when comparing to the simulations
+NR_COMPARISON_ANGLES_WELL_BELOW_STALL = 5
 
-# Initial values and limits for the higher order lift term
-# The power of the higher order lift term, which is the same for all foil models
-HIGH_ORDER_POWER = 3.0
-
-NR_GAUSS_NEWTON_ITERATIONS = 3
+# Number of angles of attack close to stall used when tuning the slope reduction
+NR_COMPARISON_ANGLES_CLOSE_TO_STALL = 5
 
 # Step sizes for the finite differences
 CL_ZERO_ANGLE_STEP = 0.01
 CL_INITIAL_SLOPE_FACTOR_STEP = 0.01
-HIGH_ORDER_FACTOR_STEP = 0.1
+SLOPE_REDUCTION_FACTOR_STEP = 0.01
+SLOPE_REDUCTION_ONSET_ANGLE_STEP = 0.01  # radians
 
-# Angle of attack step when searching for the maximum lift in the simulations
-STALL_SEARCH_STEP_DEG = 0.5
+NR_GAUSS_NEWTON_ITERATIONS = 3
+NR_SLOPE_REDUCTION_ITERATIONS = 3
 
-# Range for the stall angle offset
-STALL_ANGLE_OFFSET_RANGE = np.radians([-15.0, 15.0])
+# Number of lowest drag points to use when tuning cd_min
+NR_DRAG_TUNING_POINTS = 3
 
-# The stall angle offsets at the different suction coefficients depend slightly on each other, so
-# they are tuned more than once
-NR_STALL_ANGLE_PASSES = 2
+# Stall angle used when tuning the slope reduction, so that the stall does not interfere
+DISABLED_STALL_ANGLE = np.radians(80.0)
 
 
 class Data3D:
     '''
-    The three-dimensional lift data for one suction coefficient, divided into categories based on
-    the angle of attack with the maximum lift, and with a linear curve fitted to the lift well below
-    stall.
+    The three-dimensional data for one suction coefficient. A linear curve is fitted to the lift
+    data well below stall, which is used when tuning the linear lift parameters.
     '''
     def __init__(self, cq: float):
         self.cq = cq
 
-        self.aoa_deg, self.cl = lift_data(cq, "3d")
+        aoa_deg, cl = lift_data(cq, "3d")
+        cl_drag, cd = drag_data(cq, "3d")
 
-        index_max_lift = np.argmax(self.cl)
+        index_max_lift = np.argmax(cl)
+        self.stall_angle_deg = aoa_deg[index_max_lift]
 
-        self.stall_angle_deg = self.aoa_deg[index_max_lift]
-        self.max_lift = self.cl[index_max_lift]
-
-        indices = np.arange(len(self.aoa_deg))
-
-        self.well_below_stall = self.aoa_deg < self.stall_angle_deg - WELL_BELOW_STALL_MARGIN_DEG
-        self.close_to_stall = ~self.well_below_stall & (indices <= index_max_lift)
-        self.post_stall = indices > index_max_lift
+        well_below_stall = aoa_deg < self.stall_angle_deg - WELL_BELOW_STALL_MARGIN_DEG
 
         self.linear_slope, self.linear_intercept = np.polyfit(
-            self.aoa_deg[self.well_below_stall], self.cl[self.well_below_stall], 1
+            aoa_deg[well_below_stall], cl[well_below_stall], 1
         )
 
         self.angles_well_below_stall_deg = np.linspace(
-            self.aoa_deg[self.well_below_stall].min(),
-            self.aoa_deg[self.well_below_stall].max(),
+            aoa_deg[well_below_stall].min(),
+            aoa_deg[well_below_stall].max(),
             NR_COMPARISON_ANGLES_WELL_BELOW_STALL
         )
 
-        # Data points close to stall, evenly distributed among the available points. The points
-        # closest to the maximum lift are part of the stall transition, which is modeled by the
-        # stall angle rather than the higher order lift term, and are therefore not used.
-        close_to_stall_indices = indices[
-            self.close_to_stall & (self.aoa_deg < self.stall_angle_deg - STALL_TRANSITION_MARGIN_DEG)
-        ]
-        selected = np.linspace(
-            0, len(close_to_stall_indices) - 1, NR_COMPARISON_ANGLES_CLOSE_TO_STALL
-        ).round().astype(int)
+        # Data points close to stall but before the stall transition, used for tuning the slope
+        # reduction. These are between "well below stall" and "stall transition".
+        indices = np.arange(len(aoa_deg))
+        close_to_stall = (
+            (aoa_deg >= self.stall_angle_deg - WELL_BELOW_STALL_MARGIN_DEG) &
+            (aoa_deg < self.stall_angle_deg - STALL_TRANSITION_MARGIN_DEG) &
+            (indices <= index_max_lift)
+        )
 
-        self.angles_close_to_stall_deg = self.aoa_deg[close_to_stall_indices[selected]]
-        self.cl_close_to_stall = self.cl[close_to_stall_indices[selected]]
+        if np.sum(close_to_stall) >= NR_COMPARISON_ANGLES_CLOSE_TO_STALL:
+            # Select evenly distributed points from the close-to-stall region
+            close_to_stall_indices = indices[close_to_stall]
+            selected = np.linspace(
+                0, len(close_to_stall_indices) - 1, NR_COMPARISON_ANGLES_CLOSE_TO_STALL
+            ).round().astype(int)
+            self.angles_close_to_stall_deg = aoa_deg[close_to_stall_indices[selected]]
+            self.cl_close_to_stall = cl[close_to_stall_indices[selected]]
+        else:
+            # Not enough points, use what we have
+            self.angles_close_to_stall_deg = aoa_deg[close_to_stall]
+            self.cl_close_to_stall = cl[close_to_stall]
+
+        # The points with the lowest drag from the drag polar, used for tuning cd_min.
+        # We use multiple points to get a more robust estimate.
+        sorted_indices = np.argsort(cd)[:NR_DRAG_TUNING_POINTS]
+        self.cd_tuning_points = cd[sorted_indices]
+        self.cl_tuning_points = cl_drag[sorted_indices]
 
     def linear_lift(self, aoa_deg: np.ndarray) -> np.ndarray:
         return self.linear_intercept + self.linear_slope * aoa_deg
@@ -163,33 +139,54 @@ class Corrections:
     '''
     cl_zero_angle_offset: np.ndarray
     cl_initial_slope_factor: np.ndarray
-    cl_high_order_factor: np.ndarray
-    stall_angle_offset: np.ndarray
+    cl_slope_reduction_factor: np.ndarray
+    cl_slope_reduction_onset_angle: np.ndarray
+    cd_min_offset: np.ndarray
 
     @classmethod
     def none(cls) -> "Corrections":
         n = len(CQ_VALUES_3D)
+        return cls(
+            np.zeros(n),       # cl_zero_angle_offset
+            np.ones(n),        # cl_initial_slope_factor
+            np.zeros(n),       # cl_slope_reduction_factor (0 = no reduction)
+            np.zeros(n),       # cl_slope_reduction_onset_angle
+            np.zeros(n),       # cd_min_offset
+        )
 
-        return cls(np.zeros(n), np.ones(n), np.zeros(n), np.zeros(n))
-
-    def lift_corrections(self) -> np.ndarray:
+    def linear_lift_as_array(self) -> np.ndarray:
         return np.concatenate([
             self.cl_zero_angle_offset,
             self.cl_initial_slope_factor,
-            self.cl_high_order_factor,
         ])
 
-    def with_lift_corrections(self, x: np.ndarray) -> "Corrections":
+    def with_linear_lift_values(self, x: np.ndarray) -> "Corrections":
         n = len(CQ_VALUES_3D)
-
         return Corrections(
             np.array(x[:n]),
             np.array(x[n:2 * n]),
-            np.array(x[2 * n:3 * n]),
-            self.stall_angle_offset.copy()
+            self.cl_slope_reduction_factor.copy(),
+            self.cl_slope_reduction_onset_angle.copy(),
+            self.cd_min_offset.copy(),
         )
 
-    def at(self, cq: float) -> tuple[float, float, float, float]:
+    def slope_reduction_as_array(self) -> np.ndarray:
+        return np.concatenate([
+            self.cl_slope_reduction_factor,
+            self.cl_slope_reduction_onset_angle,
+        ])
+
+    def with_slope_reduction_values(self, x: np.ndarray) -> "Corrections":
+        n = len(CQ_VALUES_3D)
+        return Corrections(
+            self.cl_zero_angle_offset.copy(),
+            self.cl_initial_slope_factor.copy(),
+            np.array(x[:n]),
+            np.array(x[n:2 * n]),
+            self.cd_min_offset.copy(),
+        )
+
+    def at(self, cq: float) -> tuple[float, float, float, float, float]:
         '''
         The corrections at a suction coefficient, linearly interpolated between the suction
         coefficients with three-dimensional data.
@@ -197,8 +194,9 @@ class Corrections:
         return (
             float(np.interp(cq, CQ_VALUES_3D, self.cl_zero_angle_offset)),
             float(np.interp(cq, CQ_VALUES_3D, self.cl_initial_slope_factor)),
-            float(np.interp(cq, CQ_VALUES_3D, self.cl_high_order_factor)),
-            float(np.interp(cq, CQ_VALUES_3D, self.stall_angle_offset)),
+            float(np.interp(cq, CQ_VALUES_3D, self.cl_slope_reduction_factor)),
+            float(np.interp(cq, CQ_VALUES_3D, self.cl_slope_reduction_onset_angle)),
+            float(np.interp(cq, CQ_VALUES_3D, self.cd_min_offset)),
         )
 
 
@@ -206,39 +204,70 @@ def corrected_foil(
     foil: FoilSetup,
     corrections: Corrections,
     cq: float,
-    disable_stall: bool,
+    disable_stall: bool = False
 ) -> FoilSetup:
-    cl_zero_angle_offset, cl_initial_slope_factor, cl_high_order_factor, stall_angle_offset = (
-        corrections.at(cq)
-    )
+    '''
+    Applies the corrections to a foil model at a given suction coefficient.
+    
+    The slope reduction is applied to the positive or negative side based on the sign of
+    cl_zero_angle. With positive cl_zero_angle (suction on the upper surface), the operating
+    angles of attack are typically positive, so we tune the positive slope reduction.
+    
+    If disable_stall is True, the stall angles are set to a very large value so that stall
+    does not interfere with the slope reduction tuning.
+    '''
+    (
+        cl_zero_angle_offset,
+        cl_initial_slope_factor,
+        cl_slope_reduction_factor,
+        cl_slope_reduction_onset_angle,
+        cd_min_offset
+    ) = corrections.at(cq)
 
-    if disable_stall:
-        stall_angle_positive = DISABLED_STALL_ANGLE
-        stall_angle_negative = DISABLED_STALL_ANGLE
-    else:
-        stall_angle_positive = foil.mean_positive_stall_angle + stall_angle_offset
-        stall_angle_negative = foil.mean_negative_stall_angle + stall_angle_offset
+    # The foil parameters should always be set when coming from the fitted model
+    assert foil.cl_zero_angle is not None
+    assert foil.cl_initial_slope is not None
+    assert foil.cd_min is not None
 
-    return foil.model_copy(update = {
+    updates: dict[str, float] = {
         "cl_zero_angle": foil.cl_zero_angle + cl_zero_angle_offset,
         "cl_initial_slope": foil.cl_initial_slope * cl_initial_slope_factor,
-        "cl_high_order_factor_positive": cl_high_order_factor,
-        "cl_high_order_factor_negative": cl_high_order_factor,
-        "cl_high_order_power": HIGH_ORDER_POWER,
-        "mean_positive_stall_angle": stall_angle_positive,
-        "mean_negative_stall_angle": stall_angle_negative,
-    })
+        "cd_min": foil.cd_min + cd_min_offset,
+    }
+
+    # Disable stall by setting very large stall angles
+    if disable_stall:
+        updates["mean_positive_stall_angle"] = DISABLED_STALL_ANGLE
+        updates["mean_negative_stall_angle"] = DISABLED_STALL_ANGLE
+
+    # Apply slope reduction to the appropriate side based on cl_zero_angle sign
+    corrected_cl_zero_angle = foil.cl_zero_angle + cl_zero_angle_offset
+
+    if corrected_cl_zero_angle >= 0:
+        # Positive cl_zero_angle: tune positive side
+        base_onset = foil.cl_slope_reduction_onset_angle_positive or 0.0
+        updates["cl_slope_reduction_factor_positive"] = cl_slope_reduction_factor
+        updates["cl_slope_reduction_onset_angle_positive"] = base_onset + cl_slope_reduction_onset_angle
+    else:
+        # Negative cl_zero_angle: tune negative side
+        base_onset = foil.cl_slope_reduction_onset_angle_negative or 0.0
+        updates["cl_slope_reduction_factor_negative"] = cl_slope_reduction_factor
+        updates["cl_slope_reduction_onset_angle_negative"] = base_onset + cl_slope_reduction_onset_angle
+
+    return foil.model_copy(update=updates)
 
 
 def apply_corrections(
     raw_varying_foil: VaryingFoilSetup,
     corrections: Corrections,
-    disable_stall: bool = False
+    disable_stall: bool = False,
 ) -> VaryingFoilSetup:
     '''
     Applies the corrections to each foil model in the raw varying foil model, at its own suction
     coefficient. A foil model is added for the largest suction coefficient in the
     three-dimensional data, if this is outside the two-dimensional data.
+    
+    If disable_stall is True, the stall angles are set to a very large value.
     '''
     cq_values, foils = positive_foils(raw_varying_foil)
 
@@ -253,15 +282,41 @@ def apply_corrections(
     return varying_foil_with_mirrored_foils(cq_values, corrected_foils)
 
 
-def lift_residuals(
+def linear_lift_residuals(
     raw_varying_foil: VaryingFoilSetup,
     corrections: Corrections,
     data: list[Data3D]
 ) -> np.ndarray:
     '''
-    The difference between the lift from the simulations, without stall, and the data, for all
-    suction coefficients. Well below stall, the linear curve fitted to the data is used, while the
-    data points are used close to stall.
+    The difference between the lift from the simulations and the linear fit of the data well below
+    stall, for all suction coefficients.
+    '''
+    simulation = create_simulation(
+        suction_coefficient_direct(),
+        apply_corrections(raw_varying_foil, corrections)
+    )
+
+    residuals = []
+
+    for data_cq in data:
+        angles = data_cq.angles_well_below_stall_deg
+        cl_data = data_cq.linear_lift(angles)
+        cl_model = np.array([result.cl for result in angle_sweep(simulation, angles, data_cq.cq)])
+
+        residuals.append(cl_model - cl_data)
+
+    return np.concatenate(residuals)
+
+
+def slope_reduction_residuals(
+    raw_varying_foil: VaryingFoilSetup,
+    corrections: Corrections,
+    data: list[Data3D]
+) -> np.ndarray:
+    '''
+    The difference between the lift from the simulations and the data close to stall,
+    for all suction coefficients. Stall is disabled so the slope reduction effect can be
+    tuned without interference from stall.
     '''
     simulation = create_simulation(
         suction_coefficient_direct(),
@@ -271,40 +326,35 @@ def lift_residuals(
     residuals = []
 
     for data_cq in data:
-        angles = np.concatenate([
-            data_cq.angles_well_below_stall_deg, data_cq.angles_close_to_stall_deg
-        ])
+        if len(data_cq.angles_close_to_stall_deg) == 0:
+            continue
 
-        cl_data = np.concatenate([
-            data_cq.linear_lift(data_cq.angles_well_below_stall_deg), data_cq.cl_close_to_stall
-        ])
-
+        angles = data_cq.angles_close_to_stall_deg
+        cl_data = data_cq.cl_close_to_stall
         cl_model = np.array([result.cl for result in angle_sweep(simulation, angles, data_cq.cq)])
 
         residuals.append(cl_model - cl_data)
 
-    return np.concatenate(residuals)
+    return np.concatenate(residuals) if residuals else np.array([])
 
 
-def tune_lift(
+def tune_linear_lift(
     raw_varying_foil: VaryingFoilSetup,
     corrections: Corrections,
     data: list[Data3D]
 ) -> Corrections:
     '''
-    Tunes the lift corrections with the stall disabled, with Gauss-Newton iterations
+    Tunes the linear lift corrections using Gauss-Newton iterations.
     '''
-    x = corrections.lift_corrections()
+    x = corrections.linear_lift_as_array()
 
     n = len(CQ_VALUES_3D)
-    steps = np.array(
-        [CL_ZERO_ANGLE_STEP] * n + [CL_INITIAL_SLOPE_FACTOR_STEP] * n + [HIGH_ORDER_FACTOR_STEP] * n
-    )
+    steps = np.array([CL_ZERO_ANGLE_STEP] * n + [CL_INITIAL_SLOPE_FACTOR_STEP] * n)
 
     def rms_error(residuals: np.ndarray) -> float:
         return float(np.sqrt(np.mean(residuals**2)))
 
-    residuals = lift_residuals(raw_varying_foil, corrections.with_lift_corrections(x), data)
+    residuals = linear_lift_residuals(raw_varying_foil, corrections.with_linear_lift_values(x), data)
 
     for iteration in range(NR_GAUSS_NEWTON_ITERATIONS):
         print(f"  Iteration {iteration + 1}: RMS lift error = {rms_error(residuals):.4f}")
@@ -316,18 +366,16 @@ def tune_lift(
             x_perturbed[j] += steps[j]
 
             jacobian[:, j] = (
-                lift_residuals(raw_varying_foil, corrections.with_lift_corrections(x_perturbed), data) -
+                linear_lift_residuals(raw_varying_foil, corrections.with_linear_lift_values(x_perturbed), data) -
                 residuals
             ) / steps[j]
 
         step = -np.linalg.lstsq(jacobian, residuals, rcond=None)[0]
 
-        # A too large higher order term makes the sectional lift decrease before the angle of attack
-        # in the data, which gives a sudden drop in the lift from the simulations. The step is
-        # therefore reduced until the error decreases.
+        # Reduce the step if needed to ensure the error decreases
         for _ in range(6):
-            residuals_new = lift_residuals(
-                raw_varying_foil, corrections.with_lift_corrections(x + step), data
+            residuals_new = linear_lift_residuals(
+                raw_varying_foil, corrections.with_linear_lift_values(x + step), data
             )
 
             if np.all(np.isfinite(residuals_new)) and rms_error(residuals_new) < rms_error(residuals):
@@ -338,197 +386,203 @@ def tune_lift(
 
     print(f"  Final: RMS lift error = {rms_error(residuals):.4f}")
 
-    return corrections.with_lift_corrections(x)
+    return corrections.with_linear_lift_values(x)
 
 
-def simulated_maximum_lift(varying_foil: VaryingFoilSetup, data_cq: Data3D) -> float:
-    '''
-    The maximum lift before stall in the simulations. The angle of attack is increased from well
-    below stall until the lift starts to decrease, so that no simulations are done after stall. The
-    maximum is refined with a parabola through the points around it, so that it varies smoothly
-    with the model parameters.
-    '''
-    simulation = create_simulation(suction_coefficient_direct(), varying_foil)
-
-    aoa = max(data_cq.stall_angle_deg - 2.0 * WELL_BELOW_STALL_MARGIN_DEG, 0.0)
-    max_aoa = data_cq.stall_angle_deg + 2.0 * WELL_BELOW_STALL_MARGIN_DEG
-
-    cl = [run_case(simulation, aoa, data_cq.cq).cl]
-
-    while aoa < max_aoa:
-        aoa += STALL_SEARCH_STEP_DEG
-
-        cl.append(run_case(simulation, aoa, data_cq.cq).cl)
-
-        if cl[-1] < cl[-2]:
-            break
-
-    if len(cl) < 3 or cl[-1] >= cl[-2]:
-        return max(cl)
-
-    y0, y1, y2 = cl[-3], cl[-2], cl[-1]
-    denominator = y0 - 2.0 * y1 + y2
-
-    if denominator == 0.0:
-        return y1
-
-    return y1 - 0.125 * (y0 - y2)**2 / denominator
-
-
-def tune_stall_angle(
+def tune_slope_reduction(
     raw_varying_foil: VaryingFoilSetup,
     corrections: Corrections,
-    index: int,
-    data_cq: Data3D
-) -> None:
+    data: list[Data3D]
+) -> Corrections:
     '''
-    Tunes the stall angle offset at one suction coefficient, so that the maximum lift is the same as
-    in the data
+    Tunes the slope reduction parameters using Gauss-Newton iterations to match the lift
+    data close to stall.
     '''
-    def maximum_lift_error(offset: float) -> float:
-        corrections.stall_angle_offset[index] = offset
+    x = corrections.slope_reduction_as_array()
 
-        varying_foil = apply_corrections(raw_varying_foil, corrections)
+    n = len(CQ_VALUES_3D)
+    steps = np.array([SLOPE_REDUCTION_FACTOR_STEP] * n + [SLOPE_REDUCTION_ONSET_ANGLE_STEP] * n)
 
-        return simulated_maximum_lift(varying_foil, data_cq) - data_cq.max_lift
+    def rms_error(residuals: np.ndarray) -> float:
+        return float(np.sqrt(np.mean(residuals**2))) if len(residuals) > 0 else 0.0
 
-    lower, upper = STALL_ANGLE_OFFSET_RANGE
+    residuals = slope_reduction_residuals(raw_varying_foil, corrections.with_slope_reduction_values(x), data)
 
-    error_lower, error_upper = maximum_lift_error(lower), maximum_lift_error(upper)
+    if len(residuals) == 0:
+        print("  No close-to-stall data available for slope reduction tuning")
+        return corrections
 
-    if error_lower * error_upper > 0.0:
-        print(f"  Could not match the maximum lift for Cq = {data_cq.cq}, using the closest limit")
-        corrections.stall_angle_offset[index] = lower if abs(error_lower) < abs(error_upper) else upper
-        return
+    for iteration in range(NR_SLOPE_REDUCTION_ITERATIONS):
+        print(f"  Iteration {iteration + 1}: RMS lift error (close to stall) = {rms_error(residuals):.4f}")
 
-    corrections.stall_angle_offset[index] = opt.brentq(
-        maximum_lift_error, lower, upper, xtol=np.radians(0.02)
+        jacobian = np.zeros((len(residuals), len(x)))
+
+        for j in range(len(x)):
+            x_perturbed = x.copy()
+            x_perturbed[j] += steps[j]
+
+            jacobian[:, j] = (
+                slope_reduction_residuals(raw_varying_foil, corrections.with_slope_reduction_values(x_perturbed), data) -
+                residuals
+            ) / steps[j]
+
+        step = -np.linalg.lstsq(jacobian, residuals, rcond=None)[0]
+
+        # Reduce the step if needed to ensure the error decreases
+        for _ in range(6):
+            residuals_new = slope_reduction_residuals(
+                raw_varying_foil, corrections.with_slope_reduction_values(x + step), data
+            )
+
+            if np.all(np.isfinite(residuals_new)) and rms_error(residuals_new) < rms_error(residuals):
+                x, residuals = x + step, residuals_new
+                break
+
+            step *= 0.5
+
+    print(f"  Final: RMS lift error (close to stall) = {rms_error(residuals):.4f}")
+
+    return corrections.with_slope_reduction_values(x)
+
+
+def tune_cd_min(
+    raw_varying_foil: VaryingFoilSetup,
+    corrections: Corrections,
+    data: list[Data3D]
+) -> Corrections:
+    '''
+    Tunes cd_min by comparing the total drag from simulations (profile + induced) to the drag
+    in the 3D data at multiple low-drag points. The offset minimizes the mean error across these
+    points, giving a more robust estimate than using a single point.
+    '''
+    simulation = create_simulation(
+        suction_coefficient_direct(),
+        apply_corrections(raw_varying_foil, corrections)
     )
+
+    angles_of_attack_deg = np.arange(0.0, 30.0, 0.5)
+
+    for i, data_cq in enumerate(data):
+        # Run an angle sweep to find the drag at different lift coefficients
+        results = angle_sweep(simulation, angles_of_attack_deg, data_cq.cq)
+
+        cl_sim = np.array([r.cl for r in results])
+        cd_sim = np.array([r.cd for r in results])
+
+        # Interpolate to find the simulated drag at each tuning point's lift coefficient
+        cd_sim_at_points = np.interp(data_cq.cl_tuning_points, cl_sim, cd_sim)
+
+        # The offset that minimizes the mean error across all tuning points
+        offsets = data_cq.cd_tuning_points - cd_sim_at_points
+        corrections.cd_min_offset[i] = np.mean(offsets)
+
+        print(f"  Cq = {data_cq.cq:.3f}: cd_data = {data_cq.cd_tuning_points}, "
+              f"cd_sim = {cd_sim_at_points}, mean offset = {corrections.cd_min_offset[i]:.4f}")
+
+    return corrections
 
 
 def retune_section_model(data: list[Data3D]) -> tuple[VaryingFoilSetup, Corrections]:
     raw_varying_foil = load_raw_varying_foil()
 
-    print("Tuning the lift before stall, with the stall disabled")
-    corrections = tune_lift(raw_varying_foil, Corrections.none(), data)
+    print("Tuning the linear lift parameters")
+    corrections = tune_linear_lift(raw_varying_foil, Corrections.none(), data)
 
-    print("Tuning the stall angle to the maximum lift")
-    for _ in range(NR_STALL_ANGLE_PASSES):
-        for index, data_cq in enumerate(data):
-            tune_stall_angle(raw_varying_foil, corrections, index, data_cq)
+    print("\nTuning the slope reduction (lift close to stall)")
+    corrections = tune_slope_reduction(raw_varying_foil, corrections, data)
+
+    print("\nTuning the minimum drag")
+    corrections = tune_cd_min(raw_varying_foil, corrections, data)
 
     return apply_corrections(raw_varying_foil, corrections), corrections
 
 
 if __name__ == "__main__":
-    # TODO: Remove this when the corrections are updated to the slope reduction (see the top of the
-    # file)
-    raise SystemExit(
-        "retune_section_model.py is not updated to the slope reduction in the foil model yet. "
-        "See the TODO at the top of the file."
-    )
-
     data = [Data3D(cq) for cq in CQ_VALUES_3D]
+
+    print("Three-dimensional data:")
+    print(f"{'Cq':>6} {'slope':>8} {'intercept':>10} {'stall angle':>12}")
+    for d in data:
+        print(f"{d.cq:6.3f} {d.linear_slope:8.4f} {d.linear_intercept:10.4f} {d.stall_angle_deg:12.1f}")
+        print(f"       close-to-stall angles: {d.angles_close_to_stall_deg}")
+        print(f"       close-to-stall cl:     {d.cl_close_to_stall}")
+
+    print()
 
     retuned_varying_foil, corrections = retune_section_model(data)
 
     RETUNED_VARYING_FOIL_FILE.write_text(retuned_varying_foil.to_json_string())
 
     print(f"\nRetuned varying foil model written to {RETUNED_VARYING_FOIL_FILE.name}")
-    print(f"\nPower of the higher order lift term: {HIGH_ORDER_POWER}\n")
 
-    print(
-        f"{'Cq':>6} {'cl_zero_angle offset':>21} {'cl_initial_slope factor':>24} "
-        f"{'high order factor':>18} {'stall offset [deg]':>19} {'max CL data':>12} {'max CL model':>13}"
-    )
+    print("\nCorrections at each suction coefficient:")
+    print(f"{'Cq':>6} {'cl_0 off':>9} {'slope fac':>10} {'red fac':>8} {'red onset':>10} {'cd_min off':>11}")
+    for cq, cl_0, slope, red_fac, red_onset, cd_min in zip(
+        CQ_VALUES_3D,
+        corrections.cl_zero_angle_offset,
+        corrections.cl_initial_slope_factor,
+        corrections.cl_slope_reduction_factor,
+        corrections.cl_slope_reduction_onset_angle,
+        corrections.cd_min_offset,
+    ):
+        print(f"{cq:6.3f} {cl_0:9.4f} {slope:10.4f} {red_fac:8.4f} {np.degrees(red_onset):10.2f}° {cd_min:11.4f}")
 
-    for data_cq in data:
-        cl_zero_angle_offset, cl_initial_slope_factor, cl_high_order_factor, stall_angle_offset = (
-            corrections.at(data_cq.cq)
-        )
+    # Plot the results
+    angles_of_attack_deg = np.arange(0.0, 45.5, 0.5)
 
-        max_lift_model = simulated_maximum_lift(retuned_varying_foil, data_cq)
-
-        print(
-            f"{data_cq.cq:6.3f} {cl_zero_angle_offset:21.3f} {cl_initial_slope_factor:24.3f} "
-            f"{cl_high_order_factor:18.3f} {np.degrees(stall_angle_offset):19.2f} "
-            f"{data_cq.max_lift:12.2f} {max_lift_model:13.2f}"
-        )
-
-    w_plot = 18
-    h_plot = w_plot / 3.2
-
-    fig = plt.figure(figsize = (w_plot, h_plot))
-    ax_data = fig.add_subplot(131)
-    ax_lift_corrections = fig.add_subplot(132)
-    ax_stall_correction = fig.add_subplot(133)
-
-    # The data in each category, the linear curve fitted to the data well below stall, and the
-    # simulated lift without stall
     raw_varying_foil = load_raw_varying_foil()
 
-    simulation_without_stall = create_simulation(
-        suction_coefficient_direct(),
-        apply_corrections(raw_varying_foil, corrections, disable_stall=True)
-    )
+    w_plot = 14
+    h_plot = w_plot / 2.35
+
+    fig = plt.figure(figsize=(w_plot, h_plot))
+    ax_cl = fig.add_subplot(121)
+    ax_cd = fig.add_subplot(122)
 
     for data_cq in data:
-        color = ax_data.plot(
-            data_cq.aoa_deg[data_cq.well_below_stall],
-            data_cq.cl[data_cq.well_below_stall],
-            "o",
-            markersize=3,
-            label=f"Cq = {data_cq.cq}, well below stall"
-        )[0].get_color()
+        cq = data_cq.cq
 
-        ax_data.plot(
-            data_cq.aoa_deg[data_cq.close_to_stall], data_cq.cl[data_cq.close_to_stall],
-            "^", markersize=3, color=color, label=f"Cq = {data_cq.cq}, close to stall"
-        )
-        ax_data.plot(
-            data_cq.aoa_deg[data_cq.post_stall], data_cq.cl[data_cq.post_stall],
-            "x", markersize=3, color=color, label=f"Cq = {data_cq.cq}, after stall"
-        )
+        # Data
+        aoa_data, cl_data = lift_data(cq, "3d")
+        cl_drag_data, cd_data = drag_data(cq, "3d")
 
-        aoa_line = np.array([0.0, data_cq.stall_angle_deg])
-        ax_data.plot(aoa_line, data_cq.linear_lift(aoa_line), ":", color=color)
+        color = ax_cl.plot(aoa_data, cl_data, "o", markersize=3, label=f"Data, Cq = {cq}")[0].get_color()
+        ax_cd.plot(cl_drag_data, cd_data, "o", markersize=3, color=color)
 
-        aoa_model = np.arange(0.0, data_cq.stall_angle_deg + 0.5, 1.0)
-        cl_model = [result.cl for result in angle_sweep(simulation_without_stall, aoa_model, data_cq.cq)]
+        # Linear fit used for tuning
+        aoa_linear = np.array([0.0, data_cq.angles_well_below_stall_deg.max()])
+        ax_cl.plot(aoa_linear, data_cq.linear_lift(aoa_linear), ":", color=color, linewidth=1)
 
-        ax_data.plot(aoa_model, cl_model, "-", color=color)
+        # Raw model (fitted to 2D data)
+        simulation_raw = create_simulation(suction_coefficient_direct(), raw_varying_foil)
+        results_raw = angle_sweep(simulation_raw, angles_of_attack_deg, cq)
+        cl_raw = [r.cl for r in results_raw]
+        cd_raw = [r.cd for r in results_raw]
 
-    ax_data.set_title("Data, linear fit (dotted), and lifting line without stall (solid)")
-    ax_data.set_xlabel("Angle of attack [deg]")
-    ax_data.set_ylabel("Lift coefficient (CL)")
-    ax_data.legend(fontsize=7)
+        ax_cl.plot(angles_of_attack_deg, cl_raw, "--", color=color, alpha=0.5)
+        ax_cd.plot(cl_raw, cd_raw, "--", color=color, alpha=0.5)
 
-    # The corrections as a function of the suction coefficient, with the values applied to each foil
-    # model as points
-    cq_foils, _ = positive_foils(retuned_varying_foil)
-    cq_line = np.linspace(0.0, max(cq_foils), 100)
+        # Retuned model
+        simulation_retuned = create_simulation(suction_coefficient_direct(), retuned_varying_foil)
+        results_retuned = angle_sweep(simulation_retuned, angles_of_attack_deg, cq)
+        cl_retuned = [r.cl for r in results_retuned]
+        cd_retuned = [r.cd for r in results_retuned]
 
-    corrections_line = np.array([corrections.at(cq) for cq in cq_line])
-    corrections_foils = np.array([corrections.at(cq) for cq in cq_foils])
+        ax_cl.plot(angles_of_attack_deg, cl_retuned, "-", color=color)
+        ax_cd.plot(cl_retuned, cd_retuned, "-", color=color)
 
-    labels = ["Offset to cl_zero_angle", "Factor on cl_initial_slope", "High order lift factor"]
+    # Legend entries for line styles
+    ax_cl.plot([], [], "--", color="gray", alpha=0.5, label="Fitted to 2D data")
+    ax_cl.plot([], [], "-", color="gray", label="Retuned to 3D data")
+    ax_cl.plot([], [], ":", color="gray", linewidth=1, label="Linear fit (tuning target)")
 
-    for i, label in enumerate(labels):
-        color = f"C{i}"
+    ax_cl.legend()
 
-        ax_lift_corrections.plot(cq_line, corrections_line[:, i], "-", color=color, label=label)
-        ax_lift_corrections.plot(cq_foils, corrections_foils[:, i], "o", color=color)
+    ax_cl.set_xlabel("Angle of attack [deg]")
+    ax_cl.set_ylabel("Lift coefficient (CL)")
 
-    ax_lift_corrections.set_title("Lift corrections")
-    ax_lift_corrections.set_xlabel("Suction coefficient (CQ)")
-    ax_lift_corrections.legend()
-
-    ax_stall_correction.plot(cq_line, np.degrees(corrections_line[:, 3]), "-", color="C3")
-    ax_stall_correction.plot(cq_foils, np.degrees(corrections_foils[:, 3]), "o", color="C3")
-
-    ax_stall_correction.set_title("Stall angle correction")
-    ax_stall_correction.set_xlabel("Suction coefficient (CQ)")
-    ax_stall_correction.set_ylabel("Stall angle offset [deg]")
+    ax_cd.set_xlabel("Lift coefficient (CL)")
+    ax_cd.set_ylabel("Drag coefficient (CD)")
 
     plt.tight_layout()
     plt.show()

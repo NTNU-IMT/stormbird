@@ -34,6 +34,10 @@ AREA = CHORD_LENGTH * HEIGHT
 
 NR_SECTIONS = 20
 
+# Virtual extension at the top of the wing, as a fraction of the span. This increases the induced
+# drag to better match the three-dimensional data.
+VIRTUAL_EXTENSION_FACTOR = 0.15
+
 # Gaussian smoothing of the circulation, given as a fraction of the span. The smoothing stabilizes
 # the solution close to and after stall, where the lift can otherwise jump between different
 # solutions from one angle of attack to the next.
@@ -129,19 +133,26 @@ def create_simulation(
     standing directly on the wall of the wind tunnel. This is modeled with a symmetry plane at
     z = 0, where the bottom of the wing is placed, which gives an effective aspect ratio that is
     twice the geometric aspect ratio.
+    
+    A virtual extension is added at the top of the wing to increase the induced drag.
     '''
     chord_vector = SpatialVector(x=CHORD_LENGTH)
 
+    virtual_extension_length = VIRTUAL_EXTENSION_FACTOR * HEIGHT
+
     # The wing is oriented along the z-axis, starting at the symmetry plane. The circulation is not
     # zero at the bottom of the wing, as the wing continues as a mirror image below the plane.
+    # A virtual extension is added at the top to increase induced drag.
     wing_builder = WingBuilder(
         section_points = [
             SpatialVector(x=0.0, y=0.0, z=0.0),
-            SpatialVector(x=0.0, y=0.0, z=HEIGHT)
+            SpatialVector(x=0.0, y=0.0, z=HEIGHT),
+            SpatialVector(x=0.0, y=0.0, z=HEIGHT + virtual_extension_length),
         ],
-        chord_vectors = [chord_vector, chord_vector],
+        chord_vectors = [chord_vector, chord_vector, chord_vector],
         section_model = section_model(internal_state_conversion, varying_foil),
-        non_zero_circulation_at_ends = (True, False)
+        non_zero_circulation_at_ends = (True, False),
+        line_segment_is_virtual = [False, True],
     )
 
     line_force_model = LineForceModelBuilder(
