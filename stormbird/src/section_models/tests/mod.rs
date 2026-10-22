@@ -8,3 +8,5 @@ mod foil;
 mod active_air_flow_foil;
 #[cfg(test)]
 mod rotating_cylinder;
+#[cfg(test)]
+mod varying_foil;

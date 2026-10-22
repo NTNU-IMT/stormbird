@@ -33,7 +33,6 @@
 - [Other functionalities](./utils/utils_intro.md)
     - [Wind environment](./utils/wind_environment.md)
     - [Control system](./utils/control_system.md)
-    - [Empirical models](./utils/empirical_models.md)
 - [Literature](./literature/literature_intro.md)
     - [Simulation methods](./literature/simulation_methods.md)
     - [Validation data](./literature/validation_data.md)

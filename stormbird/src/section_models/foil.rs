@@ -307,6 +307,75 @@ impl Foil {
 
         pre_stall * (1.0 - amount_of_stall) + amount_of_stall * post_stall
     }
+
+    /// Returns the mirror image of the foil, i.e., the same foil profile with the suction side and
+    /// pressure side swapped. For instance, a foil with a flap deflected to one side becomes a foil
+    /// with the flap deflected to the other side.
+    ///
+    /// The mirrored foil satisfies C_L(alpha) = -C_L_original(-alpha) and
+    /// C_D(alpha) = C_D_original(-alpha). This is achieved by changing the sign of the lift at zero
+    /// angle of attack, and swapping all parameters that are given separately for positive and
+    /// negative angles of attack. The other parameters are symmetric with respect to the angle of
+    /// attack, and are kept as they are.
+    pub fn mirrored(&self) -> Self {
+        Self {
+            cl_zero_angle: -self.cl_zero_angle,
+            cl_initial_slope: self.cl_initial_slope,
+            cl_slope_reduction_factor_positive: self.cl_slope_reduction_factor_negative,
+            cl_slope_reduction_factor_negative: self.cl_slope_reduction_factor_positive,
+            cl_slope_reduction_onset_angle_positive: self.cl_slope_reduction_onset_angle_negative,
+            cl_slope_reduction_onset_angle_negative: self.cl_slope_reduction_onset_angle_positive,
+            cl_slope_reduction_range: self.cl_slope_reduction_range,
+            cl_max_after_stall: self.cl_max_after_stall,
+            cd_min: self.cd_min,
+            cd_second_order_factor: self.cd_second_order_factor,
+            cd_max_after_stall: self.cd_max_after_stall,
+            cd_power_after_stall: self.cd_power_after_stall,
+            cdi_correction_factor: self.cdi_correction_factor,
+            mean_positive_stall_angle: self.mean_negative_stall_angle,
+            mean_negative_stall_angle: self.mean_positive_stall_angle,
+            stall_range: self.stall_range,
+            cd_bump_during_stall: self.cd_bump_during_stall,
+            cd_stall_angle_offset: self.cd_stall_angle_offset,
+            added_mass_factor: self.added_mass_factor,
+        }
+    }
+
+    /// Linear interpolation between all the parameters of two foils, where a weight of 0.0 gives
+    /// the first foil and a weight of 1.0 gives the second foil.
+    pub fn interpolate(first: &Self, second: &Self, weight: Float) -> Self {
+        let blend = |a: Float, b: Float| a + weight * (b - a);
+
+        Self {
+            cl_zero_angle: blend(first.cl_zero_angle, second.cl_zero_angle),
+            cl_initial_slope: blend(first.cl_initial_slope, second.cl_initial_slope),
+            cl_slope_reduction_factor_positive: blend(
+                first.cl_slope_reduction_factor_positive, second.cl_slope_reduction_factor_positive
+            ),
+            cl_slope_reduction_factor_negative: blend(
+                first.cl_slope_reduction_factor_negative, second.cl_slope_reduction_factor_negative
+            ),
+            cl_slope_reduction_onset_angle_positive: blend(
+                first.cl_slope_reduction_onset_angle_positive, second.cl_slope_reduction_onset_angle_positive
+            ),
+            cl_slope_reduction_onset_angle_negative: blend(
+                first.cl_slope_reduction_onset_angle_negative, second.cl_slope_reduction_onset_angle_negative
+            ),
+            cl_slope_reduction_range: blend(first.cl_slope_reduction_range, second.cl_slope_reduction_range),
+            cl_max_after_stall: blend(first.cl_max_after_stall, second.cl_max_after_stall),
+            cd_min: blend(first.cd_min, second.cd_min),
+            cd_second_order_factor: blend(first.cd_second_order_factor, second.cd_second_order_factor),
+            cd_max_after_stall: blend(first.cd_max_after_stall, second.cd_max_after_stall),
+            cd_power_after_stall: blend(first.cd_power_after_stall, second.cd_power_after_stall),
+            cdi_correction_factor: blend(first.cdi_correction_factor, second.cdi_correction_factor),
+            mean_positive_stall_angle: blend(first.mean_positive_stall_angle, second.mean_positive_stall_angle),
+            mean_negative_stall_angle: blend(first.mean_negative_stall_angle, second.mean_negative_stall_angle),
+            stall_range: blend(first.stall_range, second.stall_range),
+            cd_bump_during_stall: blend(first.cd_bump_during_stall, second.cd_bump_during_stall),
+            cd_stall_angle_offset: blend(first.cd_stall_angle_offset, second.cd_stall_angle_offset),
+            added_mass_factor: blend(first.added_mass_factor, second.added_mass_factor),
+        }
+    }
 }
 
 impl Default for Foil {

@@ -2,23 +2,75 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-use stormath::interpolation::linear_interpolation;
-
 use super::*;
 
 use crate::error::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// A foil profile where the parameters can vary depending on an internal state. 
-/// 
-/// The two typical use cases are to model foil sections that include a flap angle, or suction 
+#[serde(try_from = "VaryingFoilInput")]
+/// A foil profile where the parameters can vary depending on an internal state.
+///
+/// The two typical use cases are to model foil sections that include a flap angle, or suction
 /// sails, where the foil section properties are dependent on the suction rate.
+///
+/// The parameters of the foil are linearly interpolated between the foils in the data, and are
+/// constant outside the range of the data.
+///
+/// If the internal state data only contains values with one sign, i.e., only positive or only
+/// negative values, the foil is assumed to be symmetric with respect to the sign of the internal
+/// state. An internal state with the opposite sign then gives the mirrored foil at the absolute
+/// value of the internal state. This means that, for instance, the data for a flap angle only
+/// needs to be given for positive flap angles. If the data contains both positive and negative
+/// values, the data is used directly, without any mirroring.
 pub struct VaryingFoil {
+    /// The internal state values for the foils in the data, in increasing order
     pub internal_state_data: Vec<Float>,
+    /// The foil models, one for each internal state value
     pub foils_data: Vec<Foil>,
 }
 
+#[derive(Deserialize)]
+/// Unchecked version of the varying foil, used for deserialization
+struct VaryingFoilInput {
+    internal_state_data: Vec<Float>,
+    foils_data: Vec<Foil>,
+}
+
+impl TryFrom<VaryingFoilInput> for VaryingFoil {
+    type Error = String;
+
+    fn try_from(input: VaryingFoilInput) -> Result<Self, Self::Error> {
+        Self::new(input.internal_state_data, input.foils_data)
+    }
+}
+
 impl VaryingFoil {
+    /// Creates a new varying foil, and checks that the data is valid
+    pub fn new(internal_state_data: Vec<Float>, foils_data: Vec<Foil>) -> Result<Self, String> {
+        if internal_state_data.is_empty() {
+            return Err("The varying foil must have at least one foil in the data".to_string());
+        }
+
+        if internal_state_data.len() != foils_data.len() {
+            return Err(format!(
+                "The internal state data and the foils data must have the same length. Internal \
+                state data: {}, foils data: {}",
+                internal_state_data.len(), foils_data.len()
+            ));
+        }
+
+        for i in 1..internal_state_data.len() {
+            if internal_state_data[i] <= internal_state_data[i - 1] {
+                return Err(
+                    "The internal state data for the varying foil must be strictly increasing"
+                    .to_string()
+                );
+            }
+        }
+
+        Ok(Self { internal_state_data, foils_data })
+    }
+
     pub fn new_from_string(input_str: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(input_str)?;
 
@@ -29,54 +81,57 @@ impl VaryingFoil {
         serde_json::to_string(self).unwrap()
     }
 
-    pub fn get_foil(&self, internal_state: Float) -> Foil {
-        let cl_zero_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_zero_angle).collect();
-        let cl_initial_slope_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_initial_slope).collect();
-        let cl_slope_reduction_factor_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_factor_positive).collect();
-        let cl_slope_reduction_factor_negative_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_factor_negative).collect();
-        let cl_slope_reduction_onset_angle_positive_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_onset_angle_positive).collect();
-        let cl_slope_reduction_onset_angle_negative_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_onset_angle_negative).collect();
-        let cl_slope_reduction_range_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_slope_reduction_range).collect();
-        let cl_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cl_max_after_stall).collect();
+    /// Returns the sign of the internal state data if all values have the same sign, i.e., if the
+    /// data only covers one side of the internal state. Returns `None` if the data contains both
+    /// positive and negative values. Zero counts as positive, unless all values are zero or
+    /// negative.
+    pub fn one_sided_data_sign(&self) -> Option<Float> {
+        let first = self.internal_state_data[0];
+        let last = self.internal_state_data[self.internal_state_data.len() - 1];
 
-        let cd_min_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_min).collect();
-        let cd_second_order_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_second_order_factor).collect();
-        let cd_max_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_max_after_stall).collect();
-        let cd_power_after_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_power_after_stall).collect();
-        let cdi_correction_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.cdi_correction_factor).collect();
-
-        let mean_positive_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_positive_stall_angle).collect();
-        let mean_negative_stall_angle_data: Vec<Float> = self.foils_data.iter().map(|x| x.mean_negative_stall_angle).collect();
-        let stall_range_data: Vec<Float> = self.foils_data.iter().map(|x| x.stall_range).collect();
-        let cd_stall_angle_offset_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_stall_angle_offset).collect();
-        let cd_bump_during_stall_data: Vec<Float> = self.foils_data.iter().map(|x| x.cd_bump_during_stall).collect();
-
-        let added_mass_factor_data: Vec<Float> = self.foils_data.iter().map(|x| x.added_mass_factor).collect();
-
-        let x = internal_state;
-        let x_data = &self.internal_state_data;
-
-        Foil {
-            cl_zero_angle:             linear_interpolation(x, x_data, &cl_zero_angle_data),
-            cl_initial_slope:          linear_interpolation(x, x_data, &cl_initial_slope_data),
-            cl_slope_reduction_factor_positive: linear_interpolation(x, x_data, &cl_slope_reduction_factor_positive_data),
-            cl_slope_reduction_factor_negative: linear_interpolation(x, x_data, &cl_slope_reduction_factor_negative_data),
-            cl_slope_reduction_onset_angle_positive: linear_interpolation(x, x_data, &cl_slope_reduction_onset_angle_positive_data),
-            cl_slope_reduction_onset_angle_negative: linear_interpolation(x, x_data, &cl_slope_reduction_onset_angle_negative_data),
-            cl_slope_reduction_range:  linear_interpolation(x, x_data, &cl_slope_reduction_range_data),
-            cl_max_after_stall:        linear_interpolation(x, x_data, &cl_max_after_stall_data),
-            cd_min:                    linear_interpolation(x, x_data, &cd_min_data),
-            cd_second_order_factor:    linear_interpolation(x, x_data, &cd_second_order_factor_data),
-            cd_max_after_stall:        linear_interpolation(x, x_data, &cd_max_after_stall_data),
-            cd_power_after_stall:      linear_interpolation(x, x_data, &cd_power_after_stall_data),
-            cdi_correction_factor:     linear_interpolation(x, x_data, &cdi_correction_factor_data),
-            mean_positive_stall_angle: linear_interpolation(x, x_data, &mean_positive_stall_angle_data),
-            mean_negative_stall_angle: linear_interpolation(x, x_data, &mean_negative_stall_angle_data),
-            stall_range:               linear_interpolation(x, x_data, &stall_range_data),
-            cd_stall_angle_offset:     linear_interpolation(x, x_data, &cd_stall_angle_offset_data),
-            cd_bump_during_stall:      linear_interpolation(x, x_data, &cd_bump_during_stall_data),
-            added_mass_factor:         linear_interpolation(x, x_data, &added_mass_factor_data)
+        if first >= 0.0 {
+            Some(1.0)
+        } else if last <= 0.0 {
+            Some(-1.0)
+        } else {
+            None
         }
+    }
+
+    /// Returns the foil for a given internal state.
+    ///
+    /// If the data is one-sided, and the internal state has the opposite sign of the data, the
+    /// mirrored foil at the absolute value of the internal state is returned.
+    pub fn get_foil(&self, internal_state: Float) -> Foil {
+        match self.one_sided_data_sign() {
+            Some(data_sign) if internal_state * data_sign < 0.0 => {
+                self.interpolated_foil(-internal_state).mirrored()
+            },
+            _ => self.interpolated_foil(internal_state),
+        }
+    }
+
+    /// Linear interpolation of the foil parameters directly on the data, without any mirroring.
+    /// The first or last foil is used if the internal state is outside the range of the data.
+    fn interpolated_foil(&self, internal_state: Float) -> Foil {
+        let x_data = &self.internal_state_data;
+        let n = x_data.len();
+
+        if internal_state <= x_data[0] {
+            return self.foils_data[0].clone();
+        }
+
+        if internal_state >= x_data[n - 1] {
+            return self.foils_data[n - 1].clone();
+        }
+
+        // Index of the last data point that is less than or equal to the internal state. Always
+        // in the range [0, n - 2] at this point, due to the checks above.
+        let index = x_data.partition_point(|&x| x <= internal_state) - 1;
+
+        let weight = (internal_state - x_data[index]) / (x_data[index + 1] - x_data[index]);
+
+        Foil::interpolate(&self.foils_data[index], &self.foils_data[index + 1], weight)
     }
 
     pub fn lift_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {

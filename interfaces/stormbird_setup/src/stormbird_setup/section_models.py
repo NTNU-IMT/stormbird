@@ -35,8 +35,37 @@ class Foil(StormbirdSetupBaseModel):
     added_mass_factor: float | None = None
 
 class VaryingFoil(StormbirdSetupBaseModel):
+    '''
+    Foil where the parameters are interpolated between foils given for different internal states.
+
+    If the internal state data only contains values with one sign, e.g., only positive values, the
+    foil is assumed to be symmetric with respect to the sign of the internal state. An internal
+    state with the opposite sign then gives the mirrored foil at the absolute value of the internal
+    state. If the data contains both positive and negative values, the data is used directly.
+    '''
     internal_state_data: list[float]
     foils_data: list[Foil]
+
+    @model_validator(mode='after')
+    def check_data(self) -> "VaryingFoil":
+        n = len(self.internal_state_data)
+
+        if n == 0:
+            raise ValueError("The varying foil must have at least one foil in the data")
+
+        if len(self.foils_data) != n:
+            raise ValueError(
+                f"The internal state data and the foils data must have the same length. Internal "
+                f"state data: {n}, foils data: {len(self.foils_data)}"
+            )
+
+        for i in range(1, n):
+            if self.internal_state_data[i] <= self.internal_state_data[i - 1]:
+                raise ValueError(
+                    "The internal state data for the varying foil must be strictly increasing"
+                )
+
+        return self
 
 class MultiElementFoil(VaryingFoil):
     '''
@@ -509,13 +538,15 @@ class SectionModel(StormbirdSetupBaseModel):
     def default_wing_sail_two_element(cls) -> "SectionModel":
         """
         Default values for a two-element wing sail.
+
+        The data is only given for positive flap angles. Negative flap angles give the mirrored
+        foils.
         """
-        internal_state_data = np.radians([-30.0, 0.0, 30.0]).tolist()
-        
+        internal_state_data = np.radians([0.0, 30.0]).tolist()
+
         stall_angle = np.radians(15)
 
         foils_data = [
-            Foil(cl_zero_angle = -2.0, cd_min = 0.01, mean_negative_stall_angle = stall_angle),
             Foil(cl_zero_angle = 0.0,  cd_min = 0.01),
             Foil(cl_zero_angle = 2.0,  cd_min = 0.01, mean_positive_stall_angle = stall_angle)
         ]
@@ -557,30 +588,25 @@ class SectionModel(StormbirdSetupBaseModel):
         cl_initial_slope = [2 * np.pi, 2*np.pi * 1.4, 2*np.pi * 1.4, 2*np.pi * 1.4]
         stall_angles = (np.radians([20.0, 23, 27, 29.0]) * scale_factor).tolist()
         
-        # Make the model valid for both positive and negative Cp values
-        cp_values_full = [-x for x in cp_values[:0:-1]] + cp_values
-        cl_zero_angle_full = [-x for x in cl_zero_angle[:0:-1]] + cl_zero_angle
-        cl_initial_slope_full = [x for x in cl_initial_slope[:0:-1]] + cl_initial_slope
-        stall_angles_full = [x for x in stall_angles[:0:-1]] + stall_angles
-        
-        # Create foil models from the input arrays
+        # Create foil models from the input arrays. The data is only given for positive Cp values,
+        # as negative Cp values give the mirrored foils.
         foils_data = []
-        for foil_index in range(len(cp_values_full)):
-            if cl_zero_angle_full[foil_index] > 0:
+        for foil_index in range(len(cp_values)):
+            if cl_zero_angle[foil_index] > 0:
                 foil = Foil(
-                    cl_zero_angle = cl_zero_angle_full[foil_index],
-                    cl_initial_slope = cl_initial_slope_full[foil_index],
+                    cl_zero_angle = cl_zero_angle[foil_index],
+                    cl_initial_slope = cl_initial_slope[foil_index],
                     cd_min = 0.01,
-                    mean_positive_stall_angle = stall_angles_full[foil_index],
-                    mean_negative_stall_angle = 2.0 * stall_angles_full[foil_index]
+                    mean_positive_stall_angle = stall_angles[foil_index],
+                    mean_negative_stall_angle = 2.0 * stall_angles[foil_index]
                 )
             else:
                 foil = Foil(
-                    cl_zero_angle = cl_zero_angle_full[foil_index],
-                    cl_initial_slope = cl_initial_slope_full[foil_index],
+                    cl_zero_angle = cl_zero_angle[foil_index],
+                    cl_initial_slope = cl_initial_slope[foil_index],
                     cd_min = 0.01,
-                    mean_positive_stall_angle = 2.0 * stall_angles_full[foil_index],
-                    mean_negative_stall_angle = stall_angles_full[foil_index]
+                    mean_positive_stall_angle = 2.0 * stall_angles[foil_index],
+                    mean_negative_stall_angle = stall_angles[foil_index]
                 )
                 
             foils_data.append(foil)
@@ -588,7 +614,7 @@ class SectionModel(StormbirdSetupBaseModel):
         return cls(
             model = ActiveAirFlowFoil(
                 varying_foil = VaryingFoil(
-                    internal_state_data = cp_values_full,
+                    internal_state_data = cp_values,
                     foils_data = foils_data
                 ),
                 internal_state_conversion = InternalStateConversion(
