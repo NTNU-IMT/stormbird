@@ -33,7 +33,7 @@ from suction_sail_model import (
     create_simulation,
     suction_coefficient_direct,
     power_to_internal_flow,
-    load_retuned_varying_foil,
+    load_section_varying_foil,
     angle_sweep,
     run_case,
     first_maximum,
@@ -53,6 +53,15 @@ LIFT_MARGIN = 0.03
 MAX_POWER_COEFFICIENT_FOR_TUNING = 0.25
 
 TUNED_SECTION_MODEL_FILE = Path(__file__).parent / "tuned_active_air_flow_foil.json"
+
+# The data can not separate the effect of the lift on the external pressure (`cp_gradient`) from the
+# effect of the suction coefficient, as both increase along the power curve. With the section model
+# fitted to the two-dimensional data, tuning all three parameters ends with a loss coefficient of
+# zero, which is not physical, and gives no flow through the porous surface. `cp_gradient` is
+# therefore fixed at zero, which gives practically the same error in the power.
+# TODO: Check if `cp_gradient` can be tuned again when the retuned section model is updated (see
+# retune_section_model.py)
+TUNE_CP_GRADIENT = False
 
 
 class OperatingPoint:
@@ -84,7 +93,7 @@ def maximum_lift_per_suction_coefficient(
     The maximum lift before stall for each suction coefficient, with the suction coefficient set
     directly on the wing.
     '''
-    simulation = create_simulation(suction_coefficient_direct(), load_retuned_varying_foil())
+    simulation = create_simulation(suction_coefficient_direct(), load_section_varying_foil())
 
     cl_max = np.zeros(len(cq_values))
 
@@ -102,14 +111,14 @@ def find_operating_points(angles_of_attack_deg: np.ndarray) -> list[OperatingPoi
     coefficient that gives the lift is used. Points where no suction is needed in the model are
     skipped.
     '''
-    # The range of suction coefficients in the retuned section model
-    cq_values = np.linspace(0.0, max(load_retuned_varying_foil().internal_state_data), 20)
+    # The range of suction coefficients in the section model
+    cq_values = np.linspace(0.0, max(load_section_varying_foil().internal_state_data), 20)
 
     cl_max = maximum_lift_per_suction_coefficient(cq_values, angles_of_attack_deg)
 
     cl_usable = (1.0 - LIFT_MARGIN) * np.maximum.accumulate(cl_max)
 
-    simulation = create_simulation(suction_coefficient_direct(), load_retuned_varying_foil())
+    simulation = create_simulation(suction_coefficient_direct(), load_section_varying_foil())
 
     operating_points = []
 
@@ -164,7 +173,7 @@ def tune_internal_flow(operating_points: list[OperatingPoint]) -> InternalFlow:
     '''
     foil_model = ActiveAirFlowFoilModel(
         ActiveAirFlowFoil(
-            varying_foil = load_retuned_varying_foil(),
+            varying_foil = load_section_varying_foil(),
             internal_state_conversion = suction_coefficient_direct()
         ).to_json_string()
     )
@@ -192,13 +201,23 @@ def tune_internal_flow(operating_points: list[OperatingPoint]) -> InternalFlow:
 
     # The loss coefficient must be positive, while the external pressure on the suction side is
     # assumed to be negative, and to decrease with increasing lift
-    fit = opt.lsq_linear(
-        np.array(rows),
-        np.ones(len(rows)),
-        bounds = ([0.0, -np.inf, -np.inf], [np.inf, 0.0, 0.0])
-    )
+    if TUNE_CP_GRADIENT:
+        fit = opt.lsq_linear(
+            np.array(rows),
+            np.ones(len(rows)),
+            bounds = ([0.0, -np.inf, -np.inf], [np.inf, 0.0, 0.0])
+        )
 
-    loss_coefficient, cp_zero_cl, cp_gradient = fit.x
+        loss_coefficient, cp_zero_cl, cp_gradient = fit.x
+    else:
+        fit = opt.lsq_linear(
+            np.array(rows)[:, :2],
+            np.ones(len(rows)),
+            bounds = ([0.0, -np.inf], [np.inf, 0.0])
+        )
+
+        loss_coefficient, cp_zero_cl = fit.x
+        cp_gradient = 0.0
 
     return InternalFlow(
         cp_zero_cl = cp_zero_cl,
@@ -228,7 +247,7 @@ if __name__ == "__main__":
 
     TUNED_SECTION_MODEL_FILE.write_text(
         ActiveAirFlowFoil(
-            varying_foil = load_retuned_varying_foil(),
+            varying_foil = load_section_varying_foil(),
             internal_state_conversion = conversion
         ).to_json_string()
     )
@@ -237,7 +256,7 @@ if __name__ == "__main__":
 
     # Simulate the operating points with the power as the internal state, where the suction
     # coefficient on each line element is found from the internal flow model
-    simulation = create_simulation(conversion, load_retuned_varying_foil())
+    simulation = create_simulation(conversion, load_section_varying_foil())
 
     power_factor = 0.5 * DENSITY * AREA * VELOCITY**3
 

@@ -1,8 +1,11 @@
 '''
-Step 3 in the suction sail example: simulates the three-dimensional model from the paper, and
-compares the results to the three-dimensional data. Two section models are compared: the model
-fitted to the two-dimensional data in the first step, and the same model retuned to the
-three-dimensional data in the second step.
+Step 2 in the suction sail example: simulates the three-dimensional model from the paper, and
+compares the results to the three-dimensional data, using the section model fitted to the
+two-dimensional data in the first step.
+
+TODO: When the retuning in retune_section_model.py is updated to the slope reduction in the foil
+model, and `USE_RETUNED_SECTION_MODEL` is set in suction_sail_model.py, the retuned model is
+compared as well.
 
 The suction coefficient is set directly as the internal state of the wing, which gives the same
 suction coefficient along the whole span.
@@ -14,7 +17,7 @@ aspect ratio of 8 (see `create_simulation` in suction_sail_model.py).
 The largest suction coefficient in the three-dimensional data, 0.05, is slightly larger than the
 largest suction coefficient in the two-dimensional data, 0.047. The model fitted to the
 two-dimensional data uses the values for the largest suction coefficient in the data for larger
-values, while the retuned model has a separate foil model for this suction coefficient.
+values.
 '''
 
 import numpy as np
@@ -26,14 +29,17 @@ from suction_sail_model import (
     suction_coefficient_direct,
     angle_sweep,
     load_raw_varying_foil,
-    load_retuned_varying_foil
+    load_retuned_varying_foil,
+    USE_RETUNED_SECTION_MODEL,
 )
 
 if __name__ == "__main__":
     models = {
         "fitted to 2D data": (load_raw_varying_foil(), "--"),
-        "retuned to 3D data": (load_retuned_varying_foil(), "-"),
     }
+
+    if USE_RETUNED_SECTION_MODEL:
+        models["retuned to 3D data"] = (load_retuned_varying_foil(), "-")
 
     angles_of_attack_deg = np.arange(0.0, 45.5, 0.5)
 

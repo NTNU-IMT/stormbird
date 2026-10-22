@@ -1,6 +1,13 @@
 '''
-Step 2 in the suction sail example: retunes the section model from the first step, so that the
-three-dimensional simulations match the three-dimensional data better.
+TODO: This script is currently not part of the example, and does not work with the current foil
+model. It uses the higher order term in the pre-stall lift (`cl_high_order_factor_positive`,
+`cl_high_order_factor_negative` and `cl_high_order_power`), which has been replaced by a reduction
+of the lift slope (`cl_slope_reduction_*`). The corrections must be updated to the slope reduction
+before the script can be used again. When this is done, set `USE_RETUNED_SECTION_MODEL` in
+suction_sail_model.py to use the retuned model in the other steps.
+
+Optional step in the suction sail example: retunes the section model from the first step, so that
+the three-dimensional simulations match the three-dimensional data better.
 
 The three-dimensional data for each suction coefficient is first divided into three categories,
 based on the angle of attack with the maximum lift: well below stall, close to stall but before the
@@ -414,6 +421,13 @@ def retune_section_model(data: list[Data3D]) -> tuple[VaryingFoilSetup, Correcti
 
 
 if __name__ == "__main__":
+    # TODO: Remove this when the corrections are updated to the slope reduction (see the top of the
+    # file)
+    raise SystemExit(
+        "retune_section_model.py is not updated to the slope reduction in the foil model yet. "
+        "See the TODO at the top of the file."
+    )
+
     data = [Data3D(cq) for cq in CQ_VALUES_3D]
 
     retuned_varying_foil, corrections = retune_section_model(data)

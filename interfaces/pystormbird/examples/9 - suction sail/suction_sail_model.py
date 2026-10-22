@@ -48,6 +48,11 @@ DENSITY = 1.225
 RAW_VARYING_FOIL_FILE = VARYING_FOIL_FILE
 RETUNED_VARYING_FOIL_FILE = Path(__file__).parent / "retuned_varying_foil.json"
 
+# TODO: The retuning to the three-dimensional data in retune_section_model.py must be updated to the
+# new slope reduction in the foil model. Until then, the model fitted to the two-dimensional data is
+# used in all steps. Set this to True when the retuning is updated.
+USE_RETUNED_SECTION_MODEL = False
+
 
 def load_varying_foil(file_path: Path, script_name: str) -> VaryingFoil:
     if not file_path.exists():
@@ -68,6 +73,17 @@ def load_retuned_varying_foil() -> VaryingFoil:
     The varying foil model retuned to the three-dimensional data in the second step
     '''
     return load_varying_foil(RETUNED_VARYING_FOIL_FILE, "retune_section_model.py")
+
+
+def load_section_varying_foil() -> VaryingFoil:
+    '''
+    The varying foil model used when tuning the power model: the retuned model if
+    `USE_RETUNED_SECTION_MODEL` is set, and the model fitted to the two-dimensional data otherwise
+    '''
+    if USE_RETUNED_SECTION_MODEL:
+        return load_retuned_varying_foil()
+
+    return load_raw_varying_foil()
 
 
 def section_model(

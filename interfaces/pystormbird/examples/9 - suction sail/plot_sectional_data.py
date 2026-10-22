@@ -65,12 +65,9 @@ class SuctionFoilTuner:
 
         self.aoa_drag_deg = angles_for_drag_data(self.aoa_lift_deg, self.cl_lift, self.cl_drag)
 
-        # The lift before stall is linear, without higher order terms. A higher order term can give
-        # a better fit to the curvature close to stall, but extrapolates poorly to larger angles of
-        # attack, which is a problem when the stall angle is retuned in the next step. The data has
-        # few points after stall, so the lift after stall is set to the same value for all suction
-        # coefficients, rather than tuned. The value matches the data for the largest suction
-        # coefficient.
+        # The lift before stall is linear, without slope reduction. The data has few points after
+        # stall, so the lift after stall is set to the same value for all suction coefficients,
+        # rather than tuned. The value matches the data for the largest suction coefficient.
         self.model_setup = FoilSetup(cl_max_after_stall = 3.0)
 
     def set_lift_parameters(self, x: np.ndarray) -> None:
@@ -149,8 +146,10 @@ def mirrored_foil(foil: FoilSetup) -> FoilSetup:
     '''
     return foil.model_copy(update = {
         "cl_zero_angle": -foil.cl_zero_angle,
-        "cl_high_order_factor_positive": foil.cl_high_order_factor_negative,
-        "cl_high_order_factor_negative": foil.cl_high_order_factor_positive,
+        "cl_slope_reduction_factor_positive": foil.cl_slope_reduction_factor_negative,
+        "cl_slope_reduction_factor_negative": foil.cl_slope_reduction_factor_positive,
+        "cl_slope_reduction_onset_angle_positive": foil.cl_slope_reduction_onset_angle_negative,
+        "cl_slope_reduction_onset_angle_negative": foil.cl_slope_reduction_onset_angle_positive,
         "mean_positive_stall_angle": foil.mean_negative_stall_angle,
         "mean_negative_stall_angle": foil.mean_positive_stall_angle,
     })
