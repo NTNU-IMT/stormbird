@@ -16,7 +16,7 @@ impl DynamicWake {
     /// Since the last time step, the line force model might have moved, and the wake points have
     /// streamed downstream. That means that the following must happen:
     /// - Synchronize the geometry for the first points in the wake to the geometry of the line
-    /// force model.
+    ///   force model.
     /// - Stream the old wake points downstream.
     /// - Shift the strength of the panels downstream.
     ///
@@ -24,7 +24,7 @@ impl DynamicWake {
     /// * `time_step` - The current value of the time step
     /// * `line_force_model` - The line force model that the wake is based on
     /// * `ctrl_points_freestream` - The freestream velocity at the ctrl points at the line force 
-    /// model current time step
+    ///   model current time step
     pub fn update_before_solving(
         &mut self,
         time_step: Float,
@@ -81,7 +81,7 @@ impl DynamicWake {
         self.move_last_wake_points();
     }
 
-    /// Takes a line force vector as input, that might have a different position and orientation
+    /// Takes a line force model as input, that might have a different position and orientation
     /// than the previous time step, and updates the first points in the wake to match the new
     /// geometry.
     ///
@@ -123,9 +123,9 @@ impl DynamicWake {
     /// # Argument
     /// * `wake_points_freestream` - A vector containing the freestream velocity at the wake points
     pub fn update_velocity_at_points(&mut self, wake_points_freestream: &[SpatialVector]) {
-        for i in 0..self.points.len() {
-            self.velocity_at_points[i] = wake_points_freestream[i];
-        }
+        let nr_points = self.points.len();
+
+        self.velocity_at_points[..nr_points].copy_from_slice(&wake_points_freestream[..nr_points]);
 
         let end_index = self.settings.end_index_induced_velocities_on_wake.min(
             self.points.len()
@@ -134,8 +134,8 @@ impl DynamicWake {
         if end_index > 0 && self.number_of_time_steps_completed > 2 {
             let u_i_calc: Vec<SpatialVector> = self.induced_velocities(&self.points[0..end_index]);
 
-            for i in 0..end_index {
-                self.velocity_at_points[i] += u_i_calc[i];
+            for (velocity, &u_i) in self.velocity_at_points[..end_index].iter_mut().zip(&u_i_calc) {
+                *velocity += u_i;
             }
         }
     }
@@ -144,9 +144,7 @@ impl DynamicWake {
     ///
     /// This is the same as updating the circulation strength on the first panels in the wake.
     pub fn update_wing_strength(&mut self, new_circulation_strength: &[Float]) {
-        for i in 0..new_circulation_strength.len() {
-            self.strengths[i] = new_circulation_strength[i];
-        }
+        self.strengths[..new_circulation_strength.len()].copy_from_slice(new_circulation_strength);
     }
 
     fn first_free_wake_points_direction_chord(
@@ -184,7 +182,7 @@ impl DynamicWake {
         ctrl_points_freestream: &[SpatialVector]
     ) -> Vec<SpatialVector> {        
         let felt_ctrl_points_freestream = line_force_model.felt_ctrl_points_velocity(
-            &ctrl_points_freestream
+            ctrl_points_freestream
         );
 
         self.span_point_directions_from_ctrl_point_velocities(
@@ -269,8 +267,10 @@ impl DynamicWake {
 
         let first_panel_length = self.representative_chord_length * self.settings.first_panel_relative_length;
 
-        for i in 0..self.indices.nr_points_along_span {
-            let estimated_new_wake_point = self.points[i] + direction_vectors[i] * first_panel_length;
+        let nr_points_along_span = self.indices.nr_points_along_span;
+
+        for (i, &direction) in direction_vectors.iter().enumerate().take(nr_points_along_span) {
+            let estimated_new_wake_point = self.points[i] + direction * first_panel_length;
 
             self.points[i + self.indices.nr_points_along_span] = estimated_new_wake_point;
         }
@@ -297,8 +297,10 @@ impl DynamicWake {
 
         let first_panel_length = self.representative_chord_length * self.settings.first_panel_relative_length;
 
-        for i in 0..self.indices.nr_points_along_span {
-            let estimated_new_wake_point = self.points[i] + direction_vectors[i] * first_panel_length;
+        let nr_points_along_span = self.indices.nr_points_along_span;
+
+        for (i, &direction) in direction_vectors.iter().enumerate().take(nr_points_along_span) {
+            let estimated_new_wake_point = self.points[i] + direction * first_panel_length;
 
             self.points[i + self.indices.nr_points_along_span] =
                 old_wake_points[i] * self.settings.shape_damping_factor +
@@ -325,8 +327,10 @@ impl DynamicWake {
             (previous_point - second_previous_point).normalize()
         }).collect();
 
-        for i in 0..self.indices.nr_points_along_span {
-            let change_vector = self.settings.last_panel_relative_length * self.representative_chord_length * change_directions[i];
+        let nr_points_along_span = self.indices.nr_points_along_span;
+
+        for (i, &change_direction) in change_directions.iter().enumerate().take(nr_points_along_span) {
+            let change_vector = self.settings.last_panel_relative_length * self.representative_chord_length * change_direction;
 
             self.points[start_index_last + i] = self.points[start_index_previous + i] + change_vector;
         }

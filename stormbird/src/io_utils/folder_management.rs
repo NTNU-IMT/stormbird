@@ -6,6 +6,7 @@
 use std::fs;
 use std::path::Path;
 
+/// Creates the folder, including any parent folders, if it does not exist
 pub fn ensure_folder_exists(folder_path: &Path) -> std::io::Result<()> {    
     if !folder_path.exists() {
         fs::create_dir_all(folder_path)?;

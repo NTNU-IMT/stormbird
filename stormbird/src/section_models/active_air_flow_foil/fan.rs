@@ -127,15 +127,20 @@ pub enum FanCurves {
     /// Q = Q_ref * (n / n_ref), dp = dp_ref * (rho / rho_ref) * (n / n_ref)^2,
     /// P = P_ref * (rho / rho_ref) * (n / n_ref)^3
     Dimensional {
+        /// The rotational speed of the measured curves, in revolutions per second
         reference_rotational_speed: Float,
+        /// The density of the measured curves
         reference_density: Float,
+        /// The dimensional fan curve data
         data: FanCurveData,
     },
     /// Non-dimensional curves, given as the flow coefficient, Q / (n * D^3), the pressure
     /// coefficient, dp / (rho * n^2 * D^2), and the power coefficient, P / (rho * n^3 * D^5),
     /// where D is the fan diameter.
     NonDimensional {
+        /// The diameter of the fan
         diameter: Float,
+        /// The non-dimensional fan curve data
         data: FanCurveData,
     },
 }
@@ -202,6 +207,7 @@ impl FanCurves {
 /// Model of the fan system that drives the internal flow in a wing. The system can consist of
 /// multiple identical fans in parallel, which share the total volume flow equally.
 pub struct Fan {
+    /// The fan curves for a single fan
     pub curves: FanCurves,
     #[serde(default = "Fan::default_number_of_fans")]
     /// The number of identical fans in parallel
@@ -213,6 +219,7 @@ pub struct Fan {
 }
 
 impl Fan {
+    /// Default number of fans
     pub fn default_number_of_fans() -> usize {1}
 
     fn number_of_fans_float(&self) -> Float {

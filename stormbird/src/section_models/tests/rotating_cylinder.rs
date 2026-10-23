@@ -1,3 +1,4 @@
+use crate::test_utils::tolerance;
 use stormath::type_aliases::Float;
 
 use crate::section_models::rotating_cylinder::RotatingCylinder;
@@ -18,7 +19,7 @@ fn rotating_cylinder_power_coefficient_follows_tillig_polynomial() {
 
 /// Numerical derivative of the lift coefficient with respect to the spin ratio
 fn lift_slope(cylinder: &RotatingCylinder, spin_ratio: Float) -> Float {
-    let delta = 1e-5;
+    let delta = tolerance(1e-5, 1e-2);
 
     (cylinder.lift_coefficient(spin_ratio + delta) - cylinder.lift_coefficient(spin_ratio - delta)) /
         (2.0 * delta)
@@ -51,17 +52,17 @@ fn rotating_cylinder_lift_slopes_match_parameters() {
 
     // Well below the transition, the slope is the initial slope, also at zero spin ratio
     for spin_ratio in [0.0, 0.5, -0.5] {
-        assert!((lift_slope(&cylinder, spin_ratio) - 3.0).abs() < 1e-4);
+        assert!((lift_slope(&cylinder, spin_ratio) - 3.0).abs() < tolerance(1e-4, 1e-3));
     }
 
     // Half-way through the transition at the transition spin ratio
     for spin_ratio in [3.0, -3.0] {
-        assert!((lift_slope(&cylinder, spin_ratio) - 2.0).abs() < 1e-4);
+        assert!((lift_slope(&cylinder, spin_ratio) - 2.0).abs() < tolerance(1e-4, 1e-3));
     }
 
     // Well above the transition, the slope is the high spin ratio slope
     for spin_ratio in [6.0, -6.0, 20.0] {
-        assert!((lift_slope(&cylinder, spin_ratio) - 1.0).abs() < 1e-4);
+        assert!((lift_slope(&cylinder, spin_ratio) - 1.0).abs() < tolerance(1e-4, 1e-3));
     }
 }
 

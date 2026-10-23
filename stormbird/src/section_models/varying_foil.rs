@@ -44,6 +44,15 @@ impl TryFrom<VaryingFoilInput> for VaryingFoil {
     }
 }
 
+impl std::fmt::Display for VaryingFoil {
+    /// Formats the model as a JSON string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+
+        write!(f, "{}", json)
+    }
+}
+
 impl VaryingFoil {
     /// Creates a new varying foil, and checks that the data is valid
     pub fn new(internal_state_data: Vec<Float>, foils_data: Vec<Foil>) -> Result<Self, String> {
@@ -71,14 +80,11 @@ impl VaryingFoil {
         Ok(Self { internal_state_data, foils_data })
     }
 
+    /// Creates a varying foil from a JSON string
     pub fn new_from_string(input_str: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(input_str)?;
 
         Ok(serde_res)
-    }
-
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
     }
 
     /// Returns the sign of the internal state data if all values have the same sign, i.e., if the
@@ -134,39 +140,52 @@ impl VaryingFoil {
         Foil::interpolate(&self.foils_data[index], &self.foils_data[index + 1], weight)
     }
 
+    /// Returns the lift coefficient of the foil at the given internal state
     pub fn lift_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).lift_coefficient(angle_of_attack)
     }
 
+    /// Returns the linear lift coefficient of the foil at the given internal state
     pub fn lift_coefficient_linear(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).lift_coefficient_linear(angle_of_attack)
     }
 
+    /// Returns the pre-stall lift coefficient of the foil at the given internal state, without
+    /// stall effects
     pub fn lift_coefficient_pre_stall_raw(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).lift_coefficient_pre_stall_raw(angle_of_attack)
     }
 
+    /// Returns the pre-stall lift coefficient of the foil at the given internal state, reduced by
+    /// the amount of stall
     pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack)
     }
 
+    /// Returns the post-stall lift coefficient of the foil at the given internal state, without
+    /// weighting by the amount of stall
     pub fn lift_coefficient_post_stall_raw(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).lift_coefficient_post_stall_raw(angle_of_attack)
     }
 
+    /// Returns the post-stall lift coefficient of the foil at the given internal state, weighted by
+    /// the amount of stall
     pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).lift_coefficient_post_stall_with_stall_weight(angle_of_attack)
     }
 
+    /// Returns the initial lift slope of the foil at the given internal state
     pub fn lift_coefficient_derivative(&self, internal_state: Float) -> Float {
         self.get_foil(internal_state).cl_initial_slope
     }
 
+    /// Returns the drag coefficient of the foil at the given internal state
     pub fn drag_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).drag_coefficient(angle_of_attack)
     }
 
 
+    /// Returns the amount of stall of the foil at the given internal state
     pub fn amount_of_stall(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).amount_of_stall(angle_of_attack)
     }

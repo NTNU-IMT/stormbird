@@ -28,7 +28,7 @@ use super::elliptic_wing_theory::EllipticWingTheory;
 fn steady_lift() {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 1.2;
-    let angle_of_attack = Float::from(2.0).to_radians();
+    let angle_of_attack = Float::to_radians(2.0);
 
     let theory = EllipticWingTheory {
         cl_2d: cl_zero_angle + TAU * angle_of_attack,
@@ -48,8 +48,10 @@ fn steady_lift() {
 
     let mut prescribed_wing_builder = wing_builder.clone();
 
-    let mut prescribed_circulation = PrescribedCirculation::default();
-    prescribed_circulation.curve_fit_shape_parameters = true;
+    let prescribed_circulation = PrescribedCirculation {
+        curve_fit_shape_parameters: true,
+        ..Default::default()
+    };
 
     prescribed_wing_builder.circulation_correction = CirculationCorrectionBuilder::Prescribed(
         prescribed_circulation

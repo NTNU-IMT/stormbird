@@ -4,10 +4,14 @@
 
 //! Implementations of wake models used to calculate induced velocities in lifting line simulations
 
+/// Dynamic wake, made of vortex panels that are shed from the wings
 pub mod dynamic_wake;
 pub mod quasi_steady_wake;
+/// Re-exports of commonly used structures, to simplify imports
 pub mod prelude;
+/// Settings for the wake models
 pub mod settings;
+/// Frozen wake, used to compute induced velocities efficiently in the solvers
 pub mod frozen_wake;
 pub mod vtk;
 
@@ -17,8 +21,11 @@ use dynamic_wake::DynamicWake;
 use quasi_steady_wake::QuasiSteadyWake;
 
 #[derive(Clone, Debug)]
+/// The wake model of a lifting line simulation
 pub enum WakeData {
+    /// Dynamic wake
     Dynamic(DynamicWake),
+    /// Quasi-steady wake
     QuasiSteady(QuasiSteadyWake),
 }
 

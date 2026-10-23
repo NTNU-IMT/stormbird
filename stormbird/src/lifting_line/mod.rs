@@ -4,7 +4,7 @@
 
 //! Implementation of lifting line functionality. 
 //! 
-//! This mainly consist of functions that can solve for vortex strength and induced velocity on a 
+//! This mainly consists of functions that can solve for vortex strength and induced velocity on a 
 //! wing based on potential theory and line representation of wings. Uses the 
 //! [crate::line_force_model] as input
 

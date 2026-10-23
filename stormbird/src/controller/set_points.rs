@@ -45,7 +45,9 @@ pub enum InternalStateSetPointType {
 #[serde(deny_unknown_fields)]
 /// Set points for the sail that depends on the apparent wind direction
 pub struct ControllerSetPoints {
+    /// The apparent wind directions where the set points are given
     pub apparent_wind_directions_data: Vec<Float>,
+    /// Optional angle of attack set points at each apparent wind direction
     #[serde(default)]
     pub angle_of_attack_data: Option<Vec<Float>>,
     #[serde(default)]
@@ -62,8 +64,11 @@ pub struct ControllerSetPoints {
     /// `SuctionCoefficientDirect`, the wing state, and therefore this value, is the suction 
     /// coefficient.
     pub wing_internal_state_max_value: Option<Float>,
+    /// If true, the local wing angle is set from the measured effective angle of attack. If false,
+    /// it is set from the geometric angle between the apparent wind and the wing.
     #[serde(default)]
     pub use_effective_angle_of_attack: bool,
+    /// Optional maximum change rate of the local wing angle, per unit time
     #[serde(default)]
     pub max_local_wing_angle_change_rate: Option<Float>,
     #[serde(default)]
@@ -74,6 +79,7 @@ pub struct ControllerSetPoints {
 }
 
 impl ControllerSetPoints {
+    /// Returns the new local wing angle, limited by the maximum change rate if given
     pub fn get_local_wing_angle(&self, input: &ControllerInput, time_step: Float) -> Float {
         let mut local_wing_angle = if self.use_effective_angle_of_attack {
             self.get_local_wing_angle_effective(input)
@@ -81,17 +87,19 @@ impl ControllerSetPoints {
             self.get_local_wing_angle_geometric(input)
         };
         
-        if self.max_local_wing_angle_change_rate.is_some() {
+        if let Some(max_change_rate) = self.max_local_wing_angle_change_rate {
             local_wing_angle = limit_value(
-                input.current_local_wing_angle, 
-                local_wing_angle, 
-                self.max_local_wing_angle_change_rate.unwrap() * time_step
+                input.current_local_wing_angle,
+                local_wing_angle,
+                max_change_rate * time_step
             )
         }
 
         local_wing_angle
     }
 
+    /// Returns the angle of attack set point at the given apparent wind direction, or zero if no
+    /// angle of attack data is given
     pub fn get_angle_of_attack_set_point(&self, apparent_wind_direction: Float) -> Float {
         if let Some(angle_data) = &self.angle_of_attack_data {
             linear_interpolation(
@@ -104,20 +112,24 @@ impl ControllerSetPoints {
         }
     }
 
+    /// Returns the local wing angle that gives the angle of attack set point, based on the geometric
+    /// angle between the apparent wind and the wing
     pub fn get_local_wing_angle_geometric(&self, input: &ControllerInput) -> Float {
         if self.angle_of_attack_data.is_some() {
             let set_point = input.loading * self.get_angle_of_attack_set_point(
                 input.apparent_wind_direction
             );
 
-            let wing_angle = input.apparent_wind_direction - set_point;
+            
 
-            wing_angle
+            input.apparent_wind_direction - set_point
         } else {
             0.0
         }
     }
 
+    /// Returns the local wing angle that gives the angle of attack set point, based on the error in
+    /// the measured effective angle of attack
     pub fn get_local_wing_angle_effective(&self, input: &ControllerInput) -> Float {
         let angle_measurement = &input.angle_of_attack;
 
@@ -139,6 +151,8 @@ impl ControllerSetPoints {
     }
     
 
+    /// Returns the new internal state of the wing, limited by the maximum value and change rate if
+    /// given
     pub fn get_internal_state(
         &self,
         wing_index: usize,
@@ -215,6 +229,8 @@ impl ControllerSetPoints {
 
     
 
+    /// Returns the internal state set point at the given apparent wind direction, or zero if no
+    /// internal state data is given
     pub fn get_internal_state_set_point(&self, apparent_wind_direction: Float) -> Float {
         if let Some(internal_states_data) = &self.internal_state_data {
             linear_interpolation(

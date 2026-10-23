@@ -5,13 +5,13 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
+/// Optional correction of the angles of attack on the line elements
 pub enum AngleOfAttackCorrection {
+    /// No correction
+    #[default]
     None,
+    /// Gaussian smoothing of the angles of attack. **Note**: not implemented yet, and panics if used.
     GaussianSmoothing
 }
 
-impl Default for AngleOfAttackCorrection {
-    fn default() -> Self {
-        AngleOfAttackCorrection::None
-    }
-}

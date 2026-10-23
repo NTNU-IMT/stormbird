@@ -13,6 +13,7 @@ const FOUR_PI_INVERSE: Float = 1.0/ (4.0 * PI);
 use super::vortex_line::VortexLine;
 
 #[derive(Clone, Debug, Default)]
+/// A quadrilateral vortex panel, made of four vortex lines along the edges
 pub struct Panel {
     vortex_lines: [VortexLine; 4],
     center: SpatialVector,
@@ -23,6 +24,7 @@ pub struct Panel {
 }
 
 impl Panel {
+    /// Creates a panel from the four corner points
     pub fn new(
         points: [SpatialVector; 4],
         far_field_ratio: Float,
@@ -62,6 +64,8 @@ impl Panel {
     }
 
     #[inline(always)]
+    /// Returns true if the point is close enough to the panel that the induced velocity must be
+    /// computed from the full vortex lines, rather than the far-field model
     pub fn necessary_with_full_vortex_line_computation(&self, ctrl_point: SpatialVector) -> bool {
         let distance_to_ctrl_point_sq = (ctrl_point - self.center).length_squared();
 
@@ -69,8 +73,8 @@ impl Panel {
     }
 
     #[inline(always)]
-    /// Function that calculates the induced velocity from a vortex panel, based on the corner points
-    /// given as input
+    /// Calculates the velocity induced by the panel with unit strength at the given point. The full
+    /// vortex line computation is used close to the panel, and a point doublet model far away.
     pub fn induced_velocity_with_unit_strength(&self, ctrl_point: SpatialVector) -> SpatialVector {
         if self.necessary_with_full_vortex_line_computation(ctrl_point) {
             self.induced_velocity_as_vortex_lines_with_unit_strength(ctrl_point)
@@ -100,6 +104,8 @@ impl Panel {
     }
 
     #[inline(always)]
+    /// Returns the velocity induced by the panel with unit strength, computed from the vortex lines
+    /// along the edges
     pub fn induced_velocity_as_vortex_lines_with_unit_strength(
         &self, 
         ctrl_point: SpatialVector,

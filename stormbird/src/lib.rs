@@ -16,3 +16,6 @@ pub mod wind;
 pub mod error;
 pub mod io_utils;
 pub mod elliptic_wing_theory;
+
+#[cfg(test)]
+pub(crate) mod test_utils;

@@ -16,6 +16,7 @@ pub struct InternalFlowSolverSettings {
     /// Relative tolerance when solving for the internal suction of the whole wing, either from the
     /// power or from the balance between the fan curves and the flow through the wing.
     pub wing_tolerance: Float,
+    /// Maximum number of iterations when solving for the internal suction of the whole wing
     #[serde(default="InternalFlowSolverSettings::default_wing_max_iterations")]
     pub wing_max_iterations: usize,
 }
@@ -24,6 +25,7 @@ impl InternalFlowSolverSettings {
     fn default_wing_tolerance() -> Float {1e-6}
     fn default_wing_max_iterations() -> usize {50}
 
+    /// Returns the settings to use in the solver for the internal suction of the whole wing
     pub fn wing_solver_settings(&self) -> SolverSettings {
         SolverSettings {
             tolerance: self.wing_tolerance,
@@ -64,6 +66,7 @@ pub struct InternalFlow {
     pub loss_coefficient: Float,
     /// The fraction of the segment area that is porous. Must be larger than zero.
     pub porous_fraction: Float,
+    /// Settings for the numerical solvers
     pub solver_settings: InternalFlowSolverSettings,
 }
 

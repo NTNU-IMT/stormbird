@@ -42,7 +42,7 @@ impl LineForceModel {
     /// * `viscous_lift` - the viscous lift force on each line element
     /// * `velocity` - the felt velocity at each control point
     /// * `sectional_drag` - the sectional drag force on each line element, which the drag from the
-    /// lift-induced drag correction is added to
+    ///   lift-induced drag correction is added to
     pub fn apply_force_corrections(
         &self,
         circulatory: &[SpatialVector],

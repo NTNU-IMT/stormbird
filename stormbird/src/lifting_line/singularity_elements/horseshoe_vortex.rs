@@ -25,17 +25,17 @@ pub struct HorseshoeVortex {
     /// There array stores five collections of spatial vectors, that later is used to represent 
     /// vortex lines. The intended meaning of them is as follows:
     /// 1) The first line goes from the end of the first free vortex to the "elbow vortex" (see next
-    /// vortex definition)
+    ///    vortex definition)
     /// 2) The second line is the first "elbow vortex". It connect the bound vortex with the first 
-    /// free stream vortex in a direction normal to the bound vortex. However, the direction is from 
-    /// point closest to the bound vortex in the first free vortex, to the first point of the bound 
-    /// vortex to maintain the right direction.
+    ///    free stream vortex in a direction normal to the bound vortex. However, the direction is from 
+    ///    point closest to the bound vortex in the first free vortex, to the first point of the bound 
+    ///    vortex to maintain the right direction.
     /// 3) The third line is the bound vortex itself, going from the start of the span line to the
-    /// end of the span line.
+    ///    end of the span line.
     /// 4) The fourth line is the second elbow vortex, connecting the end of the bound vortex to the 
-    /// second free vortex in a direction normal to the bound vortex.
+    ///    second free vortex in a direction normal to the bound vortex.
     /// 5) The fifth and last line is the second free vortex, going from the end of the second elbow
-    /// vortex in the direction of the free stream
+    ///    vortex in the direction of the free stream
     vortex_lines: [VortexLine; 5],
     /// The viscous core length used to limit the induced velocity close to the vortices. The main 
     /// point is to avoid singularities.
@@ -130,8 +130,8 @@ impl HorseshoeVortex {
     /// Arguments
     /// - `line_force_model`: a pointer to the line force model the wake is intended for
     /// - `wake_vectors`: the vectors that defines the direction and length of each of the free 
-    /// vortices. It will typically be based on the direction of the velocity at the span points of
-    /// the lifting line, but logic for determining this is delegated to outside this function
+    ///   vortices. It will typically be based on the direction of the velocity at the span points of
+    ///   the lifting line, but logic for determining this is delegated to outside this function
     /// - `viscous_core_length`: The viscous core length to give to each horseshoe vortex structure
     pub fn vortices_from_line_force_model_and_wake_vectors(
         line_force_model: &LineForceModel,
@@ -162,7 +162,7 @@ impl HorseshoeVortex {
 
                 horseshoe_vortices.push(
                     Self::new(
-                        &span_line,
+                        span_line,
                         &local_wake_vectors,
                         elbow_length,
                         viscous_core_length

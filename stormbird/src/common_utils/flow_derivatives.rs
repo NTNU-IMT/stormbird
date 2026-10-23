@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality to compute derivatives of different quantities relevant or the output from the 
+//! Functionality to compute derivatives of different quantities relevant for the output from the 
 //! line force model.
 
 use stormath::spatial_vector::SpatialVector;
@@ -14,12 +14,13 @@ use stormath::type_aliases::Float;
 #[derive(Debug, Clone)]
 /// Structure used to calculate the derivatives of flow quantities in a line force model
 pub struct FlowDerivatives {
+    /// The velocity at the two previous updates, with the oldest first
     pub velocity_history: [Vec<SpatialVector>; 2],
     update_count: usize,
 }
 
 impl FlowDerivatives {
-    /// Create a new FlowDerivativesCalculator
+    /// Creates a new structure, with the initial velocity as the history
     pub fn new(initial_velocity: &[SpatialVector]) -> Self {
         Self {
             velocity_history: [initial_velocity.to_vec(), initial_velocity.to_vec()],
@@ -35,11 +36,11 @@ impl FlowDerivatives {
 
         let mut acceleration = Vec::with_capacity(current_velocity.len());
 
-        for i in 0..current_velocity.len() {
+        for (i, &velocity) in current_velocity.iter().enumerate() {
             let data = [
                 self.velocity_history[0][i],
                 self.velocity_history[1][i],
-                current_velocity[i],
+                velocity,
             ];
 
             acceleration.push(
@@ -54,6 +55,7 @@ impl FlowDerivatives {
     }
 
 
+    /// Stores the current velocity in the history, and removes the oldest values
     pub fn update(&mut self, current_velocity: &[SpatialVector]) {
         self.velocity_history[0] = self.velocity_history[1].clone();
         self.velocity_history[1] = current_velocity.to_vec();

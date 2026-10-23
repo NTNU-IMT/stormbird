@@ -22,8 +22,10 @@ use crate::error::Error;
 #[serde(deny_unknown_fields)]
 /// Settings for a quasi-steady simulation.
 pub struct QuasiSteadySettings {
+    /// Builder for the solver
     #[serde(default)]
     pub solver: QuasiSteadySolverBuilder,
+    /// Settings for the quasi-steady wake
     #[serde(default)]
     pub wake: QuasiSteadyWakeSettings,
 }
@@ -32,8 +34,10 @@ pub struct QuasiSteadySettings {
 #[serde(deny_unknown_fields)]
 /// Settings for a dynamic simulation.
 pub struct DynamicSettings {
+    /// The solver
     #[serde(default)]
     pub solver: Solver,
+    /// Builder for the dynamic wake
     #[serde(default)]
     pub wake: DynamicWakeBuilder,
 }
@@ -46,7 +50,11 @@ pub struct DynamicSettings {
 /// Both quasi-steady and dynamic simulations are supported. The settings for each simulation type 
 /// is stored as a member variable of each variant.
 pub enum SimulationSettings {
+    /// Quasi-steady simulation, where the wake is made of horseshoe vortices aligned with the
+    /// freestream in each time step
     QuasiSteady(QuasiSteadySettings),
+    /// Dynamic simulation, where the wake is made of vortex panels that are shed from the wings and
+    /// moved with the flow
     Dynamic(DynamicSettings),
 }
 
@@ -60,12 +68,15 @@ impl Default for SimulationSettings {
 #[serde(deny_unknown_fields)]
 /// Builder for the [Simulation] struct.
 pub struct SimulationBuilder {
+    /// Builder for the line force model
     pub line_force_model: LineForceModelBuilder,
+    /// Settings that determine the type of simulation
     #[serde(default)]
     pub simulation_settings: SimulationSettings,
 }
 
 impl SimulationBuilder {
+    /// Creates a new builder from a line force model builder and simulation settings
     pub fn new(
         line_force_model: LineForceModelBuilder,
         simulation_settings: SimulationSettings,
@@ -76,7 +87,7 @@ impl SimulationBuilder {
         }
     }
 
-    /// Creates a new simulation builder by parsing the the string as a JSON object. The parsing is
+    /// Creates a new simulation builder by parsing the string as a JSON object. The parsing is
     /// done using the serde_json library.
     pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
         let builder = serde_json::from_str(setup_string)?;

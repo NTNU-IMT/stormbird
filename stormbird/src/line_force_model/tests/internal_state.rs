@@ -21,14 +21,14 @@ fn span_varying_internal_state() {
 
     let section_states = model.section_models_internal_state(&velocity);
 
-    for index in 0..model.nr_span_lines() {
+    for (index, &section_state) in section_states.iter().enumerate().take(model.nr_span_lines()) {
         let expected = if model.wing_index_from_global(index) == 0 {
             0.3
         } else {
             span_variation.value_at(model.ctrl_point_spanwise_distance_non_dimensional[index])
         };
 
-        assert!((section_states[index] - expected).abs() < 1e-12);
+        assert!((section_state - expected).abs() < 1e-12);
     }
 
     // The values vary along the span of the second wing

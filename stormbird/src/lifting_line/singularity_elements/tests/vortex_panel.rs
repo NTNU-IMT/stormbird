@@ -30,8 +30,8 @@ fn compare_near_and_far_field() {
 
     // Add some rotation to test a "arbitrary" oriented panel (the angles should not matter)
     let rotation = SpatialVector::new(
-        Float::from(45.0).to_radians(),
-        Float::from(-10.0).to_radians(),
+        Float::to_radians(45.0),
+        Float::to_radians(-10.0),
         0.0,
     );
 

@@ -36,6 +36,7 @@ pub struct AddedMass {
 }
 
 impl AddedMass {
+    /// Returns true if any of the added mass coefficients are different from zero
     pub fn is_active(&self) -> bool {
         self.normal_coefficient != 0.0 || self.chordwise_coefficient != 0.0
     }
@@ -47,7 +48,7 @@ impl AddedMass {
     /// * `chord_vector` - the chord vector of the line element
     /// * `span_length` - the length of the line element
     /// * `acceleration` - the felt acceleration of the flow at the control point, with the
-    /// component along the span line removed
+    ///   component along the span line removed
     pub fn force(
         &self,
         density: Float,

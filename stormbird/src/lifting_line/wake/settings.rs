@@ -31,17 +31,21 @@ impl Default for ViscousCoreLength {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Variables used whn constructing a quasi-steady wake model.
+/// Variables used when constructing a quasi-steady wake model.
 pub struct QuasiSteadyWakeSettings {
+    /// The length of the wake, relative to the average chord length
     #[serde(default="QuasiSteadyWakeSettings::default_wake_length_factor")]
     pub wake_length_factor: Float,
+    /// Optional symmetry condition
     #[serde(default)]
     pub symmetry_condition: SymmetryCondition,
+    /// The viscous core length of the vortex lines
     #[serde(default)]
     pub viscous_core_length: ViscousCoreLength,
 }
 
 impl QuasiSteadyWakeSettings {
+    /// Default wake length, relative to the average chord length (100)
     pub fn default_wake_length_factor() -> Float {100.0}
 }
 

@@ -37,11 +37,13 @@ fn closest_index(non_dim_locations: &[Float], target: Float) -> usize {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Builder for the SpanwiseMeasurementStructure, that computes the start and end index from
+/// Builder for the [`SpanwiseMeasurement`] structure, that computes the start and end index from
 /// non-dimensional values of the span distance
 pub struct SpanwiseMeasurementBuilder {
+    /// Non-dimensional span location where the measurement starts, running from -0.5 to 0.5
     #[serde(default = "SpanwiseMeasurementBuilder::default_non_dim_start_location")]
     pub non_dim_start_location: Float,
+    /// Non-dimensional span location where the measurement ends, running from -0.5 to 0.5
     #[serde(default = "SpanwiseMeasurementBuilder::default_non_dim_end_location")]
     pub non_dim_end_location: Float,
 }
@@ -129,6 +131,8 @@ pub struct SpanwiseMeasurement {
 }
 
 impl SpanwiseMeasurement {
+    /// Returns the mean of the values on each wing, over the part of the span given by the
+    /// measurement settings
     pub fn measure_float_values(
         &self,
         values: &[Float],
@@ -156,6 +160,7 @@ impl SpanwiseMeasurement {
         out
     }
     
+    /// Returns the representative angle of attack for each wing
     pub fn measure_angles_of_attack(&self, simulation_result: &SimulationResult) -> Vec<Float> {
         self.measure_float_values(
             &simulation_result.force_input.angles_of_attack,
@@ -163,6 +168,7 @@ impl SpanwiseMeasurement {
         )
     }
     
+    /// Returns the representative magnitude of the wind velocity for each wing
     pub fn measure_wind_velocity_magnitude(&self, simulation_result: &SimulationResult) -> Vec<Float> {
         let velocity_magnitude: Vec<Float> = simulation_result.force_input.velocity
             .iter()
@@ -175,6 +181,7 @@ impl SpanwiseMeasurement {
         )
     }
     
+    /// Returns the representative apparent wind direction for each wing
     pub fn measure_apparent_wind_direction(
         &self,
         simulation_result: &SimulationResult,

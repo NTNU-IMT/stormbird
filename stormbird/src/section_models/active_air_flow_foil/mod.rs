@@ -9,6 +9,7 @@ use crate::line_force_model::wing_internal_state::{WingInternalState, InternalCo
 
 pub use super::SegmentFlowConditions;
 
+/// Model of the internal flow in a wing with active air flow
 pub mod internal_flow;
 pub mod fan;
 
@@ -38,6 +39,7 @@ pub enum InternalStateConversion {
     /// internal flow model and a constant fan efficiency. The foil data must be given as a
     /// function of C_Q.
     PowerToInternalFlow {
+        /// Model of the flow through the porous surface of the wing
         internal_flow: InternalFlow,
         #[serde(default = "InternalStateConversion::default_fan_efficiency")]
         /// Efficiency of the fan, defined as the ratio between the power delivered to the flow,
@@ -49,12 +51,15 @@ pub enum InternalStateConversion {
     /// where the pressure rise over the fans balances the internal suction and the duct losses.
     /// The power is given by the fan curves. The foil data must be given as a function of C_Q.
     FanSpeedToInternalFlow {
+        /// Model of the flow through the porous surface of the wing
         internal_flow: InternalFlow,
+        /// Model of the fans that drive the internal flow
         fan: Fan,
     },
 }
 
 impl InternalStateConversion {
+    /// Default fan efficiency
     pub fn default_fan_efficiency() -> Float {1.0}
 }
 
@@ -64,39 +69,55 @@ impl InternalStateConversion {
 /// The internal state of the foil model is either the suction coefficient or the power
 /// coefficient, depending on the internal state conversion.
 pub struct ActiveAirFlowFoil {
+    /// The foil model for the lift and drag, as a function of the section internal state
     pub varying_foil: VaryingFoil,
+    /// How the wing internal state is converted to the internal state of the foil model
     pub internal_state_conversion: InternalStateConversion,
 }
 
+impl std::fmt::Display for ActiveAirFlowFoil {
+    /// Formats the model as a JSON string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+
+        write!(f, "{}", json)
+    }
+}
+
 impl ActiveAirFlowFoil {
+    /// Creates an active air flow foil from a JSON string
     pub fn new_from_string(input_str: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(input_str)
     }
 
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-
+    /// Returns the lift coefficient for the given section internal state
     pub fn lift_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.varying_foil.lift_coefficient(angle_of_attack, internal_state)
     }
 
+    /// Returns the linear lift coefficient for the given section internal state
     pub fn lift_coefficient_linear(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.varying_foil.lift_coefficient_linear(angle_of_attack, internal_state)
     }
 
+    /// Returns the pre-stall lift coefficient for the given section internal state, reduced by the
+    /// amount of stall
     pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.varying_foil.lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack, internal_state)
     }
 
+    /// Returns the post-stall lift coefficient for the given section internal state, weighted by
+    /// the amount of stall
     pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.varying_foil.lift_coefficient_post_stall_with_stall_weight(angle_of_attack, internal_state)
     }
 
+    /// Returns the initial lift slope for the given section internal state
     pub fn lift_coefficient_derivative(&self, internal_state: Float) -> Float {
         self.varying_foil.lift_coefficient_derivative(internal_state)
     }
 
+    /// Returns the drag coefficient for the given section internal state
     pub fn drag_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.varying_foil.drag_coefficient(angle_of_attack, internal_state)
     }

@@ -18,12 +18,19 @@ use crate::error::Error;
 #[derive(Debug, Clone)]
 /// Struct that contains the data needed to run a lifting line simulation.
 pub struct Simulation {
+    /// The line force model representing the wings
     pub line_force_model: LineForceModel,
+    /// History of the flow at the control points, used to compute the flow acceleration
     pub flow_derivatives: FlowDerivatives,
+    /// The wake model, either quasi-steady or dynamic
     pub wake_data: WakeData,
+    /// Frozen version of the wake, used to compute induced velocities efficiently in the solver
     pub frozen_wake: FrozenWake,
+    /// The solver used to find the circulation strength
     pub solver: Solver,
+    /// The circulation strength from the previous time step, used as initial solution in the next
     pub previous_circulation_strength: Vec<Float>,
+    /// Whether the first time step is completed, i.e., whether the simulation is initialized
     pub first_time_step_completed: bool,
 }
 
@@ -62,6 +69,8 @@ impl Simulation {
         points
     }
 
+    /// Initializes the simulation before the first time step, based on the freestream velocity at
+    /// the control points
     pub fn initialize(
         &mut self,
         ctrl_points_freestream: &[SpatialVector],
@@ -84,7 +93,7 @@ impl Simulation {
         }
         
         self.flow_derivatives = FlowDerivatives::new(
-            &ctrl_points_freestream
+            ctrl_points_freestream
         );
 
         self.first_time_step_completed = true;
@@ -103,7 +112,7 @@ impl Simulation {
     /// - `time`: The current time of the simulation.
     /// - `time_step`: The time step to use for the simulation.
     /// - `freestream_velocity`: The freestream velocity at the points returned by
-    /// `get_freestream_velocity_points`
+    ///   `get_freestream_velocity_points`
     pub fn do_step(
         &mut self,
         time: Float,
@@ -136,7 +145,7 @@ impl Simulation {
                 // Use the updated wake model to update the frozen wake
                 self.frozen_wake.update_from_full_wake(
                     &self.line_force_model.ctrl_points_global,
-                    &wake
+                    wake
                 );
             },
             WakeData::QuasiSteady(wake) => {
@@ -148,7 +157,7 @@ impl Simulation {
 
                 self.frozen_wake.update_from_quasi_steady_wake(
                     &self.line_force_model.ctrl_points_global,
-                    &wake
+                    wake
                 );
             }
         }

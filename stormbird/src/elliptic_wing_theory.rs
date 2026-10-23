@@ -11,7 +11,9 @@ use stormath::{
     consts::PI
 };
 
+/// An elliptical wing, as described by classical lifting line theory
 pub struct EllipticalWing {
+    /// The aspect ratio of the wing
     pub aspect_ratio: Float,
 }
 
@@ -19,7 +21,7 @@ impl EllipticalWing {
     #[inline(always)]
     /// Function that computes the lift-induced angle of attack according to elliptic wing theory, based
     /// only on the lift coefficient and aspect ratio of the wing.
-    pub fn lift_induced_angle_of_attach(&self, lift_coefficient: Float) -> Float {
+    pub fn lift_induced_angle_of_attack(&self, lift_coefficient: Float) -> Float {
         if self.aspect_ratio <= 0.0 {
             return 0.0;
         }

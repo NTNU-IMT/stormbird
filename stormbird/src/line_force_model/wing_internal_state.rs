@@ -24,14 +24,18 @@ pub const SPAN_END: Float = 0.5;
 pub enum SpanVariation {
     /// The value is linearly interpolated between the locations, and constant outside of them.
     Linear {
+        /// Non-dimensional span locations of the values
         locations: Vec<Float>,
+        /// The values at each location
         values: Vec<Float>,
     },
     /// The value is constant within each zone, defined by the boundaries between them. There must
     /// be one more boundary than values. Outside of the boundaries, the value of the closest zone
     /// is used.
     PiecewiseConstant {
+        /// Non-dimensional span locations of the boundaries between the zones
         boundaries: Vec<Float>,
+        /// The value in each zone
         values: Vec<Float>,
     },
 }
@@ -216,7 +220,9 @@ impl SpanVariation {
 /// The internal state of a wing, which can either be constant along the span, or vary along the
 /// span. The meaning of the value depends on the section model of the wing.
 pub enum WingInternalState {
+    /// The same value along the whole span
     Constant(Float),
+    /// A value that varies along the span
     SpanVarying(SpanVariation),
 }
 
@@ -280,6 +286,7 @@ impl WingInternalState {
         self.span_integral_of_absolute_value(SPAN_START, SPAN_END, 1.0) / (SPAN_END - SPAN_START)
     }
 
+    /// Returns true if the internal state is constant along the span
     pub fn is_constant(&self) -> bool {
         matches!(self, Self::Constant(_))
     }
@@ -330,10 +337,13 @@ impl InternalCompartments {
         Ok(Self { boundaries })
     }
 
+    /// Returns the non-dimensional span locations of the boundaries between the compartments,
+    /// including the ends of the wing
     pub fn boundaries(&self) -> &[Float] {
         &self.boundaries
     }
 
+    /// Returns the number of compartments
     pub fn nr_compartments(&self) -> usize {
         self.boundaries.len() - 1
     }

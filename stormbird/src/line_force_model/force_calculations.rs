@@ -10,8 +10,13 @@
 //! # Available methods
 //! The methods available in this implementation block are:
 //! - [`felt_ctrl_points_velocity`](LineForceModel::felt_ctrl_points_velocity)
+//! - [`felt_span_points_velocity`](LineForceModel::felt_span_points_velocity)
 //! - [`angles_of_attack`](LineForceModel::angles_of_attack)
-//! - [`lift_coefficients`](LineForceModel::lift_coefficients_total)
+//! - [`section_models_internal_state`](LineForceModel::section_models_internal_state)
+//! - [`wing_segment_flow_conditions`](LineForceModel::wing_segment_flow_conditions)
+//! - [`lift_coefficients_total`](LineForceModel::lift_coefficients_total)
+//! - [`lift_coefficients_pre_stall_with_stall_drop_off`](LineForceModel::lift_coefficients_pre_stall_with_stall_drop_off)
+//! - [`lift_coefficients_post_stall_with_stall_weight`](LineForceModel::lift_coefficients_post_stall_with_stall_weight)
 //! - [`lift_coefficients_linear`](LineForceModel::lift_coefficients_linear)
 //! - [`lift_coefficients_derivatives`](LineForceModel::lift_coefficients_derivatives)
 //! - [`circulation_strength`](LineForceModel::circulation_strength)
@@ -20,6 +25,7 @@
 //! - [`sectional_force_input`](LineForceModel::sectional_force_input)
 //! - [`sectional_forces`](LineForceModel::sectional_forces)
 //! - [`sectional_circulatory_forces`](LineForceModel::sectional_circulatory_forces)
+//! - [`viscous_lift_forces`](LineForceModel::viscous_lift_forces)
 //! - [`sectional_drag_forces`](LineForceModel::sectional_drag_forces)
 //! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
 //! - [`sectional_gyroscopic_moments`](LineForceModel::sectional_gyroscopic_moments)
@@ -28,7 +34,8 @@
 //! - [`residual`](LineForceModel::residual)
 //! - [`residual_absolute`](LineForceModel::residual_absolute)
 //! - [`average_residual_absolute`](LineForceModel::average_residual_absolute)
-//! - [`amount_of_flow_separation`](LineForceModel::amount_of_flow_separation)
+//! - [`input_power`](LineForceModel::input_power)
+//! - [`section_models_power`](LineForceModel::section_models_power)
 //! - [`calculate_simulation_result`](LineForceModel::calculate_simulation_result)
 
 use crate::section_models::SegmentFlowConditions;
@@ -41,7 +48,10 @@ use stormath::consts::MIN_POSITIVE;
 
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// Settings for the force calculations
 pub struct ForceCalculationSettings {
+    /// If true, the viscous lift is included in the circulation, rather than added as a separate
+    /// viscous lift force
     #[serde(default)]
     pub include_viscous_lift_in_the_circulation: bool
 }
@@ -192,7 +202,7 @@ impl LineForceModel {
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `velocity` - the velocity vector at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     pub fn lift_coefficients_total(
         &self, 
         angles_of_attack: &[Float],
@@ -210,6 +220,7 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Returns the pre-stall lift coefficient on each line element, reduced by the amount of stall
     pub fn lift_coefficients_pre_stall_with_stall_drop_off(
         &self, 
         angles_of_attack: &[Float],
@@ -228,6 +239,7 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Returns the post-stall lift coefficient on each line element, weighted by the amount of stall
     pub fn lift_coefficients_post_stall_with_stall_weight(
         &self,
         angles_of_attack: &[Float],
@@ -250,7 +262,7 @@ impl LineForceModel {
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `velocity` - the velocity vector at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     pub fn lift_coefficients_linear(
         &self, 
         angles_of_attack: &[Float],
@@ -268,6 +280,7 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Returns the initial slope of the linear lift coefficient on each line element
     pub fn lift_coefficients_derivatives(&self, internal_states: &[Float]) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |index| {
@@ -278,11 +291,12 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Returns the circulation strength, either directly or based on the prescribed shape,
-    /// depending on the fields in self.
+    /// Returns the circulation strength, with the circulation correction of the line force model
+    /// applied, if any.
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(
         &self, 
@@ -318,6 +332,7 @@ impl LineForceModel {
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     /// * `velocity` - the velocity vector at each control point
     /// 
     /// # Definitions
@@ -349,12 +364,11 @@ impl LineForceModel {
         }).collect()
     }
 
-    /// Returns the viscous drag coefficient on each line element, based on the section model
-    /// and the input velocity.
+    /// Returns the viscous drag coefficient on each line element, based on the section model.
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `velocity` - the velocity vector at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     pub fn viscous_drag_coefficients(
         &self, 
         angles_of_attack: &[Float],
@@ -372,6 +386,7 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Computes the input to the sectional force calculations from the result of a solver
     pub fn sectional_force_input(
         &self, 
         solver_result: &SolverResult,
@@ -489,6 +504,8 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Computes the viscous lift forces on each line element, i.e., the post-stall lift. Zero if the
+    /// viscous lift is included in the circulation.
     pub fn viscous_lift_forces(
         &self, 
         angles_of_attack: &[Float],
@@ -553,8 +570,8 @@ impl LineForceModel {
     ///
     /// # Argument
     /// * `acceleration` - the acceleration of the flow at each control point. That is, if the only
-    /// velocity is due to the motion of the wings, the acceleration will be opposite to the motion
-    /// of the wings.
+    ///   velocity is due to the motion of the wings, the acceleration will be opposite to the motion
+    ///   of the wings.
     pub fn sectional_added_mass_force(
         &self, 
         acceleration: &[SpatialVector],
@@ -642,8 +659,8 @@ impl LineForceModel {
         moments
     }
 
-    /// Calculates the magnitude of the lift force on each line element based on the given
-    /// circulation and velocity.
+    /// Calculates the lift coefficient on each line element based on the given circulation and
+    /// velocity.
     pub fn lift_coefficient_from_circulation(
         &self, 
         strength: &[Float], 
@@ -653,7 +670,7 @@ impl LineForceModel {
         let force = self.sectional_circulatory_forces(strength, velocity);
 
         (0..self.nr_span_lines()).map(|i_span| {
-            let sign = -1.0 * strength[i_span].signum();
+            let sign = -strength[i_span].signum();
             
             let lift_area = self.chord_lengths[i_span] * self.span_lines_local[i_span].length();
 
@@ -691,6 +708,8 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Returns the difference between the lift coefficient from the circulation and the lift
+    /// coefficient from the section models, on each line element
     pub fn residual(
         &self, 
         strength: &[Float], 
@@ -710,6 +729,7 @@ impl LineForceModel {
         }).collect()
     }
 
+    /// Returns the absolute value of the residual on each line element
     pub fn residual_absolute(
         &self, 
         strength: &[Float], 
@@ -721,6 +741,7 @@ impl LineForceModel {
             .iter().map(|r| r.abs()).collect()
     }
 
+    /// Returns the mean of the absolute value of the residual over all line elements
     pub fn average_residual_absolute(
         &self, 
         strength: &[Float], 
@@ -779,18 +800,20 @@ impl LineForceModel {
         )
     }
 
+    /// Computes the full simulation result, including sectional and integrated forces and moments,
+    /// from the result of a solver
     pub fn calculate_simulation_result(
         &self, 
         solver_result: &SolverResult,
         ctrl_point_acceleration: &[SpatialVector],
         time: Float,
     ) -> SimulationResult {
-        let force_input = self.sectional_force_input(&solver_result, ctrl_point_acceleration);
+        let force_input = self.sectional_force_input(solver_result, ctrl_point_acceleration);
 
         let ctrl_points = self.ctrl_points_global.clone();
         let sectional_forces   = self.sectional_forces(&force_input);
-        let integrated_forces = sectional_forces.integrate_forces(&self);
-        let integrated_moments = sectional_forces.integrate_moments(&self);
+        let integrated_forces = sectional_forces.integrate_forces(self);
+        let integrated_moments = sectional_forces.integrate_moments(self);
 
         let input_power = self.input_power(&force_input);
 

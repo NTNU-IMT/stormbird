@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use stormath::type_aliases::Float;
 
+/// Power law model for the atmospheric boundary layer
 pub mod power_model;
+/// Logarithmic model for the atmospheric boundary layer
 pub mod logarithmic_model;
 
 use power_model::PowerModel;
@@ -26,10 +28,12 @@ pub enum VelocityVariation {
 }
 
 impl VelocityVariation {
+    /// Creates a constant velocity variation
     pub fn new_constant(velocity: Float) -> Self {
         Self::Constant(velocity)
     }
     
+    /// Returns the true wind velocity at the given height
     pub fn true_wind_velocity_at_height(&self, height: Float) -> Float {
         match self {
             Self::Constant(value) => *value,
@@ -38,10 +42,12 @@ impl VelocityVariation {
         }
     }
 
+    /// Creates a velocity variation from a JSON string. Panics if the string can not be parsed.
     pub fn from_json_string(json_string: &str) -> Self {
         serde_json::from_str(json_string).unwrap()
     }
 
+    /// Creates a velocity variation from a JSON file. Panics if the file can not be read or parsed.
     pub fn from_json_file(file_path: &str) -> Self {
         let json_string = std::fs::read_to_string(file_path).unwrap();
         Self::from_json_string(&json_string)

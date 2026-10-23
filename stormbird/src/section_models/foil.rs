@@ -18,24 +18,24 @@ use crate::error::Error;
 /// The reason for using a parametric model, rather than a data based table look-up, is two fold:
 ///
 /// 1) It becomes easier to use this model as a building block for more complex foil models, where
-/// the behavior depends on some internal state, such as flap angle or suction rate, because the
-/// parameters can be allowed to depend on the internal state through interpolation.
+///    the behavior depends on some internal state, such as flap angle or suction rate, because the
+///    parameters can be allowed to depend on the internal state through interpolation.
 /// 2) A parametric model ensures smoothness, which is important when using the model in
-/// some form optimization, for instance to maximize thrust for a given wind direction. The
-/// smoothness is in particular practical when the expected optimal point is close to the stall
-/// angle
+///    some form optimization, for instance to maximize thrust for a given wind direction. The
+///    smoothness is in particular practical when the expected optimal point is close to the stall
+///    angle
 ///
 /// The model is divided in two core sub-models
 /// 1) For angles of attack below stall, it is assumed that both lift and drag can be represented
-/// accurately as simple functions. The lift is mostly linear, but the slope can optionally be
-/// reduced above a given angle, to model separation that develops gradually before the full
-/// stall. The reduction is introduced smoothly using an integrated sigmoid function. The drag is assumed
-/// to be represented as a second order polynomial, with the minimum value where the linear part of
-/// the lift is zero.
+///    accurately as simple functions. The lift is mostly linear, but the slope can optionally be
+///    reduced above a given angle, to model separation that develops gradually before the full
+///    stall. The reduction is introduced smoothly using an integrated sigmoid function. The drag is assumed
+///    to be represented as a second order polynomial, with the minimum value where the linear part of
+///    the lift is zero.
 /// 2) For angles of attack above stall, both the lift and drag are assumed to be harmonic functions
-/// which primarily is adjusted by setting the *max value* after stall. This is a rough model, which
-/// is assumed to be appropriate as the pre-stall behavior is usually more important for a
-/// wind power device.
+///    which primarily is adjusted by setting the *max value* after stall. This is a rough model, which
+///    is assumed to be appropriate as the pre-stall behavior is usually more important for a
+///    wind power device.
 ///
 /// The transit between the two models is done using a sigmoid function, where both the transition
 /// point and the width of the transition can be adjusted.
@@ -104,22 +104,33 @@ pub struct Foil {
     pub stall_range: Float,
 }
 
+impl std::fmt::Display for Foil {
+    /// Formats the model as a JSON string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+
+        write!(f, "{}", json)
+    }
+}
+
 impl Foil {
     fn default_one() -> Float {1.0}
+    /// Default initial lift slope (2π)
     pub fn default_cl_initial_slope()     -> Float {TAU}
+    /// Default mean stall angle (20 degrees)
     pub fn default_mean_stall_angle()     -> Float {Float::from(20.0_f32).to_radians()}
+    /// Default stall range (6 degrees)
     pub fn default_stall_range()          -> Float {Float::from(6.0_f32).to_radians()}
+    /// Default onset angle for the reduction of the lift slope (10 degrees)
     pub fn default_cl_slope_reduction_onset_angle() -> Float {Float::from(10.0_f32).to_radians()}
+    /// Default exponent in the drag after stall
     pub fn default_cd_power_after_stall() -> Float {1.6}
 
+    /// Creates a foil from a JSON string
     pub fn new_from_string(string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(string)?;
 
         Ok(serde_res)
-    }
-
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
     }
 
     /// Calculates the lift coefficient for a given angle of attack.
@@ -135,6 +146,7 @@ impl Foil {
     }
 
     #[inline(always)]
+    /// Returns the linear lift coefficient, without slope reduction or stall
     pub fn lift_coefficient_linear(&self, angle_of_attack: Float) -> Float {
         self.cl_zero_angle + self.cl_initial_slope * angle_of_attack.sin()
     }
@@ -167,6 +179,7 @@ impl Foil {
     }
 
     #[inline(always)]
+    /// Returns the pre-stall lift coefficient, reduced by the amount of stall
     pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float) -> Float {
         let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
@@ -176,11 +189,13 @@ impl Foil {
     }
 
     #[inline(always)]
+    /// Returns the post-stall lift coefficient, without weighting by the amount of stall
     pub fn lift_coefficient_post_stall_raw(&self, angle_of_attack: Float) -> Float {
         self.cl_max_after_stall * (2.0 * angle_of_attack).sin()
     }
 
     #[inline(always)]
+    /// Returns the post-stall lift coefficient, weighted by the amount of stall
     pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float) -> Float {
         let cl_post_stall_raw = self.lift_coefficient_post_stall_raw(angle_of_attack);
 

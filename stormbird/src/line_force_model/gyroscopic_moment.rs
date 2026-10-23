@@ -32,6 +32,7 @@ pub struct GyroscopicMoment {
 }
 
 impl GyroscopicMoment {
+    /// Returns true if the moment of inertia is different from zero
     pub fn is_active(&self) -> bool {
         self.moment_of_inertia != 0.0
     }

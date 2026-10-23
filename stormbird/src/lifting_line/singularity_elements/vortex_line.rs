@@ -17,14 +17,20 @@ const CLOSENESS_ERROR: Float = 1.0e-6;
 const CLOSENESS_ERROR: Float = 1.0e-10;
 
 #[derive(Clone, Debug, Default)]
+/// A straight vortex line between two points
 pub struct VortexLine {
+    /// The start and end points of the line
     pub points: [SpatialVector; 2],
+    /// The length of the line
     pub length: Float,
+    /// The squared length of the line
     pub length_squared: Float,
+    /// The unit vector from the start point to the end point
     pub direction: SpatialVector,
 }
 
 impl VortexLine {
+    /// Creates a vortex line between two points
     pub fn new(points: [SpatialVector; 2]) -> Self {
         let relative_line  = points[1] - points[0];
     
@@ -74,7 +80,7 @@ impl VortexLine {
     }
     
     #[inline(always)]
-    /// Calculates the distance between the point and the line
+    /// Calculates the squared normal distance between the point and the line
     fn normal_distance_squared(
         &self,
         ctrl_point: SpatialVector,

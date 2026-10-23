@@ -16,8 +16,11 @@ use stormath::matrix::Matrix;
 use super::velocity_corrections::VelocityCorrections;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+/// How the induced velocities are updated after the viscous correction of the circulation
 pub enum InducedVelocityCorrectionMethod {
+    /// The induced velocities from the linear solution are used
     NoCorrection,
+    /// The induced velocities are computed again from the corrected circulation
     #[default]
     FullCorrection
 }
@@ -26,25 +29,19 @@ pub enum InducedVelocityCorrectionMethod {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Structure with settings for a linearized lifting line solver
+#[derive(Default)]
 pub struct Linearized {
+    /// Optional empirical corrections of the velocity
     #[serde(default)]
     pub velocity_corrections: VelocityCorrections,
+    /// If true, the circulation is not corrected for non-linear effects, such as stall
     #[serde(default)]
     pub disable_viscous_corrections: bool,
     #[serde(default)]
-    /// Specification on how to correct the lift
+    /// How the induced velocities are updated after the viscous correction of the circulation
     pub induced_velocity_correction_method: InducedVelocityCorrectionMethod
 }
 
-impl Default for Linearized {
-    fn default() -> Self {
-        Linearized {
-            velocity_corrections: VelocityCorrections::default(),
-            disable_viscous_corrections: false,
-            induced_velocity_correction_method: InducedVelocityCorrectionMethod::default()
-        }
-    }
-}
 
 impl Linearized {
 
@@ -62,19 +59,12 @@ impl Linearized {
 
         let mut ctrl_points_velocity = felt_ctrl_points_freestream.to_vec();
 
-        // Check if there is any lift to solve for at all
-        let pre_solver_res = self.check_for_zero_linear_lift(
-            line_force_model,
-            &ctrl_points_velocity
-        );
-
-        if let Some(result) = pre_solver_res {
-            return result;
-        }
-
         // Add fixed velocities from the frozen wake
-        for i in 0..nr_unknowns {
-            ctrl_points_velocity[i] += frozen_wake.fixed_velocities[i];
+        for (velocity, &fixed_velocity) in ctrl_points_velocity.iter_mut()
+            .zip(&frozen_wake.fixed_velocities)
+            .take(nr_unknowns)
+        {
+            *velocity += fixed_velocity;
         }
 
         ctrl_points_velocity = line_force_model.remove_span_velocity(
@@ -86,8 +76,8 @@ impl Linearized {
         let mut velocity_dir = Vec::with_capacity(nr_unknowns);
         let mut normal_dir = Vec::with_capacity(nr_unknowns);
 
-        for i in 0..nr_unknowns {
-            let u_norm = ctrl_points_velocity[i].normalize();
+        for (i, velocity) in ctrl_points_velocity.iter().enumerate().take(nr_unknowns) {
+            let u_norm = velocity.normalize();
 
             let span_dir = line_force_model.span_lines_global[i].relative_vector().normalize();
 
@@ -225,51 +215,6 @@ impl Linearized {
             output_ctrl_points_velocity: ctrl_points_velocity,
             iterations: 1,
             residual
-        }
-    }
-
-    /// Functions that evaluates wether there is any lift to solve for at all, based on the input
-    /// velocity.
-    pub fn check_for_zero_linear_lift(
-        &self,
-        line_force_model: &LineForceModel,
-        ctrl_points_velocity: &[SpatialVector]
-    ) -> Option<SolverResult> {
-        let angles_of_attack = line_force_model.angles_of_attack(
-            ctrl_points_velocity,
-            CoordinateSystem::Global
-        );
-
-        let internal_states = line_force_model.section_models_internal_state(ctrl_points_velocity);
-
-        let cl_linear_pre_solver = line_force_model.lift_coefficients_linear(
-            &angles_of_attack,
-            &internal_states
-        );
-
-        let mut cl_linear_pre_solver_is_large = true;
-
-        for i in 0..cl_linear_pre_solver.len() {
-            if cl_linear_pre_solver[i].abs() > 1e-9 {
-                cl_linear_pre_solver_is_large = true;
-                break;
-            }
-        }
-
-        let nr_unknowns = line_force_model.nr_span_lines();
-
-        if !cl_linear_pre_solver_is_large {
-            Some(
-                SolverResult {
-                    input_ctrl_points_velocity: ctrl_points_velocity.to_vec(),
-                    circulation_strength: vec![0.0; nr_unknowns],
-                    output_ctrl_points_velocity: ctrl_points_velocity.to_vec(),
-                    iterations: 0,
-                    residual: 0.0
-                }
-            )
-        } else {
-            None
         }
     }
 }

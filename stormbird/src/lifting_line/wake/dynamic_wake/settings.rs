@@ -8,22 +8,28 @@ use stormath::type_aliases::Float;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone)]
+/// Numbers that describe the structure of the wake, used to convert between flat indices and
+/// indices along the span and the stream
 pub struct WakeIndices {
+    /// Number of points along the span
     pub nr_points_along_span: usize,
+    /// Number of panels along the span
     pub nr_panels_along_span: usize,
+    /// Number of panels in the streamwise direction behind each line element
     pub nr_panels_per_line_element: usize,
+    /// Number of points in the streamwise direction behind each line element
     pub nr_points_per_line_element: usize,
 }
 
 impl WakeIndices {
     #[inline(always)]
-    /// Returns a flatten index for the wake panels. The panels are ordered streamwise-major.
+    /// Returns a flattened index for the wake panels. The panels are ordered streamwise-major.
     pub fn panel_index(&self, stream_index: usize, span_index: usize) -> usize {
         stream_index * self.nr_panels_along_span + span_index
     }
 
     #[inline(always)]
-    /// Returns the stream and span indices from a flatten index
+    /// Returns the stream and span indices from a flattened index
     pub fn reverse_panel_index(&self, flat_index: usize) -> (usize, usize) {
         let stream_index = flat_index / self.nr_panels_along_span;
         let span_index   = flat_index % self.nr_panels_along_span;
@@ -32,7 +38,7 @@ impl WakeIndices {
     }
 
     #[inline(always)]
-    /// Returns a flatten index for the wake points. The points are ordered streamwise-major.
+    /// Returns a flattened index for the wake points. The points are ordered streamwise-major.
     pub fn point_index(&self, stream_index: usize, span_index: usize) -> usize {
         stream_index * self.nr_points_along_span + span_index
     }
@@ -73,8 +79,8 @@ pub struct WakeSettings {
     pub last_panel_relative_length: Float,
     /// Which direction to use for the first wake points
     pub first_wake_points_direction: FirstWakePointsDirection,
-    /// A variable which panels that should be updated with the induced velocities included in the 
-    /// velocity calculation
+    /// The index of the last wake point where the induced velocities are included in the velocity
+    /// used to move the wake
     pub end_index_induced_velocities_on_wake: usize,
     /// The amount of damping in the shape of the wake
     pub shape_damping_factor: Float,

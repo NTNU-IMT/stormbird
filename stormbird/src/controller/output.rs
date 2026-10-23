@@ -10,12 +10,16 @@ use stormath::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+/// Output from the controller
 pub struct ControllerOutput {
+    /// The local wing angle for each wing
     pub local_wing_angles: Vec<Float>,
+    /// The internal state for each wing
     pub internal_states: Vec<Float>,
 }
 
 impl ControllerOutput {
+    /// Returns a header and a data string for a CSV file with the output
     pub fn as_csv_string(output_to_write: &Self) -> (String, String) {
         let mut header = String::new();
         let mut data = String::new();
@@ -43,6 +47,8 @@ impl ControllerOutput {
         (header, data)
     }
 
+    /// Writes the output to a CSV file. The file is created if it does not exist, and the data is
+    /// appended otherwise.
     pub fn write_to_csv_file(output_to_write: &Self, file_path: &str) {
         let (header, data) = Self::as_csv_string(output_to_write);
 

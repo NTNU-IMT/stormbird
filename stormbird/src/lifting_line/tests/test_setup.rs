@@ -62,8 +62,8 @@ impl RectangularWing {
             ],
             section_model: SectionModel::SingleElementFoil(Foil {
                 cl_zero_angle: self.cl_zero_angle,
-                mean_positive_stall_angle: Float::from(45.0).to_radians(),
-                mean_negative_stall_angle: Float::from(45.0).to_radians(),
+                mean_positive_stall_angle: Float::to_radians(45.0),
+                mean_negative_stall_angle: Float::to_radians(45.0),
                 ..Default::default()
             }),
             non_zero_circulation_at_ends: [false, false],

@@ -23,9 +23,11 @@ use stormath::type_aliases::Float;
 /// * `title` - The title written in the header of the data
 /// * `points` - The points of the polygons
 /// * `polygons` - The indices of the points making up each polygon. The polygons can have
-/// different numbers of points.
+///   different numbers of points.
 /// * `cell_scalars` - Named scalar values, with one value for each polygon
 /// * `binary` - Whether to use the binary or ASCII variant of the format
+// The casts to f32 are only unnecessary when compiling with the `single_precision` feature
+#[allow(clippy::unnecessary_cast)]
 pub fn polygons_as_vtk(
     title: &str,
     points: &[SpatialVector],

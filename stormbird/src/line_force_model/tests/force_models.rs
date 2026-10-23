@@ -4,6 +4,7 @@
 
 //! Tests for the wing level force models: force corrections, added mass and gyroscopic moments.
 
+use crate::test_utils::tolerance;
 use super::*;
 
 use stormath::type_aliases::Float;
@@ -55,7 +56,7 @@ fn force_input(
     SectionalForcesInput {
         circulation_strength: vec![-3.0; nr_span_lines],
         velocity: vec![velocity; nr_span_lines],
-        angles_of_attack: vec![Float::from(30.0).to_radians(); nr_span_lines],
+        angles_of_attack: vec![Float::to_radians(30.0); nr_span_lines],
         section_models_internal_state: vec![0.0; nr_span_lines],
         acceleration: vec![acceleration; nr_span_lines],
         rotation_velocity,
@@ -64,7 +65,10 @@ fn force_input(
 }
 
 fn assert_vectors_equal(a: SpatialVector, b: SpatialVector) {
-    assert!((a - b).length() < 1e-9 * (1.0 + b.length()), "{:?} != {:?}", a, b);
+    assert!(
+        (a - b).length() < tolerance(1e-9, 1e-5) * (1.0 + b.length()),
+        "{:?} != {:?}", a, b
+    );
 }
 
 #[test]

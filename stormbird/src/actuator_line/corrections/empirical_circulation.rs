@@ -8,9 +8,13 @@ use stormath::type_aliases::Float;
 use stormath::consts::PI;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Empirical correction of the circulation close to the ends of the wings, with a shape similar to
+/// the Prandtl tip loss factor
 pub struct EmpiricalCirculationCorrection {
+    /// Factor that determines how fast the correction approaches one away from the ends of the wings
     #[serde(default = "EmpiricalCirculationCorrection::default_exp_factor")]
     pub exp_factor: Float,
+    /// Factor multiplied with the correction everywhere along the span
     #[serde(default = "EmpiricalCirculationCorrection::default_one")]
     pub overall_correction: Float,
 }
@@ -28,6 +32,8 @@ impl EmpiricalCirculationCorrection {
     fn default_one() -> Float {1.0}
     fn default_exp_factor() -> Float {10.0}
 
+    /// Returns the correction factor at the given non-dimensional span position, running from -0.5
+    /// to 0.5: overall_correction * (2 / pi) * acos(exp(-exp_factor * (0.5 - |s|)))
     pub fn correction_factor(&self, non_dim_span_position: Float) -> Float {
         let s_in = 0.5 - non_dim_span_position.abs();
 

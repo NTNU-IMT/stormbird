@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 //pub mod quasi_newton;
 pub mod iterative;
+/// The linearized lifting line solver
 pub mod linearized;
 pub mod velocity_corrections;
 
@@ -18,8 +19,11 @@ use iterative::{
 use linearized::Linearized;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// The solver used to find the circulation strength in a lifting line simulation
 pub enum Solver {
+    /// Iterative solver
     Iterative(Iterative),
+    /// Linearized solver
     Linearized(Linearized)
 }
 
@@ -30,8 +34,11 @@ impl Default for Solver {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Builder for the solver in quasi-steady simulations
 pub enum QuasiSteadySolverBuilder {
+    /// Iterative solver
     Iterative(QuasiSteadyIterativeBuilder),
+    /// Linearized solver
     Linearized(Linearized)
 }
 
@@ -42,6 +49,7 @@ impl Default for QuasiSteadySolverBuilder {
 }
 
 impl QuasiSteadySolverBuilder {
+    /// Builds the solver
     pub fn build(&self) -> Solver {
         match self {
             Self::Linearized(settings) => {
@@ -55,6 +63,7 @@ impl QuasiSteadySolverBuilder {
 
 }
 
+/// Re-exports of commonly used structures, to simplify imports
 pub mod prelude {
     pub use super::Solver;
     pub use super::QuasiSteadySolverBuilder;

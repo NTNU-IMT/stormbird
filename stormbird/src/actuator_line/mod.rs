@@ -7,11 +7,17 @@
 use std::fs;
 use std::path::Path;
 
+/// Projection of the forces from the line elements onto the CFD grid
 pub mod projection;
+/// Sampling of the velocity from the CFD grid
 pub mod sampling;
+/// Builder for the actuator line model
 pub mod builder;
+/// Settings for the actuator line solver
 pub mod solver;
+/// Corrections of the velocity and circulation in actuator line simulations
 pub mod corrections;
+/// Damping of the flow along the span
 pub mod spanflow_damper;
 
 use stormath::smoothing::gaussian::gaussian_kernel;
@@ -44,14 +50,13 @@ pub struct ActuatorLine {
     /// The line force model used to compute forces on each line segment as a function of the local
     /// velocity.
     pub line_force_model: LineForceModel,
-    /// Enum, with an internal structure, that determines how forces are projected in a CFD
-    /// simulation
+    /// Settings that determine how the forces are projected in a CFD simulation
     pub projection_settings: ProjectionSettings,
     /// Settings for the solver
     pub solver_settings: SolverSettings,
     /// Settings for the velocity sampling
     pub sampling_settings: SamplingSettings,
-    /// Dynamic optimizer that can be optionally used to optimize the settings in the model
+    /// Optional controller that sets the local wing angles and internal states during the simulation
     pub controller: Option<Controller>,
     /// The time to start solving
     pub start_time: Float,
@@ -176,7 +181,7 @@ impl ActuatorLine {
                 let inputs = ControllerInput::new_from_simulation_result(
                     1.0,
                     &self.line_force_model,
-                    &simulation_result,
+                    simulation_result,
                     &controller.spanwise_measurement,
                     &wind_environment,
                     false
@@ -237,8 +242,8 @@ impl ActuatorLine {
             }
         }
 
-        for i in 0..corrected_velocity.len() {
-            corrected_velocity[i] *= self.sampling_settings.correction_factor;
+        for velocity in corrected_velocity.iter_mut() {
+            *velocity *= self.sampling_settings.correction_factor;
         }
 
         if self.sampling_settings.extrapolate_end_velocities {
@@ -270,7 +275,7 @@ impl ActuatorLine {
         corrected_velocity
     }
 
-    /// Takes the estimated velocity on at the control points as input and calculates a simulation
+    /// Takes the estimated velocity at the control points as input and calculates a simulation
     /// result from the line force model.
     pub fn solve(&mut self, time: Float, _time_step: Float) -> SolverResult {
         let corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
@@ -366,14 +371,17 @@ impl ActuatorLine {
         }
     }
     
-    /// Function 
+    /// Updates the lift and drag forces that are projected onto the CFD grid, based on the latest
+    /// simulation result and the projection settings
     pub fn update_sectional_forces_to_project(&mut self) {
         let nr_span_lines = self.line_force_model.nr_span_lines();
         let ctrl_points_velocity = &self.ctrl_points_velocity; //self.corrected_ctrl_points_velocity(time);
         
         if let Some(simulation_result) = &self.simulation_result {
-            for line_index in 0..nr_span_lines {
-                let mut lift_force = simulation_result.sectional_forces.circulatory[line_index];
+            let circulatory_forces = &simulation_result.sectional_forces.circulatory;
+
+            for (line_index, &circulatory_force) in circulatory_forces.iter().enumerate().take(nr_span_lines) {
+                let mut lift_force = circulatory_force;
                 let mut drag_force = SpatialVector::default();
                 
                 if self.projection_settings.project_sectional_drag {
@@ -415,7 +423,7 @@ impl ActuatorLine {
     /// # Arguments
     /// * `line_index` - The index of the line segment for which the force is to be projected.
     /// * `velocity` - The velocity vector at the control point of the cell where the force is to be
-    /// projected.
+    ///   projected.
     pub fn force_to_project_at_cell(
         &self,
         line_index: usize,
@@ -440,6 +448,8 @@ impl ActuatorLine {
         }
     }
 
+    /// Returns the force used to damp the flow along the span on the given line element, or zero if
+    /// no span flow damper is used
     pub fn spanwise_damping_flow(
         &self,
         line_index: usize,

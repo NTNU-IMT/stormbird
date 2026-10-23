@@ -12,7 +12,7 @@ pub struct LogarithmicModel {
     /// in hindcast data
     pub friction_velocity: Float,
     /// The surface roughness of the ground or ocean (e.g., how much waves). Can either be computed 
-    /// based if some reference velocity and the frictional velocity is known, or set directly from
+    /// based on the frictional velocity, if some reference velocity is known, or set directly from
     /// hindcast data
     pub surface_roughness: Float,
     #[serde(default)]
@@ -24,29 +24,37 @@ pub struct LogarithmicModel {
     pub von_karman_constant: Float,
     #[serde(default="LogarithmicModel::default_stable_coefficient")]
     /// Coefficient used in the model for a stable stability correction. It is typically fixed for a
-    /// given case (e.g., it is not not supposed to depend on the weather), so the default value 
+    /// given case (e.g., it is not supposed to depend on the weather), so the default value 
     /// should be useful most of the time. However, it is allowed to vary, because different papers
     /// use slight variations here.
     pub stable_coefficient: Float,
     #[serde(default="LogarithmicModel::default_unstable_coefficient")]
     /// Coefficient used in the model for an unstable stability correction. As for the stable 
-    /// coefficient above, it is typically fixed, but different paper use slight variations.
+    /// coefficient above, it is typically fixed, but different papers use slight variations.
     pub unstable_coefficient: Float
 }
 
 impl LogarithmicModel {
+    /// Default Von Karman constant (0.41)
     pub fn default_von_karman_constant() -> Float {0.41}
+    /// Default coefficient for the stable stability correction (6.0)
     pub fn default_stable_coefficient() -> Float {6.0}
+    /// Default coefficient for the unstable stability correction (19.3)
     pub fn default_unstable_coefficient() -> Float {19.3}
     
+    /// Returns the velocity at the given height, including the stability correction
     pub fn velocity_at_height(&self, height: Float) -> Float {
         self.neutral_velocity_at_height(height) - self.businger_dyer_correction(height)
     }
 
+    /// Returns the scale factor of the profile, i.e., the friction velocity divided by the Von Karman
+    /// constant
     pub fn scale_factor(&self) -> Float {
         self.friction_velocity / self.von_karman_constant
     }
     
+    /// Returns the velocity at the given height for a neutral atmosphere. Zero if the height or
+    /// the surface roughness is not positive.
     pub fn neutral_velocity_at_height(&self, height: Float) -> Float {
         let undefined_condition = self.surface_roughness <= 0.0 || height <= 0.0;
         
@@ -81,7 +89,7 @@ impl LogarithmicModel {
         }
     }
     
-    /// Function that computer the Businger-Dyer correction based on the atmosphere state and 
+    /// Function that computes the Businger-Dyer correction based on the atmosphere state and 
     /// the Obukhov length
     pub fn businger_dyer_correction(&self, height: Float) -> Float {
         let non_scaled_correction = self.businger_dyer_unscaled_correction(height);

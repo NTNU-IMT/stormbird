@@ -29,7 +29,7 @@ fn test_rigid_body_motion() {
     // Roll motion
     let rotation_func = |time: Float| -> SpatialVector {
         let frequency = 1.0 / rotation_motion_period;
-        let amplitude = Float::from(45.0).to_radians();
+        let amplitude = Float::to_radians(45.0);
         let omega = 2.0 * PI * frequency;
 
         SpatialVector::from([amplitude * (omega * time).sin(), 0.0, 0.0])
@@ -82,9 +82,9 @@ fn test_rigid_body_motion() {
 fn test_wing_angles() {
     let mut line_force_model = get_example_model();
 
-    let chord_vector = line_force_model.chord_vectors_local_not_rotated[0].clone();
+    let chord_vector = line_force_model.chord_vectors_local_not_rotated[0];
 
-    let rotation_angle = Float::from(45.0).to_radians();
+    let rotation_angle = Float::to_radians(45.0);
 
     let rotated_chord_vector = chord_vector.rotate_around_axis(
         rotation_angle, 
@@ -100,11 +100,11 @@ fn test_wing_angles() {
     let chord_vectors = &line_force_model.chord_vectors_global;
     let span_points = &line_force_model.span_points_global.clone();
 
-    for i in 0..chord_vectors.len() {
-        assert_eq!(chord_vectors[i], rotated_chord_vector);
+    for &chord_vector in chord_vectors {
+        assert_eq!(chord_vector, rotated_chord_vector);
     }
 
-    for i in 0..span_points.len() {
-        assert_eq!(span_points[i], original_span_points[i]);
+    for (span_point, original_span_point) in span_points.iter().zip(&original_span_points) {
+        assert_eq!(span_point, original_span_point);
     }
 }

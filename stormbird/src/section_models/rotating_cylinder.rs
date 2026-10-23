@@ -10,7 +10,7 @@ use crate::error::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Parametric model representing a rotating cylinder. The lift, drag and moment can be calculated
+/// Parametric model representing a rotating cylinder. The lift, drag and power can be calculated
 /// based on how fast the cylinder is spinning.
 ///
 /// The lift has an initial slope with respect to the spin ratio, which changes smoothly to a
@@ -71,18 +71,35 @@ impl Default for RotatingCylinder {
     }
 }
 
+impl std::fmt::Display for RotatingCylinder {
+    /// Formats the model as a JSON string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+
+        write!(f, "{}", json)
+    }
+}
+
 impl RotatingCylinder {
     // The default lift parameters are fitted to two dimensional CFD simulations, from:
     // Ostman et al. (2023). Calculation of Flettner rotor forces using lifting line and CFD
     // methods. NuTTS conference.
+    /// Default initial lift slope
     pub fn default_cl_initial_slope() -> Float {3.0}
+    /// Default lift slope at high spin ratios
     pub fn default_cl_high_spin_ratio_slope() -> Float {1.5}
+    /// Default spin ratio for the transition between the lift slopes
     pub fn default_cl_slope_transition_spin_ratio() -> Float {3.4}
+    /// Default range of the transition between the lift slopes
     pub fn default_cl_slope_transition_range() -> Float {1.0}
 
+    /// Default drag at zero spin ratio
     pub fn default_cd_start() -> Float {0.457}
+    /// Default drag at large spin ratios
     pub fn default_cd_end() -> Float {0.05}
+    /// Default angle that defines the initial slope of the drag curve (5 degrees)
     pub fn default_cd_angle_start() -> Float {Float::from(5.0_f32).to_radians()}
+    /// Default spin ratio where the low drag is used
     pub fn default_cd_spin_ratio_low_drag() -> Float {2.7}
 
     /// Default power coefficient polynomial, from equation (9) in:
@@ -95,14 +112,11 @@ impl RotatingCylinder {
         vec![0.0, 0.0234, -0.0168, 0.0143, -0.0004, 0.0001]
     }
     
+    /// Creates a rotating cylinder from a JSON string
     pub fn new_from_string(input_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(input_string)?;
 
         Ok(serde_res)
-    }
-
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
     }
 
 
@@ -125,6 +139,7 @@ impl RotatingCylinder {
             (self.cl_initial_slope - self.cl_high_spin_ratio_slope) * transition
     }
 
+    /// Calculates the drag coefficient for a given spin ratio
     pub fn drag_coefficient(&self, spin_ratio: Float) -> Float {   
         let angle0 = PI * spin_ratio.abs() / self.cd_spin_ratio_low_drag;
         let angle = angle0 + self.cd_angle_start;

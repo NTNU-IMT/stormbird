@@ -23,12 +23,12 @@ impl DynamicWake {
 
         let mut writer = BufWriter::new(f);
 
-        write!(writer, "o wake\n")?;
+        writeln!(writer, "o wake")?;
 
         for i in 0..self.points.len(){
-            write!(
+            writeln!(
                 writer, 
-                "v {} {} {}\n", 
+                "v {} {} {}", 
                 self.points[i][0], 
                 self.points[i][1], 
                 self.points[i][2]
@@ -40,9 +40,9 @@ impl DynamicWake {
 
             let indices = self.panel_point_indices(stream_index, span_index);
 
-            write!(
+            writeln!(
                 writer, 
-                "f {} {} {} {}\n", 
+                "f {} {} {} {}", 
                 indices[0] + 1, 
                 indices[1] + 1, 
                 indices[2] + 1, 
@@ -68,44 +68,44 @@ impl DynamicWake {
         let nr_faces  = self.strengths.len();
 
         // Header
-        write!(writer, "<?xml version=\"1.0\"?>\n")?;
-        write!(writer, "<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n")?;
-        write!(writer, "\t<PolyData>\n")?;
-        write!(
+        writeln!(writer, "<?xml version=\"1.0\"?>")?;
+        writeln!(writer, "<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">")?;
+        writeln!(writer, "\t<PolyData>")?;
+        writeln!(
             writer, 
-            "\t\t<Piece NumberOfPoints=\"{}\" NumberOfVerts=\"0\" NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"{}\">\n", 
+            "\t\t<Piece NumberOfPoints=\"{}\" NumberOfVerts=\"0\" NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"{}\">", 
             nr_points, 
             nr_faces
         )?;
 
         // Write points
-        write!(writer, "\t\t\t<Points>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t<Points>")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">")?;
         for i in 0..nr_points {
-            write!(
+            writeln!(
                 writer, 
-                "\t\t\t\t\t{} {} {}\n", 
+                "\t\t\t\t\t{} {} {}", 
                 self.points[i][0], 
                 self.points[i][1], 
                 self.points[i][2]
             )?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</Points>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t</Points>")?;
 
         // Write faces
-        write!(writer, "\t\t\t<Polys>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t<Polys>")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">")?;
 
         for panel_index in 0..self.strengths.len() {
             let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
 
             let indices = self.panel_point_indices(stream_index, span_index);
 
-            write!(
+            writeln!(
                 writer, 
-                "\t\t\t\t\t{} {} {} {}\n", 
+                "\t\t\t\t\t{} {} {} {}", 
                 indices[0], 
                 indices[1], 
                 indices[2], 
@@ -113,36 +113,36 @@ impl DynamicWake {
             )?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">")?;
         for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", (i+1)*4)?;
+            writeln!(writer, "\t\t\t\t\t{}", (i+1)*4)?;
         }
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</Polys>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t</Polys>")?;
 
         // Write strength
-        write!(writer, "\t\t\t<CellData Scalars=\"strength\">\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"strength\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t<CellData Scalars=\"strength\">")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"strength\" format=\"ascii\">")?;
         for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", self.strengths[i])?;
+            writeln!(writer, "\t\t\t\t\t{}", self.strengths[i])?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
 
         // Write viscous core length
 
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"viscous_core_length\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"viscous_core_length\" format=\"ascii\">")?;
         for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", self.panels_viscous_core_length[i])?;
+            writeln!(writer, "\t\t\t\t\t{}", self.panels_viscous_core_length[i])?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</CellData>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t</CellData>")?;
 
-        write!(writer, "\t\t</Piece>\n")?;
-        write!(writer, "\t</PolyData>\n")?;
-        write!(writer, "</VTKFile>\n")?;
+        writeln!(writer, "\t\t</Piece>")?;
+        writeln!(writer, "\t</PolyData>")?;
+        writeln!(writer, "</VTKFile>")?;
 
         writer.flush()?;
 

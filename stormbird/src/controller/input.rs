@@ -17,12 +17,12 @@ use stormath::{spatial_vector::SpatialVector, type_aliases::Float};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-/// Structure containing input values that is used by the controllers to set the local wing angles
+/// Structure containing input values that are used by the controllers to set the local wing angles
 /// and the section models' internal state.
 pub struct ControllerInput {
     /// How much of the max value that should be used
     pub loading: Float,
-    /// The current local wing angles, so that the controller know what to change from
+    /// The current local wing angles, so that the controller knows what to change from
     pub current_local_wing_angle: Float,
     /// Current internal state
     pub current_internal_state: Float,
@@ -64,7 +64,7 @@ impl ControllerInput {
         for i in 0..nr_wings {
             out.push(
                 Self {
-                    loading: loading,
+                    loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
                     current_internal_state: line_force_model.internal_state[i].representative_value(),
                     angle_of_attack: angles_of_attack[i],
@@ -120,7 +120,7 @@ impl ControllerInput {
         for i in 0..nr_wings {
             out.push(
                 Self {
-                    loading: loading,
+                    loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
                     current_internal_state: line_force_model.internal_state[i].representative_value(),
                     angle_of_attack: angles_of_attack[i],

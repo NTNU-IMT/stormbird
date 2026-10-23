@@ -19,7 +19,7 @@ use super::test_setup::RectangularWing;
 
 fn quasi_steady_simulation(symmetry_condition: SymmetryCondition) -> Simulation {
     let line_force_model_builder = RectangularWing {
-        angle_of_attack: Float::from(5.0).to_radians(),
+        angle_of_attack: Float::to_radians(5.0),
         nr_strips: 8,
         ..Default::default()
     }.build();
@@ -67,17 +67,17 @@ fn quasi_steady_induced_velocities_match_the_solver() {
 
         let nr_span_lines = ctrl_points.len();
 
-        for row_index in 0..nr_span_lines {
+        for (row_index, &induced_velocity) in induced_velocities.iter().enumerate().take(nr_span_lines) {
             let mut expected = SpatialVector::default();
 
-            for col_index in 0..nr_span_lines {
-                expected += circulation_strength[col_index] *
+            for (col_index, &strength) in circulation_strength.iter().enumerate().take(nr_span_lines) {
+                expected += strength *
                     sim.frozen_wake.variable_velocity_factors[[row_index, col_index]];
             }
 
             assert!(expected.length() > 0.0);
             assert!(
-                (induced_velocities[row_index] - expected).length() < 1e-12 * expected.length(),
+                (induced_velocity - expected).length() < 1e-12 * expected.length(),
                 "Induced velocity at control point {} differs from the solver", row_index
             );
         }

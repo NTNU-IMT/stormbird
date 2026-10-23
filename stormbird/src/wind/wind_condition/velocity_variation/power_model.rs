@@ -17,15 +17,17 @@ pub struct PowerModel {
 }
 
 impl PowerModel {
-    /// The wind velocity is often specified at 10 m height in hind cast models
+    /// The wind velocity is often specified at 10 m height in hindcast models
     pub fn default_reference_height() -> Float {10.0}
     /// The ITTC recommends a factor of 1/9 for the power factor if no other information about the
     /// atmospheric boundary layer shape is available.
     pub fn default_power_factor() -> Float {1.0/9.0}
     
+    /// Creates a power model with the given reference velocity, and default values for the other
+    /// parameters
     pub fn new_default(reference_velocity: Float) -> Self {
         Self {
-            reference_velocity: reference_velocity,
+            reference_velocity,
             reference_height: Self::default_reference_height(),
             power_factor: Self::default_power_factor()
         }

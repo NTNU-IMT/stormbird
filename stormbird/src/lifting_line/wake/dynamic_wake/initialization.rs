@@ -32,7 +32,7 @@ impl DynamicWake {
         for _ in 0..nr_initial_time_steps {
             self.update_wake_points_before_solving(
                 time_step,
-                &line_force_model,
+                line_force_model,
                 &wake_points_freestream
             );
         }

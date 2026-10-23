@@ -17,11 +17,14 @@ impl LineForceModel {
         self.update_ctrl_points();
     }
 
+    /// Updates all values that are calculated from the input geometry. Called after the model is
+    /// created.
     pub fn update_calculated_values_after_create(&mut self) {
         self.update_global_data_representations();
         self.update_ctrl_point_spanwise_distance();
     }
 
+    /// Updates the span lines in the global coordinate system, based on the rigid body motion
     pub fn update_global_span_lines(&mut self) {
         if self.span_lines_global.len() != self.span_lines_local.len() {
             self.span_lines_global = self.span_lines_local.clone();
@@ -38,6 +41,7 @@ impl LineForceModel {
         }
     }
 
+    /// Updates the span points in the global coordinate system, based on the global span lines
     pub fn update_global_span_points(&mut self) {
         let mut span_points: Vec<SpatialVector> = Vec::new();
 
@@ -54,6 +58,8 @@ impl LineForceModel {
         self.span_points_global = span_points;
     }
 
+    /// Updates the local and global chord vectors, based on the local wing angles and the rigid body
+    /// motion
     pub fn update_chord_vectors(&mut self) {
         if self.chord_vectors_local.len() != self.chord_vectors_local_not_rotated.len() {
             self.chord_vectors_local = self.chord_vectors_local_not_rotated.clone();
@@ -79,6 +85,7 @@ impl LineForceModel {
         );
     }
 
+    /// Updates the control points in the global coordinate system, based on the global span lines
     pub fn update_ctrl_points(&mut self) {
         if self.ctrl_points_global.len() != self.span_lines_global.len() {
             self.ctrl_points_global = vec![SpatialVector::from([0.0, 0.0, 0.0]); self.span_lines_global.len()];
@@ -89,6 +96,8 @@ impl LineForceModel {
         }
     }
 
+    /// Updates the distance along the span from the center of each wing to each control point, both
+    /// in dimensional and non-dimensional form
     pub fn update_ctrl_point_spanwise_distance(&mut self) {
         self.ctrl_point_spanwise_distance = Vec::with_capacity(self.span_lines_local.len());
         self.ctrl_point_spanwise_distance_non_dimensional = Vec::with_capacity(self.span_lines_local.len());
@@ -120,10 +129,10 @@ impl LineForceModel {
             let total_distance =
                 current_wing_span_distance.last().unwrap() + end_point.distance(previous_point);
 
-            for i in 0..self.wing_indices[wing_index].end - self.wing_indices[wing_index].start {
-                let relative_distance = current_wing_span_distance[i] / total_distance;
+            for &span_distance in &current_wing_span_distance {
+                let relative_distance = span_distance / total_distance;
 
-                self.ctrl_point_spanwise_distance.push(current_wing_span_distance[i] - 0.5 * total_distance);
+                self.ctrl_point_spanwise_distance.push(span_distance - 0.5 * total_distance);
                 self.ctrl_point_spanwise_distance_non_dimensional.push(relative_distance - 0.5);
             }
         }
@@ -159,11 +168,13 @@ impl LineForceModel {
         self.internal_state[wing_index] = WingInternalState::SpanVarying(span_variation);
     }
 
+    /// Sets the local wing angles and internal states from the output of a controller
     pub fn set_controller_output(&mut self, controller_output: &ControllerOutput) {                
         self.set_local_wing_angles(&controller_output.local_wing_angles);
         self.set_internal_state(&controller_output.internal_states);
     }
 
+    /// Sets the local wing angles, and updates the global geometry
     pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {
         for (index, angle) in local_wing_angles.iter().enumerate() {
             self.local_wing_angles[index] = *angle;
@@ -181,6 +192,8 @@ impl LineForceModel {
         self.update_global_data_representations();
     }
 
+    /// Sets the translation and rotation, and updates the velocity of the rigid body motion with
+    /// finite differences, using the previous translation and rotation
     pub fn set_translation_and_rotation_with_finite_difference_for_the_velocity(
         &mut self,
         time_step: Float,
@@ -200,6 +213,7 @@ impl LineForceModel {
         self.update_global_data_representations();
     }
 
+    /// Sets the translation, without changing the rotation or the velocity
     pub fn set_translation_only(
         &mut self,
         translation: SpatialVector
@@ -209,6 +223,7 @@ impl LineForceModel {
         self.update_global_data_representations();
     }
 
+    /// Sets the rotation, without changing the translation or the velocity
     pub fn set_rotation_only(
         &mut self,
         rotation: SpatialVector
@@ -218,6 +233,7 @@ impl LineForceModel {
         self.update_global_data_representations();
     }
 
+    /// Sets the translation and rotation, without changing the velocity
     pub fn set_translation_and_rotation(
         &mut self,
         translation: SpatialVector,

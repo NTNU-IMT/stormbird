@@ -11,7 +11,7 @@ pub mod foil;
 pub mod varying_foil;
 /// Section model of a rotating cylinder, for instance to be used when modelling rotor sails.
 pub mod rotating_cylinder;
-/// Section model of a foil that use active air flow, e.g. suction.
+/// Section model of a foil that uses active air flow, e.g. suction.
 pub mod active_air_flow_foil;
 
 use serde::{Serialize, Deserialize};
@@ -28,7 +28,9 @@ use crate::line_force_model::wing_internal_state::{WingInternalState, InternalCo
 /// relationship between the wing and the sections depends on the flow conditions along the whole
 /// wing, such as when converting the wing internal state or computing the power for a wing.
 pub struct SegmentFlowConditions {
+    /// The angle of attack at the control point of the segment
     pub angle_of_attack: Float,
+    /// The magnitude of the velocity at the control point of the segment
     pub velocity: Float,
     /// The area of the segment, i.e., the chord length times the span length
     pub area: Float,
@@ -96,11 +98,26 @@ pub fn integrate_power_coefficient(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Sectional model for a wing, that can be of multiple variants
 pub enum SectionModel {
+    /// A single-element foil with fixed properties
     SingleElementFoil(Foil),
+    /// A foil where the properties vary with the internal state, e.g., a multi-element foil with a
+    /// flap angle that can be changed
     MultiElementFoil(VaryingFoil),
+    /// A foil with active air flow, e.g., a suction sail
     ActiveAirFlowFoil(ActiveAirFlowFoil),
+    /// A rotating cylinder, e.g., a rotor sail
     RotatingCylinder(RotatingCylinder),
+    /// A section that gives no forces, used to measure the effective wind at the location of a wing
     EffectiveWindSensor,
+}
+
+impl std::fmt::Display for SectionModel {
+    /// Formats the model as a JSON string
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let json = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
+
+        write!(f, "{}", json)
+    }
 }
 
 impl SectionModel {
@@ -108,13 +125,13 @@ impl SectionModel {
     /// 
     /// # Arguments
     /// - `angle_of_attack`: the angle of attack, relevant if the sectional model is a foil, with or
-    /// without active flow control and flap
+    ///   without active flow control and flap
     /// - `internal_state`: the internal state to use when calculating the forces. The meaning of 
-    /// the number varies depending on the which section model is used. For a multi-element foil, it
-    /// will typically be the flap angle (or a number implicitly setting the flap and leading edge 
-    /// slot angle). For a foil with active flow control it will typically be either the power 
-    /// coefficient or the non-dimensional suction rate (the flap setting typically implicitly set 
-    /// from the same data). For a rotating cylinder, it will be the spin ratio
+    ///   the number varies depending on the which section model is used. For a multi-element foil, it
+    ///   will typically be the flap angle (or a number implicitly setting the flap and leading edge 
+    ///   slot angle). For a foil with active flow control it will typically be either the power 
+    ///   coefficient or the non-dimensional suction rate (the flap setting typically implicitly set 
+    ///   from the same data). For a rotating cylinder, it will be the spin ratio
     pub fn lift_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         match self {
             Self::SingleElementFoil(foil) => foil.lift_coefficient(angle_of_attack),
@@ -131,6 +148,7 @@ impl SectionModel {
         }
     }
 
+    /// Returns the linear lift coefficient, i.e., the lift without stall effects
     pub fn lift_coefficient_linear(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         match self {
             Self::SingleElementFoil(foil) => foil.lift_coefficient_linear(angle_of_attack),
@@ -145,6 +163,7 @@ impl SectionModel {
         }
     }
 
+    /// Returns the pre-stall lift coefficient, reduced by the amount of stall
     pub fn lift_coefficient_pre_stall_with_stall_drop_off(
         &self, 
         angle_of_attack: Float, 
@@ -165,6 +184,7 @@ impl SectionModel {
         }
     }
 
+    /// Returns the post-stall lift coefficient, weighted by the amount of stall
     pub fn lift_coefficient_post_stall_with_stall_weight(
         &self, 
         angle_of_attack: Float, 
@@ -185,6 +205,7 @@ impl SectionModel {
         }
     }
 
+    /// Returns the initial slope of the linear lift coefficient
     pub fn lift_coefficient_derivative(&self, internal_state: Float) -> Float {
         match self {
             Self::SingleElementFoil(foil) => foil.cl_initial_slope,
@@ -195,6 +216,7 @@ impl SectionModel {
         }
     }
 
+    /// Returns the drag coefficient
     pub fn drag_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         match self {
             Self::SingleElementFoil(foil) => foil.drag_coefficient(angle_of_attack),
@@ -301,15 +323,12 @@ impl SectionModel {
         }
     }
 
+    /// Creates a section model from a JSON string
     pub fn from_string(setup_string: &str) -> Result<Self, String> {
         let section_model: SectionModel = serde_json::from_str(setup_string)
             .map_err(|e| format!("Failed to parse section model from string: {}", e))?;
         
         Ok(section_model)
-    }
-
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
     }
 }
 

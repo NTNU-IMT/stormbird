@@ -64,7 +64,7 @@ impl LineForceModel {
         self.internal_state.iter().map(|state| state.representative_value()).collect()
     }
 
-    /// returns the span length of each wing in the model
+    /// Returns the span length of each wing in the model
     pub fn span_lengths(&self) -> Vec<Float> {
         let mut span_length = vec![0.0; self.nr_wings()];
 

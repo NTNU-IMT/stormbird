@@ -10,20 +10,22 @@ use stormath::spatial_vector::SpatialVector;
 /// Enum that represent a symmetry plane.
 ///
 /// To be used when calculating induced velocities in space from a potential theory velocity model.
+#[derive(Default)]
 pub enum SymmetryCondition {
+    /// No symmetry
+    #[default]
     NoSymmetry,
+    /// Symmetry plane at x = 0
     X,
+    /// Symmetry plane at y = 0
     Y,
+    /// Symmetry plane at z = 0
     Z,
 }
 
-impl Default for SymmetryCondition {
-    fn default() -> Self {
-        SymmetryCondition::NoSymmetry
-    }
-}
 
 impl SymmetryCondition {
+    /// Returns the point mirrored about the symmetry plane, or `None` if there is no symmetry
     pub fn mirrored_point(&self, point: SpatialVector) -> Option<SpatialVector> {
         match self {
             SymmetryCondition::NoSymmetry => None,
@@ -33,6 +35,8 @@ impl SymmetryCondition {
         }
     }
 
+    /// Combines the velocity induced at a point, `u_i`, with the velocity induced at the mirrored
+    /// point, `u_i_m`, to get the velocity with the symmetry condition
     pub fn corrected_velocity(&self, u_i: SpatialVector, u_i_m: SpatialVector) -> SpatialVector {
         match self {
             SymmetryCondition::NoSymmetry => u_i,

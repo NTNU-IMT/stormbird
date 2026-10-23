@@ -13,9 +13,15 @@ use crate::line_force_model::span_line::SpanLine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Gaussian projection function, with separate widths in the chord, thickness and span directions
 pub struct Gaussian {
+    /// Width in the chord direction, relative to the chord length
     pub chord_factor: Float,
+    /// Width in the thickness direction, relative to the chord length
     pub thickness_factor: Float,
+    /// Width of the Gaussian falloff of the force beyond the ends of the line elements where it is
+    /// enabled, typically the ends of the wings, relative to the length of each line element. Zero
+    /// means a sharp cut-off.
     #[serde(default = "Gaussian::default_span_falloff_factor")]
     pub span_falloff_factor: Float,
 }

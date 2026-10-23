@@ -47,15 +47,11 @@ fn no_self_induced_velocity() {
 
     let chord_vector = SpatialVector::from([diameter, 0.0, 0.0]);
 
-    let wing_x_positions = vec![
-        -1.0 * span,
-        1.0 * span,
-    ];
+    let wing_x_positions = [-span,
+        1.0 * span];
 
-    let wing_y_positions = vec![
-        -10.0 * span,
-        10.0 * span,
-    ];
+    let wing_y_positions = [-10.0 * span,
+        10.0 * span];
 
     for (x_pos, y_pos) in wing_x_positions.iter().zip(wing_y_positions.iter()) {
         let wing_builder = WingBuilder {

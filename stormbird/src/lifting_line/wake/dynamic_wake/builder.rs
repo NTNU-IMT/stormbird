@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Functionality for calculating lift-induced velocities from full dynamic wake.
+//! Builder for the dynamic wake.
 
 use serde::{Deserialize, Serialize};
 
@@ -29,9 +29,13 @@ use super::{
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Settings for a viscous core length that increases along the wake, following a sine function
 pub struct SinIncreasedViscousCoreLength {
+    /// The viscous core length at the last panel in the wake
     #[serde(default)]
     pub last_panel_value: ViscousCoreLength,
+    /// The fraction of the wake length over which the viscous core length increases. After this,
+    /// the last panel value is used.
     #[serde(default="SinIncreasedViscousCoreLength::default_evolution_length_factor")]
     pub evolution_length_factor: Float,
 }
@@ -42,16 +46,16 @@ impl SinIncreasedViscousCoreLength {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[derive(Default)]
+/// How the viscous core length evolves along the wake
 pub enum ViscousCoreLengthEvolution {
+    /// The same viscous core length for all panels
+    #[default]
     Constant,
+    /// Viscous core length that increases along the wake
     SinIncrease(SinIncreasedViscousCoreLength)
 }
 
-impl Default for ViscousCoreLengthEvolution {
-    fn default() -> Self {
-        Self::Constant
-    }
-}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,7 +63,7 @@ impl Default for ViscousCoreLengthEvolution {
 /// Variables used to build a wake model.
 pub struct DynamicWakeBuilder {
     #[serde(default="DynamicWakeBuilder::default_number_of_panels_per_line_element")]
-    /// Number of panels.
+    /// Number of panels in the streamwise direction behind each line element
     pub nr_panels_per_line_element: usize,
     #[serde(default)]
     /// The viscous core length used when calculating the induced velocities
@@ -68,14 +72,13 @@ pub struct DynamicWakeBuilder {
     /// How the viscous core length should evolve behind the wake.
     pub viscous_core_length_evolution: ViscousCoreLengthEvolution,
     #[serde(default="DynamicWakeBuilder::default_first_panel_relative_length")]
-    /// How the first panel in the wake is treated
+    /// Length of the first panel in the wake, relative to the chord length
     pub first_panel_relative_length: Float,
     #[serde(default="DynamicWakeBuilder::default_last_panel_relative_length")]
     /// Factor used to calculate the length of the final panel, relative to the chord length.
     pub last_panel_relative_length: Float,
     #[serde(default)]
-    /// Determines if the chord direction should be used when calculating the direction of the first
-    /// wake panels
+    /// Determines which direction to use for the first wake panels, right behind the wings
     pub first_wake_points_direction: FirstWakePointsDirection,
     #[serde(default)]
     /// Symmetry condition
@@ -104,7 +107,7 @@ pub struct DynamicWakeBuilder {
     /// shape in the line force model to maintain a realistic local shape.
     pub neglect_self_induced_velocities: bool,
     #[serde(default)]
-    // Switch to set the strength update to be "steady-state"
+    /// Switch to set the strength update to be "steady-state"
     pub steady_state_strength_update: bool,
     #[serde(default="DynamicWakeBuilder::default_initial_relative_wake_length")]
     /// Length of wake during initialization, relative to the chord length
@@ -140,6 +143,7 @@ impl DynamicWakeBuilder {
         }
     }
 
+    /// Builds the dynamic wake for the given line force model. Panics if the settings are not valid.
     pub fn build(
         &self,
         line_force_model: &LineForceModel,
@@ -153,10 +157,10 @@ impl DynamicWakeBuilder {
         let mut points = vec![SpatialVector::default(); indices.nr_points()];
 
         for i_stream in 0..indices.nr_points_per_line_element {
-            for i_span in 0..span_points.len() {
+            for (i_span, &span_point) in span_points.iter().enumerate() {
                 let flat_index = indices.point_index(i_stream, i_span);
 
-                points[flat_index] = span_points[i_span];
+                points[flat_index] = span_point;
             }
         }
 
@@ -180,9 +184,8 @@ impl DynamicWakeBuilder {
         };
 
         let potential_theory_settings = PotentialTheorySettings {
-            symmetry_condition: self.symmetry_condition.clone(),
+            symmetry_condition: self.symmetry_condition,
             far_field_ratio: self.far_field_ratio,
-            ..Default::default()
         };
 
         let nr_panels = indices.nr_panels();
@@ -198,8 +201,7 @@ impl DynamicWakeBuilder {
 
         let velocity_at_points = vec![SpatialVector::default(); indices.nr_points()];
 
-        let representative_chord_length = line_force_model.chord_lengths.iter()
-            .map(|c| *c)
+        let representative_chord_length = line_force_model.chord_lengths.iter().copied()
             .sum::<Float>() / line_force_model.chord_lengths.len() as Float;
 
         let mut wake = DynamicWake {
@@ -217,7 +219,7 @@ impl DynamicWakeBuilder {
         };
 
         wake.initialize_based_on_chord_length(
-            &line_force_model, 
+            line_force_model, 
             self.initial_relative_wake_length
         );
 
@@ -239,7 +241,7 @@ impl DynamicWakeBuilder {
             .collect();
 
         for i_stream in 0..wake_indices.nr_panels_per_line_element {
-            for i_span in 0..wake_indices.nr_panels_along_span {
+            for (i_span, &span_line_length) in span_line_lengths.iter().enumerate().take(wake_indices.nr_panels_along_span) {
                 let flat_index = wake_indices.panel_index(
                     i_stream, 
                     i_span
@@ -247,7 +249,7 @@ impl DynamicWakeBuilder {
 
                 let viscous_core_length_raw = match self.viscous_core_length {
                     ViscousCoreLength::Relative(relative_length) => {
-                        relative_length * span_line_lengths[i_span]
+                        relative_length * span_line_length
                     },
                     ViscousCoreLength::Absolute(length) => length,
                     ViscousCoreLength::NoViscousCore => MIN_POSITIVE
@@ -258,7 +260,7 @@ impl DynamicWakeBuilder {
                     ViscousCoreLengthEvolution::SinIncrease(evolution_settings) => {
                         let final_viscous_core_length = match evolution_settings.last_panel_value {
                             ViscousCoreLength::Relative(relative_length) => {
-                                relative_length * span_line_lengths[i_span]
+                                relative_length * span_line_length
                             },
                             ViscousCoreLength::Absolute(length) => length,
                             ViscousCoreLength::NoViscousCore => MIN_POSITIVE
@@ -266,7 +268,12 @@ impl DynamicWakeBuilder {
 
                         let length_before_last_value_is_used = (wake_indices.nr_panels_per_line_element - 1) as Float * evolution_settings.evolution_length_factor;
 
-                        let relative_stream_value = (i_stream as Float / length_before_last_value_is_used).min(1.0).max(0.0); // Converts to [0, 1]
+                        // Converts to [0, 1]
+                        let relative_stream_value = if length_before_last_value_is_used == 0.0 {
+                            1.0
+                        } else {
+                            (i_stream as Float / length_before_last_value_is_used).clamp(0.0, 1.0)
+                        };
 
                         let sin_input = 0.5 * relative_stream_value * PI; // Converts to [0, PI/2]
                         let sin_factor = sin_input.sin(); // Converts to [0, 1]
@@ -281,6 +288,7 @@ impl DynamicWakeBuilder {
         out
     }
 
+    /// Returns the indices that describe the structure of the wake for the given line force model
     pub fn get_wake_indices(
         &self,
         line_force_model: &LineForceModel,

@@ -1,3 +1,4 @@
+use crate::test_utils::tolerance;
 use stormath::type_aliases::Float;
 
 use crate::section_models::foil::Foil;
@@ -150,7 +151,7 @@ fn assert_self_consistent(
 
         let cq_flow_model = volume_flow / (segment.velocity * segment.area);
 
-        assert!((cq_flow_model - cq).abs() < 1e-10);
+        assert!((cq_flow_model - cq).abs() < tolerance(1e-10, 1e-5));
     }
 }
 
@@ -465,8 +466,8 @@ fn fan_curves_follow_the_affinity_laws() {
             let pressure = curves.pressure_rise(flow, speed, density);
             let power = curves.power(flow, speed, density);
 
-            assert!((pressure - expected_pressure).abs() / expected_pressure < 1e-8);
-            assert!((power - expected_power).abs() / expected_power < 1e-8);
+            assert!((pressure - expected_pressure).abs() / expected_pressure < tolerance(1e-8, 1e-5));
+            assert!((power - expected_power).abs() / expected_power < tolerance(1e-8, 1e-5));
         }
     }
 }
@@ -933,7 +934,7 @@ fn suction_coefficient_inverts_internal_suction_coefficient() {
 
             let sigma = internal_flow.internal_suction_coefficient(cq);
 
-            assert!((internal_flow.suction_coefficient(sigma) - cq).abs() < 1e-12);
+            assert!((internal_flow.suction_coefficient(sigma) - cq).abs() < tolerance(1e-12, 1e-6));
         }
 
         // Below the threshold, the internal suction can not overcome the external suction

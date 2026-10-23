@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
-## 0.11.0 - Unreleased
+## 0.11.0 - 2026-10-23
 ### Highlights
 - New structure for the `ActiveAirFlowFoil` section model, intended for suction sails. It now consists of a `VaryingFoil` model for the lift and drag, together with an `InternalStateConversion` that defines how the wing internal state is converted to the internal state of the foil model. Four conversions are available:
     - `SuctionCoefficientDirect`: the wing internal state is the suction coefficient, used directly. Mostly useful for testing.
@@ -27,6 +27,7 @@ This file contains an overview of the changes made to the Stormbird Rust library
     - `added_mass`: an `AddedMass` strip theory model, with separate coefficients for the acceleration normal to and along the chord. The coefficients are relative to the added mass of a flat plate, so that the theoretical value is 1.0 for acceleration normal to a foil, and 1.0 in all directions for a circular cylinder.
     - `gyroscopic_moment`: a `GyroscopicMoment` model for rotor sails, set by the total moment of inertia of the rotor. Only allowed together with the `RotatingCylinder` section model.
 - The force calculations chapter in the book has new sections on the force corrections, the added mass model and the gyroscopic moment model, including recommended values for the added mass coefficients, and a comparison between the lift-induced drag correction and virtual line segments.
+- The controller can again apply a moving average to its input, through the `moving_average_window_size` setting in the `ControllerBuilder`. When the window size is larger than zero, the measured angle of attack, velocity and apparent wind direction for each wing are averaged over the given number of controller updates, so that the controller acts on a smoothed version of the flow conditions rather than the instantaneous values. The apparent wind direction is averaged through its sine and cosine, so that the average is correct also when the direction passes ±π. The filter is not used by default.
 
 ### Breaking changes
 - The input format for the `ActiveAirFlowFoil` section model has changed. The `VaryingFoil` data must now be given in a `varying_foil` field, together with an `internal_state_conversion` field. To get the same behavior as before, use the `PowerToPowerCoefficient` conversion.
@@ -36,7 +37,7 @@ This file contains an overview of the changes made to the Stormbird Rust library
     - `internal_state_max_value` -> `wing_internal_state_max_value`
     - `max_internal_state_change_rate` -> `wing_internal_state_max_change_rate`
 - The `input_power` function on the line force model now takes the sectional force input as an argument, as the power can depend on the local flow conditions.
-- Stormbird now depends on version 0.4.0 of Stormath, which adds a bracketed root-finding method (Brent's method), used to find the operating point of the fans.
+- Stormbird now depends on version 0.4.0 of Stormath, which adds a bracketed root-finding method (Brent's method), used to find the operating point of the fans. Stormath 0.4.0 requires Rust 1.85, which is therefore also the minimum supported Rust version for Stormbird, set through the new `rust-version` field.
 - The `internal_state` field in the line force model is now a vector of `WingInternalState` rather than a vector of floats. Use `set_internal_state` to set constant values as before, and `internal_state_representative_values` to get one value per wing.
 - Virtual line elements are no longer included in the power or in the flow through an `ActiveAirFlowFoil`. They still get the same type of internal state as the rest of the wing, so that the circulation stays consistent along the span. For the `PowerToPowerCoefficient` conversion, this means that the power is only distributed over the line elements that are not virtual.
 - Changes to the fields of the `Foil` model. As unknown fields are not accepted, input that uses the removed fields must be updated:
@@ -55,8 +56,24 @@ This file contains an overview of the changes made to the Stormbird Rust library
 - `VaryingFoil` models with only positive (or only negative) internal state data now give the mirrored foil for internal states with the opposite sign. Previously, the first (or last) foil in the data was used for these internal states. The input is also checked when it is read: the internal state data must be strictly increasing, contain at least one value, and have the same length as the foils data.
 - The automatic export of the dynamic wake to files was removed, together with the `write_wake_data_to_file` and `wake_files_folder_path` settings in the `DynamicWakeBuilder`. As unknown fields are not accepted, input that uses these settings must be updated. The wake can instead be exported from the script that runs the simulation, with the `wake_as_vtk` function. `Simulation::dynamic_wake_as_vtk` is deprecated in favor of `Simulation::wake_as_vtk`, which returns the data directly rather than an `Option`, as all wakes can now be exported. `WakeData::QuasiSteady` now holds a `QuasiSteadyWake` rather than the `QuasiSteadyWakeSettings`.
 
+- The `check_for_zero_linear_lift` function on the `Linearized` solver was removed. It was meant to skip the solver when there is no lift, but due to a bug it never did, so the results are unchanged.
+- `EllipticalWing::lift_induced_angle_of_attach` was renamed to `EllipticalWing::lift_induced_angle_of_attack`, to fix a typo.
+
 ### Bug fixes
+- The `moving_average_window_size` setting in the `ControllerBuilder` was accepted, but not used, since the restructuring of the controller in version 0.8.0.
 - The initial shape of the dynamic wake, before the first time step, had a length proportional to the chord length squared, rather than the chord length, as the direction of the wake was not normalized. The wake is initialized again at the first time step, so this only affected the wake shape before the simulation started.
+- The angular velocity computed from finite differences of the rotation was wrong when a rotation angle passed -π in the negative direction, i.e., jumped from close to -π to close to π. This is fixed in Stormath 0.4.0, and affects simulations where the rotation is set with `set_translation_and_rotation_with_finite_difference_for_the_velocity`.
+
+### Other changes
+- Removed the unused `rand` dependency.
+- Removed the `empirical_models` folder, which contained an old model for superstructure forces that was no longer part of the library.
+- Added `keywords` and `categories` to the crate metadata, and changed the license identifier from the deprecated `GPL-3.0` to `GPL-3.0-only`.
+- Updated the description in the README, which is also the front page of the documentation, to include all three simulation methods.
+- Fixed the list of methods in the documentation of the force calculations, which included a function that no longer exists and was missing several others.
+- Added documentation to all public modules, structures, fields, variants and functions that were missing it.
+- Fixed errors in the existing documentation, including argument lists that did not match the function parameters, descriptions that referred to old behavior (e.g., the circulation smoothing being Gaussian only, and the wing builder interpolating the section model), and a number of typos.
+- Internal cleanup based on Clippy suggestions, without changes to the behavior. The `to_string` functions on the section models were replaced by implementations of the standard `Display` trait, which give the same JSON string through `to_string`.
+- Fixed tests that failed to compile with the `padded_spatial_vectors` feature, and tests that failed or gave warnings with the `single_precision` feature. The tests for the sign of the forces and moments from motion now compare against the velocity used in the simulation, rather than the analytical velocity, which could have the wrong sign close to the turning points of the motion.
 
 ## 0.10.0 - 2026-10-11
 ### Highlights

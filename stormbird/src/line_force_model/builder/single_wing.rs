@@ -22,34 +22,55 @@ use crate::line_force_model::gyroscopic_moment::GyroscopicMoment;
 #[derive(Debug, Clone)]
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
+    /// The span lines of the wing, in the local coordinate system
     pub span_lines_local: Vec<SpanLine>,
+    /// The chord vectors at the control point of each span line, in the local coordinate system
     pub chord_vectors_local: Vec<SpatialVector>,
+    /// The chord length at the control point of each span line
     pub chord_lengths: Vec<Float>,
+    /// Whether each span line is virtual, i.e., only part of the simulation and not of the wing
     pub line_segment_is_virtual: Vec<bool>,
+    /// The section model of the wing
     pub section_model: SectionModel,
+    /// Whether the circulation can be different from zero at the start and the end of the wing
     pub non_zero_circulation_at_ends: [bool; 2],
+    /// Model for the input power to the wing
     pub input_power_model: InputPowerModel,
+    /// The internal compartments of the wing
     pub internal_compartments: InternalCompartments,
+    /// Empirical corrections of the forces on the wing
     pub force_correction: ForceCorrection,
+    /// Model for the added mass forces on the wing
     pub added_mass: AddedMass,
+    /// Model for the gyroscopic moment from the wing
     pub gyroscopic_moment: GyroscopicMoment,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// A wing is specified by giving a set of points along the span were the chord length and 
-/// section model is set. Between these points the chord length and section model is linearly 
-/// interpolated 
+/// A wing is specified by giving a set of points along the span where the chord vector is set.
+/// Between these points the chord vector is linearly interpolated. The section model is the same
+/// along the whole wing.
 pub struct WingBuilder {
+    /// Points along the span where the chord vectors are given
     pub section_points: Vec<SpatialVector>,
+    /// The chord vector at each section point
     pub chord_vectors: Vec<SpatialVector>,
+    /// The section model of the wing
     pub section_model: SectionModel,
+    /// Optional specification of which span lines are virtual. None of the span lines are virtual
+    /// by default.
     #[serde(default)]
     pub line_segment_is_virtual: Option<Vec<bool>>,
+    /// Whether the circulation can be different from zero at the start and the end of the wing.
+    /// The default is zero circulation at both ends.
     #[serde(default="WingBuilder::default_non_zero_circulation_at_ends")]
     pub non_zero_circulation_at_ends: [bool; 2],
+    /// Optional number of sections for this wing, which overrides the number in the line force
+    /// model builder
     #[serde(default)]
     pub nr_sections: Option<usize>,
+    /// Model for the input power to the wing
     #[serde(default)]
     pub input_power_model: InputPowerModel,
     #[serde(default)]
@@ -71,9 +92,10 @@ pub struct WingBuilder {
 }
 
 impl WingBuilder {
+    /// Default value for `non_zero_circulation_at_ends`, which is zero circulation at both ends
     pub fn default_non_zero_circulation_at_ends() -> [bool; 2] {[false, false]}
 
-    /// Returns a vector that contain the distance from along the span to each section point.
+    /// Returns a vector that contains the distance along the span to each section point.
     pub fn specified_sections_span_distance(&self) -> Vec<Float> {
         let mut span_distance: Vec<Float> = Vec::new();
 
@@ -230,14 +252,14 @@ mod tests {
     #[test]
     fn test_wing_builder() {
         let chord_length = 5.0;
-        let chord_vector = SpatialVector([chord_length, 0.0, 0.0]);
+        let chord_vector = SpatialVector::from([chord_length, 0.0, 0.0]);
         
         let wing_builder = WingBuilder{
             section_points: vec![
-                SpatialVector([0.0, 0.0, -1.0]),
-                SpatialVector([0.0, 0.0, 0.0]),
-                SpatialVector([0.0, 0.0, 10.0]),
-                SpatialVector([0.0, 0.0, 11.0])
+                SpatialVector::from([0.0, 0.0, -1.0]),
+                SpatialVector::from([0.0, 0.0, 0.0]),
+                SpatialVector::from([0.0, 0.0, 10.0]),
+                SpatialVector::from([0.0, 0.0, 11.0])
             ],
             chord_vectors: vec![
                 chord_vector,

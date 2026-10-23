@@ -23,6 +23,7 @@ pub mod data_update;
 pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
+/// Models for the input power needed to drive a wind propulsion device
 pub mod input_power;
 /// The internal state of a wing, which can be constant or vary along the span
 pub mod wing_internal_state;
@@ -32,6 +33,7 @@ pub mod added_mass;
 pub mod gyroscopic_moment;
 
 pub mod corrections;
+/// Re-exports of commonly used structures, to simplify imports
 pub mod prelude;
 
 #[cfg(test)]
@@ -68,8 +70,8 @@ pub struct LineForceModel {
     pub chord_vectors_local_not_rotated: Vec<SpatialVector>,
     /// The length of the chord vectors, stored as it is needed for several calculations
     pub chord_lengths: Vec<Float>,
-    /// A vector with booleans that indicate wether each span line is "virtual" or "real". A virtual 
-    /// line segment is predominately used to effectively increase the aspect ratio, without having 
+    /// A vector with booleans that indicate whether each span line is "virtual" or "real". A virtual 
+    /// line segment is predominantly used to effectively increase the aspect ratio, without having to
     /// add more line segments in the force calculation
     pub line_segment_is_virtual: Vec<bool>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
@@ -81,9 +83,9 @@ pub struct LineForceModel {
     /// distribution. The vector is structured as follows:
     /// - The first index is the wing index
     /// - The second index is the end index, where 0 means that start of the wing and 1 means the
-    /// end
-    /// - When the boolean is true, it is a warning to any correction method that that it is not 
-    /// correct to assume zero circulation at that end.
+    ///   end
+    /// - When the boolean is true, it is a warning to any correction method that it is not 
+    ///   correct to assume zero circulation at that end.
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     /// Density used in force calculations
     pub density: Float,
@@ -124,7 +126,7 @@ pub struct LineForceModel {
     pub ctrl_point_spanwise_distance_non_dimensional: Vec<Float>,
     /// Effective values for the ctrl point spanwise distance when applying prescribed circulation
     pub ctrl_point_spanwise_distance_circulation_model: Vec<Float>,
-    /// Models for estimating the input energy for the sails
+    /// Models for estimating the input power for the sails
     pub input_power_models: Vec<InputPowerModel>,
     /// Empirical corrections of the forces on each wing
     pub force_corrections: Vec<ForceCorrection>,
@@ -202,8 +204,8 @@ impl LineForceModel {
         });
 
         for line in &wing.span_lines_local {
-            self.span_lines_local.push(line.clone());
-            self.span_lines_global.push(line.clone());
+            self.span_lines_local.push(*line);
+            self.span_lines_global.push(*line);
         }
 
         for chord_vector in &wing.chord_vectors_local {

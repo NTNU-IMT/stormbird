@@ -11,8 +11,11 @@ use crate::line_force_model::wing_internal_state::{WingInternalState, SPAN_START
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Tabulated data for the input power as a function of the internal state
 pub struct InputPowerData {
+    /// The internal state values in the data
     pub internal_state_data: Vec<Float>,
+    /// The input power at each internal state value
     pub input_power_data: Vec<Float>,
 }
 
@@ -20,10 +23,12 @@ pub struct InputPowerData {
 #[serde(deny_unknown_fields)]
 /// An empirical model to calculate the input power required for driving a wind propulsion device.
 /// It comes with different modes that represents different ways of calculating the power.
+#[derive(Default)]
 pub enum InputPowerModel {
     /// Default value. The power is calculated from the power coefficient of the section models,
     /// integrated over the wing: P = sum(c_P * 0.5 * density * A * U^3). Section models that do
     /// not need power, such as regular foils, have a power coefficient of zero.
+    #[default]
     FromSectionModelPowerCoefficient,
     /// Represent a case where a sail does not need power at all, e.g., wing sails
     NoPower,
@@ -37,11 +42,6 @@ pub enum InputPowerModel {
     InterpolateFromInternalState(InputPowerData),
 }
 
-impl Default for InputPowerModel {
-    fn default() -> Self {
-        InputPowerModel::FromSectionModelPowerCoefficient
-    }
-}
 
 impl InputPowerModel {
     /// Calculates the input power for a wing.
@@ -49,9 +49,9 @@ impl InputPowerModel {
     /// # Arguments
     /// * `internal_state` - the internal state of the wing
     /// * `span_length` - the span length of the wing, used if the internal state varies along the
-    /// span
+    ///   span
     /// * `section_models_power` - function that returns the power integrated from the section
-    /// models. Only evaluated when needed.
+    ///   models. Only evaluated when needed.
     pub fn input_power(
         &self,
         internal_state: &WingInternalState,

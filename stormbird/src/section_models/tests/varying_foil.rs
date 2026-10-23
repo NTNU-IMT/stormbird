@@ -1,3 +1,4 @@
+use crate::test_utils::tolerance;
 use stormath::type_aliases::Float;
 use stormath::interpolation::linear_interpolation;
 
@@ -12,18 +13,18 @@ fn asymmetric_foil(cl_zero_angle: Float) -> Foil {
         cl_initial_slope: 5.5,
         cl_slope_reduction_factor_positive: 0.4,
         cl_slope_reduction_factor_negative: 0.1,
-        cl_slope_reduction_onset_angle_positive: Float::from(8.0).to_radians(),
-        cl_slope_reduction_onset_angle_negative: Float::from(14.0).to_radians(),
-        cl_slope_reduction_range: Float::from(4.0).to_radians(),
+        cl_slope_reduction_onset_angle_positive: Float::to_radians(8.0),
+        cl_slope_reduction_onset_angle_negative: Float::to_radians(14.0),
+        cl_slope_reduction_range: Float::to_radians(4.0),
         cl_max_after_stall: 1.1,
         cd_min: 0.012,
         cd_second_order_factor: 0.6,
         cd_max_after_stall: 1.3,
         cd_power_after_stall: 1.8,
 
-        mean_positive_stall_angle: Float::from(16.0).to_radians(),
-        mean_negative_stall_angle: Float::from(24.0).to_radians(),
-        stall_range: Float::from(5.0).to_radians(),
+        mean_positive_stall_angle: Float::to_radians(16.0),
+        mean_negative_stall_angle: Float::to_radians(24.0),
+        stall_range: Float::to_radians(5.0),
 
 
     }
@@ -35,8 +36,8 @@ fn test_angles() -> Vec<Float> {
 
 fn assert_same_coefficients(foil_a: &Foil, foil_b: &Foil) {
     for angle in test_angles() {
-        assert!((foil_a.lift_coefficient(angle) - foil_b.lift_coefficient(angle)).abs() < 1e-12);
-        assert!((foil_a.drag_coefficient(angle) - foil_b.drag_coefficient(angle)).abs() < 1e-12);
+        assert!((foil_a.lift_coefficient(angle) - foil_b.lift_coefficient(angle)).abs() < tolerance(1e-12, 1e-6));
+        assert!((foil_a.drag_coefficient(angle) - foil_b.drag_coefficient(angle)).abs() < tolerance(1e-12, 1e-6));
     }
 }
 
@@ -126,7 +127,7 @@ fn one_sided_data_is_mirrored_for_the_opposite_sign() {
 #[test]
 fn single_foil_is_mirrored_for_the_opposite_sign() {
     // Typical setup with only one flap angle, which should still be usable for both directions
-    let flap_angle = Float::from(30.0).to_radians();
+    let flap_angle = Float::to_radians(30.0);
 
     let varying_foil = VaryingFoil::new(vec![flap_angle], vec![asymmetric_foil(2.0)]).unwrap();
 
