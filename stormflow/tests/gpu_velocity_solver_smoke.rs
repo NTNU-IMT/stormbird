@@ -6,6 +6,11 @@ use stormflow::simulation::Simulation;
 
 const NR_STEPS: usize = 5;
 
+/// The rotational speed of the rotor sail in the example, in revolutions per second. The internal
+/// state of the wings is not part of the setup file, so it is set after the simulation is built,
+/// in the same way as with the `-s` option of the executable.
+const ROTOR_REVOLUTIONS_PER_SECOND: Float = -1.273;
+
 /// The rotor sail example with end disks (actuator line + slip geometries), on a coarser grid, with
 /// an extra no-slip sphere, so that every part of the velocity solver is exercised. The coarsest
 /// multigrid level is solved with Jacobi iterations, to keep the test fast. `boundary_case`
@@ -103,6 +108,10 @@ struct SimulationOutput {
 
 fn run(velocity_platform: &str, pressure_platform: &str, boundary_case: BoundaryCase) -> SimulationOutput {
     let mut sim = Simulation::new_from_string(&setup_string(velocity_platform, pressure_platform, boundary_case)).unwrap();
+
+    if let Some(actuator_line) = &mut sim.actuator_line {
+        actuator_line.model.line_force_model.set_internal_state(&[ROTOR_REVOLUTIONS_PER_SECOND]);
+    }
 
     let mut time_steps = Vec::with_capacity(NR_STEPS);
     let mut nr_limited_values = Vec::with_capacity(NR_STEPS);

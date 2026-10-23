@@ -3,6 +3,33 @@
 ## Purpose
 Stormflow is a CFD solver specialized for actuator line simulations. That is, it is NOT intended to be a general solver, but rather dedicated to this one purpose. The hypotheses behind the development is that a simple solver may prove to a be a good fit for this type of modeling.
 
+## Usage
+The main way to use Stormflow is intended to be through [pystormflow](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/pystormflow), the Python interface to the solver. Stormflow can also be used directly as a Rust library.
+
+The crate also contains a command line tool, which is mostly intended for testing purposes, for instance to quickly run one of the examples. It is run with a JSON file that describes the simulation setup:
+
+```
+stormflow --file-path setup.json --end-time 100.0
+```
+
+Run `stormflow --help` for all options. The most important ones, in addition to the file path (`-f`) and the end time (`-e`), are:
+
+- `-c`, `--courant-number`: the Courant number used to compute the time step. The default is 0.75.
+- `-n`, `--nr-of-cores`: the number of CPU cores to use. The default, 0, uses all available cores.
+- `-w`, `--wind-direction-deg`: overrides the wind direction in the setup file, in degrees.
+- `-s`, `--wing-internal-states`: sets the [internal state](https://jarlekramer.github.io/stormbird_book_pages/sectional_models/sectional_models_intro.html) of each wing in the actuator line model, e.g., the revolutions per second of a rotor sail, or the flap angle of a multi-element wing sail. The internal state can not be given in the setup file, so this option is the way to set it when no controller is used. Give either one value per wing, in the same order as the wings in the setup file, or a single value that is used for all wings. The values are separated by spaces, e.g., `-s -1.273 -1.273`. They can also be separated by commas, but then the values must be attached to the option with `=` if the first value is negative, e.g., `-s=-1.273,-1.273`. If the setup file defines a controller, the controller overwrites the values at its first update. The old name of the option, `--section-models-internal-state`, still works.
+
+For instance, the rotor sail examples should be run with the rotational speeds they are set up for:
+
+```
+cd examples/rotor_sail
+stormflow -f rotor_sail_single.json -e <end time> -s -0.637
+stormflow -f rotor_sail_single_with_end_disks.json -e <end time> -s -1.273
+stormflow -f rotor_sails_on_sobc1.json -e <end time> -s -1.273
+```
+
+Without the `-s` option, the internal state of all wings is zero, which means that the rotors are not spinning.
+
 ## Methods
 ### General CFD details
 The solver implements a structured, fixed cell size, cartesian grid and solves the incompressible Navier-Stokes equations using fourth order finite difference schemes. The flow variables are stored using a staggered approach; the pressure lives at the cell center, while the velocity components live on the positive faces of each cell (u on the positive x-face, v on the positive y-face, and w on the positive z-face). Time stepping is done explicitly. The pressure projection step is solved using a geometric multigrid method. The boundaries on the outer grid boundary are enforces through ghost cell, except for the pressure, where the boundaries are also enforces in the kernels directly (to simplify the GPU execution, see the section on Software architecture for more)

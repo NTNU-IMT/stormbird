@@ -27,7 +27,6 @@
           ],
           "section_model": {
             "RotatingCylinder": {
-              "revolutions_per_second": -0.637,
               "cl_initial_slope": 2.8,
               "cl_high_spin_ratio_slope": 2.8
             }

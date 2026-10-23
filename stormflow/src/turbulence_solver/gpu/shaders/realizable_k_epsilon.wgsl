@@ -19,30 +19,52 @@ struct GradientInvariants {
     omega2: f32,
 }
 
+// Component (i, j) of `dev(twoSymm(g))`
+fn dev_two_symm_component(g: array<vec3<f32>, 3>, trace: f32, i: u32, j: u32) -> f32 {
+    let two_symm = g[i][j] + g[j][i];
+
+    if i == j {
+        return two_symm - (2.0 / 3.0) * trace;
+    }
+
+    return two_symm;
+}
+
 fn gradient_invariants(i_0: u32) -> GradientInvariants {
-    var g = velocity_gradient(i_0);
+    let g = velocity_gradient(i_0);
 
     let trace = g[0][0] + g[1][1] + g[2][2];
 
-    var s: array<vec3<f32>, 3>;
+    // S = dev(symm(g)). Built with constructors, rather than by writing to the vector components
+    // with dynamic indices in a loop, which was miscompiled for the velocity gradient on some GPU
+    // backends.
+    let s = array<vec3<f32>, 3>(
+        0.5 * vec3<f32>(
+            dev_two_symm_component(g, trace, 0u, 0u),
+            dev_two_symm_component(g, trace, 0u, 1u),
+            dev_two_symm_component(g, trace, 0u, 2u),
+        ),
+        0.5 * vec3<f32>(
+            dev_two_symm_component(g, trace, 1u, 0u),
+            dev_two_symm_component(g, trace, 1u, 1u),
+            dev_two_symm_component(g, trace, 1u, 2u),
+        ),
+        0.5 * vec3<f32>(
+            dev_two_symm_component(g, trace, 2u, 0u),
+            dev_two_symm_component(g, trace, 2u, 1u),
+            dev_two_symm_component(g, trace, 2u, 2u),
+        ),
+    );
+
     var s2: f32 = 0.0;
     var production_factor: f32 = 0.0;
     var omega2: f32 = 0.0;
 
     for (var i: u32 = 0u; i < 3u; i = i + 1u) {
         for (var j: u32 = 0u; j < 3u; j = j + 1u) {
-            let two_symm = g[i][j] + g[j][i];
-
-            var dev_two_symm = two_symm;
-
-            if i == j {
-                dev_two_symm = two_symm - (2.0 / 3.0) * trace;
-            }
-
-            s[i][j] = 0.5 * dev_two_symm;
             s2 += 2.0 * s[i][j] * s[i][j];
 
-            production_factor += g[i][j] * dev_two_symm;
+            production_factor += g[i][j] * dev_two_symm_component(g, trace, i, j);
 
             let skew = 0.5 * (g[i][j] - g[j][i]);
             omega2 += skew * skew;

@@ -66,9 +66,19 @@ struct Args {
     #[arg(short, long, default_value_t = 0)]
     nr_of_cores: usize,
 
-    /// New control variables
-    #[arg(short, long, allow_negative_numbers = true)]
-    section_models_internal_state: Vec<f32>,
+    /// Internal state for each wing, in the units of the wing internal state, e.g., revolutions per
+    /// second for rotor sails. Give either one value per wing, or a single value that is used for
+    /// all wings, e.g., `-s -1.27 -1.27`. If the input file defines a controller, the controller
+    /// overwrites these values at its first update.
+    #[arg(
+        short = 's',
+        long = "wing-internal-states",
+        alias = "section-models-internal-state",
+        num_args = 1..,
+        value_delimiter = ',',
+        allow_negative_numbers = true
+    )]
+    wing_internal_states: Vec<Float>,
 
     /// New wind direction in degrees
     #[arg(short, long, default_value_t = -9999.0, allow_negative_numbers = true)]
@@ -76,6 +86,20 @@ struct Args {
     
 }
 
+
+/// Returns the internal state for each wing from the values given on the command line. A single
+/// value is used for all wings, while more values must match the number of wings.
+fn wing_internal_states(values: &[Float], nr_wings: usize) -> Result<Vec<Float>, String> {
+    match values.len() {
+        1 => Ok(vec![values[0]; nr_wings]),
+        nr_values if nr_values == nr_wings => Ok(values.to_vec()),
+        nr_values => Err(format!(
+            "{} wing internal states were given, but the simulation has {} wings. Give either one \
+             value for each wing, or a single value that is used for all wings.",
+            nr_values, nr_wings
+        )),
+    }
+}
 
 pub fn main() -> Result<(), Error> {
     let args = Args::parse();
@@ -97,12 +121,22 @@ pub fn main() -> Result<(), Error> {
 
     sim.initialize_after_build();
 
-    let new_internal_states: bool = !args.section_models_internal_state.is_empty();
+    if !args.wing_internal_states.is_empty() {
+        let Some(actuator_line) = &mut sim.actuator_line else {
+            return Err(Error::CustomStringError(
+                "Wing internal states were given, but the input file has no actuator line model."
+                    .to_string()
+            ));
+        };
 
-    if new_internal_states && let Some(actuator_line) = &mut sim.actuator_line {
-        actuator_line.model.line_force_model.set_section_models_internal_state(
-            &args.section_models_internal_state
-        );
+        let line_force_model = &mut actuator_line.model.line_force_model;
+
+        let internal_states = wing_internal_states(
+            &args.wing_internal_states,
+            line_force_model.nr_wings()
+        )?;
+
+        line_force_model.set_internal_state(&internal_states);
     }
     
     let mut time = 0.0;
@@ -211,4 +245,39 @@ pub fn main() -> Result<(), Error> {
     sim.export_fields_as_vtk("sim_result.vtk", true);
     
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_single_wing_internal_state_is_used_for_all_wings() {
+        assert_eq!(wing_internal_states(&[-1.273], 2).unwrap(), vec![-1.273, -1.273]);
+    }
+
+    #[test]
+    fn one_wing_internal_state_per_wing_is_used_directly() {
+        assert_eq!(wing_internal_states(&[1.0, -2.0, 3.0], 3).unwrap(), vec![1.0, -2.0, 3.0]);
+    }
+
+    #[test]
+    fn a_wrong_number_of_wing_internal_states_is_an_error() {
+        assert!(wing_internal_states(&[1.0, 2.0], 3).is_err());
+    }
+
+    #[test]
+    fn wing_internal_states_can_be_given_with_spaces_or_commas() {
+        let base = ["stormflow", "-f", "input.json", "-e", "1.0"];
+
+        let with_spaces = Args::parse_from(base.iter().chain(&["-s", "-1.273", "2.5"]));
+        let with_commas = Args::parse_from(base.iter().chain(&["-s=-1.273,2.5"]));
+        let with_old_name = Args::parse_from(
+            base.iter().chain(&["--section-models-internal-state", "-1.273", "2.5"])
+        );
+
+        for args in [with_spaces, with_commas, with_old_name] {
+            assert_eq!(args.wing_internal_states, vec![-1.273, 2.5]);
+        }
+    }
 }
