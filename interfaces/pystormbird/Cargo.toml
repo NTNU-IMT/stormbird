@@ -17,8 +17,8 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.28.3"}
 pythonize = {version ="0.28.0"}
 
-stormbird = {path="../../stormbird", features = ["parallel"] }
-stormath = { version="0.4.0", path = "../../stormath" }
+stormbird = { version = "0.11.0", features = ["parallel"] }
+stormath = "0.4.0"
 
 [profile.release]
 opt-level = 3

@@ -11,7 +11,7 @@ def revolutions_per_second_from_spin_ratio(
     spin_ratio: float,
     diameter: float,
     velocity: float
-):
+) -> float:
     '''
     Helper function to convert spin ratio to revolutions per second
     '''
@@ -27,7 +27,7 @@ def spin_ratio_from_revolutions_per_second(
     revolutions_per_second: float,
     diameter: float,
     velocity: float
-):
+) -> float:
     '''
     Helper function to convert revolutions per second to spin ratio
     '''

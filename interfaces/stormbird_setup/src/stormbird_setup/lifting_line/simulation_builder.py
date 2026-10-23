@@ -40,9 +40,9 @@ class QuasiSteadySettings(StormbirdSetupBaseModel):
         return data
 
     @model_serializer
-    def ser_model(self):
-        solver_dict = self.solver.model_dump()
-        wake_dict = self.wake.model_dump()
+    def ser_model(self) -> dict[str, Any]:
+        solver_dict = self.solver.model_dump(exclude_none=True)
+        wake_dict = self.wake.model_dump(exclude_none=True)
 
         if isinstance(self.solver, Linearized):
             return {
@@ -76,9 +76,9 @@ class DynamicSettings(StormbirdSetupBaseModel):
         return data
 
     @model_serializer
-    def ser_model(self):
-        solver_dict = self.solver.model_dump()
-        wake_dict = self.wake.model_dump()
+    def ser_model(self) -> dict[str, Any]:
+        solver_dict = self.solver.model_dump(exclude_none=True)
+        wake_dict = self.wake.model_dump(exclude_none=True)
 
         if isinstance(self.solver, Linearized):
             return {
@@ -112,9 +112,9 @@ class SimulationBuilder(StormbirdSetupBaseModel):
         return data
 
     @model_serializer
-    def ser_model(self):
-        line_force_model_dict = self.line_force_model.model_dump()
-        simulation_settings_dict = self.simulation_settings.model_dump()
+    def ser_model(self) -> dict[str, Any]:
+        line_force_model_dict = self.line_force_model.model_dump(exclude_none=True)
+        simulation_settings_dict = self.simulation_settings.model_dump(exclude_none=True)
 
         if isinstance(self.simulation_settings, QuasiSteadySettings):
             return {

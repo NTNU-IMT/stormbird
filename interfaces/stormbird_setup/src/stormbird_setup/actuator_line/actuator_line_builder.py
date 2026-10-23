@@ -21,4 +21,8 @@ class ActuatorLineBuilder(StormbirdSetupBaseModel):
     start_time: float = 0
     controller: ControllerBuilder | None = None
     lifting_line_correction: LiftingLineCorrectionBuilder | None = LiftingLineCorrectionBuilder()
+    """
+    Correction of the sampled velocity, based on a lifting line model. Used by default. Set to `None`
+    to turn the correction off.
+    """
     empirical_circulation_correction: EmpiricalCirculationCorrection | None = None

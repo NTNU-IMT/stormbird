@@ -43,7 +43,7 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
     wing_internal_state_max_change_rate: float | None = None
                 
     @classmethod
-    def new_default_wing_sail_single_element(cls, max_angle_deg: float = 15.0):
+    def new_default_wing_sail_single_element(cls, max_angle_deg: float = 15.0) -> "ControllerSetPoints":
         apparent_wind_directions_data = np.radians([-180, -15, -10, 10, 15, 180])
         angle_of_attack_data = np.radians([-max_angle_deg, -max_angle_deg, 0.0, 0.0, max_angle_deg, max_angle_deg])
 
@@ -53,7 +53,7 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         )
         
     @classmethod
-    def new_default_wing_sail_two_element(cls, max_angle_deg: float = 12.0):
+    def new_default_wing_sail_two_element(cls, max_angle_deg: float = 12.0) -> "ControllerSetPoints":
         apparent_wind_directions_data = np.radians([-180, -15, -10, 10, 15, 180])
         angle_of_attack_data = np.radians([-max_angle_deg, -max_angle_deg, 0.0, 0.0, max_angle_deg, max_angle_deg])
         internal_state_data = np.radians([-30.0, -30.0, 0.0, 0.0, 30.0, 30.0])
@@ -65,7 +65,7 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         )
         
     @classmethod
-    def new_default_rotor_sail(cls, *, max_rps: float | None = None):
+    def new_default_rotor_sail(cls, *, max_rps: float | None = None) -> "ControllerSetPoints":
         '''
         Helper function to quickly set up a suitable controller for a rotor sail. Assumed to be
         fairly general.
@@ -92,7 +92,7 @@ class ControllerSetPoints(StormbirdSetupBaseModel):
         max_aoa_deg: float = 30.0, 
         max_power_coefficient: float = 0.3,
         max_power: float | None = None
-    ):
+    ) -> "ControllerSetPoints":
         '''
         Helper function to quickly set up a suitable controller for a suction sail, where the
         section model uses the PowerToPowerCoefficient internal state conversion, such as the

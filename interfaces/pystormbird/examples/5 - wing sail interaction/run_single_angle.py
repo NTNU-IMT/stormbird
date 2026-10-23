@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     ctrl_points_z = []
     for i, ctrl_point in enumerate(result.ctrl_points):
-        ctrl_points_z.append(ctrl_point.z)
+        ctrl_points_z.append(ctrl_point[2])
 
     ctrl_points_z = np.array(ctrl_points_z)
     circulation_strength = np.array(result.force_input.circulation_strength)

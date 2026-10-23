@@ -33,7 +33,7 @@ class SailType(Enum):
             case _:
                 raise ValueError("Unsupported sail type:", self)
                 
-    def add_default_corrections(self, simulation_builder: SimulationBuilder):
+    def add_default_corrections(self, simulation_builder: SimulationBuilder) -> None:
         if self == SailType.RotorSail:
             simulation_builder.simulation_settings.solver.velocity_corrections = VelocityCorrections(
                 type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
@@ -49,7 +49,7 @@ class SailType(Enum):
             case SailType.RotorSail:
                 section_model = SectionModel.rotor_sail_deybach_2024()
             case SailType.SuctionSail:
-                section_model = SectionModel.default_suction_sail_turbosail()
+                section_model = SectionModel.suction_sail_turbosail_charrier_1985()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
                 

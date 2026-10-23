@@ -7,3 +7,4 @@ Each crate and package in this repository has its own change log:
 - [stormflow](stormflow/CHANGELOG.md) - CFD solver for actuator line simulations
 - [pystormbird](interfaces/pystormbird/CHANGELOG.md) - Python interface to the core library
 - [stormbird_setup](interfaces/stormbird_setup/CHANGELOG.md) - Python library for setting up models
+- [pystormflow](interfaces/pystormflow/CHANGELOG.md) - Python interface to the Stormflow CFD solver

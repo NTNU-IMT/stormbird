@@ -650,7 +650,7 @@ class SectionModel(StormbirdSetupBaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def deserialize_from_rust_enum(cls, data):
+    def deserialize_from_rust_enum(cls, data: Any) -> Any:
         # Handle the "EffectiveWindSensor" string case (unit variant)
         if data == "EffectiveWindSensor":
             return {'model': EffectiveWindSensor()}
@@ -675,7 +675,7 @@ class SectionModel(StormbirdSetupBaseModel):
             raise ValueError(f"Unknown section model variant: {list(data.keys())}")
 
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         model_dict = self.model.model_dump(exclude_none=True, mode='json')
 
         if isinstance(self.model, Foil):

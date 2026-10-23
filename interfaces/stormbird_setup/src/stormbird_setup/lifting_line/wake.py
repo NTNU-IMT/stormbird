@@ -70,7 +70,7 @@ class ViscousCoreLength(StormbirdSetupBaseModel):
         return data
 
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         match self.value_type:
             case ViscousCoreLengthType.Relative:
                 return {
@@ -103,7 +103,7 @@ class ViscousCoreLengthEvolution(StormbirdSetupBaseModel):
     value: SinIncreasedViscousCoreLength | None = None
     
     @classmethod
-    def new_sin_increase(cls, *, last_panel_value_absolute: float, evolution_length_factor: float):
+    def new_sin_increase(cls, *, last_panel_value_absolute: float, evolution_length_factor: float) -> "ViscousCoreLengthEvolution":
         return cls(
             value_type = ViscousCoreLengthEvolutionType.SinIncrease,
             value = SinIncreasedViscousCoreLength(
@@ -113,7 +113,7 @@ class ViscousCoreLengthEvolution(StormbirdSetupBaseModel):
         )
     
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         match self.value_type:
             case ViscousCoreLengthEvolutionType.SinIncrease:
                 return {

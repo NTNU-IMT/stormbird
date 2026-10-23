@@ -2,7 +2,8 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
-## 0.11.0 - Unreleased
+## 0.11.0 - 2026-10-23
+- Depends on the published versions of Stormbird 0.11.0 and Stormath 0.4.0, rather than the local versions in the repository.
 - New `ActiveAirFlowFoil` class, including functions for the section internal states and the power for a whole wing, and a new `power_coefficient` function for the `RotatingCylinder` class. The `as_active_air_flow_foil` function on the `VaryingFoil` class was removed, as an active air flow foil now also needs an internal state conversion.
 - New `set_internal_state_linear` and `set_internal_state_piecewise_constant` functions for the lifting line simulation and the complete sail model, for setting internal states that vary along the span. The `internal_state` functions return the mean value over the span for wings with a span varying internal state.
 - The `Foil` class was updated with the new and removed fields in the foil model.

@@ -176,7 +176,7 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     output_coordinate_system: CoordinateSystem = CoordinateSystem.Global
     force_calculation_settings: ForceCalculationSettings = ForceCalculationSettings()
 
-    def add_wing_builder(self, wing_builder: WingBuilder):
+    def add_wing_builder(self, wing_builder: WingBuilder) -> None:
         self.wing_builders.append(wing_builder)
         self.local_wing_angles.append(0.0)
 

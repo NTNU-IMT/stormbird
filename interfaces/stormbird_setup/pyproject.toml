@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stormbird_setup"
-version = "0.10.0"
+version = "0.11.0"
 authors = [
   { name = "Jarle Kramer", email = "jarlekramer@pm.me" },
 ]
@@ -39,3 +39,8 @@ stormbird_setup = ["py.typed"]
 [tool.mypy]
 disallow_untyped_defs = true
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# SciPy does not include type information
+module = ["scipy", "scipy.*"]
+ignore_missing_imports = true
