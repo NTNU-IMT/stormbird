@@ -16,9 +16,6 @@
 
     const toRadians = (degrees) => degrees * Math.PI / 180.0;
 
-    // Equivalent to Rust's `Float::signum`, which returns 1.0 for zero
-    const signum = (x) => (x < 0.0 || Object.is(x, -0.0)) ? -1.0 : 1.0;
-
     function sigmoidZeroToOne(x, x0, transitionRange) {
         const slope = SIGMOID_SLOPE / transitionRange;
 
@@ -54,8 +51,6 @@
         mean_positive_stall_angle: toRadians(20.0),
         mean_negative_stall_angle: toRadians(20.0),
         stall_range: toRadians(6.0),
-        cd_bump_during_stall: 0.0,
-        cd_stall_angle_offset: 0.0,
     });
 
     class Foil {
@@ -98,7 +93,7 @@
         }
 
         liftCoefficientPostStallRaw(angleOfAttack) {
-            // The Rust code first wraps the angle to [-pi, pi], which does not change sin(2 * angle)
+
             return this.cl_max_after_stall * Math.sin(2.0 * angleOfAttack);
         }
 
@@ -120,32 +115,22 @@
                 Math.abs(Math.sin(angleOfAttack)) ** this.cd_power_after_stall;
         }
 
-        angleForDragStallTransition(angleOfAttack) {
-            return angleOfAttack + this.cd_stall_angle_offset * signum(angleOfAttack);
-        }
-
-        amountOfStallDrag(angleOfAttack) {
-            return this.amountOfStall(this.angleForDragStallTransition(angleOfAttack));
-        }
 
         dragCoefficient(angleOfAttack) {
             const cdPreStall = this.dragCoefficientPreStall(angleOfAttack);
             const cdPostStall = this.dragCoefficientPostStallRaw(angleOfAttack);
 
-            const amountOfStall = this.amountOfStallDrag(angleOfAttack);
+            const amountOfStall = this.amountOfStall(angleOfAttack);
 
             const cdRaw = cdPreStall * (1.0 - amountOfStall) + amountOfStall * cdPostStall;
-
-            const cdDuringStall = this.cd_bump_during_stall *
-                (1.0 - Math.cos(amountOfStall * TAU)) * 0.5;
 
             if (this.cdi_correction_factor !== 0.0) {
                 const cl = this.liftCoefficient(angleOfAttack);
 
-                return cdRaw + this.cdi_correction_factor * cl ** 2 + cdDuringStall;
+                return cdRaw + this.cdi_correction_factor * cl ** 2;
             }
 
-            return cdRaw + cdDuringStall;
+            return cdRaw;
         }
 
         amountOfStall(angleOfAttack) {

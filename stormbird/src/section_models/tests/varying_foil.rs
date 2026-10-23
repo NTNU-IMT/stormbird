@@ -24,8 +24,7 @@ fn asymmetric_foil(cl_zero_angle: Float) -> Foil {
         mean_positive_stall_angle: Float::from(16.0).to_radians(),
         mean_negative_stall_angle: Float::from(24.0).to_radians(),
         stall_range: Float::from(5.0).to_radians(),
-        cd_bump_during_stall: 0.2,
-        cd_stall_angle_offset: Float::from(2.0).to_radians(),
+
         added_mass_factor: 0.3,
     }
 }

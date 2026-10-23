@@ -202,25 +202,6 @@ impl Foil {
         self.data.stall_range = value;
     }
 
-    #[getter]
-    pub fn get_cd_bump_during_stall(&self) -> f64 {
-        self.data.cd_bump_during_stall
-    }
-
-    #[setter]
-    pub fn set_cd_bump_during_stall(&mut self, value: f64) {
-        self.data.cd_bump_during_stall = value;
-    }
-
-    #[getter]
-    pub fn get_cd_stall_angle_offset(&self) -> f64 {
-        self.data.cd_stall_angle_offset
-    }
-
-    #[setter]
-    pub fn set_cd_stall_angle_offset(&mut self, value: f64) {
-        self.data.cd_stall_angle_offset = value;
-    }
 
     #[getter]
     pub fn get_added_mass_factor(&self) -> f64 {

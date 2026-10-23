@@ -36,8 +36,6 @@
                 { key: 'cd_second_order_factor', min: 0.0, max: 3.0, step: 0.05 },
                 { key: 'cd_max_after_stall', min: 0.0, max: 2.5, step: 0.05 },
                 { key: 'cd_power_after_stall', min: 0.5, max: 4.0, step: 0.1 },
-                { key: 'cd_bump_during_stall', min: 0.0, max: 1.0, step: 0.01 },
-                { key: 'cd_stall_angle_offset', min: -10.0, max: 10.0, step: 0.5, angle: true },
             ],
         },
         {
@@ -124,8 +122,7 @@
             id: 'stall', height: 130, yLabel: 'Amount of stall',
             ariaLabel: 'Amount of stall as a function of angle of attack',
             series: [
-                { key: 'amountOfStall', label: 'Lift, s', className: 'me-series-primary', hoverDot: true },
-                { key: 'amountOfStallDrag', label: 'Drag, s_D', className: 'me-series-secondary me-dashed', hoverDot: true },
+                { key: 'amountOfStall', label: 'Amount of stall, s', className: 'me-series-primary', hoverDot: true },
             ],
             domain: () => ({ min: 0.0, max: 1.0, step: 0.5 }),
             markers: stallMarkers,
@@ -138,7 +135,7 @@
         const data = {
             cl: [], clPreStall: [], clPostStall: [],
             cd: [], cdPreStall: [], cdPostStall: [],
-            amountOfStall: [], amountOfStallDrag: [],
+            amountOfStall: [],
         };
 
         for (const angle of angles) {
@@ -151,7 +148,6 @@
             data.cdPreStall.push(foil.dragCoefficientPreStall(a));
             data.cdPostStall.push(foil.dragCoefficientPostStallRaw(a));
             data.amountOfStall.push(foil.amountOfStall(a));
-            data.amountOfStallDrag.push(foil.amountOfStallDrag(a));
         }
 
         return data;
@@ -164,7 +160,6 @@
             ['C_D', d.cd[index].toFixed(4)],
             ['C_L / C_D', Math.abs(d.cd[index]) > 1e-12 ? (d.cl[index] / d.cd[index]).toFixed(1) : '–'],
             ['s', d.amountOfStall[index].toFixed(3)],
-            ['s_D', d.amountOfStallDrag[index].toFixed(3)],
         ];
     }
 

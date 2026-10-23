@@ -52,8 +52,6 @@ pub struct Foil {
     pub mean_positive_stall_angle: f64,
     pub mean_negative_stall_angle: f64,
     pub stall_range: f64,
-    pub cd_bump_during_stall: f64,
-    pub cd_stall_angle_offset: f64,
     pub added_mass_factor: f64,
 }
 ```
@@ -74,8 +72,7 @@ An explanation of the parameters is given below:
 - `mean_positive_stall_angle`: The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to post-stall behavior. The default value is 20 degrees.
 - `mean_negative_stall_angle`: The mean stall angle for negative angles of attack, which is the mean angle where the model transitions from pre-stall to post-stall behavior. The default value is 20 degrees.
 - `stall_range`: The range of the stall transition, as described in the [stall model](#stall-model) section below. The default value is 6 degrees.
-- `cd_bump_during_stall`: Factor to model additional drag when the foil is stalling, but that is not included in the pre- and post-stall drag models. Set to zero by default.
-- `cd_stall_angle_offset`: Optional offset to the stall angle for the drag coefficient. This can be used to tune the drag curve to better fit experimental data. The default is zero, which means that stall effects on the drag starts at the same angle of attack as for the lift. When the offset is set to any value, the "amount of stall" function is shifted by this value for the case of the drag coefficient only.
+
 - `added_mass_factor`: Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
 
 ## Pre-stall lift
@@ -171,25 +168,19 @@ The post-stall drag is given as:
 
 where \\( C\_{D, max} \\) is `cd_max_after_stall` and \\( p \\) is `cd_power_after_stall`. The maximum drag is therefore reached at 90 degrees.
 
-The drag uses its own amount of stall, \\( s\_D \\), which can be shifted relative to the amount of stall used for the lift:
+The total drag coefficient uses the same amount of stall as the lift:
 
 \\[
-    s\_D = s \left(\alpha + \delta\_D \\, \text{sign}(\alpha) \right)
+    C\_D = (1 - s) \\, C\_{D, pre-stall} + s \\, C\_{D, post-stall} + k\_{i} C\_L^2
 \\]
 
-where \\( \delta\_D \\) is `cd_stall_angle_offset`. A positive offset makes the stall effects on the drag start at lower angles of attack than for the lift. The total drag coefficient is then:
-
-\\[
-    C\_D = (1 - s\_D) \\, C\_{D, pre-stall} + s\_D \\, C\_{D, post-stall} + C\_{D, bump} \frac{1 - \cos(2 \pi s\_D)}{2} + k\_{i} C\_L^2
-\\]
-
-where \\( C\_{D, pre-stall} \\) is described in the [pre-stall drag](#pre-stall-drag) section. The third term models additional drag during the stall transition, where \\( C\_{D, bump} \\) is `cd_bump_during_stall`. It is zero before and after the stall, and reaches its maximum value of \\( C\_{D, bump} \\) when \\( s\_D = 0.5 \\). The last term is the correction of the lift-induced drag, where \\( k\_i \\) is `cdi_correction_factor` and \\( C\_L \\) is the total lift coefficient.
+where \\( C\_{D, pre-stall} \\) is described in the [pre-stall drag](#pre-stall-drag) section. The last term is the correction of the lift-induced drag, where \\( k\_i \\) is `cdi_correction_factor` and \\( C\_L \\) is the total lift coefficient.
 
 ## Interactive example
 
 The plot below shows the output of the foil model, and can be used to explore how the parameters affect the lift and drag. The parameters are adjusted with the sliders, or by typing in values, below the plot. The angles are given in degrees in the sliders, but must be given in radians in the actual input to Stormbird. The current parameters can be copied as JSON input, with angles in radians, from the bottom of the plot.
 
-The thin gray lines show the pre-stall and post-stall models before they are combined using the amount of stall. The lowest panel shows the amount of stall for the lift, \\( s \\), and for the drag, \\( s\_D \\), which are only different when `cd_stall_angle_offset` is non-zero. The parameters that are not available in the plot, such as `cdi_correction_factor` and `added_mass_factor`, are set to their default values.
+The thin gray lines show the pre-stall and post-stall models before they are combined using the amount of stall. The lowest panel shows the amount of stall, \\( s \\). The parameters that are not available in the plot, such as `cdi_correction_factor` and `added_mass_factor`, are set to their default values.
 
 <link rel="stylesheet" href="interactive/model_explorer.css">
 
