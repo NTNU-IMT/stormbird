@@ -8,3 +8,4 @@ Each crate and package in this repository has its own change log:
 - [pystormbird](interfaces/pystormbird/CHANGELOG.md) - Python interface to the core library
 - [stormbird_setup](interfaces/stormbird_setup/CHANGELOG.md) - Python library for setting up models
 - [pystormflow](interfaces/pystormflow/CHANGELOG.md) - Python interface to the Stormflow CFD solver
+- [cstormbird](interfaces/cstormbird/CHANGELOG.md) - C interface to the core library

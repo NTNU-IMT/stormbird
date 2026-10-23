@@ -474,9 +474,10 @@ pub extern "C" fn lifting_line_simulation_set_local_wing_angles(
     0
 }
 
-/// The internal state of the section model of each sail. The meaning depends on the section model
-/// that is used, and is for instance the revolutions per second for a rotating cylinder. There is
-/// one value per sail.
+/// The internal state of each sail. The meaning depends on the section model that is used, and is
+/// for instance the revolutions per second for a rotating cylinder. There is one value per sail.
+/// For a sail with an internal state that varies along the span, the value is the mean over the
+/// span.
 ///
 /// Returns the number of values written to `internal_state_out`, or a negative error code:
 /// -1 if a pointer is null, -2 if `internal_state_out_length` is zero.
@@ -485,12 +486,12 @@ pub extern "C" fn lifting_line_simulation_set_local_wing_angles(
 /// - `internal_state_out` must point to an array with room for at least
 ///   `internal_state_out_length` doubles.
 #[unsafe(no_mangle)]
-pub extern "C" fn lifting_line_simulation_section_models_internal_state(
+pub extern "C" fn lifting_line_simulation_internal_state(
     simulation: *mut LiftingLineSimulation,
     internal_state_out: *mut f64,
     internal_state_out_length: usize,
 ) -> i32 {
-    let function_name = "lifting_line_simulation_section_models_internal_state";
+    let function_name = "lifting_line_simulation_internal_state";
 
     if simulation.is_null() || internal_state_out.is_null() {
         set_last_error(format!("{}: one of the input pointers is null", function_name));
@@ -506,12 +507,12 @@ pub extern "C" fn lifting_line_simulation_section_models_internal_state(
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
 
-    let internal_state = rust_simulation.line_force_model.section_models_internal_state();
+    let internal_state = rust_simulation.line_force_model.internal_state_representative_values();
 
     write_floats(&internal_state, internal_state_out, internal_state_out_length)
 }
 
-/// Sets the internal state of the section model of each sail. The number of values must match the
+/// Sets a constant internal state for each sail. The number of values must match the
 /// number of sails, given by `lifting_line_simulation_get_number_of_sails`.
 ///
 /// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if the number of
@@ -520,12 +521,12 @@ pub extern "C" fn lifting_line_simulation_section_models_internal_state(
 /// # Safety
 /// - `internal_state` must point to an array with at least `length` doubles.
 #[unsafe(no_mangle)]
-pub extern "C" fn lifting_line_simulation_set_section_models_internal_state(
+pub extern "C" fn lifting_line_simulation_set_internal_state(
     simulation: *mut LiftingLineSimulation,
     internal_state: *const f64,
     length: usize,
 ) -> i32 {
-    let function_name = "lifting_line_simulation_set_section_models_internal_state";
+    let function_name = "lifting_line_simulation_set_internal_state";
 
     let input_slice = match input_values_for_each_sail(
         simulation,
@@ -540,7 +541,7 @@ pub extern "C" fn lifting_line_simulation_set_section_models_internal_state(
 
     let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };
 
-    rust_simulation.line_force_model.set_section_models_internal_state(input_slice);
+    rust_simulation.line_force_model.set_internal_state(input_slice);
 
     0
 }
@@ -623,12 +624,12 @@ pub extern "C" fn lifting_line_simulation_do_step(
 
 /// The velocities induced by the wake at the given points, written as 3 doubles per point.
 ///
-/// This is only available for simulations with a dynamic wake, which can be checked with
-/// `lifting_line_simulation_has_dynamic_wake`.
+/// Available for both dynamic and quasi-steady wakes, and based on the state of the wake at the
+/// last completed time step. For a quasi-steady wake, the velocities are zero before the first
+/// time step.
 ///
 /// Returns the number of points written to `velocity_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `nr_points` is zero, -5 if the simulation uses a quasi-steady
-/// wake.
+/// -1 if a pointer is null, -2 if `nr_points` is zero.
 ///
 /// # Safety
 /// - `points` and `velocity_out` must both point to arrays with at least `3 * nr_points` doubles.
@@ -655,19 +656,6 @@ pub extern "C" fn lifting_line_simulation_induced_velocities(
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
 
-    // The rust function panics for quasi-steady wakes, where the induced velocities are not
-    // available, so that case is reported as an error instead
-    if let WakeData::QuasiSteady(_) = rust_simulation.wake_data {
-        set_last_error(
-            format!(
-                "{}: the induced velocities are only available for simulations with a dynamic \
-                 wake",
-                function_name
-            )
-        );
-
-        return -5;
-    }
 
     let rust_points = unsafe { vectors_from_c(points, nr_points) };
 

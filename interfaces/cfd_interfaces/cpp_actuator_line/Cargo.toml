@@ -1,6 +1,6 @@
 [package]
 name = "cpp_actuator_line"
-version = "0.5.2"
+version = "0.11.0"
 edition = "2021"
 
 [lib]
@@ -9,5 +9,5 @@ crate-type = ["staticlib"]
 [dependencies]
 cxx = "1.0"
 
-stormbird = {path = "../../../stormbird"}
-stormath  = {version = "0.4.0", path = "../../../stormath"}
+stormbird = { version = "0.11.0" }
+stormath  = { version = "0.4.0" }

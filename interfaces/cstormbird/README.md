@@ -17,7 +17,6 @@ Functions that return a value use the natural type, and return `NaN` for a null 
 | `-2` | An array length is zero, or does not match what the model expects      |
 | `-3` | A string is not valid UTF-8, or not valid JSON for the given structure |
 | `-4` | The wind condition does not use the velocity variation that is needed  |
-| `-5` | The operation is not available for this simulation configuration       |
 
 Arrays are always owned by the caller. Vectors are passed as 3 doubles per point.
 

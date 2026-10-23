@@ -708,9 +708,10 @@ pub extern "C" fn complete_sail_model_set_local_wing_angles(
     0
 }
 
-/// The internal state of the section model of each sail. The meaning depends on the section model
-/// that is used, and is for instance the revolutions per second for a rotating cylinder. There is
-/// one value per sail.
+/// The internal state of each sail. The meaning depends on the section model that is used, and is
+/// for instance the revolutions per second for a rotating cylinder. There is one value per sail.
+/// For a sail with an internal state that varies along the span, the value is the mean over the
+/// span.
 ///
 /// Returns the number of values written to `internal_state_out`, or a negative error code:
 /// -1 if a pointer is null, -2 if `internal_state_out_length` is zero.
@@ -719,14 +720,14 @@ pub extern "C" fn complete_sail_model_set_local_wing_angles(
 /// - `internal_state_out` must point to an array with room for at least
 ///   `internal_state_out_length` doubles.
 #[unsafe(no_mangle)]
-pub extern "C" fn complete_sail_model_section_models_internal_state(
+pub extern "C" fn complete_sail_model_internal_state(
     sail_model: *mut CompleteSailModel,
     internal_state_out: *mut f64,
     internal_state_out_length: usize,
 ) -> i32 {
     if sail_model.is_null() || internal_state_out.is_null() {
         set_last_error(
-            "complete_sail_model_section_models_internal_state: \
+            "complete_sail_model_internal_state: \
              one of the input pointers is null"
         );
 
@@ -735,7 +736,7 @@ pub extern "C" fn complete_sail_model_section_models_internal_state(
 
     if internal_state_out_length == 0 {
         set_last_error(
-            "complete_sail_model_section_models_internal_state: \
+            "complete_sail_model_internal_state: \
              the output array has zero length"
         );
 
@@ -749,12 +750,12 @@ pub extern "C" fn complete_sail_model_section_models_internal_state(
     let internal_state = rust_model
         .lifting_line_simulation
         .line_force_model
-        .section_models_internal_state();
+        .internal_state_representative_values();
 
     write_floats(&internal_state, internal_state_out, internal_state_out_length)
 }
 
-/// Sets the internal state of the section model of each sail. The number of values must match the
+/// Sets a constant internal state for each sail. The number of values must match the
 /// number of sails, given by `complete_sail_model_get_number_of_sails`.
 ///
 /// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if the number of
@@ -763,14 +764,14 @@ pub extern "C" fn complete_sail_model_section_models_internal_state(
 /// # Safety
 /// - `internal_state` must point to an array with at least `length` doubles.
 #[unsafe(no_mangle)]
-pub extern "C" fn complete_sail_model_set_section_models_internal_state(
+pub extern "C" fn complete_sail_model_set_internal_state(
     sail_model: *mut CompleteSailModel,
     internal_state: *const f64,
     length: usize,
 ) -> i32 {
     if sail_model.is_null() || internal_state.is_null() {
         set_last_error(
-            "complete_sail_model_set_section_models_internal_state: \
+            "complete_sail_model_set_internal_state: \
              one of the input pointers is null"
         );
 
@@ -784,7 +785,7 @@ pub extern "C" fn complete_sail_model_set_section_models_internal_state(
     if length != rust_model.get_number_of_sails() {
         set_last_error(
             format!(
-                "complete_sail_model_set_section_models_internal_state: got {} values, but the \
+                "complete_sail_model_set_internal_state: got {} values, but the \
                  model has {} sails",
                 length,
                 rust_model.get_number_of_sails()
@@ -798,7 +799,7 @@ pub extern "C" fn complete_sail_model_set_section_models_internal_state(
         std::slice::from_raw_parts(internal_state, length)
     };
 
-    rust_model.set_section_models_internal_state(input_slice);
+    rust_model.set_internal_state(input_slice);
 
     0
 }
