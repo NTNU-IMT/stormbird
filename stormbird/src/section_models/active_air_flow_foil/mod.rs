@@ -101,9 +101,6 @@ impl ActiveAirFlowFoil {
         self.varying_foil.drag_coefficient(angle_of_attack, internal_state)
     }
 
-    pub fn added_mass_factor(&self, internal_state: Float) -> Float {
-        self.varying_foil.get_foil(internal_state).added_mass_factor
-    }
 
     /// Computes the power coefficient, c_P = P / (0.5 * density * A * U^3), from the internal
     /// state of the foil model. The power is always positive, as the sign of the internal state

@@ -10,7 +10,6 @@ use std::ops::Range;
 
 use stormath::{
     type_aliases::Float,
-    consts::PI,
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 
@@ -27,6 +26,10 @@ pub mod span_line;
 pub mod input_power;
 /// The internal state of a wing, which can be constant or vary along the span
 pub mod wing_internal_state;
+/// Model for the added mass forces on a wing
+pub mod added_mass;
+/// Model for the gyroscopic moment from a rotor sail
+pub mod gyroscopic_moment;
 
 pub mod corrections;
 pub mod prelude;
@@ -42,7 +45,10 @@ use crate::controller::output::ControllerOutput;
 use corrections::{
     circulation::CirculationCorrection,
     angle_of_attack::AngleOfAttackCorrection,
+    force::ForceCorrection,
 };
+use added_mass::AddedMass;
+use gyroscopic_moment::GyroscopicMoment;
 use builder::single_wing::SingleWing;
 use span_line::*;
 
@@ -120,6 +126,12 @@ pub struct LineForceModel {
     pub ctrl_point_spanwise_distance_circulation_model: Vec<Float>,
     /// Models for estimating the input energy for the sails
     pub input_power_models: Vec<InputPowerModel>,
+    /// Empirical corrections of the forces on each wing
+    pub force_corrections: Vec<ForceCorrection>,
+    /// Models for the added mass forces on each wing
+    pub added_mass: Vec<AddedMass>,
+    /// Models for the gyroscopic moment from each wing. Only used for rotor sails.
+    pub gyroscopic_moments: Vec<GyroscopicMoment>,
     /// Settings for the force calculation
     pub force_calculation_settings: ForceCalculationSettings,
 }
@@ -165,6 +177,9 @@ impl LineForceModel {
             ctrl_point_spanwise_distance_non_dimensional: Vec::new(),
             ctrl_point_spanwise_distance_circulation_model: Vec::new(),
             input_power_models: Vec::new(),
+            force_corrections: Vec::new(),
+            added_mass: Vec::new(),
+            gyroscopic_moments: Vec::new(),
             force_calculation_settings: ForceCalculationSettings::default()
         }
     }
@@ -213,6 +228,9 @@ impl LineForceModel {
         self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
 
         self.input_power_models.push(wing.input_power_model.clone());
+        self.force_corrections.push(wing.force_correction.clone());
+        self.added_mass.push(wing.added_mass.clone());
+        self.gyroscopic_moments.push(wing.gyroscopic_moment.clone());
 
         self.update_global_data_representations();
     }

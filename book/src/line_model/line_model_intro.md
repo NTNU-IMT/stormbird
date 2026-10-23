@@ -34,6 +34,9 @@ pub struct LineForceModel {
     pub ctrl_point_spanwise_distance_non_dimensional: Vec<f64>,
     pub ctrl_point_spanwise_distance_circulation_model: Vec<f64>,
     pub input_power_models: Vec<InputPowerModel>,
+    pub force_corrections: Vec<ForceCorrection>,
+    pub added_mass: Vec<AddedMass>,
+    pub gyroscopic_moments: Vec<GyroscopicMoment>,
     pub force_calculation_settings: ForceCalculationSettings,
 }
 ```

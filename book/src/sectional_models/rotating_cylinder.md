@@ -19,9 +19,6 @@ pub struct RotatingCylinder {
     pub cd_end: f64,
     pub cd_angle_start: f64,
     pub cd_spin_ratio_low_drag: f64,
-    pub added_mass_factor: f64,
-    pub moment_of_inertia_2d: f64,
-    pub cdi_correction_factor: f64,
     pub power_coefficient_polynomial: Vec<f64>,
 }
 ```
@@ -31,9 +28,10 @@ pub struct RotatingCylinder {
 - `cl_slope_transition_spin_ratio`: The spin ratio where the transition between the two slopes is half-way developed. Given as a positive value, which is used for both positive and negative spin ratios. The default value is 3.4.
 - `cl_slope_transition_range`: The range of the transition between the two slopes, with the same definition as the `stall_range` in the [foil model](foil_model.md#stall-model). The default value is 1.0.
 - `cd_start`, `cd_end`, `cd_angle_start` and `cd_spin_ratio_low_drag`: Parameters for the drag, as described in the [drag](#drag) section below.
-- `cdi_correction_factor`: Factor that can be used to correct for numerical errors in the lift-induced drag, in the same way as for the [foil model](foil_model.md). It adds a term to the drag coefficient that is equal to the factor times the lift coefficient squared. The default is zero, which means no correction.
-- `added_mass_factor` and `moment_of_inertia_2d`: Can be used to estimate added mass forces and gyroscopic forces on the rotor. **Note**: more to come on these parameters later. They need further validation, and are therefore set to zero by default.
+
 - `power_coefficient_polynomial`: Model for the power needed to spin the cylinder, as described in the [power coefficient](#power-coefficient) section below.
+
+Added mass forces, the gyroscopic moment from the rotor, and empirical corrections of the lift-induced drag are not part of the section model, but are set for each wing in the [wing builder](../line_model/building_line_model.md). See the [force calculations chapter](../line_model/force_calculations.md) for more.
 
 The default values for the lift and drag are based on the two-dimensional CFD results in the article "[Calculation of Flettner rotor forces using lifting line and CFD methods](https://blueoasis.pt/wp-content/uploads/2023/10/Nutts2023_proceedings_v4.pdf)". The lift parameters are fitted to the lift coefficients for spin ratios between 0 and 8 in the article, with a maximum deviation of about 0.4 in the lift coefficient. See also the [validation data section](../literature/validation_data.md) for more on this.
 
@@ -104,7 +102,7 @@ The power coefficient is used by the default [input power model](../line_model/i
 
 The plot below shows the output of the rotating cylinder model, and can be used to explore how the parameters affect the lift and drag. The parameters are adjusted with the sliders, or by typing in values, below the plot. The current parameters can be copied as JSON input from the bottom of the plot. The `cd_angle_start` is given in degrees in the slider, but must be given in radians in the actual input to Stormbird, which is also how it is given in the JSON output.
 
-The thin gray lines in the lift panel show the line with the initial slope, \\( a\_0 \lambda \\), and the straight line the lift approaches well above the transition spin ratio, \\( \text{sign}(\lambda) \left( a\_\infty |\lambda| + (a\_0 - a\_\infty) \lambda\_t \right) \\). The second panel shows the slope of the lift with respect to the spin ratio. The plot is limited to spin ratios between -5 and 5, as higher values are typically not relevant for rotor sails. The parameters that are not available in the plot, such as `added_mass_factor` and `power_coefficient_polynomial`, are set to their default values.
+The thin gray lines in the lift panel show the line with the initial slope, \\( a\_0 \lambda \\), and the straight line the lift approaches well above the transition spin ratio, \\( \text{sign}(\lambda) \left( a\_\infty |\lambda| + (a\_0 - a\_\infty) \lambda\_t \right) \\). The second panel shows the slope of the lift with respect to the spin ratio. The plot is limited to spin ratios between -5 and 5, as higher values are typically not relevant for rotor sails. The parameters that are not available in the plot, such as `power_coefficient_polynomial`, are set to their default values.
 
 <link rel="stylesheet" href="interactive/model_explorer.css">
 

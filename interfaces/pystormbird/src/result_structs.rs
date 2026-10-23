@@ -78,8 +78,8 @@ impl SectionalForces {
     }
 
     #[getter]
-    pub fn gyroscopic(&self) -> Vec<[f64; 3]> {
-        self.data.gyroscopic.iter().map(|v| v.0).collect()
+    pub fn gyroscopic_moment(&self) -> Vec<[f64; 3]> {
+        self.data.gyroscopic_moment.iter().map(|v| v.0).collect()
     }
 
     #[getter]

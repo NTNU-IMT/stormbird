@@ -148,35 +148,6 @@ impl RotatingCylinder {
         self.data.cd_spin_ratio_low_drag = value;
     }
 
-    #[getter]
-    pub fn get_added_mass_factor(&self) -> f64 {
-        self.data.added_mass_factor
-    }
-
-    #[setter]
-    pub fn set_added_mass_factor(&mut self, value: f64) {
-        self.data.added_mass_factor = value;
-    }
-
-    #[getter]
-    pub fn get_moment_of_inertia_2d(&self) -> f64 {
-        self.data.moment_of_inertia_2d
-    }
-
-    #[setter]
-    pub fn set_moment_of_inertia_2d(&mut self, value: f64) {
-        self.data.moment_of_inertia_2d = value;
-    }
-
-    #[getter]
-    pub fn get_cdi_correction_factor(&self) -> f64 {
-        self.data.cdi_correction_factor
-    }
-
-    #[setter]
-    pub fn set_cdi_correction_factor(&mut self, value: f64) {
-        self.data.cdi_correction_factor = value;
-    }
 
     #[getter]
     pub fn get_power_coefficient_polynomial(&self) -> Vec<f64> {

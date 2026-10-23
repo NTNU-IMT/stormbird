@@ -209,15 +209,6 @@ impl SectionModel {
         }
     }
 
-    pub fn added_mass_factor(&self, internal_state: Float) -> Float {
-        match self {
-            Self::SingleElementFoil(foil) => foil.added_mass_factor,
-            Self::MultiElementFoil(varying_foil) => varying_foil.get_foil(internal_state).added_mass_factor,
-            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.added_mass_factor(internal_state),
-            Self::RotatingCylinder(cylinder) => cylinder.added_mass_factor,
-            Self::EffectiveWindSensor => 0.0
-        }
-    }
 
     /// Computes the power coefficient, c_P = P / (0.5 * density * A * U^3), where A is the area of
     /// the section and U is the local velocity. Section models that do not need power return zero.

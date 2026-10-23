@@ -48,18 +48,6 @@ pub struct RotatingCylinder {
     #[serde(default = "RotatingCylinder::default_cd_spin_ratio_low_drag")]
     /// The spin ratio where the low drag is used
     pub cd_spin_ratio_low_drag: Float,
-    
-    #[serde(default)]
-    /// Added mass factor for the cylinder
-    pub added_mass_factor: Float,
-    #[serde(default)]
-    /// Two-dimensional moment of inertia
-    pub moment_of_inertia_2d: Float,
-    #[serde(default)]
-    /// factor that can be used to correct for numerical errors in the lift-induced drag. Set to a
-    /// positive value to increase the drag, and a negative value to decrease the drag. The
-    /// default is zero, which means no correction.
-    pub cdi_correction_factor: Float,
     #[serde(default = "RotatingCylinder::default_power_coefficient_polynomial")]
     /// Coefficients of a polynomial in the absolute spin ratio, used to calculate the power 
     /// coefficient, c_P = P / (0.5 * density * A * U^3), where A is the projected area. Given in 
@@ -78,9 +66,6 @@ impl Default for RotatingCylinder {
             cd_end: Self::default_cd_end(),
             cd_angle_start: Self::default_cd_angle_start(),
             cd_spin_ratio_low_drag: Self::default_cd_spin_ratio_low_drag(),
-            added_mass_factor: 0.0,
-            moment_of_inertia_2d: 0.0,
-            cdi_correction_factor: 0.0,
             power_coefficient_polynomial: Self::default_power_coefficient_polynomial(),
         }
     }
@@ -146,7 +131,7 @@ impl RotatingCylinder {
 
         let angle_effective = PI * angle / (PI + self.cd_angle_start);
 
-        let mut cd = if angle_effective < PI {
+        if angle_effective < PI {
             let c1 = (1.0 + angle_effective.cos())/2.0;
             let c0 = (1.0 + self.cd_angle_start.cos())/2.0;
 
@@ -155,17 +140,7 @@ impl RotatingCylinder {
             self.cd_start * s + (1.0 - s) * self.cd_end
         } else {
             self.cd_end
-        };
-
-        if self.cdi_correction_factor != 0.0{
-            let cl = self.lift_coefficient(spin_ratio);
-
-            let cdi_correction = self.cdi_correction_factor * cl.abs().powi(2);
-
-            cd += cdi_correction;
         }
-
-        cd
     }
 
     /// Calculates the power coefficient from the polynomial model, using the absolute value of the
@@ -179,9 +154,6 @@ impl RotatingCylinder {
         })
     }
 
-    pub fn added_mass_coefficient(&self, acceleration_magnitude: Float) -> Float {
-        self.added_mass_factor * acceleration_magnitude
-    }
 
     /// Helper function to calculate revolutions per second from a target spin ratio, diameter and
     /// velocity.

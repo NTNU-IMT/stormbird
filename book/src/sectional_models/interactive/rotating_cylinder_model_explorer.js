@@ -33,7 +33,6 @@
                 { key: 'cd_end', min: 0.0, max: 0.5, step: 0.005 },
                 { key: 'cd_angle_start', min: 0.0, max: 45.0, step: 0.5, angle: true },
                 { key: 'cd_spin_ratio_low_drag', min: 0.5, max: 5.0, step: 0.05 },
-                { key: 'cdi_correction_factor', min: 0.0, max: 0.02, step: 0.0005 },
             ],
         },
     ];

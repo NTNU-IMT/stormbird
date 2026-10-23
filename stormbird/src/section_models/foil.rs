@@ -39,9 +39,6 @@ use crate::error::Error;
 ///
 /// The transit between the two models is done using a sigmoid function, where both the transition
 /// point and the width of the transition can be adjusted.
-///
-/// In addition, there factors in the model to account for added mass and lift due to the time
-/// derivative of the angle of attack. Both these effects are assumed to be linear for simplicity.
 pub struct Foil {
     #[serde(default)]
     /// Lift coefficient at zero angle of attack. This is zero by default, but can be set to a
@@ -94,11 +91,6 @@ pub struct Foil {
     /// Power factor for the harmonic dependency of the drag coefficient after stall. Set to 1.6 by
     /// default.
     pub cd_power_after_stall: Float,
-    #[serde(default)]
-    /// factor that can be used to correct for numerical errors in the lift-induced drag. Set to a
-    /// positive value to increase the drag, and a negative value to decrease the drag. The
-    /// default is zero, which means no correction.
-    pub cdi_correction_factor: Float,
     #[serde(default="Foil::default_mean_stall_angle")]
     /// The mean stall angle for positive angles of attack, which is the mean angle where the model transitions from pre-stall to
     /// post-stall behavior. The default value is 20 degrees.
@@ -110,12 +102,7 @@ pub struct Foil {
     #[serde(default="Foil::default_stall_range")]
     /// The range of the stall transition. The default value is 6 degrees.
     pub stall_range: Float,
-
-    #[serde(default)]
-    /// Factor to model added mass due to accelerating flow around the foil. Set to zero by default.
-    pub added_mass_factor: Float,
 }
-
 
 impl Foil {
     fn default_one() -> Float {1.0}
@@ -212,17 +199,7 @@ impl Foil {
 
         let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
-        let cd_raw = cd_pre_stall * (1.0 - amount_of_stall) + amount_of_stall * cd_post_stall;
-
-        if self.cdi_correction_factor != 0.0{
-            let cl = self.lift_coefficient(angle_of_attack);
-
-            let cdi_correction = self.cdi_correction_factor * cl.abs().powi(2);
-
-            cd_raw + cdi_correction
-        } else {
-            cd_raw
-        }
+        cd_pre_stall * (1.0 - amount_of_stall) + amount_of_stall * cd_post_stall
     }
 
     /// Pre-stall drag coefficient, modeled as a second order polynomial with the minimum value
@@ -242,16 +219,6 @@ impl Foil {
         self.cd_min + self.cd_second_order_factor * effective_angle.powi(2)
     }
 
-
-    /// Calculates the added mass force in the direction of the heave motion of the foil.
-    ///
-    /// # Arguments
-    /// * `heave_acceleration` - Acceleration of the flow around the foil normal to the chord
-    /// length. That is, the opposite of the acceleration of the foil itself.
-    pub fn added_mass_coefficient(&self, heave_acceleration: Float) -> Float {
-        self.added_mass_factor * heave_acceleration
-    }
-
     /// Calculates the amount of stall for a given angle of attack. Varies between 0 and 1, where 0
     /// means no stall and 1 means full stall.
     pub fn amount_of_stall(&self, angle_of_attack: Float) -> Float {
@@ -267,7 +234,6 @@ impl Foil {
             self.stall_range
         )
     }
-
 
     /// Returns the mirror image of the foil, i.e., the same foil profile with the suction side and
     /// pressure side swapped. For instance, a foil with a flap deflected to one side becomes a foil
@@ -292,12 +258,9 @@ impl Foil {
             cd_second_order_factor: self.cd_second_order_factor,
             cd_max_after_stall: self.cd_max_after_stall,
             cd_power_after_stall: self.cd_power_after_stall,
-            cdi_correction_factor: self.cdi_correction_factor,
             mean_positive_stall_angle: self.mean_negative_stall_angle,
             mean_negative_stall_angle: self.mean_positive_stall_angle,
             stall_range: self.stall_range,
-
-            added_mass_factor: self.added_mass_factor,
         }
     }
 
@@ -327,12 +290,9 @@ impl Foil {
             cd_second_order_factor: blend(first.cd_second_order_factor, second.cd_second_order_factor),
             cd_max_after_stall: blend(first.cd_max_after_stall, second.cd_max_after_stall),
             cd_power_after_stall: blend(first.cd_power_after_stall, second.cd_power_after_stall),
-            cdi_correction_factor: blend(first.cdi_correction_factor, second.cdi_correction_factor),
             mean_positive_stall_angle: blend(first.mean_positive_stall_angle, second.mean_positive_stall_angle),
             mean_negative_stall_angle: blend(first.mean_negative_stall_angle, second.mean_negative_stall_angle),
             stall_range: blend(first.stall_range, second.stall_range),
-
-            added_mass_factor: blend(first.added_mass_factor, second.added_mass_factor),
         }
     }
 }
@@ -352,12 +312,9 @@ impl Default for Foil {
             cd_second_order_factor: 0.0,
             cd_max_after_stall:     Self::default_one(),
             cd_power_after_stall:   Self::default_cd_power_after_stall(),
-            cdi_correction_factor:  0.0,
             mean_positive_stall_angle: Self::default_mean_stall_angle(),
             mean_negative_stall_angle: Self::default_mean_stall_angle(),
             stall_range:            Self::default_stall_range(),
-
-            added_mass_factor:      0.0
         }
     }
 }

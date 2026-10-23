@@ -22,7 +22,7 @@
 //! - [`sectional_circulatory_forces`](LineForceModel::sectional_circulatory_forces)
 //! - [`sectional_drag_forces`](LineForceModel::sectional_drag_forces)
 //! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
-//! - [`sectional_gyroscopic_force`](LineForceModel::sectional_gyroscopic_force)
+//! - [`sectional_gyroscopic_moments`](LineForceModel::sectional_gyroscopic_moments)
 //! - [`lift_coefficient_from_circulation`](LineForceModel::lift_coefficient_from_circulation)
 //! - [`lift_from_coefficients`](LineForceModel::lift_from_coefficients)
 //! - [`residual`](LineForceModel::residual)
@@ -417,28 +417,38 @@ impl LineForceModel {
         }
     }
 
-     /// Calculates the forces on each line element.
-     pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
+    /// Calculates the forces on each line element, together with the gyroscopic moments.
+    pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
+        let circulatory = self.sectional_circulatory_forces(
+            &input.circulation_strength, 
+            &input.velocity
+        );
+
+        let viscous_lift = self.viscous_lift_forces(
+            &input.angles_of_attack, 
+            &input.section_models_internal_state, 
+            &input.velocity
+        );
+
+        let mut sectional_drag = self.sectional_drag_forces(
+            &input.angles_of_attack, 
+            &input.section_models_internal_state, 
+            &input.velocity
+        );
+
+        self.apply_force_corrections(
+            &circulatory,
+            &viscous_lift,
+            &input.velocity,
+            &mut sectional_drag
+        );
+
         let mut sectional_forces = SectionalForces {
-            circulatory: self.sectional_circulatory_forces(
-                &input.circulation_strength, 
-                &input.velocity
-            ),
-            viscous_lift: self.viscous_lift_forces(
-                &input.angles_of_attack, 
-                &input.section_models_internal_state, 
-                &input.velocity
-            ),
-            sectional_drag: self.sectional_drag_forces(
-                &input.angles_of_attack, 
-                &input.section_models_internal_state, 
-                &input.velocity
-            ),
-            added_mass: self.sectional_added_mass_force(
-                &input.acceleration, 
-                &input.section_models_internal_state
-            ),
-            gyroscopic: self.sectional_gyroscopic_force(input.rotation_velocity),
+            circulatory,
+            viscous_lift,
+            sectional_drag,
+            added_mass: self.sectional_added_mass_force(&input.acceleration),
+            gyroscopic_moment: self.sectional_gyroscopic_moments(input.rotation_velocity),
             total: vec![SpatialVector::default(); self.nr_span_lines()],
             coordinate_system: input.coordinate_system
         };
@@ -509,7 +519,8 @@ impl LineForceModel {
 
     /// Calculates the forces on each line element due to the sectional drag model. This is most
     /// often the viscous drag, but it can also include other physical effects if that is included
-    /// in the sectional drag model.
+    /// in the sectional drag model. The drag from the [force corrections](ForceCorrection) is not
+    /// included, but is added in [`apply_force_corrections`](LineForceModel::apply_force_corrections).
     pub fn sectional_drag_forces(
         &self, 
         angles_of_attack: &[Float], 
@@ -532,7 +543,7 @@ impl LineForceModel {
     }
 
     /// Calculates the added mass force on each line element due to the flow acceleration at each
-    /// control point.
+    /// control point, using the [added mass model](AddedMass) of each wing.
     ///
     /// **Note**: At the moment, this function only calculates the added mass due to the point
     /// acceleration. However, according to, for instance, Theodorsen, the added mass should also
@@ -547,48 +558,48 @@ impl LineForceModel {
     pub fn sectional_added_mass_force(
         &self, 
         acceleration: &[SpatialVector],
-        internal_state: &[Float],
     ) -> Vec<SpatialVector> {
         let (span_lines, chord_vectors) = match self.output_coordinate_system {
             CoordinateSystem::Global => (&self.span_lines_global, &self.chord_vectors_global),
             CoordinateSystem::Body => (&self.span_lines_local, &self.chord_vectors_local)
         };
 
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
+        let mut forces = vec![SpatialVector::default(); self.nr_span_lines()];
 
-                let strip_area = self.chord_lengths[index] * span_lines[index].length();
+        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
+            let added_mass = &self.added_mass[wing_index];
 
-                let mut relevant_acceleration = acceleration[index];
-
-                relevant_acceleration -= relevant_acceleration.project(span_lines[index].direction());
-
-                match self.section_models[wing_index] {
-                    SectionModel::RotatingCylinder(_) => {},
-                    _ => {
-                        relevant_acceleration -= relevant_acceleration.project(chord_vectors[index]);
-                    }
-                }
-
-                if relevant_acceleration.length() == 0.0 {
-                    SpatialVector::default()
-                } else {
-                    let added_mass_factor = self.section_models[wing_index]
-                        .added_mass_factor(internal_state[index]);
-                    
-                    added_mass_factor * self.density * strip_area * relevant_acceleration.length() * relevant_acceleration.normalize()
-                }
+            if !added_mass.is_active() {
+                continue;
             }
-        ).collect()
+
+            for index in wing_indices.clone() {
+                let acceleration_in_section_plane = acceleration[index].project_on_plane(
+                    span_lines[index].direction()
+                );
+
+                forces[index] = added_mass.force(
+                    self.density,
+                    chord_vectors[index],
+                    span_lines[index].length(),
+                    acceleration_in_section_plane
+                );
+            }
+        }
+
+        forces
     }
 
-    /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
+    /// Calculates the gyroscopic moment from each line element, using the
+    /// [gyroscopic moment model](GyroscopicMoment) of each wing. This is only relevant for rotor
+    /// sails, where the internal state of the wing is the revolutions per second of the rotor.
     ///
-    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be
-    /// significantly larger than the rotational velocity of the sail, for instance due to roll or
-    /// pitch motion of the boat.
-    pub fn sectional_gyroscopic_force(
+    /// The moment of inertia of a wing is distributed over the line elements in proportion to their
+    /// length. Virtual line elements get no moment.
+    ///
+    /// # Arguments
+    /// * `rotation_velocity` - the rotational velocity of the whole line force model
+    pub fn sectional_gyroscopic_moments(
         &self, 
         rotation_velocity: SpatialVector
     ) -> Vec<SpatialVector> {
@@ -597,29 +608,38 @@ impl LineForceModel {
             CoordinateSystem::Body => &self.span_lines_local,
         };
 
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index = self.wing_index_from_global(index);
+        let mut moments = vec![SpatialVector::default(); self.nr_span_lines()];
 
-                match &self.section_models[wing_index] {
-                    SectionModel::RotatingCylinder(cylinder) => {
-                        let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
+        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
+            let gyroscopic_moment = &self.gyroscopic_moments[wing_index];
 
-                        let rps = self.internal_state[wing_index].value_at(
-                            self.ctrl_point_spanwise_distance_non_dimensional[index]
-                        );
-
-                        let radial_velocity = 2.0 * PI * rps;
-
-                        let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
-
-                        angular_momentum.cross(rotation_velocity)
-                    },
-                    _ => SpatialVector::default()
-                }
-
+            if !gyroscopic_moment.is_active() {
+                continue;
             }
-        ).collect()
+
+            let real_indices = || wing_indices.clone().filter(|&i| !self.line_segment_is_virtual[i]);
+
+            let span: Float = real_indices().map(|i| span_lines[i].length()).sum();
+
+            if span == 0.0 {
+                continue;
+            }
+
+            for i in real_indices() {
+                let revolutions_per_second = self.internal_state[wing_index].value_at(
+                    self.ctrl_point_spanwise_distance_non_dimensional[i]
+                );
+
+                moments[i] = gyroscopic_moment.moment(
+                    span_lines[i].length() / span,
+                    revolutions_per_second,
+                    span_lines[i].direction(),
+                    rotation_velocity
+                );
+            }
+        }
+
+        moments
     }
 
     /// Calculates the magnitude of the lift force on each line element based on the given

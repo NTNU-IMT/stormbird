@@ -6,7 +6,7 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from .base_model import StormbirdSetupBaseModel
 from .spatial_vector import SpatialVector
-from .section_models import SectionModel
+from .section_models import SectionModel, RotatingCylinder
 
 from .circulation_corrections import CirculationCorrectionBuilder
 
@@ -20,6 +20,39 @@ class CoordinateSystem(Enum):
     Global = "Global"
     Body = "Body"
 
+class ForceCorrection(StormbirdSetupBaseModel):
+    '''
+    Empirical corrections of the forces on a wing. All corrections are zero by default.
+
+    The lift-induced drag correction adds a drag coefficient equal to the factor times the square
+    of the lift coefficient on each line element, computed from the total lift force. A positive
+    value increases the drag, while a negative value decreases it.
+    '''
+    lift_induced_drag_correction: float = 0.0
+
+class AddedMass(StormbirdSetupBaseModel):
+    '''
+    Strip theory model of the added mass forces on a wing. The coefficients are relative to the
+    added mass of a flat plate accelerating normal to its chord, density * pi * chord^2 / 4 per
+    span length. Typical values are:
+
+    - Thin foil: normal_coefficient = 1.0, chordwise_coefficient = 0.0
+    - Thick foil: normal_coefficient = 1.0, chordwise_coefficient = (thickness / chord)^2
+    - Circular cylinder (rotor sail): normal_coefficient = 1.0, chordwise_coefficient = 1.0
+
+    Both coefficients are zero by default, which means that the model is not used.
+    '''
+    normal_coefficient: float = 0.0
+    chordwise_coefficient: float = 0.0
+
+class GyroscopicMoment(StormbirdSetupBaseModel):
+    '''
+    Model of the gyroscopic moment from a rotor sail. The moment of inertia is the total moment of
+    inertia of the rotor about its axis of rotation, in kg m^2. Only used together with the
+    rotating cylinder section model. Zero by default, which means that the model is not used.
+    '''
+    moment_of_inertia: float = 0.0
+
 class WingBuilder(StormbirdSetupBaseModel):
     '''
     Class for defining a wing model builder
@@ -32,6 +65,27 @@ class WingBuilder(StormbirdSetupBaseModel):
     nr_sections: int | None = None
     input_power_model: InputPowerModel = InputPowerModel()
     internal_compartment_boundaries: list[float] | None = None
+    force_correction: ForceCorrection | None = None
+    added_mass: AddedMass | None = None
+    gyroscopic_moment: GyroscopicMoment | None = None
+
+    @model_validator(mode='after')
+    def check_gyroscopic_moment(self) -> "WingBuilder":
+        '''
+        The gyroscopic moment uses the internal state of the wing as the rotational speed of the
+        rotor, and is therefore only allowed together with the rotating cylinder section model.
+        '''
+        if (
+            self.gyroscopic_moment is not None and
+            self.gyroscopic_moment.moment_of_inertia != 0.0 and
+            not isinstance(self.section_model.model, RotatingCylinder)
+        ):
+            raise ValueError(
+                "The gyroscopic moment model is only used together with the rotating cylinder "
+                "section model"
+            )
+
+        return self
 
     @model_validator(mode='after')
     def check_internal_compartments(self) -> "WingBuilder":

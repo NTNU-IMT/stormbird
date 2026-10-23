@@ -166,9 +166,6 @@ impl VaryingFoil {
         self.get_foil(internal_state).drag_coefficient(angle_of_attack)
     }
 
-    pub fn added_mass_coefficient(&self, heave_acceleration: Float, internal_state: Float) -> Float {
-        self.get_foil(internal_state).added_mass_coefficient(heave_acceleration)
-    }
 
     pub fn amount_of_stall(&self, angle_of_attack: Float, internal_state: Float) -> Float {
         self.get_foil(internal_state).amount_of_stall(angle_of_attack)

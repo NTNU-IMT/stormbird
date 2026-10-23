@@ -26,12 +26,9 @@ class Foil(StormbirdSetupBaseModel):
     cd_second_order_factor: float | None = None
     cd_max_after_stall: float | None = None
     cd_power_after_stall: float | None = None
-    cdi_correction_factor: float | None = None
     mean_positive_stall_angle: float | None = None
     mean_negative_stall_angle: float | None = None
     stall_range: float | None = None
-
-    added_mass_factor: float | None = None
 
 class VaryingFoil(StormbirdSetupBaseModel):
     '''
@@ -473,9 +470,6 @@ class RotatingCylinder(StormbirdSetupBaseModel):
     cd_end: float | None = None
     cd_angle_start: float | None = None
     cd_spin_ratio_low_drag: float | None = None
-    added_mass_factor: float | None = None
-    moment_of_inertia_2d: float | None = None
-    cdi_correction_factor: float | None = None
     power_coefficient_polynomial: list[float] | None = None
     
 class EffectiveWindSensor(StormbirdSetupBaseModel):

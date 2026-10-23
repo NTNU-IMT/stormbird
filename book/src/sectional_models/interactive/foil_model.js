@@ -4,7 +4,7 @@
 
 // JavaScript copy of the `Foil` model in `stormbird/src/section_models/foil.rs`, used for the
 // interactive plot in the book. The functions mirror the Rust implementation one-to-one, and must
-// be updated whenever the Rust model changes. Added mass is not included, as it is not plotted.
+// be updated whenever the Rust model changes.
 
 (function (root) {
     'use strict';
@@ -47,7 +47,6 @@
         cd_second_order_factor: 0.0,
         cd_max_after_stall: 1.0,
         cd_power_after_stall: 1.6,
-        cdi_correction_factor: 0.0,
         mean_positive_stall_angle: toRadians(20.0),
         mean_negative_stall_angle: toRadians(20.0),
         stall_range: toRadians(6.0),
@@ -115,22 +114,13 @@
                 Math.abs(Math.sin(angleOfAttack)) ** this.cd_power_after_stall;
         }
 
-
         dragCoefficient(angleOfAttack) {
             const cdPreStall = this.dragCoefficientPreStall(angleOfAttack);
             const cdPostStall = this.dragCoefficientPostStallRaw(angleOfAttack);
 
             const amountOfStall = this.amountOfStall(angleOfAttack);
 
-            const cdRaw = cdPreStall * (1.0 - amountOfStall) + amountOfStall * cdPostStall;
-
-            if (this.cdi_correction_factor !== 0.0) {
-                const cl = this.liftCoefficient(angleOfAttack);
-
-                return cdRaw + this.cdi_correction_factor * cl ** 2;
-            }
-
-            return cdRaw;
+            return cdPreStall * (1.0 - amountOfStall) + amountOfStall * cdPostStall;
         }
 
         amountOfStall(angleOfAttack) {

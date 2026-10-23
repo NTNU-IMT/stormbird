@@ -51,6 +51,9 @@ pub struct WingBuilder {
     pub nr_sections: Option<usize>,
     pub input_power_model: InputPowerModel,
     pub internal_compartment_boundaries: Option<Vec<f64>>,
+    pub force_correction: ForceCorrection,
+    pub added_mass: AddedMass,
+    pub gyroscopic_moment: GyroscopicMoment,
 }
 ```
 
@@ -69,6 +72,12 @@ The `nr_sections` variable is optional but can be set for each wing to override 
 The `input_power_model` specifies an optional empirical model for the power needed to operate the wing, for instance for rotor sails or suction sails. The default is `FromSectionModelPowerCoefficient`, which computes the power from the section model, and gives zero power for section models that do not need power. See the [input power chapter](./input_power.md) for more.
 
 The `internal_compartment_boundaries` is an optional division of the internal volume of the wing into sealed compartments, for instance for a suction sail with several fans along the span. The boundaries are given as non-dimensional span locations, running from -0.5 at one end of the wing to 0.5 at the other, including both ends. For instance, `[-0.5, 0.0, 0.5]` gives two compartments of equal length. The compartments are only used by section models with an internal flow model, and setting more than one compartment for other section models gives an error. The default is a single compartment. See the [active air flow foil chapter](../sectional_models/active_air_flow_foil.md#internal-compartments) for more.
+
+The `force_correction`, `added_mass` and `gyroscopic_moment` are optional models that are applied to the forces on the wing, and are independent of the section model. They can be set separately for each wing, and are all turned off by default. See the [force calculations chapter](./force_calculations.md) for more:
+
+- `force_correction`: [empirical corrections of the forces](./force_calculations.md#force-corrections), such as a correction of the lift-induced drag.
+- `added_mass`: a strip theory model of the [added mass forces](./force_calculations.md#4---added-mass).
+- `gyroscopic_moment`: a model of the [gyroscopic moment](./force_calculations.md#5---gyroscopic-moment) from a rotor sail. Can only be used together with the rotating cylinder section model.
 
 When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note].
 

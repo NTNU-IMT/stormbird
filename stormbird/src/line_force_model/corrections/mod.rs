@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Various corrections for the circulation strength and angle of attack calculated
+//! Various corrections for the circulation strength, the angle of attack and the forces calculated
 //! 
 //! The module contains an implementation block for the [LineForceModel] and various correction 
 //! structs.
@@ -12,9 +12,11 @@
 //! - [`gaussian_smoothed_values`](LineForceModel::gaussian_smoothed_values)
 //! - [`polynomial_smoothed_values`](LineForceModel::polynomial_smoothed_values)
 //! - [`circulation_strength_prescribed`](LineForceModel::circulation_strength_prescribed)
+//! - [`apply_force_corrections`](LineForceModel::apply_force_corrections)
 
 pub mod circulation;
 pub mod angle_of_attack;
+pub mod force;
 
 use stormath::type_aliases::Float;
 use stormath::consts::MIN_POSITIVE;

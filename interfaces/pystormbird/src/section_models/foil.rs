@@ -162,15 +162,6 @@ impl Foil {
         self.data.cd_power_after_stall = value;
     }
 
-    #[getter]
-    pub fn get_cdi_correction_factor(&self) -> f64 {
-        self.data.cdi_correction_factor
-    }
-
-    #[setter]
-    pub fn set_cdi_correction_factor(&mut self, value: f64) {
-        self.data.cdi_correction_factor = value;
-    }
 
     #[getter]
     pub fn get_mean_positive_stall_angle(&self) -> f64 {
@@ -203,15 +194,6 @@ impl Foil {
     }
 
 
-    #[getter]
-    pub fn get_added_mass_factor(&self) -> f64 {
-        self.data.added_mass_factor
-    }
-
-    #[setter]
-    pub fn set_added_mass_factor(&mut self, value: f64) {
-        self.data.added_mass_factor = value;
-    }
 
     pub fn __str__(&self) -> String {
         self.data.to_string()

@@ -5,8 +5,7 @@
 // JavaScript copy of the `RotatingCylinder` model in
 // `stormbird/src/section_models/rotating_cylinder.rs`, used for the interactive plot in the book.
 // The functions mirror the Rust implementation one-to-one, and must be updated whenever the Rust
-// model changes. Added mass, the moment of inertia and the power coefficient are not included, as
-// they are not plotted.
+// model changes. The power coefficient is not included, as it is not plotted.
 
 (function (root) {
     'use strict';
@@ -38,7 +37,6 @@
         cd_end: 0.05,
         cd_angle_start: toRadians(5.0),
         cd_spin_ratio_low_drag: 2.7,
-        cdi_correction_factor: 0.0,
     });
 
     class RotatingCylinder {
@@ -65,24 +63,16 @@
 
             const angleEffective = Math.PI * angle / (Math.PI + this.cd_angle_start);
 
-            let cd = this.cd_end;
-
             if (angleEffective < Math.PI) {
                 const c1 = (1.0 + Math.cos(angleEffective)) / 2.0;
                 const c0 = (1.0 + Math.cos(this.cd_angle_start)) / 2.0;
 
                 const s = c1 / c0;
 
-                cd = this.cd_start * s + (1.0 - s) * this.cd_end;
+                return this.cd_start * s + (1.0 - s) * this.cd_end;
             }
 
-            if (this.cdi_correction_factor !== 0.0) {
-                const cl = this.liftCoefficient(spinRatio);
-
-                cd += this.cdi_correction_factor * cl ** 2;
-            }
-
-            return cd;
+            return this.cd_end;
         }
     }
 

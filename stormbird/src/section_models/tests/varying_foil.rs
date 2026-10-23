@@ -20,12 +20,12 @@ fn asymmetric_foil(cl_zero_angle: Float) -> Foil {
         cd_second_order_factor: 0.6,
         cd_max_after_stall: 1.3,
         cd_power_after_stall: 1.8,
-        cdi_correction_factor: 0.01,
+
         mean_positive_stall_angle: Float::from(16.0).to_radians(),
         mean_negative_stall_angle: Float::from(24.0).to_radians(),
         stall_range: Float::from(5.0).to_radians(),
 
-        added_mass_factor: 0.3,
+
     }
 }
 
@@ -89,7 +89,7 @@ fn interpolation_matches_parameter_wise_interpolation() {
         assert!((foil.mean_positive_stall_angle - interpolate(|f| f.mean_positive_stall_angle)).abs() < 1e-12);
         assert!((foil.mean_negative_stall_angle - interpolate(|f| f.mean_negative_stall_angle)).abs() < 1e-12);
         assert!((foil.cl_slope_reduction_factor_positive - interpolate(|f| f.cl_slope_reduction_factor_positive)).abs() < 1e-12);
-        assert!((foil.added_mass_factor - interpolate(|f| f.added_mass_factor)).abs() < 1e-12);
+        assert!((foil.cd_power_after_stall - interpolate(|f| f.cd_power_after_stall)).abs() < 1e-12);
     }
 }
 

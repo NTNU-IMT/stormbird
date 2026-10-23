@@ -15,6 +15,9 @@ use crate::section_models::SectionModel;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
 use crate::line_force_model::wing_internal_state::InternalCompartments;
+use crate::line_force_model::corrections::force::ForceCorrection;
+use crate::line_force_model::added_mass::AddedMass;
+use crate::line_force_model::gyroscopic_moment::GyroscopicMoment;
 
 #[derive(Debug, Clone)]
 /// Input struct to add a single wing to a line force model
@@ -27,6 +30,9 @@ pub struct SingleWing {
     pub non_zero_circulation_at_ends: [bool; 2],
     pub input_power_model: InputPowerModel,
     pub internal_compartments: InternalCompartments,
+    pub force_correction: ForceCorrection,
+    pub added_mass: AddedMass,
+    pub gyroscopic_moment: GyroscopicMoment,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -52,6 +58,16 @@ pub struct WingBuilder {
     /// wing at -0.5 and 0.5. Only used by section models with an internal flow model, such as
     /// suction sails with several fans. The default is a single compartment.
     pub internal_compartment_boundaries: Option<Vec<Float>>,
+    #[serde(default)]
+    /// Optional empirical corrections of the forces on the wing. Not used by default.
+    pub force_correction: ForceCorrection,
+    #[serde(default)]
+    /// Optional model for the added mass forces on the wing. Not used by default.
+    pub added_mass: AddedMass,
+    #[serde(default)]
+    /// Optional model for the gyroscopic moment from the wing. Only allowed together with the
+    /// rotating cylinder section model. Not used by default.
+    pub gyroscopic_moment: GyroscopicMoment,
 }
 
 impl WingBuilder {
@@ -100,6 +116,24 @@ impl WingBuilder {
         }
 
         compartments
+    }
+
+    /// Returns the gyroscopic moment model of the wing.
+    ///
+    /// # Panics
+    /// If the model is active for a section model that is not a rotating cylinder, as the internal
+    /// state is then not the rotational speed of the wing.
+    pub fn gyroscopic_moment(&self) -> GyroscopicMoment {
+        if self.gyroscopic_moment.is_active() &&
+            !matches!(self.section_model, SectionModel::RotatingCylinder(_))
+        {
+            panic!(
+                "The gyroscopic moment model is only used together with the rotating cylinder \
+                section model"
+            );
+        }
+
+        self.gyroscopic_moment.clone()
     }
 
     /// Builds the data for a single wing
@@ -180,6 +214,9 @@ impl WingBuilder {
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
             input_power_model: self.input_power_model.clone(),
             internal_compartments: self.internal_compartments(),
+            force_correction: self.force_correction.clone(),
+            added_mass: self.added_mass.clone(),
+            gyroscopic_moment: self.gyroscopic_moment(),
         }
     }
 }
@@ -220,5 +257,21 @@ mod tests {
         let single_wing = wing_builder.build(12);
 
         dbg!(single_wing);
+    }
+
+    #[test]
+    fn wing_level_force_models_from_json() {
+        let wing_builder: WingBuilder = serde_json::from_str(r#"{
+            "section_points": [{"x": 0.0, "y": 0.0, "z": 0.0}, {"x": 0.0, "y": 0.0, "z": 1.0}],
+            "chord_vectors": [{"x": 1.0, "y": 0.0, "z": 0.0}, {"x": 1.0, "y": 0.0, "z": 0.0}],
+            "section_model": {"RotatingCylinder": {}},
+            "force_correction": {"lift_induced_drag_correction": 0.01},
+            "added_mass": {"normal_coefficient": 1.0, "chordwise_coefficient": 1.0},
+            "gyroscopic_moment": {"moment_of_inertia": 100.0}
+        }"#).unwrap();
+
+        assert_eq!(wing_builder.force_correction.lift_induced_drag_correction, 0.01);
+        assert_eq!(wing_builder.added_mass.chordwise_coefficient, 1.0);
+        assert_eq!(wing_builder.gyroscopic_moment.moment_of_inertia, 100.0);
     }
 }

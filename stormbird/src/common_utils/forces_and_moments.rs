@@ -20,6 +20,9 @@ pub enum CoordinateSystem {
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Integrated values representing either forces or moments.
+///
+/// The gyroscopic effect is a pure moment, so the `gyroscopic` field is always zero for the
+/// integrated forces.
 pub struct IntegratedValues {
     pub circulatory: SpatialVector,
     pub viscous_lift: SpatialVector,
@@ -67,8 +70,10 @@ pub struct SectionalForces {
     pub sectional_drag: Vec<SpatialVector>,
     /// Added mass forces on the line element.
     pub added_mass: Vec<SpatialVector>,
-    /// Forces due to gyroscopic effects on the line element.
-    pub gyroscopic: Vec<SpatialVector>,
+    /// Gyroscopic moment from the line element. This is a pure moment, and is therefore not
+    /// included in the total force, but is added directly to the integrated moments.
+    #[serde(default)]
+    pub gyroscopic_moment: Vec<SpatialVector>,
     /// Total forces
     pub total: Vec<SpatialVector>,
     /// The coordinate system of the forces data.
@@ -83,7 +88,6 @@ impl SectionalForces {
             self.total[i] += self.viscous_lift[i];
             self.total[i] += self.sectional_drag[i];
             self.total[i] += self.added_mass[i];
-            self.total[i] += self.gyroscopic[i];
         }
     }
 
@@ -119,7 +123,6 @@ impl SectionalForces {
                     wing_result.viscous_lift += self.viscous_lift[i];
                     wing_result.sectional_drag += self.sectional_drag[i];
                     wing_result.added_mass += self.added_mass[i];
-                    wing_result.gyroscopic += self.gyroscopic[i];
                     wing_result.total += self.total[i];
                 }
             }
@@ -135,7 +138,7 @@ impl SectionalForces {
         let sectional_viscous_lift_moments = Self::sectional_moments(line_force_model, &self.viscous_lift, self.coordinate_system);
         let sectional_drag_moments = Self::sectional_moments(line_force_model, &self.sectional_drag, self.coordinate_system);
         let sectional_added_mass_moments = Self::sectional_moments(line_force_model, &self.added_mass, self.coordinate_system);
-        let sectional_gyroscopic_moments = Self::sectional_moments(line_force_model, &self.gyroscopic, self.coordinate_system);
+
         let sectional_total_moments = Self::sectional_moments(line_force_model, &self.total, self.coordinate_system);
 
         let mut integrated_values: Vec<IntegratedValues> = Vec::new();
@@ -149,8 +152,12 @@ impl SectionalForces {
                     wing_result.viscous_lift += sectional_viscous_lift_moments[i];
                     wing_result.sectional_drag += sectional_drag_moments[i];
                     wing_result.added_mass += sectional_added_mass_moments[i];
-                    wing_result.gyroscopic += sectional_gyroscopic_moments[i];
                     wing_result.total += sectional_total_moments[i];
+
+                    if let Some(gyroscopic_moment) = self.gyroscopic_moment.get(i) {
+                        wing_result.gyroscopic += *gyroscopic_moment;
+                        wing_result.total += *gyroscopic_moment;
+                    }
                 }
             }
 
