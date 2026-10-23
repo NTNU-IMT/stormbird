@@ -74,14 +74,15 @@ pub fn secant_solver(
 /// # Arguments
 /// * `f` - The function to find the root of. Must be a function of one variable.
 /// * `lower` - The lower end of the bracket.
-/// * `upper` - The upper end of the bracket. The function must have a different sign at the two 
-/// ends of the bracket.
-/// * `settings` - The settings for the solver. The solver stops when the absolute value of the 
-/// function is below the tolerance, or when the bracket can not be reduced further. If the 
-/// maximum number of iterations is reached, the current best estimate is returned.
+/// * `upper` - The upper end of the bracket. The function must have a different sign at the two
+///   ends of the bracket.
+/// * `settings` - The settings for the solver. The solver stops when the absolute value of the
+///   function is below the tolerance, or when the bracket can not be reduced further. If the
+///   maximum number of iterations is reached, the current best estimate is returned.
 ///
 /// # Errors
-/// Returns an error if the function does not change sign between the two ends of the bracket.
+/// Returns an error if the function does not change sign between the two ends of the bracket, or
+/// if the function returns NaN.
 pub fn brent_solver(
     f: impl Fn(Float) -> Float,
     lower: Float,
@@ -92,6 +93,13 @@ pub fn brent_solver(
     let mut b = upper;
     let mut fa = f(a);
     let mut fb = f(b);
+
+    if fa.is_nan() || fb.is_nan() {
+        return Err(Error::NoSolution(format!(
+            "the function returns NaN at the ends of the bracket [{}, {}]: f({}) = {}, f({}) = {}",
+            lower, upper, lower, fa, upper, fb
+        )));
+    }
 
     if fa == 0.0 {
         return Ok(a);
@@ -192,6 +200,10 @@ pub fn brent_solver(
         }
 
         fb = f(b);
+
+        if fb.is_nan() {
+            return Err(Error::NoSolution(format!("the function returns NaN at x = {}", b)));
+        }
     }
 
     Ok(b)
@@ -264,5 +276,20 @@ mod tests {
         };
 
         assert!(brent_solver(test_function, 3.0, 5.0, &settings).is_err());
+    }
+
+    #[test]
+    fn test_brent_solver_with_nan() {
+        let settings = SolverSettings {
+            tolerance: 1e-12,
+            max_iterations: 50
+        };
+
+        // NaN at one end of the bracket
+        assert!(brent_solver(|x: Float| x.sqrt() - 1.0, -1.0, 3.0, &settings).is_err());
+
+        // NaN inside the bracket, but not at the ends
+        let f = |x: Float| if x > 0.5 && x < 2.5 { Float::NAN } else { x - 2.0 };
+        assert!(brent_solver(f, 0.0, 3.0, &settings).is_err());
     }
 }

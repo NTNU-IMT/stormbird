@@ -10,7 +10,7 @@ use crate::type_aliases::Float;
 /// 
 /// # Arguments
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
-/// data point, while the first is the oldest data point.
+///   data point, while the first is the oldest data point.
 /// * `step_size` - The step size between the data points
 pub fn first_derivative_first_order<T>(data: &[T; 2], step_size: Float) -> T 
 where T: 
@@ -28,8 +28,8 @@ where T:
 /// 
 /// # Arguments
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
-/// data point, while the first is the oldest data point. Each point is assumed to be equally spaced
-/// based on the step size
+///   data point, while the first is the oldest data point. Each point is assumed to be equally spaced
+///   based on the step size
 pub fn first_derivative_second_order_backward<T>(data: &[T; 3], step_size: Float) -> T 
 where T: 
     std::ops::Mul<Float, Output = T> + 
@@ -47,8 +47,8 @@ where T:
 /// 
 /// # Arguments
 /// * `data` - The data to calculate the derivative on. The last element in the array is the newest
-/// data point, while the first is the oldest data point. Each point is assumed to be equally spaced
-/// based on the step size
+///   data point, while the first is the oldest data point. Each point is assumed to be equally spaced
+///   based on the step size
 pub fn second_derivative_backward<T>(data: &[T; 3], step_size: Float) -> T 
 where T: 
     std::ops::Mul<Float, Output = T> + 
@@ -121,11 +121,14 @@ mod tests {
 
     #[test]
     fn test_derivatives() {
-        let step_size = 0.0012;
+        // Large enough to keep the round-off error small, also with single precision
+        let step_size = 0.004;
         let x0 = 0.85;
 
         let previous_x_values: [Float; 3] = [x0, x0 + step_size, x0 + 2.0 * step_size];
-        let new_x_value = x0 + 3.0 * step_size;
+
+        // The backward differences approximate the derivatives at the newest data point
+        let new_x_value = previous_x_values[2];
         
         let data: [Float; 3] = [
             function(previous_x_values[0]),

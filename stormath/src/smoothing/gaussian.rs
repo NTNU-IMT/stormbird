@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Gaussian kernel smoothing.
+
 use super::*;
 
 /// Gaussian kernel to be used in smoothing function.
@@ -13,13 +15,16 @@ pub fn gaussian_kernel(x: Float, x0: Float, smoothing_length: Float) -> Float {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+/// Settings for Gaussian kernel smoothing
 pub struct GaussianSmoothing<T: SmoothingOps> {
     /// The length to use in the Gaussian kernel
     pub smoothing_length: Float,
     /// How to treat the ends
     pub end_conditions: [EndCondition<T>; 2],
+    /// Number of points to insert at each end. Computed from the smoothing length if not given.
     #[serde(default)]
     pub number_of_end_insertions: Option<usize>,
+    /// Factor multiplied with the spacing of the data to get the spacing of the inserted points
     #[serde(default = "default_delta_x_factor_end_insertions")]
     pub delta_x_factor_end_insertions: Float,
 }
@@ -64,13 +69,13 @@ impl<T: SmoothingOps> GaussianSmoothing<T> {
 
         let mut y_smooth: Vec<T> = Vec::with_capacity(n);
 
-        // i_0 represents the index of the point to be smoothed
-        for i_0 in 0..n {
+        // x_0 represents the point to be smoothed
+        for &x_0 in &x[..n] {
             let mut kernel_sum = 0.0;
             let mut kernel_func_product_sum: T = Default::default();
 
             for i in 0..n_mod {
-                let kernel_value = gaussian_kernel(x_modified[i], x[i_0], self.smoothing_length);
+                let kernel_value = gaussian_kernel(x_modified[i], x_0, self.smoothing_length);
 
                 kernel_sum += kernel_value;
                 kernel_func_product_sum = kernel_func_product_sum + y_modified[i] * kernel_value;

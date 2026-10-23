@@ -1,3 +1,5 @@
+//! Linear algebra for the sparse matrix, such as solving equation systems.
+
 use super::*;
 
 use rayon::prelude::*;
@@ -120,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_sparse_matrix_solve_exact() {
-        let allowable_error = 1e-10;
+        let allowable_error = 1000.0 * Float::EPSILON;
 
         let a = Matrix {
             data: vec![3.0, 2.0, 0.0,
@@ -142,7 +144,7 @@ mod tests {
         let b = vec![1.0, 2.0, 3.0];
 
         let x_solved = a_sparse.solve_exact(&b).unwrap();
-        let x_expected = vec![0.6, -0.4, 2.0];
+        let x_expected = [0.6, -0.4, 2.0];
 
         for i in 0..x_solved.len() {
             assert!(
@@ -186,7 +188,7 @@ mod tests {
             1000
         ).unwrap();
 
-        let x_numpy = vec![0.6, -0.4,  2.0]; // Manually extracted from NumPy
+        let x_numpy = [0.6, -0.4,  2.0]; // Manually extracted from NumPy
 
         dbg!(&x_solved_elimination);
         dbg!(&x_solved_iterative);

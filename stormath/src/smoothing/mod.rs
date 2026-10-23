@@ -15,6 +15,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::type_aliases::Float;
 
+/// Operations needed for data to be smoothed. Implemented automatically for all types that
+/// support the required operations, such as `Float` and `SpatialVector`.
 pub trait SmoothingOps:
     std::ops::Mul<Float, Output = Self> + 
     std::ops::Add<Self, Output = Self> + 

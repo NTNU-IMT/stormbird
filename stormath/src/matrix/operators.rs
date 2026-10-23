@@ -4,12 +4,12 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 
-//! Implementation block for matrix operators. This includes the follwing:
+//! Implementation block for matrix operators. This includes the following:
 //!
 //! - General add, subtract and multiply
 //! - Indexing into the matrix
 //! - Special functions for [matrix multiplication](Matrix::matrix_multiply) and
-//! [matrix and vector multiplication](Matrix::vector_multiply)
+//!   [matrix and vector multiplication](Matrix::vector_multiply)
 
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
 

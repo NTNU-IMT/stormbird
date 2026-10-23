@@ -13,6 +13,7 @@ use crate::error::Error;
 
 
 impl Matrix<Float>{
+    /// Panics if the matrix is not square, or if the right-hand side does not match the matrix size.
     pub fn check_dimensions_for_solvability(&self, rhs: &[Float]) {
         let n = self.nr_rows();
         let m = self.nr_cols();
@@ -23,13 +24,15 @@ impl Matrix<Float>{
 
     }
     
+    /// Returns the residual, b - Ax, of the equation system Ax = b.
     pub fn linear_residual(&self, rhs: &[Float], x: &[Float]) -> Vec<Float> {    
         let ax = self.vector_multiply(x);
         
         ax.iter().zip(rhs.iter()).map(|(a, b)| b - a).collect()
     }
     
-    pub fn linear_residual_absolute_sum(&self, rhs: &[Float], x: &[Float]) -> Float {
+    /// Returns the mean of the absolute values of the residual of the equation system Ax = b.
+    pub fn linear_residual_absolute_mean(&self, rhs: &[Float], x: &[Float]) -> Float {
         let r = self.linear_residual(rhs, x);
         
         r.iter().map(|r| r.abs()).sum::<Float>() / (r.len() as Float)
@@ -123,7 +126,7 @@ mod tests {
 
         let x_solved_elimination = a.solve_gaussian_elimination(&b).unwrap();
 
-        let x_numpy = vec![0.6, -0.4,  2.0]; // Manually extracted from NumPy
+        let x_numpy = [0.6, -0.4,  2.0]; // Manually extracted from NumPy
 
         dbg!(&x_solved_elimination);
 
