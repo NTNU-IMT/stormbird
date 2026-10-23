@@ -17,7 +17,7 @@ class SpatialVector(StormbirdSetupBaseModel):
     z: float = 0.0
     
     @classmethod
-    def from_dict(cls, dict_in) -> "SpatialVector":
+    def from_dict(cls, dict_in: dict[str, float]) -> "SpatialVector":
         return cls(x = dict_in["x"], y = dict_in["y"], z = dict_in["z"])
         
     @classmethod

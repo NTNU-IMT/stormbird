@@ -6,6 +6,11 @@ use stormflow::simulation::Simulation;
 
 const NR_STEPS: usize = 5;
 
+/// The rotational speed of the rotor sail in the example, in revolutions per second. The internal
+/// state of the wings is not part of the setup file, so it is set after the simulation is built,
+/// in the same way as with the `-s` option of the executable.
+const ROTOR_REVOLUTIONS_PER_SECOND: Float = -1.273;
+
 /// The rotor sail example with end disks (actuator line + slip geometries), on a coarser grid, with
 /// an extra no-slip sphere and the realizable k-epsilon model, so that every part of the
 /// turbulence solver is exercised: the inlet/outlet conditions, the mirror corrections in both slip
@@ -48,6 +53,10 @@ struct SimulationOutput {
 
 fn run(platform: &str, inlet: serde_json::Value, wall_treatment: &str) -> SimulationOutput {
     let mut sim = Simulation::new_from_string(&setup_string(platform, inlet, wall_treatment)).unwrap();
+
+    if let Some(actuator_line) = &mut sim.actuator_line {
+        actuator_line.model.line_force_model.set_internal_state(&[ROTOR_REVOLUTIONS_PER_SECOND]);
+    }
 
     let mut time_steps = Vec::with_capacity(NR_STEPS);
     let mut time = 0.0;

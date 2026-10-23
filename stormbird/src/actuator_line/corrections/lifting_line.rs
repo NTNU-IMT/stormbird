@@ -19,14 +19,21 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LiftingLineCorrectionBuilder {
+    /// The length of the wake, relative to the average chord length
     #[serde(default = "LiftingLineCorrectionBuilder::default_wake_length_factor")]
     pub wake_length_factor: Float,
+    /// Optional symmetry condition
     #[serde(default)]
     pub symmetry_condition: SymmetryCondition,
+    /// Optional time over which the correction is gradually increased from zero, to avoid large
+    /// corrections at the start of a simulation
     #[serde(default)]
     pub initialization_time: Option<Float>,
+    /// The viscous core length of the projection width divided by this factor gives the small
+    /// reference viscous core length
     #[serde(default="LiftingLineCorrectionBuilder::default_reference_core_length_factor")]
     pub reference_core_length_factor: Float,
+    /// If true, the induced velocities from all wings are included in the correction
     #[serde(default)]
     pub include_wing_interactions: bool,
 }
@@ -47,6 +54,8 @@ impl LiftingLineCorrectionBuilder {
     fn default_wake_length_factor() -> Float {100.0}
     fn default_reference_core_length_factor() -> Float {100.0}
 
+    /// Builds the correction, where the viscous core length is the given factor times the average
+    /// chord length
     pub fn build(
         &self,
         viscous_core_length_factor: Float,
@@ -83,11 +92,17 @@ impl LiftingLineCorrectionBuilder {
 /// velocities from all wings are included, so that errors in the wing-to-wing interactions are
 /// also corrected.
 pub struct LiftingLineCorrection {
+    /// Viscous core length equal to the force projection width
     pub viscous_core_length: Float,
+    /// Small reference viscous core length
     pub viscous_core_length_reference: Float,
+    /// The length of the wake, relative to the average chord length
     pub wake_length_factor: Float,
+    /// Optional symmetry condition
     pub symmetry_condition: SymmetryCondition,
+    /// Optional time over which the correction is gradually increased from zero
     pub initialization_time: Option<Float>,
+    /// If true, the induced velocities from all wings are included in the correction
     pub include_wing_interactions: bool,
 }
 
@@ -123,8 +138,8 @@ impl LiftingLineCorrection {
         if let Some(initialization_time) = self.initialization_time {
             let correction_factor = cosine_transition_zero_to_one(time, 0.0, initialization_time);
 
-            for i in 0..u_i_correction.len() {
-                u_i_correction[i] *= correction_factor;
+            for u_i in u_i_correction.iter_mut() {
+                *u_i *= correction_factor;
             }
         }
 
@@ -203,11 +218,11 @@ impl LiftingLineCorrection {
             );
 
             frozen_wake_viscous.update_induced_velocities_at_control_points(
-                &wing_circulation_strength
+                wing_circulation_strength
             );
 
             frozen_wake_default.update_induced_velocities_at_control_points(
-                &wing_circulation_strength
+                wing_circulation_strength
             );
 
             for i in 0..nr_span_lines {
@@ -263,8 +278,8 @@ impl LiftingLineCorrection {
 
         let mut u_i_correction: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines);
 
-        for row_index in 0..nr_span_lines {
-            let ctrl_point = span_lines[row_index].ctrl_point();
+        for span_line in span_lines.iter().take(nr_span_lines) {
+            let ctrl_point = span_line.ctrl_point();
             let point_mirrored = self.symmetry_condition.mirrored_point(ctrl_point);
 
             let mut u_i_viscous = SpatialVector::default();

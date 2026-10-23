@@ -17,15 +17,15 @@ use stormath::{spatial_vector::SpatialVector, type_aliases::Float};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-/// Structure containing input values that is used by the controllers to set the local wing angles
+/// Structure containing input values that are used by the controllers to set the local wing angles
 /// and the section models' internal state.
 pub struct ControllerInput {
     /// How much of the max value that should be used
     pub loading: Float,
-    /// The current local wing angles, so that the controller know what to change from
+    /// The current local wing angles, so that the controller knows what to change from
     pub current_local_wing_angle: Float,
     /// Current internal state
-    pub current_section_model_internal_state: Float,
+    pub current_internal_state: Float,
     /// Measured angles of attack according to the measurement settings
     pub angle_of_attack: Float,
     /// Measured velocity magnitude
@@ -45,10 +45,8 @@ impl ControllerInput {
         spanwise_measurement: &SpanwiseMeasurement,
         wind_environment: &WindEnvironment,
         use_input_velocity_for_apparent_wind_direction: bool,
-    ) -> Vec<Self> {
+    ) -> Vec<Self> {        
         let nr_wings = line_force_model.nr_wings();
-        
-        let section_models_internal_state = line_force_model.section_models_internal_state();
         
         let angles_of_attack = spanwise_measurement.measure_angles_of_attack(simulation_result);
         
@@ -66,9 +64,9 @@ impl ControllerInput {
         for i in 0..nr_wings {
             out.push(
                 Self {
-                    loading: loading,
+                    loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
-                    current_section_model_internal_state: section_models_internal_state[i],
+                    current_internal_state: line_force_model.internal_state[i].representative_value(),
                     angle_of_attack: angles_of_attack[i],
                     velocity: velocities[i],
                     apparent_wind_direction: apparent_wind_directions[i]
@@ -117,17 +115,14 @@ impl ControllerInput {
             wing_indices.clone(),
         );
         
-        let section_models_internal_state = line_force_model.section_models_internal_state();
-
-
         let mut out: Vec<Self> = Vec::with_capacity(nr_wings);
         
         for i in 0..nr_wings {
             out.push(
                 Self {
-                    loading: loading,
+                    loading,
                     current_local_wing_angle: line_force_model.local_wing_angles[i],
-                    current_section_model_internal_state: section_models_internal_state[i],
+                    current_internal_state: line_force_model.internal_state[i].representative_value(),
                     angle_of_attack: angles_of_attack[i],
                     velocity: velocities[i],
                     apparent_wind_direction: apparent_wind_directions[i]

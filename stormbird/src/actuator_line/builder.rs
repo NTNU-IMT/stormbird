@@ -28,35 +28,48 @@ use super::corrections::{
 #[serde(deny_unknown_fields)]
 /// Builder for the actuator line model.
 pub struct ActuatorLineBuilder {
+    /// Builder for the line force model
     pub line_force_model: LineForceModelBuilder,
+    /// Settings for the projection of the forces onto the CFD grid
     #[serde(default)]
     pub projection_settings: ProjectionSettings,
+    /// Settings for the solver
     #[serde(default)]
     pub solver_settings: SolverSettings,
+    /// Settings for the sampling of the velocity from the CFD grid
     #[serde(default)]
     pub sampling_settings: SamplingSettings,
+    /// The number of iterations between each time a full simulation result is written to file
     #[serde(default="ActuatorLineBuilder::default_write_iterations_full_result")]
     pub write_iterations_full_result: usize,
+    /// The time to start solving
     #[serde(default)]
     pub start_time: Float,
+    /// Optional builder for a controller
     #[serde(default)]
     pub controller: Option<ControllerBuilder>,
+    /// Optional correction of the velocity, based on a lifting line model
     #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
+    /// Optional empirical correction of the circulation
     #[serde(default)]
     pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    /// Optional damping of the flow along the span
     #[serde(default)]
     pub spanflow_damper: Option<SpanflowDamper>
 }
 
 impl ActuatorLineBuilder {
+    /// Default number of iterations between each time a full result is written (100)
     pub fn default_write_iterations_full_result() -> usize {100}
+    /// Default lifting line correction, which uses the default settings
     pub fn default_lifting_line_correction() -> Option<LiftingLineCorrectionBuilder> {
         Some(
             LiftingLineCorrectionBuilder::default()
         )
     }
 
+    /// Creates a builder with default settings for the given line force model
     pub fn new(line_force_model: LineForceModelBuilder) -> Self {
         Self {
             line_force_model,
@@ -72,23 +85,15 @@ impl ActuatorLineBuilder {
         }
     }
 
-    /// Constructs a actuator line model from the builder data.
+    /// Constructs an actuator line model from the builder data.
     pub fn build(&self) -> ActuatorLine {
         let line_force_model = self.line_force_model.build();
 
         let nr_span_lines = line_force_model.nr_span_lines();
 
-        let controller = if let Some(controller_builder) = &self.controller {
-            // The actuator line builder cannot fail, so a controller that does not fit the line
-            // force model is reported the same way as the rest of the invalid input here
-            Some(
-                controller_builder
+        let controller = self.controller.as_ref().map(|controller_builder| controller_builder
                     .build(&line_force_model)
-                    .expect("Could not build the controller")
-            )
-        } else {
-            None
-        };
+                    .expect("Could not build the controller"));
 
         let lifting_line_correction = if let Some(lifting_line_correction_builder) = &self.lifting_line_correction {
             let viscous_core_length_factor = 0.5 * (

@@ -14,7 +14,7 @@ impl DynamicWake {
     ///
     /// # Arguments
     /// * `points` - The points at which the induced velocities are calculated
-    /// the off-body viscous core length in the potential theory model, if it exists.
+    ///   the off-body viscous core length in the potential theory model, if it exists.
     pub fn induced_velocities(
         &self, 
         points: &[SpatialVector], 
@@ -33,7 +33,7 @@ impl DynamicWake {
     ///
     /// # Arguments
     /// * `points` - The points at which the induced velocities are calculated
-    /// the off-body viscous core length in the potential theory model if it exists.
+    ///   the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities_from_first_panels(
         &self, points: &[SpatialVector], 
     ) -> Vec<SpatialVector> {
@@ -50,7 +50,7 @@ impl DynamicWake {
     ///
     /// # Arguments
     /// * `points` - The points at which the induced velocities are calculated
-    /// the off-body viscous core length in the potential theory model if it exists.
+    ///   the off-body viscous core length in the potential theory model if it exists.
     pub fn induced_velocities_from_free_wake(
         &self, 
         points: &[SpatialVector], 

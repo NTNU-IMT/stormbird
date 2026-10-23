@@ -26,9 +26,10 @@
           ],
           "section_model": {
             "RotatingCylinder": {
-              "revolutions_per_second": -1.273,
-              "spin_ratio_data": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
-              "cl_data": [0.0, 1.45, 4.75, 8.77, 10.38, 11.0],
+              "cl_initial_slope": 2.65,
+              "cl_high_spin_ratio_slope": 0.5,
+              "cl_slope_transition_spin_ratio": 3.9,
+              "cl_slope_transition_range": 0.5,
               "cd_start": 0.686,
               "cd_end": 0.1
             }

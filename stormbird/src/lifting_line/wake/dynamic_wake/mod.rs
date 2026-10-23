@@ -2,10 +2,15 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+/// Export of the wake geometry
 pub mod export;
+/// Settings for the dynamic wake
 pub mod settings;
+/// Calculation of induced velocities from the wake
 pub mod induced_velocity_calc;
+/// Initialization of the wake
 pub mod initialization;
+/// Update of the wake geometry and strength in each time step
 pub mod update_data;
 pub mod builder;
 
@@ -18,7 +23,7 @@ use crate::lifting_line::singularity_elements::prelude::*;
 use settings::*;
 
 #[derive(Debug, Clone)]
-/// Model of a dynamic wake for lifting line simulations
+/// Model of a dynamic wake for lifting line simulations.
 ///
 /// The induced velocities are calculated from vortex panels and their strengths.
 ///
@@ -28,13 +33,13 @@ use settings::*;
 ///
 /// A typical use case is as follows:
 /// - For each time step, the points in the wake lying exactly on the wing lines are updated to
-/// match the current wing geometry (which might have moved since the last time step), and the wake 
-/// points stream downstream, based on the current velocity field and time step.
+///   match the current wing geometry (which might have moved since the last time step), and the wake 
+///   points stream downstream, based on the current velocity field and time step.
 /// - The strength of the first panel is then updated iteratively to solve the lifting line
-/// equations. This happens in whatever solver that use this model. This model is used to calculate
-/// the velocity as a function of the strength.
+///   equations. This happens in whatever solver that use this model. This model is used to calculate
+///   the velocity as a function of the strength.
 /// - When the strength for a time step is solved, the final velocity at the control points are
-/// calculated.
+///   calculated.
 ///
 /// There are methods to update the strength and the shape of the vortex line for each time step in
 /// the simulation.
@@ -75,7 +80,7 @@ impl DynamicWake {
         panic!("Span index not found in any wing");
     }
 
-    /// Returns the the indices to the four points that make up a panel at the given indices.
+    /// Returns the indices to the four points that make up a panel at the given indices.
     ///
     /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom
     /// left corner when viewing the panel from above.

@@ -2,6 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Moving average filter.
 
 use std::collections::VecDeque;
 
@@ -15,6 +16,7 @@ pub struct MovingAverage {
 }
 
 impl MovingAverage {
+    /// Creates a new filter that averages over the given number of values
     pub fn new(window_size: usize) -> Self {
         Self {
             window: VecDeque::with_capacity(window_size),
@@ -22,6 +24,7 @@ impl MovingAverage {
         }
     }
 
+    /// Adds a new value, and removes the oldest value if the window is full
     pub fn add(&mut self, value: Float) {
         self.window.push_back(value);
 
@@ -30,6 +33,7 @@ impl MovingAverage {
         }
     }
 
+    /// Returns the average of the values in the window
     pub fn get_average(&self) -> Float {
         self.window.iter().sum::<Float>() / self.window.len() as Float
     }

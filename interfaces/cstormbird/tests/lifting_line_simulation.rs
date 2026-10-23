@@ -20,7 +20,7 @@ const QUASI_STEADY_SETUP: &str = r#"{
                     {"x": -2.0, "y": 0.0, "z": 0.0},
                     {"x": -2.0, "y": 0.0, "z": 0.0}
                 ],
-                "section_model": {"Foil": {}},
+                "section_model": {"SingleElementFoil": {}},
                 "non_zero_circulation_at_ends": [false, false]
             }
         ],
@@ -329,12 +329,34 @@ fn a_wrong_number_of_wing_angles_is_reported() {
 }
 
 #[test]
-fn induced_velocities_are_rejected_for_a_quasi_steady_wake() {
+fn induced_velocities_are_available_for_a_quasi_steady_wake() {
     let simulation = new_simulation(QUASI_STEADY_SETUP);
 
-    stormbird_clear_last_error();
+    let angles = [10.0_f64.to_radians()];
 
-    let points = [0.0, 0.0, 10.0];
+    assert_eq!(
+        lifting_line_simulation_set_local_wing_angles(simulation, angles.as_ptr(), angles.len()),
+        0
+    );
+
+    // The chord vectors in the setup point along the negative x-axis, so the flow must go in the
+    // same direction for the wing to have attached flow and a circulation
+    let freestream = uniform_freestream(simulation, [-10.0, 0.0, 0.0]);
+
+    let result = lifting_line_simulation_do_step(
+        simulation,
+        0.0,
+        1.0,
+        freestream.as_ptr(),
+        freestream.len() / 3
+    );
+
+    assert!(!result.is_null(), "{}", last_error_message().unwrap_or_default());
+
+    simulation_result_drop(result);
+
+    // A point next to the middle of the wing, where the bound vortex induces a velocity
+    let points = [1.0, 0.0, 10.0];
     let mut velocity_out = [0.0; 3];
 
     assert_eq!(
@@ -344,12 +366,13 @@ fn induced_velocities_are_rejected_for_a_quasi_steady_wake() {
             1,
             velocity_out.as_mut_ptr()
         ),
-        -5
+        1,
+        "{}",
+        last_error_message().unwrap_or_default()
     );
 
-    let message = last_error_message().expect("a failed call should store a message");
-
-    assert!(message.contains("dynamic"), "message was: {}", message);
+    assert!(velocity_out.iter().all(|value| value.is_finite()));
+    assert!(velocity_out.iter().any(|value| value.abs() > 0.0));
 
     lifting_line_simulation_drop(simulation);
 }
@@ -396,6 +419,47 @@ fn a_dynamic_simulation_needs_the_freestream_velocity_in_the_wake_as_well() {
             velocity_out.as_mut_ptr()
         ),
         1
+    );
+
+    lifting_line_simulation_drop(simulation);
+}
+
+#[test]
+fn the_internal_state_can_be_set_and_read() {
+    let simulation = new_simulation(QUASI_STEADY_SETUP);
+
+    let internal_state = [0.7];
+
+    assert_eq!(
+        lifting_line_simulation_set_internal_state(
+            simulation,
+            internal_state.as_ptr(),
+            internal_state.len()
+        ),
+        0,
+        "{}",
+        last_error_message().unwrap_or_default()
+    );
+
+    let mut internal_state_out = [0.0; 1];
+
+    assert_eq!(
+        lifting_line_simulation_internal_state(
+            simulation,
+            internal_state_out.as_mut_ptr(),
+            internal_state_out.len()
+        ),
+        1
+    );
+
+    assert_eq!(internal_state_out[0], 0.7);
+
+    // The number of values must match the number of sails
+    let too_many = [0.7, 0.3];
+
+    assert_eq!(
+        lifting_line_simulation_set_internal_state(simulation, too_many.as_ptr(), too_many.len()),
+        -2
     );
 
     lifting_line_simulation_drop(simulation);

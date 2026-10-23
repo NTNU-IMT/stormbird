@@ -9,9 +9,12 @@ use super::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// Defines how the rotation angles in a rotation vector, [x, y, z], are applied
 pub enum RotationType {
     #[default]
+    /// Rotation around the fixed x-axis, then the fixed y-axis, and then the fixed z-axis
     XYZ,
+    /// Yaw around the z-axis, then pitch around the new y-axis, and then roll around the new x-axis
     YawPitchRoll,
 }
 
@@ -23,7 +26,7 @@ impl SpatialVector {
     }
 
     #[inline(always)]
-    /// Uses the Rodrigues' rotation formmula to rotate the vector around the given axis.
+    /// Uses the Rodrigues' rotation formula to rotate the vector around the given axis.
     /// 
     /// Source: <https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula>
     pub fn rotate_around_axis(self, angle: Float, axis: Self) -> Self {
@@ -39,6 +42,7 @@ impl SpatialVector {
         term1 + term2 + term3
     }
 
+    /// Rotates the vector with the given rotation angles and rotation type
     pub fn rotate(self, rotation: Self, rotation_type: RotationType) -> Self {
         match rotation_type {
             RotationType::XYZ => self.rotate_xyz(rotation),
@@ -47,7 +51,7 @@ impl SpatialVector {
     }
 
     #[inline(always)]
-    /// performs rotation of the vector based on Euler angles specified in the rotation vector
+    /// Performs rotation of the vector based on Euler angles specified in the rotation vector
     /// 
     /// # Operation
     /// mut New vector = old vector * Rx
@@ -120,6 +124,7 @@ impl SpatialVector {
     }
 
     #[inline(always)]
+    /// Returns the x, y and z axes of a coordinate system rotated by the given rotation
     pub fn rotated_system_axes(&self, rotation: Self, rotation_type: RotationType) -> [Self; 3] {
         let x_axis = SpatialVector::unit_x().rotate(rotation, rotation_type);
         let y_axis = SpatialVector::unit_y().rotate(rotation, rotation_type);
@@ -192,9 +197,9 @@ mod tests {
     /// use cases. This test compares the two algorithms to ensure they produce the same result.
     fn compare_rotations() {
         let rotation = SpatialVector::new(
-            Float::from(30.0).to_radians(),
-            Float::from(21.2).to_radians(),
-            Float::from(-16.1).to_radians(),
+            Float::to_radians(30.0),
+            Float::to_radians(21.2),
+            Float::to_radians(-16.1),
         );
 
         let rotation_type = RotationType::XYZ;
@@ -241,7 +246,7 @@ mod tests {
         let negative_axis = SpatialVector::from([0.0, 0.0, -1.0]);
         let positive_axis = SpatialVector::from([0.0, 0.0, 1.0]);
 
-        let rotation_angle = Float::from(90.0).to_radians();
+        let rotation_angle = Float::to_radians(90.0);
 
         let rotated_vector_1 = vector.rotate_around_axis(-rotation_angle, negative_axis);
         let rotated_vector_2 = vector.rotate_around_axis(rotation_angle, positive_axis);
@@ -259,9 +264,9 @@ mod tests {
 
         let rotation = SpatialVector::from(
             [
-                Float::from(30.0).to_radians(),
-                Float::from(21.2).to_radians(),
-                Float::from(-16.1).to_radians(),
+                Float::to_radians(30.0),
+                Float::to_radians(21.2),
+                Float::to_radians(-16.1),
             ]
         );
 
@@ -281,9 +286,9 @@ mod tests {
     fn yaw_pitch_roll_rotation() {
         let vector = SpatialVector::from([1.2, 0.0, 0.0]);
 
-        let pure_yaw_rotation = SpatialVector::from([0.0, 0.0, Float::from(90.0).to_radians()]);
-        let pure_pitch_rotation = SpatialVector::from([0.0, Float::from(90.0).to_radians(), 0.0]);
-        let combined_rotation = SpatialVector::from([0.0, Float::from(-90.0).to_radians(), Float::from(90.0).to_radians()]);
+        let pure_yaw_rotation = SpatialVector::from([0.0, 0.0, Float::to_radians(90.0)]);
+        let pure_pitch_rotation = SpatialVector::from([0.0, Float::to_radians(90.0), 0.0]);
+        let combined_rotation = SpatialVector::from([0.0, Float::to_radians(-90.0), Float::to_radians(90.0)]);
 
         let yaw_rotated_vector = vector.rotate_yaw_pitch_roll(pure_yaw_rotation);
         let pitch_rotated_vector = vector.rotate_yaw_pitch_roll(pure_pitch_rotation);
@@ -298,9 +303,9 @@ mod tests {
         // Extrinsic xyz rotation should be the same as intrinsic yaw-pitch-roll rotation
         let vector = SpatialVector::from([1.2, 4.0, 2.0]);
 
-        let yaw_angle = Float::from(30.0).to_radians();
-        let pitch_angle = Float::from(21.2).to_radians();
-        let roll_angle = Float::from(-16.1).to_radians();
+        let yaw_angle = Float::to_radians(30.0);
+        let pitch_angle = Float::to_radians(21.2);
+        let roll_angle = Float::to_radians(-16.1);
 
         let rotation = SpatialVector::from([roll_angle, pitch_angle, yaw_angle]);
 

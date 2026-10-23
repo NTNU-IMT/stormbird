@@ -10,7 +10,6 @@ use std::ops::Range;
 
 use stormath::{
     type_aliases::Float,
-    consts::PI,
     spatial_vector::SpatialVector,
     spatial_vector::transformations::RotationType,
     statistics::mean, 
@@ -24,9 +23,17 @@ pub mod data_update;
 pub mod force_calculations;
 pub mod value_mapping;
 pub mod span_line;
+/// Models for the input power needed to drive a wind propulsion device
 pub mod input_power;
+/// The internal state of a wing, which can be constant or vary along the span
+pub mod wing_internal_state;
+/// Model for the added mass forces on a wing
+pub mod added_mass;
+/// Model for the gyroscopic moment from a rotor sail
+pub mod gyroscopic_moment;
 
 pub mod corrections;
+/// Re-exports of commonly used structures, to simplify imports
 pub mod prelude;
 
 #[cfg(test)]
@@ -34,12 +41,16 @@ mod tests;
 
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
+use wing_internal_state::{WingInternalState, SpanVariation, InternalCompartments};
 use crate::controller::output::ControllerOutput;
 
 use corrections::{
     circulation::CirculationCorrection,
     angle_of_attack::AngleOfAttackCorrection,
+    force::ForceCorrection,
 };
+use added_mass::AddedMass;
+use gyroscopic_moment::GyroscopicMoment;
 use builder::single_wing::SingleWing;
 use span_line::*;
 
@@ -59,8 +70,8 @@ pub struct LineForceModel {
     pub chord_vectors_local_not_rotated: Vec<SpatialVector>,
     /// The length of the chord vectors, stored as it is needed for several calculations
     pub chord_lengths: Vec<Float>,
-    /// A vector with booleans that indicate wether each span line is "virtual" or "real". A virtual 
-    /// line segment is predominately used to effectively increase the aspect ratio, without having 
+    /// A vector with booleans that indicate whether each span line is "virtual" or "real". A virtual 
+    /// line segment is predominantly used to effectively increase the aspect ratio, without having to
     /// add more line segments in the force calculation
     pub line_segment_is_virtual: Vec<bool>,
     /// Two dimensional models for lift and drag coefficients for each wing in the model
@@ -72,9 +83,9 @@ pub struct LineForceModel {
     /// distribution. The vector is structured as follows:
     /// - The first index is the wing index
     /// - The second index is the end index, where 0 means that start of the wing and 1 means the
-    /// end
-    /// - When the boolean is true, it is a warning to any correction method that that it is not 
-    /// correct to assume zero circulation at that end.
+    ///   end
+    /// - When the boolean is true, it is a warning to any correction method that it is not 
+    ///   correct to assume zero circulation at that end.
     pub non_zero_circulation_at_ends: Vec<[bool; 2]>,
     /// Density used in force calculations
     pub density: Float,
@@ -86,6 +97,12 @@ pub struct LineForceModel {
     pub output_coordinate_system: CoordinateSystem,
     /// Rigid body motion of the line force model
     pub rigid_body_motion: RigidBodyMotion,
+    /// Vector that stores the internal state of each wing, which can be constant or vary along the
+    /// span
+    pub internal_state: Vec<WingInternalState>,
+    /// The division of the internal volume of each wing into sealed compartments. Only used by
+    /// section models with an internal flow model.
+    pub internal_compartments: Vec<InternalCompartments>,
     /// Vector used to store local angles for each wing. This can be used to rotate the wing along
     /// the span axis during a dynamic simulation. The typical example is changing the angle of
     /// attack on a wing sail due to changing apparent wind conditions.
@@ -109,8 +126,14 @@ pub struct LineForceModel {
     pub ctrl_point_spanwise_distance_non_dimensional: Vec<Float>,
     /// Effective values for the ctrl point spanwise distance when applying prescribed circulation
     pub ctrl_point_spanwise_distance_circulation_model: Vec<Float>,
-    /// Models for estimating the input energy for the sails
+    /// Models for estimating the input power for the sails
     pub input_power_models: Vec<InputPowerModel>,
+    /// Empirical corrections of the forces on each wing
+    pub force_corrections: Vec<ForceCorrection>,
+    /// Models for the added mass forces on each wing
+    pub added_mass: Vec<AddedMass>,
+    /// Models for the gyroscopic moment from each wing. Only used for rotor sails.
+    pub gyroscopic_moments: Vec<GyroscopicMoment>,
     /// Settings for the force calculation
     pub force_calculation_settings: ForceCalculationSettings,
 }
@@ -138,6 +161,8 @@ impl LineForceModel {
             section_models: Vec::new(),
             wing_indices: Vec::new(),
             rigid_body_motion: RigidBodyMotion::default(),
+            internal_state: Vec::new(),
+            internal_compartments: Vec::new(),
             local_wing_angles: Vec::new(),
             non_zero_circulation_at_ends: Vec::new(),
             density,
@@ -154,6 +179,9 @@ impl LineForceModel {
             ctrl_point_spanwise_distance_non_dimensional: Vec::new(),
             ctrl_point_spanwise_distance_circulation_model: Vec::new(),
             input_power_models: Vec::new(),
+            force_corrections: Vec::new(),
+            added_mass: Vec::new(),
+            gyroscopic_moments: Vec::new(),
             force_calculation_settings: ForceCalculationSettings::default()
         }
     }
@@ -176,8 +204,8 @@ impl LineForceModel {
         });
 
         for line in &wing.span_lines_local {
-            self.span_lines_local.push(line.clone());
-            self.span_lines_global.push(line.clone());
+            self.span_lines_local.push(*line);
+            self.span_lines_global.push(*line);
         }
 
         for chord_vector in &wing.chord_vectors_local {
@@ -197,9 +225,14 @@ impl LineForceModel {
         self.section_models.push(wing.section_model.clone());
 
         self.local_wing_angles.push(0.0);
+        self.internal_state.push(WingInternalState::default());
+        self.internal_compartments.push(wing.internal_compartments.clone());
         self.non_zero_circulation_at_ends.push(wing.non_zero_circulation_at_ends);
 
         self.input_power_models.push(wing.input_power_model.clone());
+        self.force_corrections.push(wing.force_correction.clone());
+        self.added_mass.push(wing.added_mass.clone());
+        self.gyroscopic_moments.push(wing.gyroscopic_moment.clone());
 
         self.update_global_data_representations();
     }

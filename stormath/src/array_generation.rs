@@ -38,7 +38,7 @@ mod tests {
         let allowable_error = 1e-4;
 
         let x_start = 2.3456;
-        let x_end = 12.4535653;
+        let x_end = 12.45357;
 
         let n: usize = 103;
 

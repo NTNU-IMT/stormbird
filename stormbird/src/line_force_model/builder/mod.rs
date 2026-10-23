@@ -7,6 +7,7 @@
 use serde::{Serialize, Deserialize};
 use serde_json;
 
+/// Builder for a single wing
 pub mod single_wing;
 
 use super::*;
@@ -20,32 +21,45 @@ use corrections::circulation::CirculationCorrectionBuilder;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Builder for a line force model, consisting of one or more wings
 pub struct LineForceModelBuilder {
+    /// Builders for each wing in the model
     pub wing_builders: Vec<WingBuilder>,
     /// Nr sections to discretize the wing into. That is, each wing in the wing builder vector will
     /// end up having a number of sections equal to this variable.
     pub nr_sections: usize,
+    /// The density of the fluid
     #[serde(default = "LineForceModel::default_density")]
     pub density: Float,
+    /// Optional correction of the circulation distribution
     #[serde(default)]
     pub circulation_correction: CirculationCorrectionBuilder,
+    /// Optional correction of the angle of attack
     #[serde(default)]
     pub angle_of_attack_correction: AngleOfAttackCorrection,
+    /// The coordinate system for the output forces
     #[serde(default)]
     pub output_coordinate_system: CoordinateSystem,
+    /// How the rotation angles of the rigid body motion are applied
     #[serde(default)]
     pub rotation_type: RotationType,
+    /// Initial local angles for each wing, i.e., rotation around the span axis of each wing
     #[serde(default)]
     pub local_wing_angles: Vec<Float>,
+    /// Initial rotation of the whole model
     #[serde(default)]
     pub rotation: SpatialVector,
+    /// Initial translation of the whole model
     #[serde(default)]
     pub translation: SpatialVector,
+    /// Settings for the force calculations
     #[serde(default)]
     pub force_calculation_settings: ForceCalculationSettings
 }
 
 impl LineForceModelBuilder {
+    /// Creates a new builder without any wings, where each wing is discretized into the given
+    /// number of sections
     pub fn new(nr_sections: usize) -> Self {
         LineForceModelBuilder {
             wing_builders: Vec::new(),
@@ -62,20 +76,25 @@ impl LineForceModelBuilder {
         }
     }
 
+    /// Creates a builder from a JSON string
     pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
         let serde_res = serde_json::from_str(setup_string)?;
 
         Ok(serde_res)
     }
 
+    /// Adds a wing to the model
     pub fn add_wing(&mut self, wing_builder: WingBuilder) {
         self.wing_builders.push(wing_builder);
     }
 
+    /// Builds the line force model
     pub fn build(&self) -> LineForceModel {
         self.build_with_nr_sections(self.nr_sections)
     } 
 
+    /// Builds the line force model with the given number of sections for each wing, rather than the
+    /// number in the builder
     pub fn build_with_nr_sections(&self, nr_sections: usize) -> LineForceModel {
         let mut line_force_model = LineForceModel::new(self.density);
 
@@ -94,7 +113,7 @@ impl LineForceModelBuilder {
         
         line_force_model.output_coordinate_system = self.output_coordinate_system;
 
-        if self.local_wing_angles.len() > 0 {
+        if !self.local_wing_angles.is_empty() {
             if self.local_wing_angles.len() != line_force_model.nr_wings() {
                 panic!("The number of local wing angles does not match the number of wings.");
             }

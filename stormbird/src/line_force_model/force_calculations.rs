@@ -10,8 +10,13 @@
 //! # Available methods
 //! The methods available in this implementation block are:
 //! - [`felt_ctrl_points_velocity`](LineForceModel::felt_ctrl_points_velocity)
+//! - [`felt_span_points_velocity`](LineForceModel::felt_span_points_velocity)
 //! - [`angles_of_attack`](LineForceModel::angles_of_attack)
-//! - [`lift_coefficients`](LineForceModel::lift_coefficients_total)
+//! - [`section_models_internal_state`](LineForceModel::section_models_internal_state)
+//! - [`wing_segment_flow_conditions`](LineForceModel::wing_segment_flow_conditions)
+//! - [`lift_coefficients_total`](LineForceModel::lift_coefficients_total)
+//! - [`lift_coefficients_pre_stall_with_stall_drop_off`](LineForceModel::lift_coefficients_pre_stall_with_stall_drop_off)
+//! - [`lift_coefficients_post_stall_with_stall_weight`](LineForceModel::lift_coefficients_post_stall_with_stall_weight)
 //! - [`lift_coefficients_linear`](LineForceModel::lift_coefficients_linear)
 //! - [`lift_coefficients_derivatives`](LineForceModel::lift_coefficients_derivatives)
 //! - [`circulation_strength`](LineForceModel::circulation_strength)
@@ -20,16 +25,20 @@
 //! - [`sectional_force_input`](LineForceModel::sectional_force_input)
 //! - [`sectional_forces`](LineForceModel::sectional_forces)
 //! - [`sectional_circulatory_forces`](LineForceModel::sectional_circulatory_forces)
+//! - [`viscous_lift_forces`](LineForceModel::viscous_lift_forces)
 //! - [`sectional_drag_forces`](LineForceModel::sectional_drag_forces)
 //! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
-//! - [`sectional_gyroscopic_force`](LineForceModel::sectional_gyroscopic_force)
+//! - [`sectional_gyroscopic_moments`](LineForceModel::sectional_gyroscopic_moments)
 //! - [`lift_coefficient_from_circulation`](LineForceModel::lift_coefficient_from_circulation)
 //! - [`lift_from_coefficients`](LineForceModel::lift_from_coefficients)
 //! - [`residual`](LineForceModel::residual)
 //! - [`residual_absolute`](LineForceModel::residual_absolute)
 //! - [`average_residual_absolute`](LineForceModel::average_residual_absolute)
-//! - [`amount_of_flow_separation`](LineForceModel::amount_of_flow_separation)
+//! - [`input_power`](LineForceModel::input_power)
+//! - [`section_models_power`](LineForceModel::section_models_power)
 //! - [`calculate_simulation_result`](LineForceModel::calculate_simulation_result)
+
+use crate::section_models::SegmentFlowConditions;
 
 use super::*;
 
@@ -39,7 +48,10 @@ use stormath::consts::MIN_POSITIVE;
 
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// Settings for the force calculations
 pub struct ForceCalculationSettings {
+    /// If true, the viscous lift is included in the circulation, rather than added as a separate
+    /// viscous lift force
     #[serde(default)]
     pub include_viscous_lift_in_the_circulation: bool
 }
@@ -129,75 +141,118 @@ impl LineForceModel {
         }
     }
 
+    /// Returns the internal state as it should be supplied to the section models. Calculated from
+    /// the internal state set on each wing, and potentially from the local flow velocity, with the
+    /// appropriate conversion.
+    pub fn section_models_internal_state(&self, velocity: &[SpatialVector]) -> Vec<Float> {
+        let angles_of_attack = self.angles_of_attack(velocity, CoordinateSystem::Global);
+
+        let velocity_magnitudes: Vec<Float> = velocity.iter().map(|velocity| velocity.length()).collect();
+
+        let mut internal_states: Vec<Float> = Vec::with_capacity(self.nr_span_lines());
+
+        for wing_index in 0..self.nr_wings() {
+            let segments = self.wing_segment_flow_conditions(
+                wing_index, &angles_of_attack, &velocity_magnitudes
+            );
+
+            internal_states.extend(self.section_models[wing_index].section_internal_states(
+                &self.internal_state[wing_index],
+                &segments,
+                &self.internal_compartments[wing_index],
+                self.density
+            ));
+        }
+
+        internal_states
+    }
+
+    /// Returns the flow conditions and geometry of each segment of a wing, as used by the section
+    /// models when converting the wing internal state and computing the power.
+    ///
+    /// # Arguments
+    /// * `wing_index` - the index of the wing
+    /// * `angles_of_attack` - the angle of attack at all control points in the model
+    /// * `velocity_magnitudes` - the velocity magnitude at all control points in the model
+    pub fn wing_segment_flow_conditions(
+        &self,
+        wing_index: usize,
+        angles_of_attack: &[Float],
+        velocity_magnitudes: &[Float],
+    ) -> Vec<SegmentFlowConditions> {
+        let compartments = &self.internal_compartments[wing_index];
+
+        self.wing_indices[wing_index].clone().map(|section_index| {
+            let span_length = self.span_lines_local[section_index].length();
+            let non_dim_span_location = self.ctrl_point_spanwise_distance_non_dimensional[section_index];
+
+            SegmentFlowConditions {
+                angle_of_attack: angles_of_attack[section_index],
+                velocity: velocity_magnitudes[section_index],
+                area: self.chord_lengths[section_index] * span_length,
+                span_length,
+                non_dim_span_location,
+                is_virtual: self.line_segment_is_virtual[section_index],
+                compartment_index: compartments.index_of(non_dim_span_location),
+            }
+        }).collect()
+    }
+
     /// Returns the local lift coefficient on each line element.
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `velocity` - the velocity vector at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     pub fn lift_coefficients_total(
         &self, 
         angles_of_attack: &[Float],
-        velocity: &[SpatialVector]
-    ) -> Vec<Float> {
+        internal_states: &[Float]
+    ) -> Vec<Float> {  
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) =>
-                        foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) =>
-                        foil.lift_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) =>
-                        cylinder.lift_coefficient(
-                            self.chord_lengths[index], velocity[index].length()
-                        ),
-                    SectionModel::EffectiveWindSensor => 0.0
-                }
+                self.section_models[wing_index].lift_coefficient(
+                    angles_of_attack[index], 
+                    internal_states[index]
+                )
             }
         ).collect()
     }
 
+    /// Returns the pre-stall lift coefficient on each line element, reduced by the amount of stall
     pub fn lift_coefficients_pre_stall_with_stall_drop_off(
-        &self,
+        &self, 
         angles_of_attack: &[Float],
-        velocity: &[SpatialVector]
+        internal_states: &[Float]
     ) -> Vec<Float> {
+
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) =>
-                        foil.lift_coefficient_pre_stall_with_stall_drop_off(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) =>
-                        foil.lift_coefficient_pre_stall_with_stall_drop_off(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) =>
-                        cylinder.lift_coefficient(
-                            self.chord_lengths[index], velocity[index].length()
-                        ),
-                    SectionModel::EffectiveWindSensor => 0.0
-                }
+                self.section_models[wing_index].lift_coefficient_pre_stall_with_stall_drop_off(
+                    angles_of_attack[index], 
+                    internal_states[index]
+                )
             }
         ).collect()
     }
 
+    /// Returns the post-stall lift coefficient on each line element, weighted by the amount of stall
     pub fn lift_coefficients_post_stall_with_stall_weight(
         &self,
-        angles_of_attack: &[Float]
+        angles_of_attack: &[Float],
+        internal_states: &[Float]
     ) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) =>
-                        foil.lift_coefficient_post_stall_with_stall_weight(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) =>
-                        foil.lift_coefficient_post_stall_with_stall_weight(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(_) => 0.0,
-                    SectionModel::EffectiveWindSensor => 0.0
-                }
+                self.section_models[wing_index].lift_coefficient_post_stall_with_stall_weight(
+                    angles_of_attack[index], 
+                    internal_states[index]
+                )
             }
         ).collect()
     }
@@ -207,75 +262,65 @@ impl LineForceModel {
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `velocity` - the velocity vector at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     pub fn lift_coefficients_linear(
         &self, 
         angles_of_attack: &[Float],
-        velocity: &[SpatialVector]
+        internal_states: &[Float]
     ) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) =>
-                        foil.lift_coefficient_linear(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) =>
-                        foil.lift_coefficient_linear(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) =>
-                        cylinder.lift_coefficient(
-                            self.chord_lengths[index], velocity[index].length()
-                        ),
-                    SectionModel::EffectiveWindSensor => 0.0
-                }
+                self.section_models[wing_index].lift_coefficient_linear(
+                    angles_of_attack[index], 
+                    internal_states[index]
+                )
             }
         ).collect()
     }
 
-    pub fn lift_coefficients_derivatives(&self) -> Vec<Float> {
+    /// Returns the initial slope of the linear lift coefficient on each line element
+    pub fn lift_coefficients_derivatives(&self, internal_states: &[Float]) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index = self.wing_index_from_global(index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) => foil.cl_initial_slope,
-                    SectionModel::VaryingFoil(varying_foil) => {
-                        let foil = varying_foil.get_foil();
-
-                        foil.cl_initial_slope
-                    },
-                    SectionModel::RotatingCylinder(_) => 0.0,
-                    SectionModel::EffectiveWindSensor => 0.0
-                }
+                self.section_models[wing_index].lift_coefficient_derivative(internal_states[index])
             }
         ).collect()
     }
 
-    /// Returns the circulation strength, either directly or based on the prescribed shape,
-    /// depending on the fields in self.
+    /// Returns the circulation strength, with the circulation correction of the line force model
+    /// applied, if any.
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     /// * `velocity` - the velocity vector at each control point
     pub fn circulation_strength(
         &self, 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector]
     ) -> Vec<Float> {
         match &self.circulation_correction {
             CirculationCorrection::None => self.circulation_strength_raw(
                 angles_of_attack, 
+                internal_states,
                 velocity
             ),
             CirculationCorrection::Prescribed(prescribed_circulation) =>
                 self.circulation_strength_prescribed(
                     angles_of_attack,
+                    internal_states,
                     velocity,
                     prescribed_circulation,
                 ),
             CirculationCorrection::Smoothing(circulation_smoothing) => {
                 self.circulation_strength_smoothed(
                     angles_of_attack,
+                    internal_states,
                     velocity,
                     circulation_smoothing
                 )
@@ -287,6 +332,7 @@ impl LineForceModel {
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     /// * `velocity` - the velocity vector at each control point
     /// 
     /// # Definitions
@@ -294,15 +340,19 @@ impl LineForceModel {
     pub fn circulation_strength_raw(
         &self, 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector], 
     ) -> Vec<Float> {
         let mut cl = self.lift_coefficients_pre_stall_with_stall_drop_off(
             angles_of_attack, 
-            velocity
-        ); // 
+            internal_states
+        ); 
         
         if self.force_calculation_settings.include_viscous_lift_in_the_circulation {
-            let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(angles_of_attack);
+            let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(
+                angles_of_attack,
+                internal_states
+            );
             
             for i in 0..cl.len() {
                 cl[i] += cl_viscous[i];
@@ -314,34 +364,29 @@ impl LineForceModel {
         }).collect()
     }
 
-    /// Returns the viscous drag coefficient on each line element, based on the section model
-    /// and the input velocity.
+    /// Returns the viscous drag coefficient on each line element, based on the section model.
     ///
     /// # Arguments
     /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `velocity` - the velocity vector at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     pub fn viscous_drag_coefficients(
         &self, 
         angles_of_attack: &[Float],
-        velocity: &[SpatialVector]
+        internal_states: &[Float]
     ) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |index| {
                 let wing_index  = self.wing_index_from_global(index);
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(foil) =>
-                        foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::VaryingFoil(foil) =>
-                        foil.drag_coefficient(angles_of_attack[index]),
-                    SectionModel::RotatingCylinder(cylinder) =>
-                        cylinder.drag_coefficient(self.chord_lengths[index], velocity[index].length()),
-                    SectionModel::EffectiveWindSensor => 0.0
-                }
+                self.section_models[wing_index].drag_coefficient(
+                    angles_of_attack[index], 
+                    internal_states[index]
+                )    
             }
         ).collect()
     }
 
+    /// Computes the input to the sectional force calculations from the result of a solver
     pub fn sectional_force_input(
         &self, 
         solver_result: &SolverResult,
@@ -350,6 +395,10 @@ impl LineForceModel {
         let angles_of_attack = self.angles_of_attack(
             &solver_result.output_ctrl_points_velocity, 
             CoordinateSystem::Global
+        );
+
+        let section_models_internal_state = self.section_models_internal_state(
+            &solver_result.output_ctrl_points_velocity
         );
 
         let nr_span_lines = self.nr_span_lines();
@@ -376,23 +425,45 @@ impl LineForceModel {
             circulation_strength: solver_result.circulation_strength.clone(),
             velocity,
             angles_of_attack,
+            section_models_internal_state,
             acceleration,
             rotation_velocity,
             coordinate_system: self.output_coordinate_system
         }
     }
 
-     /// Calculates the forces on each line element.
-     pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
+    /// Calculates the forces on each line element, together with the gyroscopic moments.
+    pub fn sectional_forces(&self, input: &SectionalForcesInput) -> SectionalForces {
+        let circulatory = self.sectional_circulatory_forces(
+            &input.circulation_strength, 
+            &input.velocity
+        );
+
+        let viscous_lift = self.viscous_lift_forces(
+            &input.angles_of_attack, 
+            &input.section_models_internal_state, 
+            &input.velocity
+        );
+
+        let mut sectional_drag = self.sectional_drag_forces(
+            &input.angles_of_attack, 
+            &input.section_models_internal_state, 
+            &input.velocity
+        );
+
+        self.apply_force_corrections(
+            &circulatory,
+            &viscous_lift,
+            &input.velocity,
+            &mut sectional_drag
+        );
+
         let mut sectional_forces = SectionalForces {
-            circulatory: self.sectional_circulatory_forces(
-                &input.circulation_strength, 
-                &input.velocity
-            ),
-            viscous_lift: self.viscous_lift_forces(&input.angles_of_attack, &input.velocity),
-            sectional_drag: self.sectional_drag_forces(&input.angles_of_attack, &input.velocity),
+            circulatory,
+            viscous_lift,
+            sectional_drag,
             added_mass: self.sectional_added_mass_force(&input.acceleration),
-            gyroscopic: self.sectional_gyroscopic_force(input.rotation_velocity),
+            gyroscopic_moment: self.sectional_gyroscopic_moments(input.rotation_velocity),
             total: vec![SpatialVector::default(); self.nr_span_lines()],
             coordinate_system: input.coordinate_system
         };
@@ -433,12 +504,20 @@ impl LineForceModel {
         ).collect()
     }
 
-    pub fn viscous_lift_forces(&self, angles_of_attack: &[Float], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
+    /// Computes the viscous lift forces on each line element, i.e., the post-stall lift. Zero if the
+    /// viscous lift is included in the circulation.
+    pub fn viscous_lift_forces(
+        &self, 
+        angles_of_attack: &[Float],
+        internal_states: &[Float],
+        velocity: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
         if self.force_calculation_settings.include_viscous_lift_in_the_circulation {
             vec![SpatialVector::default(); self.nr_span_lines()]
         } else {
             let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(
-                angles_of_attack
+                angles_of_attack,
+                internal_states
             );
     
             (0..self.nr_span_lines()).map(
@@ -457,9 +536,15 @@ impl LineForceModel {
 
     /// Calculates the forces on each line element due to the sectional drag model. This is most
     /// often the viscous drag, but it can also include other physical effects if that is included
-    /// in the sectional drag model.
-    pub fn sectional_drag_forces(&self, angles_of_attack: &[Float], velocity: &[SpatialVector]) -> Vec<SpatialVector> {
-        let cd = self.viscous_drag_coefficients(angles_of_attack, velocity);
+    /// in the sectional drag model. The drag from the [force corrections](ForceCorrection) is not
+    /// included, but is added in [`apply_force_corrections`](LineForceModel::apply_force_corrections).
+    pub fn sectional_drag_forces(
+        &self, 
+        angles_of_attack: &[Float], 
+        internal_states: &[Float], 
+        velocity: &[SpatialVector]
+    ) -> Vec<SpatialVector> {
+        let cd = self.viscous_drag_coefficients(angles_of_attack, internal_states);
 
         (0..self.nr_span_lines()).map(
             |index| {
@@ -475,7 +560,7 @@ impl LineForceModel {
     }
 
     /// Calculates the added mass force on each line element due to the flow acceleration at each
-    /// control point.
+    /// control point, using the [added mass model](AddedMass) of each wing.
     ///
     /// **Note**: At the moment, this function only calculates the added mass due to the point
     /// acceleration. However, according to, for instance, Theodorsen, the added mass should also
@@ -485,62 +570,53 @@ impl LineForceModel {
     ///
     /// # Argument
     /// * `acceleration` - the acceleration of the flow at each control point. That is, if the only
-    /// velocity is due to the motion of the wings, the acceleration will be opposite to the motion
-    /// of the wings.
+    ///   velocity is due to the motion of the wings, the acceleration will be opposite to the motion
+    ///   of the wings.
     pub fn sectional_added_mass_force(
         &self, 
-        acceleration: &[SpatialVector]
+        acceleration: &[SpatialVector],
     ) -> Vec<SpatialVector> {
         let (span_lines, chord_vectors) = match self.output_coordinate_system {
             CoordinateSystem::Global => (&self.span_lines_global, &self.chord_vectors_global),
             CoordinateSystem::Body => (&self.span_lines_local, &self.chord_vectors_local)
         };
 
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
+        let mut forces = vec![SpatialVector::default(); self.nr_span_lines()];
 
-                let strip_area = self.chord_lengths[index] * span_lines[index].length();
+        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
+            let added_mass = &self.added_mass[wing_index];
 
-                let mut relevant_acceleration = acceleration[index];
-
-                relevant_acceleration -= relevant_acceleration.project(span_lines[index].direction());
-
-                match self.section_models[wing_index] {
-                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) => {
-                        relevant_acceleration -= relevant_acceleration.project(chord_vectors[index]);
-                    },
-                    _ => {}
-                }
-
-                if relevant_acceleration.length() == 0.0 {
-                    SpatialVector::default()
-                } else {
-                    let added_mass_coefficient = match &self.section_models[wing_index] {
-                        SectionModel::Foil(foil) => {
-                            foil.added_mass_coefficient(relevant_acceleration.length())
-                        },
-                        SectionModel::VaryingFoil(foil) => {
-                            foil.added_mass_coefficient(relevant_acceleration.length())
-                        },
-                        SectionModel::RotatingCylinder(cylinder) => {
-                            cylinder.added_mass_coefficient(relevant_acceleration.length())
-                        },
-                        SectionModel::EffectiveWindSensor => 0.0
-                    };
-                    
-                    added_mass_coefficient * self.density * strip_area * relevant_acceleration.normalize()
-                }
+            if !added_mass.is_active() {
+                continue;
             }
-        ).collect()
+
+            for index in wing_indices.clone() {
+                let acceleration_in_section_plane = acceleration[index].project_on_plane(
+                    span_lines[index].direction()
+                );
+
+                forces[index] = added_mass.force(
+                    self.density,
+                    chord_vectors[index],
+                    span_lines[index].length(),
+                    acceleration_in_section_plane
+                );
+            }
+        }
+
+        forces
     }
 
-    /// Calculates the gyroscopic force on each line element. This is only relevant for rotor sails.
+    /// Calculates the gyroscopic moment from each line element, using the
+    /// [gyroscopic moment model](GyroscopicMoment) of each wing. This is only relevant for rotor
+    /// sails, where the internal state of the wing is the revolutions per second of the rotor.
     ///
-    /// Uses a simplified approach where the rotational speed of the rotor is assumed to be
-    /// significantly larger than the rotational velocity of the sail, for instance due to roll or
-    /// pitch motion of the boat.
-    pub fn sectional_gyroscopic_force(
+    /// The moment of inertia of a wing is distributed over the line elements in proportion to their
+    /// length. Virtual line elements get no moment.
+    ///
+    /// # Arguments
+    /// * `rotation_velocity` - the rotational velocity of the whole line force model
+    pub fn sectional_gyroscopic_moments(
         &self, 
         rotation_velocity: SpatialVector
     ) -> Vec<SpatialVector> {
@@ -549,29 +625,42 @@ impl LineForceModel {
             CoordinateSystem::Body => &self.span_lines_local,
         };
 
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index = self.wing_index_from_global(index);
+        let mut moments = vec![SpatialVector::default(); self.nr_span_lines()];
 
-                match &self.section_models[wing_index] {
-                    SectionModel::Foil(_) | SectionModel::VaryingFoil(_) | SectionModel::EffectiveWindSensor => SpatialVector::default(),
-                    SectionModel::RotatingCylinder(cylinder) => {
-                        let i_zz = cylinder.moment_of_inertia_2d * span_lines[index].length(); // TODO: does this depend on position?
+        for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
+            let gyroscopic_moment = &self.gyroscopic_moments[wing_index];
 
-                        let radial_velocity = 2.0 * PI * cylinder.revolutions_per_second;
-
-                        let angular_momentum = i_zz * radial_velocity * span_lines[index].relative_vector();
-
-                        angular_momentum.cross(rotation_velocity)
-                    },
-                }
-
+            if !gyroscopic_moment.is_active() {
+                continue;
             }
-        ).collect()
+
+            let real_indices = || wing_indices.clone().filter(|&i| !self.line_segment_is_virtual[i]);
+
+            let span: Float = real_indices().map(|i| span_lines[i].length()).sum();
+
+            if span == 0.0 {
+                continue;
+            }
+
+            for i in real_indices() {
+                let revolutions_per_second = self.internal_state[wing_index].value_at(
+                    self.ctrl_point_spanwise_distance_non_dimensional[i]
+                );
+
+                moments[i] = gyroscopic_moment.moment(
+                    span_lines[i].length() / span,
+                    revolutions_per_second,
+                    span_lines[i].direction(),
+                    rotation_velocity
+                );
+            }
+        }
+
+        moments
     }
 
-    /// Calculates the magnitude of the lift force on each line element based on the given
-    /// circulation and velocity.
+    /// Calculates the lift coefficient on each line element based on the given circulation and
+    /// velocity.
     pub fn lift_coefficient_from_circulation(
         &self, 
         strength: &[Float], 
@@ -581,7 +670,7 @@ impl LineForceModel {
         let force = self.sectional_circulatory_forces(strength, velocity);
 
         (0..self.nr_span_lines()).map(|i_span| {
-            let sign = -1.0 * strength[i_span].signum();
+            let sign = -strength[i_span].signum();
             
             let lift_area = self.chord_lengths[i_span] * self.span_lines_local[i_span].length();
 
@@ -597,8 +686,16 @@ impl LineForceModel {
 
     /// Calculates the magnitude of the lift force on each line element based on the given
     /// coefficients and velocity
-    pub fn lift_from_coefficients(&self, angles_of_attack: &[Float], velocity: &[SpatialVector]) -> Vec<Float> {
-        let cl = self.lift_coefficients_pre_stall_with_stall_drop_off(angles_of_attack, velocity);
+    pub fn lift_from_coefficients(
+        &self, 
+        angles_of_attack: &[Float],
+        internal_states: &[Float],
+        velocity: &[SpatialVector]
+    ) -> Vec<Float> {
+        let cl = self.lift_coefficients_pre_stall_with_stall_drop_off(
+            angles_of_attack, 
+            internal_states
+        );
 
         (0..self.nr_span_lines()).map(
             |i| {
@@ -611,17 +708,20 @@ impl LineForceModel {
         ).collect()
     }
 
+    /// Returns the difference between the lift coefficient from the circulation and the lift
+    /// coefficient from the section models, on each line element
     pub fn residual(
         &self, 
         strength: &[Float], 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector]
     ) -> Vec<Float> {
         let cl_gamma = self.lift_coefficient_from_circulation(strength, velocity);
         
         let cl_direct = self.lift_coefficients_pre_stall_with_stall_drop_off(
             angles_of_attack, 
-            velocity
+            internal_states
         );
 
         (0..self.nr_span_lines()).map(|i_span| {
@@ -629,80 +729,93 @@ impl LineForceModel {
         }).collect()
     }
 
+    /// Returns the absolute value of the residual on each line element
     pub fn residual_absolute(
         &self, 
         strength: &[Float], 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector],
     ) -> Vec<Float> {
-        self.residual(strength, angles_of_attack, velocity).iter().map(|r| r.abs()).collect()
+        self.residual(strength, angles_of_attack, internal_states, velocity)
+            .iter().map(|r| r.abs()).collect()
     }
 
+    /// Returns the mean of the absolute value of the residual over all line elements
     pub fn average_residual_absolute(
         &self, 
         strength: &[Float], 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector]
     ) -> Float {
-        let residuals = self.residual_absolute(strength, angles_of_attack, velocity);
+        let residuals = self.residual_absolute(strength, angles_of_attack, internal_states, velocity);
 
         residuals.iter().sum::<Float>() / residuals.len() as Float
-    }
-
-    /// Function that calculates the amount of flow separation, as predicted by the sectional models
-    /// based on the angles of attack on each control point
-    pub fn amount_of_flow_separation(&self, angles_of_attack: &[Float]) -> Vec<Float> {
-        (0..self.nr_span_lines()).map(
-            |i| {
-                let wing_index = self.wing_index_from_global(i);
-
-                self.section_models[wing_index].amount_of_flow_separation(angles_of_attack[i])
-            }
-        ).collect()
     }
 
 
     /// Calculates the input power based on the models specified for each wing and the local 
     /// geometry and velocity
-    pub fn input_power(&self, velocity: &[SpatialVector]) -> Vec<Float> {
+    pub fn input_power(&self, force_input: &SectionalForcesInput) -> Vec<Float> {
         let nr_wings = self.nr_wings();
-        let nr_span_lines = self.nr_span_lines();
-        
+
+        let span_lengths = self.span_lengths();
+
         let mut out = vec![0.0; nr_wings];
 
-        let internal_states = self.section_models_internal_state();
-        
-        for i in 0..nr_span_lines {
-            let wing_index = self.wing_index_from_global(i);
-
+        for wing_index in 0..nr_wings {
             let power_model = &self.input_power_models[wing_index];
 
-            out[wing_index] += power_model.input_power_for_strip(
-                internal_states[wing_index],
-                self.span_lines_local[i],
-                self.chord_lengths[i],
-                self.density,
-                velocity[i]
+            out[wing_index] += power_model.input_power(
+                &self.internal_state[wing_index],
+                span_lengths[wing_index],
+                || self.section_models_power(wing_index, force_input)
             );
         }
 
         out
     }
 
+    /// Calculates the power for a wing from the section model. For most section models, this is
+    /// the power coefficient integrated over the wing: P = sum(c_P * 0.5 * density * A * U^3). See
+    /// [`SectionModel::wing_power`] for more.
+    pub fn section_models_power(&self, wing_index: usize, force_input: &SectionalForcesInput) -> Float {
+        let wing_range = self.wing_indices[wing_index].clone();
+
+        let velocity_magnitudes: Vec<Float> = force_input.velocity.iter()
+            .map(|velocity| velocity.length())
+            .collect();
+
+        let segments = self.wing_segment_flow_conditions(
+            wing_index, &force_input.angles_of_attack, &velocity_magnitudes
+        );
+
+        self.section_models[wing_index].wing_power(
+            &self.internal_state[wing_index],
+            &segments,
+            &self.internal_compartments[wing_index],
+            &force_input.section_models_internal_state[wing_range],
+            self.density
+        )
+    }
+
+    /// Computes the full simulation result, including sectional and integrated forces and moments,
+    /// from the result of a solver
     pub fn calculate_simulation_result(
         &self, 
         solver_result: &SolverResult,
         ctrl_point_acceleration: &[SpatialVector],
         time: Float,
     ) -> SimulationResult {
-        let force_input = self.sectional_force_input(&solver_result, ctrl_point_acceleration);
+        let force_input = self.sectional_force_input(solver_result, ctrl_point_acceleration);
 
         let ctrl_points = self.ctrl_points_global.clone();
         let sectional_forces   = self.sectional_forces(&force_input);
-        let integrated_forces = sectional_forces.integrate_forces(&self);
-        let integrated_moments = sectional_forces.integrate_moments(&self);
+        let integrated_forces = sectional_forces.integrate_forces(self);
+        let integrated_moments = sectional_forces.integrate_moments(self);
 
-        let input_power = self.input_power(&solver_result.output_ctrl_points_velocity);
+        let input_power = self.input_power(&force_input);
 
         SimulationResult {
             time,

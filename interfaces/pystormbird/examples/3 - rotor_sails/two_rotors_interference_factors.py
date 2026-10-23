@@ -1,9 +1,23 @@
 """
-This example compares the output from a lifting line model with two rotor sails, against the 
+This example compares the interference factors for two rotor sails, computed with a lifting line
+model, against wind tunnel experiments. One rotor is placed at different angular positions around
+the other, and the interference factors are the lift and drag on the first rotor divided by the
+lift and drag on the same rotor when it stands alone.
 
+The main point is to show the importance of the viscous core length evolution in the dynamic
+wake. Real vortices have a viscous core that grows when moving away from the rotor. This is a very
+important effect when one rotor stands directly in the wake of another, which happens when the
+interfering rotor is upstream, at angular positions close to 0 degrees.
+
+Three variants are compared:
+- A quasi-steady simulation, where the wake does not have any viscous core length evolution
+- Two dynamic simulations, with different values of the evolution length factor for the viscous
+  core length. The factor sets how far into the wake the viscous core reaches its final value, as a
+  fraction of the wake length. A lower value means that the core grows faster.
+
+The dynamic simulations use a steady state strength update and no dynamic wake shape, so that the
+only difference from the quasi-steady simulation is the viscous core length evolution.
 """
-
-import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,17 +28,32 @@ import pandas as pd
 
 from setup import simulate_single_case
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run a case with two rotors")
-    parser.add_argument("--dynamic", action="store_true", help="Turns on dynamic wake")
-    parser.add_argument("--dynamic-shape", action="store_true", help="Turns on dynamic shape for the dynamic wake")
+# The variants of the simulation that are compared. Each variant gets its own line style in the plot
+VARIANTS = [
+    {
+        "label": "Quasi-steady",
+        "dynamic": False,
+        "line_style": "-",
+    },
+    {
+        "label": "Dynamic, evolution length factor 1.0",
+        "dynamic": True,
+        "evolution_length_factor": 1.0,
+        "line_style": "--",
+    },
+    {
+        "label": "Dynamic, evolution length factor 0.3",
+        "dynamic": True,
+        "evolution_length_factor": 0.3,
+        "line_style": ":",
+    },
+]
 
-    args = parser.parse_args()
-    
+if __name__ == "__main__":
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     exp_data = pd.read_csv("data/deybach_2026_interference_factors.csv", delimiter=";")
-    
+
     spin_ratio = 2.5
 
     diameter = 5.0
@@ -38,94 +67,97 @@ if __name__ == "__main__":
 
     wind_direction_deg = 0.0
 
+    solver = SolverType.Iterative
+
     w_plot = 16
     h_plot = w_plot / 1.85
     fig = plt.figure(figsize=(w_plot, h_plot))
 
     ax = fig.add_subplot(111)
 
-    test_index = 2
+    for variant in VARIANTS:
+        print()
+        print(variant["label"])
 
-    solver = SolverType.Iterative
-    max_induced_velocity_ratio = 0.0
-    smoothing_length = 0.0
-
-    cd1 = np.zeros(n_rotations)
-    cl1 = np.zeros(n_rotations)
-    
-    cd2 = np.zeros(n_rotations)
-    cl2 = np.zeros(n_rotations)
-
-    cd_single = np.zeros(n_rotations)
-    cl_single = np.zeros(n_rotations)
-
-    for dir_index in range(n_rotations):
-        print("Testing rotation: ", rotations_deg[dir_index])
-
-        interfering_rotor_location = SpatialVector(x=-spacing).rotate_around_axis(
-            np.radians(rotations_deg[dir_index]),
-            axis=SpatialVector(z=1.0)
-        )
-
-        res = simulate_single_case(
+        simulation_settings = dict(
             diameter = diameter,
             height = height,
-            foundation_height=foundation_height,
-            rotor_x_locations = [0.0, interfering_rotor_location.x],
-            rotor_y_locations = [0.0, interfering_rotor_location.y],
+            foundation_height = foundation_height,
             spin_ratio = spin_ratio,
             solver_type = solver,
-            max_induced_velocity_ratio = max_induced_velocity_ratio,
-            smoothing_length = smoothing_length,
-            wind_direction_deg=wind_direction_deg,
-            dynamic = args.dynamic,
-            dynamic_shape = args.dynamic_shape
+            wind_direction_deg = wind_direction_deg,
+            dynamic = variant["dynamic"],
         )
 
+        if variant["dynamic"]:
+            simulation_settings["dynamic_shape"] = False
+            simulation_settings["steady_state_strength_update"] = True
+            simulation_settings["evolution_length_factor"] = variant["evolution_length_factor"]
+
+        # The single rotor does not depend on the position of the interfering rotor, and is
+        # therefore only simulated once for each variant
         res_single = simulate_single_case(
-            diameter = diameter,
-            height = height,
-            foundation_height=foundation_height,
             rotor_x_locations = [0.0],
             rotor_y_locations = [0.0],
-            spin_ratio = spin_ratio,
-            solver_type = solver,
-            max_induced_velocity_ratio = 2.0,
-            smoothing_length = smoothing_length,
-            wind_direction_deg=wind_direction_deg,
-            dynamic = args.dynamic,
-            dynamic_shape = args.dynamic_shape
+            **simulation_settings
         )
 
-        cd1[dir_index] = res[0]['cx']
-        cl1[dir_index] = res[0]['cy']
-        
-        cd2[dir_index] = res[1]['cx']
-        cl2[dir_index] = res[1]['cy']
+        cd_single = res_single[0]['cx']
+        cl_single = res_single[0]['cy']
 
-        cd_single[dir_index] = res_single[0]['cx']
-        cl_single[dir_index] = res_single[0]['cy']
-    
-    ax.plot(rotations_deg, cd1 / cd_single, label="CD interference, LL", color=default_colors[0])
-    ax.plot(rotations_deg, cl1 / cl_single, label="CL interference, LL", color=default_colors[1])
+        cd = np.zeros(n_rotations)
+        cl = np.zeros(n_rotations)
 
-exp_data = pd.read_csv("data/deybach_2026_interference_factors.csv", delimiter=";")
+        for dir_index in range(n_rotations):
+            print("Testing rotation: ", rotations_deg[dir_index])
 
-ax.scatter(
-    exp_data["Angular position of the interfering rotor [deg]"], 
-    exp_data["IFD"], 
-    color=default_colors[0],
-    label="CD interference, exp"
-)
-ax.scatter(
-    exp_data["Angular position of the interfering rotor [deg]"], 
-    exp_data["IFL"], 
-    color=default_colors[1],
-    label="CL interference, exp"
-)
+            interfering_rotor_location = SpatialVector(x=-spacing).rotate_around_axis(
+                np.radians(rotations_deg[dir_index]),
+                axis=SpatialVector(z=1.0)
+            )
 
-ax.set_ylim(0.5, 2.5)
-ax.set_xlim(-180, 180)
+            res = simulate_single_case(
+                rotor_x_locations = [0.0, interfering_rotor_location.x],
+                rotor_y_locations = [0.0, interfering_rotor_location.y],
+                **simulation_settings
+            )
 
-ax.legend()
-plt.show()
+            cd[dir_index] = res[0]['cx']
+            cl[dir_index] = res[0]['cy']
+
+        ax.plot(
+            rotations_deg, cd / cd_single,
+            variant["line_style"],
+            color=default_colors[0],
+            label="CD interference, " + variant["label"]
+        )
+
+        ax.plot(
+            rotations_deg, cl / cl_single,
+            variant["line_style"],
+            color=default_colors[1],
+            label="CL interference, " + variant["label"]
+        )
+
+    ax.scatter(
+        rotations_deg,
+        exp_data["IFD"],
+        color=default_colors[0],
+        label="CD interference, experiment, Deybach et al. (2026)"
+    )
+
+    ax.scatter(
+        rotations_deg,
+        exp_data["IFL"],
+        color=default_colors[1],
+        label="CL interference, experiment, Deybach et al. (2026)"
+    )
+
+    ax.set_xlabel("Angular position of the interfering rotor [deg]")
+    ax.set_ylabel("Interference factor")
+
+    ax.set_ylim(0.5, 2.5)
+    ax.set_xlim(-180, 180)
+
+    ax.legend()
+    plt.show()

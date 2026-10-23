@@ -12,8 +12,8 @@ use crate::consts::PI;
 /// ## Arguments
 /// * `x` - The input value to the function
 /// * `x0` - The x-value where the function is equal to 0.5
-/// * `transition_range` - The range around x0 where the function transitions from close to 0 to 
-/// close to 1. The
+/// * `transition_range` - The range around x0 where the function transitions from close to 0 to
+///   close to 1.
 ///
 /// ## Returns
 /// The value of the sigmoid function at the input
@@ -52,6 +52,8 @@ pub fn cosine_transition_zero_to_one(x: Float, x_start: Float, transition_range:
 
 #[cfg(test)]
 mod tests {
+    use crate::type_aliases::Float;
+
     #[test]
     fn test_sigmoid() {
         let x0 = 2.4;
@@ -72,7 +74,8 @@ mod tests {
     #[test]
     fn test_cosine_transition() {
         let x_start = 2.4;
-        let transition_range = 3.14;
+        let transition_range = 3.2;
+        let tolerance = 100.0 * Float::EPSILON;
         
         let f_low = super::cosine_transition_zero_to_one(-1.0, x_start, transition_range);
         let f_start = super::cosine_transition_zero_to_one(x_start, x_start, transition_range);
@@ -80,11 +83,11 @@ mod tests {
         let f_end = super::cosine_transition_zero_to_one(x_start + transition_range, x_start, transition_range);
         let f_large = super::cosine_transition_zero_to_one(x_start + 2.3 * transition_range, x_start, transition_range);
         
-        assert!(f_low.abs() < 1e-9, "f_low = {}", f_low);
-        assert!(f_start.abs() < 1e-9, "f_start = {}", f_start);
-        assert!((f_mid - 0.5).abs() < 1e-9, "f_mid = {}", f_mid);
-        assert!((f_end - 1.0).abs() < 1e-9, "f_end = {}", f_end);
-        assert!((f_large - 1.0).abs() < 1e-9, "f_large = {}", f_end);
+        assert!(f_low.abs() < tolerance, "f_low = {}", f_low);
+        assert!(f_start.abs() < tolerance, "f_start = {}", f_start);
+        assert!((f_mid - 0.5).abs() < tolerance, "f_mid = {}", f_mid);
+        assert!((f_end - 1.0).abs() < tolerance, "f_end = {}", f_end);
+        assert!((f_large - 1.0).abs() < tolerance, "f_large = {}", f_large);
         
         dbg!(f_low, f_start, f_mid, f_end, f_large);
     }

@@ -9,7 +9,9 @@ use stormath::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Settings for the actuator line solver
 pub struct SolverSettings {
+    /// Damping factor for the update of the circulation strength in each time step
     #[serde(default="SolverSettings::default_damping_factor")]
     pub damping_factor: Float,
 }

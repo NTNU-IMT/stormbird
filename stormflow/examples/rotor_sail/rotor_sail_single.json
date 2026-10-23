@@ -27,9 +27,8 @@
           ],
           "section_model": {
             "RotatingCylinder": {
-              "revolutions_per_second": -0.637,
-              "spin_ratio_data": [0.0, 1.0],
-              "cl_data": [0.0, 2.8]
+              "cl_initial_slope": 2.8,
+              "cl_high_spin_ratio_slope": 2.8
             }
           },
           "line_segment_is_virtual": [false, true],

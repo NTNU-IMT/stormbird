@@ -29,7 +29,6 @@ def get_section_model(solver: SolverType):
     cd_min = 0.0186
     cd_second_order_factor = 0.9
     cd_power_after_stall = 1.0 # Increase the fullness of the post-stall drag curve
-    cd_stall_angle_offset = np.radians(0.5) # Makes the drag curve stall a bit earlier
 
     if solver == SolverType.Linearized:
         return SectionModel(
@@ -40,7 +39,6 @@ def get_section_model(solver: SolverType):
                 mean_positive_stall_angle=np.radians(11.2),
                 stall_range=np.radians(6.0),
                 cd_power_after_stall=cd_power_after_stall,
-                cd_stall_angle_offset=cd_stall_angle_offset,
             )
         )
     else:
@@ -52,7 +50,6 @@ def get_section_model(solver: SolverType):
                 mean_positive_stall_angle=np.radians(12.7), 
                 stall_range=np.radians(9.0),
                 cd_power_after_stall=cd_power_after_stall,
-                cd_stall_angle_offset=cd_stall_angle_offset,
             )
         )
 

@@ -4,6 +4,7 @@
 
 //! Tests for the dynamic simulation capabilities of the lifting line module
 
+use crate::test_utils::tolerance;
 use stormath::type_aliases::Float;
 use stormath::consts::TAU;
 
@@ -103,7 +104,7 @@ fn right_force_magnitude_with_steady_forward_motion() {
         let cl_difference = (cl_translation - cl_inflow).abs() / cl_inflow.abs();
 
         assert!(
-            cl_difference < 0.00001,
+            cl_difference < tolerance(1e-5, 1e-4),
             "The difference between the two simulations is too large. Difference = {}",
             cl_difference
         );
@@ -155,7 +156,6 @@ fn right_sign_of_the_force_when_translating() {
         let time: Float = (i as Float) * time_step;
 
         let translation_y = amplitude * (time * frequency).sin();
-        let velocity_y = amplitude * frequency * (time * frequency).cos();
 
         let translation = SpatialVector::from([0.0, translation_y, 0.0]);
         let rotation = SpatialVector::from([0.0, 0.0, 0.0]);
@@ -163,6 +163,9 @@ fn right_sign_of_the_force_when_translating() {
         sim.line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
             time_step, translation, rotation
         );
+
+        // The velocity used in the simulation, from finite differences of the translation
+        let velocity_y = sim.line_force_model.rigid_body_motion.velocity_linear[1];
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
     
@@ -211,7 +214,7 @@ fn right_sign_of_the_moment_when_rotating() {
 
     let frequency = TAU / period;
 
-    let amplitude = Float::from(5.0).to_radians();
+    let amplitude = Float::to_radians(5.0);
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
@@ -225,11 +228,12 @@ fn right_sign_of_the_moment_when_rotating() {
             0.0,
         ]);
 
-        let rotation_vel_x = frequency * amplitude * (frequency * time).cos();
-
         sim.line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
             time_step, SpatialVector::default(), rotation
         );
+
+        // The velocity used in the simulation, from finite differences of the rotation
+        let rotation_vel_x = sim.line_force_model.rigid_body_motion.velocity_angular[0];
 
         let result = sim.do_step(time, time_step, &input_freestream_velocity);
         

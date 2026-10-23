@@ -9,7 +9,9 @@ use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;
 
+/// Models for the variation of the wind velocity with height
 pub mod velocity_variation;
+/// Gust spectrums, represented by discrete frequencies
 pub mod discretized_spectrum;
 
 use velocity_variation::VelocityVariation;
@@ -40,6 +42,7 @@ pub struct WindCondition {
 }
 
 impl WindCondition {
+    /// Creates a wind condition with a constant velocity at all heights and no gusts
     pub fn new_constant(direction_coming_from: Float, velocity: Float) -> Self {
         Self{
             direction_coming_from,
@@ -50,7 +53,7 @@ impl WindCondition {
         }
     }
     
-    /// Returns the true velocity magnitude at the height gives and input. 
+    /// Returns the true velocity magnitude at the given height. 
     pub fn steady_true_wind_velocity_at_height(&self, height: Float) -> Float {
         self.velocity_variation.true_wind_velocity_at_height(height)
     }
@@ -75,7 +78,7 @@ impl WindCondition {
         }
     }
     
-    /// Unsteady velocity component vertically to the true wind
+    /// Unsteady velocity component vertical to the true wind
     pub fn unsteady_vertical_true_wind_velocity(&self, time: Float) -> Float {
         if let Some(spectrum) = &self.vertical_gust {
             spectrum.value_at_time(time)
@@ -93,7 +96,7 @@ impl WindCondition {
 
     /// Set perpendicular gust spectrum from JSON input
     pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: &str) {
-        let perpendicular_gust: DiscretizedSpectrum = serde_json::from_str(&gust_string).unwrap();
+        let perpendicular_gust: DiscretizedSpectrum = serde_json::from_str(gust_string).unwrap();
         
         self.perpendicular_gust = Some(perpendicular_gust);
     }

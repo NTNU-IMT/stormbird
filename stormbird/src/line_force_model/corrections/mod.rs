@@ -2,7 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-//! Various corrections for the circulation strength and angle of attack calculated
+//! Various corrections for the circulation strength, the angle of attack and the forces calculated
 //! 
 //! The module contains an implementation block for the [LineForceModel] and various correction 
 //! structs.
@@ -12,9 +12,13 @@
 //! - [`gaussian_smoothed_values`](LineForceModel::gaussian_smoothed_values)
 //! - [`polynomial_smoothed_values`](LineForceModel::polynomial_smoothed_values)
 //! - [`circulation_strength_prescribed`](LineForceModel::circulation_strength_prescribed)
+//! - [`apply_force_corrections`](LineForceModel::apply_force_corrections)
 
+/// Corrections of the circulation distribution
 pub mod circulation;
+/// Corrections of the angle of attack
 pub mod angle_of_attack;
+pub mod force;
 
 use stormath::type_aliases::Float;
 use stormath::consts::MIN_POSITIVE;
@@ -39,24 +43,28 @@ impl LineForceModel {
     /// Returns the circulation strength with smoothing applied.
     /// 
     /// # Arguments
-    /// - `velocity` - A vector of velocities at the control points.
-    /// - `input_coordinate_system` - The coordinate system in which the input velocity is given.
-    /// - `circulation_smoothing` - The smoothing settings to be applied to the circulation
+    /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
+    /// * `velocity` - the velocity vector at each control point
+    /// * `circulation_smoothing` - The smoothing settings to be applied to the circulation
     ///   strength.
     pub fn circulation_strength_smoothed(
         &self, 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector],
         circulation_smoothing: &CirculationSmoothing,
     ) -> Vec<Float> {
         let raw_strength = self.circulation_strength_raw(
             angles_of_attack,
+            internal_states,
             velocity
         );
 
         let values_to_subtract = if let Some(prescribed_circulation) = &circulation_smoothing.prescribed_to_subtract_before_smoothing {
             self.circulation_strength_prescribed(
                 angles_of_attack,
+                internal_states,
                 velocity,
                 prescribed_circulation
             )
@@ -114,9 +122,9 @@ impl LineForceModel {
             let mut smoothing_weight: Vec<Float> = Vec::with_capacity(local_span_distance_non_dim.len());
             
             // TODO: make the power of the local span distance a variable
-            for i in 0..local_span_distance_non_dim.len() {
+            for span_distance_non_dim in &local_span_distance_non_dim {
                 smoothing_weight.push(
-                     1.0 - 2.0 * local_span_distance_non_dim[i].abs().powi(4)
+                     1.0 - 2.0 * span_distance_non_dim.abs().powi(4)
                 );
             }
 
@@ -126,14 +134,13 @@ impl LineForceModel {
                 &smoothing_weight
             );
             
-            for index in 0..wing_smoothed_values.len() {
-                smoothed_values.push(wing_smoothed_values[index]);
-            }
+            smoothed_values.extend_from_slice(&wing_smoothed_values);
         }
 
         smoothed_values
     }
 
+    /// Returns the values smoothed with cubic polynomial smoothing, applied to each wing separately
     pub fn polynomial_smoothed_values(
         &self, 
         noisy_values: &[Float],
@@ -148,9 +155,7 @@ impl LineForceModel {
             let settings = &smoothing_settings[wing_index];
             let wing_smoothed_values = settings.apply_smoothing(&local_noisy_values);
 
-            for index in 0..wing_smoothed_values.len() {
-                smoothed_values.push(wing_smoothed_values[index]);
-            }
+            smoothed_values.extend_from_slice(&wing_smoothed_values);
         }
 
         smoothed_values
@@ -166,12 +171,14 @@ impl LineForceModel {
     /// into account.
     /// 
     /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
     /// * `velocity` - The velocity at the control points, used to calculate the circulation
     /// * `prescribed_circulation` - The shape of the circulation distribution to be followed
-    /// * `input_coordinate_system` - The coordinate system in which the input velocity is given.
     pub fn circulation_strength_prescribed(
         &self, 
         angles_of_attack: &[Float],
+        internal_states: &[Float],
         velocity: &[SpatialVector], 
         prescribed_circulation: &PrescribedCirculation, 
     ) -> Vec<Float> {
@@ -180,6 +187,7 @@ impl LineForceModel {
 
         let raw_circulation_strength = self.circulation_strength_raw(
             angles_of_attack,
+            internal_states,
             velocity
         );
 
@@ -207,7 +215,7 @@ impl LineForceModel {
             let mut local_shape_vector = Vec::with_capacity(nr_wings);
             
             for wing_index in 0..nr_wings {
-                let wing_indices = self.wing_indices[wing_index.clone()].clone();
+                let wing_indices = self.wing_indices[wing_index].clone();
 
                 local_shape_vector.push(
                     PrescribedCirculationShape::from_curve_fit(

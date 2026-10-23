@@ -7,31 +7,45 @@ fn vel(i: u32, component: u32) -> f32 {
     return velocity[3u * i + component];
 }
 
-// The velocity gradient tensor at the center of cell `i_0`, where `g[i][j] = du_i/dx_j`. See
+// The component `du_i/dx_j` of the velocity gradient tensor at the center of cell `i_0`. See
 // `velocity_gradient`.
-fn velocity_gradient(i_0: u32) -> array<vec3<f32>, 3> {
+fn velocity_gradient_component(i_0: u32, i: u32, j: u32) -> f32 {
     let stride = grid.extended_stride.xyz;
+    let s_i = stride[i];
 
-    var g: array<vec3<f32>, 3>;
-
-    for (var i: u32 = 0u; i < 3u; i = i + 1u) {
-        let s_i = stride[i];
-
-        for (var j: u32 = 0u; j < 3u; j = j + 1u) {
-            if i == j {
-                g[i][j] = (vel(i_0, i) - vel(i_0 - s_i, i)) * grid.inv_cell_length[i];
-            } else {
-                let s_j = stride[j];
-
-                let u_p = vel(i_0 + s_j, i) + vel(i_0 + s_j - s_i, i);
-                let u_m = vel(i_0 - s_j, i) + vel(i_0 - s_j - s_i, i);
-
-                g[i][j] = 0.25 * (u_p - u_m) * grid.inv_cell_length[j];
-            }
-        }
+    if i == j {
+        return (vel(i_0, i) - vel(i_0 - s_i, i)) * grid.inv_cell_length[i];
     }
 
-    return g;
+    let s_j = stride[j];
+
+    let u_p = vel(i_0 + s_j, i) + vel(i_0 + s_j - s_i, i);
+    let u_m = vel(i_0 - s_j, i) + vel(i_0 - s_j - s_i, i);
+
+    return 0.25 * (u_p - u_m) * grid.inv_cell_length[j];
+}
+
+// The velocity gradient tensor at the center of cell `i_0`, where `g[i][j] = du_i/dx_j`. See
+// `velocity_gradient`. The tensor is built with constructors, rather than by writing to the
+// vector components with dynamic indices in a loop.
+fn velocity_gradient(i_0: u32) -> array<vec3<f32>, 3> {
+    return array<vec3<f32>, 3>(
+        vec3<f32>(
+            velocity_gradient_component(i_0, 0u, 0u),
+            velocity_gradient_component(i_0, 0u, 1u),
+            velocity_gradient_component(i_0, 0u, 2u),
+        ),
+        vec3<f32>(
+            velocity_gradient_component(i_0, 1u, 0u),
+            velocity_gradient_component(i_0, 1u, 1u),
+            velocity_gradient_component(i_0, 1u, 2u),
+        ),
+        vec3<f32>(
+            velocity_gradient_component(i_0, 2u, 0u),
+            velocity_gradient_component(i_0, 2u, 1u),
+            velocity_gradient_component(i_0, 2u, 2u),
+        ),
+    );
 }
 
 fn limited_linear_correction(f_uu: f32, f_u: f32, f_d: f32) -> f32 {

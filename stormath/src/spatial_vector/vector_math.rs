@@ -2,6 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Vector math for spatial vectors, such as dot and cross products.
 
 use super::*;
 
@@ -73,7 +74,7 @@ impl SpatialVector {
         let cosine_value = self.dot(rhs) / (self_len_sq * rhs_len_sq).sqrt();
 
         // Correct for potential floating point errors
-        let clipped_cosine_value = cosine_value.max(-1.0).min(1.0);
+        let clipped_cosine_value = cosine_value.clamp(-1.0, 1.0);
 
         clipped_cosine_value.acos()
     }

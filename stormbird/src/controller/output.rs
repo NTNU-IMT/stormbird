@@ -10,17 +10,21 @@ use stormath::type_aliases::Float;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
+/// Output from the controller
 pub struct ControllerOutput {
-    pub local_wing_angle: Float,
-    pub section_model_internal_state: Float,
+    /// The local wing angle for each wing
+    pub local_wing_angles: Vec<Float>,
+    /// The internal state for each wing
+    pub internal_states: Vec<Float>,
 }
 
 impl ControllerOutput {
-    pub fn as_csv_string(output_to_write: &[Self]) -> (String, String) {
+    /// Returns a header and a data string for a CSV file with the output
+    pub fn as_csv_string(output_to_write: &Self) -> (String, String) {
         let mut header = String::new();
         let mut data = String::new();
         
-        let nr_wings = output_to_write.len();
+        let nr_wings = output_to_write.local_wing_angles.len();
         
         for i in 0..nr_wings {
             if i > 0 {
@@ -29,7 +33,7 @@ impl ControllerOutput {
             }
             
             header.push_str(&format!("local_wing_angle_{}", i));
-            data.push_str(&format!("{:.6}", output_to_write[i].local_wing_angle));
+            data.push_str(&format!("{:.6}", output_to_write.local_wing_angles[i]));
         }
         
         for i in 0..nr_wings {
@@ -37,13 +41,15 @@ impl ControllerOutput {
             data.push(',');
             
             header.push_str(&format!("section_model_internal_state_{}", i));
-            data.push_str(&format!("{:.6}", output_to_write[i].section_model_internal_state));
+            data.push_str(&format!("{:.6}", output_to_write.internal_states[i]));
         }
         
         (header, data)
     }
 
-    pub fn write_to_csv_file(output_to_write: &[Self], file_path: &str) {
+    /// Writes the output to a CSV file. The file is created if it does not exist, and the data is
+    /// appended otherwise.
+    pub fn write_to_csv_file(output_to_write: &Self, file_path: &str) {
         let (header, data) = Self::as_csv_string(output_to_write);
 
         let _ = csv_data::create_or_append_header_and_data_strings_file(

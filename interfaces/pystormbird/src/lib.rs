@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 use pyo3::wrap_pymodule;
 
 mod section_models;
+mod span_varying_internal_state;
 mod result_structs;
 mod line_force_model;
 mod lifting_line;

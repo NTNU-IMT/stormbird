@@ -1,3 +1,5 @@
+//! Operators for the sparse matrix, such as indexing and matrix-vector multiplication.
+
 use super::*;
 
 use std::ops::{Index, IndexMut};
@@ -72,16 +74,16 @@ impl <const N: usize> SparseMatrix<N> {
 
         let mut result = vec![0.0; self.shape[0]];
 
-        for i in 0..self.shape[0] {
+        for (i, result_value) in result.iter_mut().enumerate() {
             let mut sum = 0.0;
 
             for j in 0..self.row_length[i] {
                 let col_index = self.col_indices[i][j];
 
-                sum = sum + self.values[i][j] * x[col_index];
+                sum += self.values[i][j] * x[col_index];
             }
 
-            result[i] = sum
+            *result_value = sum
         }
 
         result

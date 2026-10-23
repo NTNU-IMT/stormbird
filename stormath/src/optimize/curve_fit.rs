@@ -2,6 +2,7 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Fitting of function parameters to data, using non-linear least squares.
 
 use crate::type_aliases::Float;
 use crate::matrix::Matrix;
@@ -12,12 +13,19 @@ use super::bounded_variable::BoundedVariable;
 /// Settings for fitting data to a function using non-linear least squares. The implementation 
 /// follows the [Levenberg-Marquard method](https://en.wikipedia.org/wiki/Levenberg%E2%80%93Marquardt_algorithm)
 pub struct CurveFit {
+    /// The function to fit, taking the independent variable and the parameters as input
     pub function: fn(Float, &[Float]) -> Float,
+    /// Maximum number of iterations
     pub max_iterations: usize,
+    /// Step size used when computing the Jacobian with central finite differences
     pub delta_params: Float,
+    /// Initial value of the damping factor in the Levenberg-Marquardt method
     pub initial_damping_factor: Float,
+    /// Factor used to increase or decrease the damping factor between iterations
     pub damping_change_factor: Float,
+    /// Optional bounds for each parameter
     pub param_bounds: Option<Vec<BoundedVariable>>,
+    /// The iterations stop when the sum of the squared residuals is below this value
     pub tolerance: Float
 }
 
@@ -138,6 +146,7 @@ impl CurveFit {
         residuals
     }
 
+    /// Returns the sum of the squared residuals for the given (unbounded) parameters
     pub fn cost_function(
         &self, 
         x_data: &[Float], 
@@ -152,7 +161,7 @@ impl CurveFit {
     /// Run the Levenberg-Marquardt algorithm to fit a function to data points.
     /// # Arguments:
     /// - `function`: A function that takes a single `Float` and a slice of `Float` parameters, 
-    ///    returning a `Float` value representing the output of the function.
+    ///   returning a `Float` value representing the output of the function.
     /// - `x_data`: a slice of `Float` representing the independent variable data points.
     /// - `y_data`: a slice of `Float` representing the dependent variable data points.
     /// - `initial_params`: a slice of `Float` representing the initial guess for the parameters of the

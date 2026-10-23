@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 //! Functionality to represent the constant variables in a wind environment, and methods necessary 
-//! to compute velocities in spaces.s
+//! to compute velocities in space.
 
 use std::ops::Range;
 
@@ -22,7 +22,7 @@ use super::wind_condition::WindCondition;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Structure used to represent a wind environment, meaning all settings for the wind that is 
-/// assumed to be constant for a given model. Wind parameters that vary is given in 
+/// assumed to be constant for a given model. Wind parameters that vary are given in 
 /// [`crate::wind::wind_condition::WindCondition`]. The wind environment defines the definition of 
 /// different *directions*, and can be used to generate velocity vectors for different locations, 
 /// based on the input wind condition and linear velocity
@@ -33,7 +33,7 @@ pub struct WindEnvironment {
     /// are later used to get the true wind speed.  
     pub up_direction: SpatialVector,
     #[serde(default="WindEnvironment::default_wind_rotation_axis")]
-    /// The wind rotation axis which axis that is used when rotating the wind vector based on the 
+    /// The axis that is used when rotating the wind vector based on the 
     /// wind direction. This is kept separate from the *up-direction* to allow for arbitrary 
     /// definitions of wind direction
     pub wind_rotation_axis: SpatialVector,
@@ -124,7 +124,7 @@ impl WindEnvironment {
         condition.unsteady_parallel_true_wind_velocity_at_height(height, time)
     }
 
-    /// Returns the unsteady true wind magnitude at the location given as input
+    /// Returns the unsteady true wind vector at the location given as input
     pub fn unsteady_true_wind_velocity_vector_at_location(
         &self,
         condition: &WindCondition,
@@ -209,17 +209,17 @@ impl WindEnvironment {
         let mut wind_velocity = Vec::with_capacity(nr_ctrl_points);
         let mut average_height = 0.0;
         
-        for i in 0..nr_ctrl_points {
+        for &ctrl_point in ctrl_points {
             wind_velocity.push(
                 self.unsteady_apparent_wind_velocity_vector_at_location(
-                    condition, 
-                    ctrl_points[i], 
-                    linear_velocity, 
+                    condition,
+                    ctrl_point,
+                    linear_velocity,
                     time
                 )
             );
-            
-            average_height += ctrl_points[i].dot(self.up_direction);
+
+            average_height += ctrl_point.dot(self.up_direction);
         }
         
         average_height /= nr_ctrl_points as Float;
@@ -248,20 +248,19 @@ impl WindEnvironment {
     ) {
         if let Some(corrections) = &self.inflow_corrections {
             let nr_ctrl_points = ctrl_points.len();
-            let nr_wings = wing_indices.len();
             
             let mut height_values: Vec<Float> = Vec::with_capacity(
                 nr_ctrl_points
             );
             
-            for i in 0..nr_ctrl_points {
+            for ctrl_point in ctrl_points {
                 height_values.push(
-                    ctrl_points[i].dot(self.up_direction)
+                    ctrl_point.dot(self.up_direction)
                 );
             }
             
-            for wing_index in 0..nr_wings {
-                for i in wing_indices[wing_index].start..wing_indices[wing_index].end {
+            for (wing_index, wing_range) in wing_indices.iter().enumerate() {
+                for i in wing_range.clone() {
                     freestream_velocity[i] = corrections.correct_velocity_single_sail(
                         wing_index,
                         apparent_wind_direction,
@@ -322,7 +321,7 @@ impl WindEnvironment {
 
         let mut out = Vec::with_capacity(nr_span_lines);
 
-        for i in 0..nr_span_lines {
+        for (i, &velocity_i) in velocity.iter().enumerate().take(nr_span_lines) {
             let wing_index = line_force_model.wing_index_from_global(i);
 
             let first_strip_index = line_force_model.wing_indices[wing_index].start;
@@ -335,7 +334,7 @@ impl WindEnvironment {
 
             out.push(
                 chord_local_transformed.signed_angle_between(
-                    velocity[i],
+                    velocity_i,
                     rotation_axis
                 )
             );
@@ -367,17 +366,17 @@ mod tests {
             wind_velocity
         );
         let starboard_wind_condition = WindCondition::new_constant(
-            Float::from(-90.0).to_radians(), 
+            Float::to_radians(-90.0), 
             wind_velocity
         );
 
         let port_wind_condition = WindCondition::new_constant(
-            Float::from(90.0).to_radians(), 
+            Float::to_radians(90.0), 
             wind_velocity
         );
 
         let tail_wind_condition = WindCondition::new_constant(
-            Float::from(180.0).to_radians(), 
+            Float::to_radians(180.0), 
             wind_velocity
         );
 

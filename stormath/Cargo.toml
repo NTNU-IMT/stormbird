@@ -1,15 +1,19 @@
 [package]
 name = "stormath"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "A selection of math utility functionality"
 homepage = "https://github.com/NTNU-IMT/stormbird"
+repository = "https://github.com/NTNU-IMT/stormbird"
 readme = "README.md"
-license = "GPL-3.0"
+license = "GPL-3.0-only"
+keywords = ["math", "interpolation", "linear-algebra", "numerical", "spatial-vector"]
+categories = ["mathematics", "science"]
 edition = "2021"
+rust-version = "1.85"
 
 [dependencies]
-rand = "0.9.1"
+rand = "0.10.3"
 serde = { version = "1.0.228", features = ["derive"] }
 rayon = { version = "1.12.0"}
 

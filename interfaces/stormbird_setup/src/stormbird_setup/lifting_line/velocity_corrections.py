@@ -21,14 +21,14 @@ class VelocityCorrections(StormbirdSetupBaseModel):
     value: float | None = None
     
     @classmethod
-    def new_max_induced_velocity_magnitude(cls, max_magnitude_ratio: float = 1.0):
+    def new_max_induced_velocity_magnitude(cls, max_magnitude_ratio: float = 1.0) -> "VelocityCorrections":
         return cls(
             type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
             value = max_magnitude_ratio
         )
         
     @classmethod
-    def new_fixed_magnitude_equal_to_freestream(cls):
+    def new_fixed_magnitude_equal_to_freestream(cls) -> "VelocityCorrections":
         return cls(
             type = VelocityCorrectionType.FixedMagnitudeEqualToFreestream,
             value = None
@@ -58,7 +58,7 @@ class VelocityCorrections(StormbirdSetupBaseModel):
         return data
 
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         if self.type == VelocityCorrectionType.NoCorrection:
             return "NoCorrection"
         elif self.type == VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio:

@@ -4,13 +4,12 @@ import numpy as np
 
 from dataclasses import dataclass
 
-from stormbird_setup.direct_setup.section_models import SectionModel, Foil
-from stormbird_setup.direct_setup.spatial_vector import SpatialVector
-from stormbird_setup.direct_setup.line_force_model import LineForceModelBuilder, WingBuilder
-from stormbird_setup.direct_setup.lifting_line.wake import SymmetryCondition
+from stormbird_setup.section_models import SectionModel, Foil
+from stormbird_setup.spatial_vector import SpatialVector
+from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.lifting_line import SymmetryCondition
 
-from stormbird_setup.direct_setup.actuator_line.actuator_line_builder import ActuatorLineBuilder
-from stormbird_setup.direct_setup.actuator_line.corrections import LiftingLineCorrectionBuilder
+from stormbird_setup.actuator_line import ActuatorLineBuilder, LiftingLineCorrectionBuilder
 
 @dataclass(frozen=True, kw_only=True)
 class StormbirdSettings():
@@ -61,6 +60,9 @@ class StormbirdSettings():
             al_builder.lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition = SymmetryCondition.Z
             )
+        else:
+            # The lifting line correction is used by default
+            al_builder.lifting_line_correction = None
 
         return al_builder
 

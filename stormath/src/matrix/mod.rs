@@ -65,6 +65,7 @@ where T: Default + Clone + Copy + Debug,
         self.shape[1]
     }
     
+    /// Returns the values in the given row as a slice
     pub fn row_slice(&self, row: usize) -> &[T] {
         let start = row * self.shape[1];
         &self.data[start .. start + self.shape[1]]

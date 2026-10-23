@@ -5,7 +5,7 @@
 //! Functionality to empirically correct an input velocity to account for disturbances in the flow,
 //! such as disturbances due to the deck or superstructure on a ship. 
 //! 
-//! The empirical model consists of two correction variable; a factor that can be used to adjust the 
+//! The empirical model consists of two correction variables: a factor that can be used to adjust the 
 //! effective velocity at different line segments, and an angle that can be used to rotate the 
 //! effective velocity. The factors themselves must come from some external source. Typically, they 
 //! are either set directly from an analysis of the velocity field over a ship without any sails
@@ -24,13 +24,18 @@ use std::ops::Range;
 /// direction, as a function of a scalar height value. The correction consists of both magnitude
 /// corrections and angle corrections.
 pub struct InflowCorrectionsSingleDirection {
+    /// The height values where the corrections are given
     pub height_values: Vec<Float>,
+    /// Factors multiplied with the velocity magnitude at each height
     pub magnitude_corrections: Vec<Float>,
+    /// Angles, in radians, that the velocity is rotated around the up direction at each height
     pub angle_corrections: Vec<Float>, 
+    /// The indices of the correction values that belong to each sail
     pub wing_indices: Vec<Range<usize>>,
 }
 
 impl InflowCorrectionsSingleDirection {
+    /// Returns the corrected velocity for a single sail at the given height
     pub fn correct_velocity_single_sail(
         &self,
         wing_index: usize,
@@ -59,11 +64,15 @@ impl InflowCorrectionsSingleDirection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Inflow corrections
 pub struct InflowCorrections {
+    /// The apparent wind directions where corrections are given
     pub apparent_wind_directions: Vec<Float>,
+    /// The corrections for each apparent wind direction
     pub corrections: Vec<InflowCorrectionsSingleDirection>,
 }
 
 impl InflowCorrections {
+    /// Returns the corrected velocity for a single sail at the given height, interpolated between the
+    /// corrections for the closest apparent wind directions
     pub fn correct_velocity_single_sail(
         &self,
         wing_index: usize,

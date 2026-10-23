@@ -2,13 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from stormbird_setup.section_models import Foil as FoilSetup
-from stormbird_setup.section_models import VaryingFoil as VaryingFoilSetup
+from stormbird_setup.section_models import MultiElementFoil as MultiElementFoilSetup
 from stormbird_setup.section_models import SectionModel as SectionModelSetup
 
 from pystormbird.section_models import VaryingFoil as VaryingFoilModel
 
 
-def get_foil_setup(flap_angle: float = 0.0):
+def get_foil_setup():
     '''
     Simplified setup of a multi-element foil model, to show how it can be generated manually. 
     Usually, the parameters in the foil model should be "fitted" to some externally generated data, 
@@ -35,10 +35,9 @@ def get_foil_setup(flap_angle: float = 0.0):
             )
         )
 
-    return VaryingFoilSetup(
+    return MultiElementFoilSetup(
         internal_state_data = flap_angles.tolist(),
-        foils_data = foils_data,
-        current_internal_state = flap_angle
+        foils_data = foils_data
     )
 
 def get_foil_model():
@@ -51,12 +50,13 @@ def get_foil_model():
 
     return VaryingFoilModel(foil_setup.to_json_string())
 
-def get_section_model_setup(flap_angle: float = 0.0):
+def get_section_model_setup():
     '''
-    Returns a SectionModelSetup object containing a VaryingFoil model.
+    Returns a SectionModelSetup object containing a MultiElementFoil model. The flap angle is set
+    through the internal state of the wing in the simulation.
     '''
 
-    foil_setup = get_foil_setup(flap_angle=flap_angle)
+    foil_setup = get_foil_setup()
 
     return SectionModelSetup(model=foil_setup)
 
@@ -78,8 +78,6 @@ if __name__ == '__main__':
     flap_angles_to_test = np.radians([0, 5, 10, 15])
 
     for flap_angle in flap_angles_to_test:
-        foil.set_internal_state(flap_angle)
-
         n_test = 100
         angles_to_test = np.radians(np.linspace(-5, 20, n_test))
 
@@ -87,8 +85,8 @@ if __name__ == '__main__':
         cd = np.zeros(n_test)
 
         for i in range(n_test):
-            cl[i] = foil.lift_coefficient(angles_to_test[i])
-            cd[i] = foil.drag_coefficient(angles_to_test[i])
+            cl[i] = foil.lift_coefficient(angles_to_test[i], flap_angle)
+            cd[i] = foil.drag_coefficient(angles_to_test[i], flap_angle)
 
         
         plt.sca(ax1)

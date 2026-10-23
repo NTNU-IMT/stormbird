@@ -21,12 +21,12 @@ use stormath::type_aliases::Float;
 fn coordinate_systems() {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 1.2;
-    let angle_of_attack = Float::from(2.0).to_radians();
+    let angle_of_attack = Float::to_radians(2.0);
 
     // Note: adding rotation in any other axis than the x-axis affects the angle of attack, and will 
     // therefore make the comparison between the "fixed" and "body" forces fail.
     let rotation = SpatialVector::from([
-        Float::from(72.0).to_radians(),
+        Float::to_radians(72.0),
         0.0,
         0.0
     ]);

@@ -54,7 +54,7 @@ fn wing_sails_speed_test() {
                 chord_vector;
                 2
             ],
-            section_model: SectionModel::Foil(section_model.clone()),
+            section_model: SectionModel::SingleElementFoil(section_model.clone()),
             non_zero_circulation_at_ends: [false, false],
             ..Default::default()
         };

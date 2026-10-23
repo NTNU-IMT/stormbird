@@ -4,6 +4,8 @@ Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 """
 
+from typing import Any
+
 from .base_model import StormbirdSetupBaseModel
 
 from pydantic import model_serializer, model_validator
@@ -25,7 +27,7 @@ class CirculationSmoothingBuilder(StormbirdSetupBaseModel):
     smoothing_type: GaussianSmoothingBuilder = GaussianSmoothingBuilder()
 
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any]:
         if isinstance(self.smoothing_type, GaussianSmoothingBuilder):
             return {
                 "smoothing_type": {
@@ -37,7 +39,7 @@ class CirculationSmoothingBuilder(StormbirdSetupBaseModel):
             
     @model_validator(mode='before')
     @classmethod
-    def deserialize_from_rust_enum(cls, data):
+    def deserialize_from_rust_enum(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
         
@@ -70,7 +72,7 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
     def new_gaussian_smoothing(
         cls, 
         smoothing_length_factor: float = 0.1,
-    ):
+    ) -> "CirculationCorrectionBuilder":
         return cls(
             correction = CirculationSmoothingBuilder(
                 smoothing_type = GaussianSmoothingBuilder(
@@ -85,7 +87,7 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
         inner_power: float = 2.0, 
         outer_power: float = 0.5, 
         curve_fit_shape_parameters: bool = False
-    ):
+    ) -> "CirculationCorrectionBuilder":
         return cls(
             correction = PrescribedCirculation(
                 shape = PrescribedCirculationShape(
@@ -98,7 +100,7 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
         
     @model_validator(mode='before')
     @classmethod
-    def deserialize_from_rust_enum(cls, data):
+    def deserialize_from_rust_enum(cls, data: Any) -> Any:
         # Handle the "None" string case
         if data == "None":
             return {'correction': None}
@@ -123,7 +125,7 @@ class CirculationCorrectionBuilder(StormbirdSetupBaseModel):
             raise ValueError(f"Unknown circulation correction variant: {list(data.keys())}")
         
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         if self.correction is None:
             return "None"
         elif isinstance(self.correction, PrescribedCirculation):

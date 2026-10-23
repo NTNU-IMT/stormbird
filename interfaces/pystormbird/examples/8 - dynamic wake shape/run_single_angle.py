@@ -21,6 +21,9 @@ if __name__ == '__main__':
     argument_parser.add_argument(
         "--nr-panels-per-line-element", type=float, default=50, help="Number of panels per line element making up the wings"
     )
+    argument_parser.add_argument(
+        "--visualize-wake", action="store_true", help="Show a live animation of the wake for each case. Requires pyvista"
+    )
 
     args = argument_parser.parse_args()
 
@@ -33,7 +36,6 @@ if __name__ == '__main__':
     dynamic_shape_list = [False, True, True]
     line_style = ["-", "--", "-."]
     labels = ["Dynamic, fixed wake", "Dynamic, dynamic wake", "Steady, dynamic wake"]
-    export_wake = [False, False, True]
 
     for case_index, (dynamic, dynamic_shape) in enumerate(zip(dynamic_list, dynamic_shape_list)):
         print(labels[case_index])
@@ -42,7 +44,7 @@ if __name__ == '__main__':
             wind_angle_deg = args.wind_angle,
             dynamic = dynamic,
             dynamic_shape = dynamic_shape,
-            export_wake = export_wake[case_index],
+            visualize_wake = args.visualize_wake,
             nr_panels_per_line_element=args.nr_panels_per_line_element
         )
 

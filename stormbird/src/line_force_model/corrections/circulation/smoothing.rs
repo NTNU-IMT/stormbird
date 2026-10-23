@@ -40,32 +40,45 @@ pub struct CirculationSmoothing {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Builder for Gaussian smoothing of the circulation distribution
 pub struct GaussianSmoothingBuilder {
+    /// The smoothing length, relative to the span of each wing
     pub smoothing_length_factor: Float,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Builder for cubic polynomial smoothing of the circulation distribution
 pub struct CubicPolynomialSmoothingBuilder {
+    /// The number of points in the smoothing window
     pub window_size: WindowSize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// The type of smoothing to apply to the circulation distribution
 pub enum SmoothingTypeBuilder {
+    /// Gaussian smoothing
     Gaussian(GaussianSmoothingBuilder),
+    /// Cubic polynomial smoothing
     CubicPolynomial(CubicPolynomialSmoothingBuilder),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Builder for smoothing of the circulation distribution
 pub struct CirculationSmoothingBuilder {
+    /// The type of smoothing
     pub smoothing_type: SmoothingTypeBuilder,
+    /// Optional prescribed circulation shape, which is subtracted before the smoothing and added back
+    /// afterwards
     #[serde(default)]
     pub prescribed_to_subtract_before_smoothing: Option<PrescribedCirculation>,
 }
 
 impl CirculationSmoothingBuilder {
+    /// Returns the end conditions to use in the smoothing for each wing, based on whether the
+    /// circulation can be different from zero at the ends
     pub fn end_conditions(&self, line_force_model: &LineForceModel) -> Vec<[EndCondition<Float>; 2]> {
         let nr_wings = line_force_model.nr_wings();
 
@@ -93,6 +106,7 @@ impl CirculationSmoothingBuilder {
         end_conditions
     }
 
+    /// Builds the smoothing settings for the given line force model
     pub fn build(&self, line_force_model: &LineForceModel) -> CirculationSmoothing {
         let end_conditions = self.end_conditions(line_force_model);
         let nr_wings = line_force_model.nr_wings();
@@ -124,11 +138,11 @@ impl CirculationSmoothingBuilder {
             SmoothingTypeBuilder::CubicPolynomial(settings_builder) => {
                 let mut settings_vector: Vec<CubicPolynomialSmoothing<Float>> = Vec::with_capacity(nr_wings);
 
-                for wing_index in 0..nr_wings {
+                for &wing_end_conditions in end_conditions.iter().take(nr_wings) {
                     settings_vector.push(
                         CubicPolynomialSmoothing {
-                            window_size: settings_builder.window_size, 
-                            end_conditions: end_conditions[wing_index]
+                            window_size: settings_builder.window_size,
+                            end_conditions: wing_end_conditions
                         }
                     );
                 }

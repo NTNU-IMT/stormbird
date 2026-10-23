@@ -329,7 +329,7 @@ impl StormbirdLiftingLine {
         time_step: f64,
         controller_input: &[ControllerInput]
     ) {
-        if let Some(controller) = &self.controller {
+        if let Some(controller) = &mut self.controller {
             let controller_output = controller.update(
                 current_time,
                 time_step,

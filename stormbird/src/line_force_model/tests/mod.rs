@@ -7,11 +7,13 @@
 
 pub mod motion;
 pub mod indexing;
+pub mod internal_state;
+pub mod wing_internal_state;
+pub mod force_models;
 
 use crate::line_force_model::builder::single_wing::WingBuilder;
 use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::line_force_model::LineForceModel;
-use crate::line_force_model::input_power::InputPowerModel;
 
 use crate::section_models::SectionModel;
 use crate::section_models::foil::Foil;
@@ -41,10 +43,10 @@ pub fn get_example_model() -> LineForceModel {
                 chord_vector,
             ],
             line_segment_is_virtual: None,
-            section_model: SectionModel::Foil(Foil::default()),
+            section_model: SectionModel::SingleElementFoil(Foil::default()),
             non_zero_circulation_at_ends: [false, false],
             nr_sections: None,
-            input_power_model: InputPowerModel::NoPower,
+            ..Default::default()
         };
 
         builder.add_wing(wing);

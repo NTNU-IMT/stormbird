@@ -7,26 +7,13 @@ use std::fs::File;
 use std::io::{Write, BufWriter, Error};
 
 use super::DynamicWake;
+use crate::lifting_line::wake::vtk::polygons_as_vtk;
 
 use std::collections::HashMap;
 
 use stormath::type_aliases::Float;
 
 impl DynamicWake {
-    pub fn write_wake_data_to_file_if_activated(&self, time_step_index: usize) {
-        if self.settings.write_wake_data_to_file {
-            let file_path = format!("{}/wake_{}.vtp", self.settings.wake_files_folder_path, time_step_index);
-            let write_result = self.write_wake_to_vtk_file(&file_path);
-
-            match write_result {
-                Ok(_) => {},
-                Err(e) => {
-                    println!("Error writing wake data to file: {}", e);
-                }
-            }
-        }
-    }
-
     /// Export the wake geometry as an obj file
     ///
     /// # Argument
@@ -36,12 +23,12 @@ impl DynamicWake {
 
         let mut writer = BufWriter::new(f);
 
-        write!(writer, "o wake\n")?;
+        writeln!(writer, "o wake")?;
 
         for i in 0..self.points.len(){
-            write!(
+            writeln!(
                 writer, 
-                "v {} {} {}\n", 
+                "v {} {} {}", 
                 self.points[i][0], 
                 self.points[i][1], 
                 self.points[i][2]
@@ -53,9 +40,9 @@ impl DynamicWake {
 
             let indices = self.panel_point_indices(stream_index, span_index);
 
-            write!(
+            writeln!(
                 writer, 
-                "f {} {} {} {}\n", 
+                "f {} {} {} {}", 
                 indices[0] + 1, 
                 indices[1] + 1, 
                 indices[2] + 1, 
@@ -81,44 +68,44 @@ impl DynamicWake {
         let nr_faces  = self.strengths.len();
 
         // Header
-        write!(writer, "<?xml version=\"1.0\"?>\n")?;
-        write!(writer, "<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n")?;
-        write!(writer, "\t<PolyData>\n")?;
-        write!(
+        writeln!(writer, "<?xml version=\"1.0\"?>")?;
+        writeln!(writer, "<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">")?;
+        writeln!(writer, "\t<PolyData>")?;
+        writeln!(
             writer, 
-            "\t\t<Piece NumberOfPoints=\"{}\" NumberOfVerts=\"0\" NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"{}\">\n", 
+            "\t\t<Piece NumberOfPoints=\"{}\" NumberOfVerts=\"0\" NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"{}\">", 
             nr_points, 
             nr_faces
         )?;
 
         // Write points
-        write!(writer, "\t\t\t<Points>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t<Points>")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">")?;
         for i in 0..nr_points {
-            write!(
+            writeln!(
                 writer, 
-                "\t\t\t\t\t{} {} {}\n", 
+                "\t\t\t\t\t{} {} {}", 
                 self.points[i][0], 
                 self.points[i][1], 
                 self.points[i][2]
             )?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</Points>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t</Points>")?;
 
         // Write faces
-        write!(writer, "\t\t\t<Polys>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t<Polys>")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">")?;
 
         for panel_index in 0..self.strengths.len() {
             let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
 
             let indices = self.panel_point_indices(stream_index, span_index);
 
-            write!(
+            writeln!(
                 writer, 
-                "\t\t\t\t\t{} {} {} {}\n", 
+                "\t\t\t\t\t{} {} {} {}", 
                 indices[0], 
                 indices[1], 
                 indices[2], 
@@ -126,142 +113,65 @@ impl DynamicWake {
             )?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">")?;
         for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", (i+1)*4)?;
+            writeln!(writer, "\t\t\t\t\t{}", (i+1)*4)?;
         }
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</Polys>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t</Polys>")?;
 
         // Write strength
-        write!(writer, "\t\t\t<CellData Scalars=\"strength\">\n")?;
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"strength\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t<CellData Scalars=\"strength\">")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"strength\" format=\"ascii\">")?;
         for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", self.strengths[i])?;
+            writeln!(writer, "\t\t\t\t\t{}", self.strengths[i])?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
 
         // Write viscous core length
 
-        write!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"viscous_core_length\" format=\"ascii\">\n")?;
+        writeln!(writer, "\t\t\t\t<DataArray type=\"Float32\" Name=\"viscous_core_length\" format=\"ascii\">")?;
         for i in 0..nr_faces {
-            write!(writer, "\t\t\t\t\t{}\n", self.panels_viscous_core_length[i])?;
+            writeln!(writer, "\t\t\t\t\t{}", self.panels_viscous_core_length[i])?;
         }
 
-        write!(writer, "\t\t\t\t</DataArray>\n")?;
-        write!(writer, "\t\t\t</CellData>\n")?;
+        writeln!(writer, "\t\t\t\t</DataArray>")?;
+        writeln!(writer, "\t\t\t</CellData>")?;
 
-        write!(writer, "\t\t</Piece>\n")?;
-        write!(writer, "\t</PolyData>\n")?;
-        write!(writer, "</VTKFile>\n")?;
+        writeln!(writer, "\t\t</Piece>")?;
+        writeln!(writer, "\t</PolyData>")?;
+        writeln!(writer, "</VTKFile>")?;
 
         writer.flush()?;
 
         Ok(())
     }
 
-    /// Serialize the wake geometry and strengths as a legacy VTK PolyData buffer.
+    /// Serialize the wake geometry and strengths as a legacy VTK PolyData buffer, with one quad
+    /// per panel, and the strength and viscous core length of each panel as cell data.
     ///
-    /// Unlike [`DynamicWake::write_wake_to_vtk_file`], which writes an XML `.vtp`
-    /// file to disk, this returns the data in memory as raw bytes so it can be
-    /// consumed directly (e.g. fed into a VTK reader in pyvista) without touching
-    /// the disk.
-    ///
-    /// The `binary` switch selects between the ASCII and BINARY variants of the
-    /// VTK legacy format. In ASCII mode the returned bytes are valid UTF-8 text,
-    /// while in binary mode they contain the big-endian binary data blocks
-    /// mandated by the format. `Vec<u8>` covers both cases uniformly.
+    /// Unlike [`DynamicWake::write_wake_to_vtk_file`], which writes an XML `.vtp` file to disk,
+    /// this returns the data in memory as raw bytes. See [`polygons_as_vtk`] for more on the
+    /// format.
     pub fn wake_as_vtk(&self, binary: bool) -> Vec<u8> {
-        let mut w: Vec<u8> = Vec::new();
-
-        let nr_points = self.points.len();
-        let nr_faces  = self.strengths.len();
-
-        // ------------------------------------------------------------------ //
-        // Header (always ASCII in the VTK legacy format)                       //
-        // ------------------------------------------------------------------ //
-        writeln!(w, "# vtk DataFile Version 3.0").unwrap();
-        writeln!(w, "Stormbird dynamic wake").unwrap();
-        writeln!(w, "{}", if binary { "BINARY" } else { "ASCII" }).unwrap();
-        writeln!(w, "DATASET POLYDATA").unwrap();
-
-        // ------------------------------------------------------------------ //
-        // Points                                                               //
-        // ------------------------------------------------------------------ //
-        writeln!(w, "POINTS {} float", nr_points).unwrap();
-        for i in 0..nr_points {
-            let x = self.points[i][0] as f32;
-            let y = self.points[i][1] as f32;
-            let z = self.points[i][2] as f32;
-
-            if binary {
-                w.write_all(&x.to_be_bytes()).unwrap();
-                w.write_all(&y.to_be_bytes()).unwrap();
-                w.write_all(&z.to_be_bytes()).unwrap();
-            } else {
-                writeln!(w, "{} {} {}", x, y, z).unwrap();
-            }
-        }
-        if binary { writeln!(w).unwrap(); }
-
-        // ------------------------------------------------------------------ //
-        // Polygons (one quad per panel)                                        //
-        //                                                                      //
-        // The legacy POLYGONS section is `POLYGONS n_cells connectivity_size`,  //
-        // where each cell is stored as `n_points i0 i1 ...`. With `n_points`    //
-        // fixed at 4, the total connectivity size is `n_cells * (4 + 1)`.       //
-        // ------------------------------------------------------------------ //
-        writeln!(w, "POLYGONS {} {}", nr_faces, nr_faces * 5).unwrap();
-        for panel_index in 0..nr_faces {
+        let polygons: Vec<Vec<usize>> = (0..self.strengths.len()).map(|panel_index| {
             let (stream_index, span_index) = self.indices.reverse_panel_index(panel_index);
-            let indices = self.panel_point_indices(stream_index, span_index);
 
-            if binary {
-                w.write_all(&(4_i32).to_be_bytes()).unwrap();
-                w.write_all(&(indices[0] as i32).to_be_bytes()).unwrap();
-                w.write_all(&(indices[1] as i32).to_be_bytes()).unwrap();
-                w.write_all(&(indices[2] as i32).to_be_bytes()).unwrap();
-                w.write_all(&(indices[3] as i32).to_be_bytes()).unwrap();
-            } else {
-                writeln!(w, "4 {} {} {} {}", indices[0], indices[1], indices[2], indices[3]).unwrap();
-            }
-        }
-        if binary { writeln!(w).unwrap(); }
+            self.panel_point_indices(stream_index, span_index).to_vec()
+        }).collect();
 
-        // ------------------------------------------------------------------ //
-        // Cell data                                                            //
-        // ------------------------------------------------------------------ //
-        writeln!(w, "CELL_DATA {}", nr_faces).unwrap();
-
-        // --- Panel strength (scalar) ---
-        writeln!(w, "SCALARS strength float 1").unwrap();
-        writeln!(w, "LOOKUP_TABLE default").unwrap();
-        for i in 0..nr_faces {
-            let s = self.strengths[i] as f32;
-            if binary {
-                w.write_all(&s.to_be_bytes()).unwrap();
-            } else {
-                writeln!(w, "{}", s).unwrap();
-            }
-        }
-        if binary { writeln!(w).unwrap(); }
-
-        // --- Viscous core length (scalar) ---
-        writeln!(w, "SCALARS viscous_core_length float 1").unwrap();
-        writeln!(w, "LOOKUP_TABLE default").unwrap();
-        for i in 0..nr_faces {
-            let v = self.panels_viscous_core_length[i] as f32;
-            if binary {
-                w.write_all(&v.to_be_bytes()).unwrap();
-            } else {
-                writeln!(w, "{}", v).unwrap();
-            }
-        }
-        if binary { writeln!(w).unwrap(); }
-
-        w
+        polygons_as_vtk(
+            "Stormbird dynamic wake",
+            &self.points,
+            &polygons,
+            &[
+                ("strength", self.strengths.clone()),
+                ("viscous_core_length", self.panels_viscous_core_length.clone()),
+            ],
+            binary
+        )
     }
 
     /// Exports the wake structure to a hashmap with the necessary fields for plotting the mesh 

@@ -2,6 +2,8 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Representation of variables with bounds, for use in optimization algorithms.
+
 use serde::{Deserialize, Serialize};
 
 use crate::type_aliases::Float;
@@ -10,7 +12,9 @@ use crate::type_aliases::Float;
 #[serde(deny_unknown_fields)]
 /// A structure used to represent a bounded variable to be used within optimization algorithms.
 pub struct BoundedVariable {
+    /// Lower bound. Can be negative infinity.
     pub min: Float,
+    /// Upper bound. Can be positive infinity.
     pub max: Float,
 }
 

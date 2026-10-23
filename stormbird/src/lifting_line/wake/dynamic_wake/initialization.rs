@@ -32,7 +32,7 @@ impl DynamicWake {
         for _ in 0..nr_initial_time_steps {
             self.update_wake_points_before_solving(
                 time_step,
-                &line_force_model,
+                line_force_model,
                 &wake_points_freestream
             );
         }
@@ -60,7 +60,9 @@ impl DynamicWake {
         let wake_length = relative_length_factor * average_chord_length;
 
         let time_step = 1.0;
-        let wake_building_velocity = (wake_length / nr_panels_per_line_element as Float) * average_chord_vector;
+        // The wake is built along the chord direction, with one panel length per time step
+        let wake_building_velocity = (wake_length / nr_panels_per_line_element as Float) *
+            average_chord_vector.normalize();
 
         self.initialize_with_velocity_and_time_step(
             line_force_model, 

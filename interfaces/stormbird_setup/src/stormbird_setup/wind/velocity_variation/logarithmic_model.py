@@ -171,7 +171,7 @@ class LogarithmicModel(StormbirdSetupBaseModel):
         velocity_neutral: float,
         velocity: float,
         reference_height: float = DEFAULT_REFERENCE_HEIGHT
-    ):
+    ) -> None:
         delta_velocity = velocity_neutral - velocity
         psi_target = self.von_karman_constant * delta_velocity / self.friction_velocity
         
@@ -182,7 +182,7 @@ class LogarithmicModel(StormbirdSetupBaseModel):
         self,
         height_values: list[float], 
         velocity_values: list[float]
-    ):
+    ) -> None:
         def true_wind_velocity_at_heights(heights: np.ndarray) -> np.ndarray:
             out = np.zeros(len(heights))
             

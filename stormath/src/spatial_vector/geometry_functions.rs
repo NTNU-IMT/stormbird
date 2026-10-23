@@ -3,11 +3,12 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Geometry functions based on spatial vectors, such as areas.
+
 use super::*;
 
 #[inline(always)]
-/// Function that calculates the induced velocity from a vortex panel, based on the corner points
-/// given as input. Source: <https://en.wikipedia.org/wiki/Brahmagupta%27s_formula>
+/// Calculates the area of a quadrilateral, based on the corner points given as input. Source: <https://en.wikipedia.org/wiki/Brahmagupta%27s_formula>
 pub fn area_of_quadrilateral(vertices: &[SpatialVector; 4]) -> Float {
     let a = (vertices[1] - vertices[0]).length();
     let b = (vertices[2] - vertices[1]).length();

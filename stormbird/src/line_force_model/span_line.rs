@@ -16,31 +16,40 @@ use stormath::{
 /// Struct that represents spatial coordinates in a coordinate system that is oriented along the 
 /// chord line, span line and thickness direction of a line segment.
 pub struct LineCoordinates {
+    /// Coordinate along the chord line
     pub chord: Float,
+    /// Coordinate in the thickness direction
     pub thickness: Float,
+    /// Coordinate along the span line
     pub span: Float,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// A line segment of a wing span
 pub struct SpanLine {
+    /// The start point of the line
     pub start_point: SpatialVector,
+    /// The end point of the line
     pub end_point: SpatialVector
 }
 
 impl SpanLine {
+    /// Returns the vector from the start point to the end point
     pub fn relative_vector(&self) -> SpatialVector {
         self.end_point - self.start_point
     }
 
+    /// Returns the length of the line
     pub fn length(&self) -> Float {
         self.relative_vector().length()
     }
 
+    /// Returns the unit vector pointing from the start point to the end point
     pub fn direction(&self) -> SpatialVector {
         self.relative_vector().normalize()
     }
 
+    /// Returns the start and end points as an array
     pub fn as_array(&self) -> [SpatialVector; 2] {
         [self.start_point, self.end_point]
     }
@@ -51,6 +60,7 @@ impl SpanLine {
         0.5 * (self.start_point + self.end_point)
     }
 
+    /// Returns the shortest distance from the line segment to a point
     pub fn distance(&self, point: SpatialVector) -> Float {
         let relative_vector = self.relative_vector();
         let start_to_point  = point - self.start_point;

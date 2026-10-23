@@ -2,7 +2,13 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
+//! Handling of the ends of the data in smoothing functions.
+
 use super::*;
+
+use std::str::FromStr;
+
+use crate::error::Error;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Enum used to decide how to modify input data used in smoothing functions. 
@@ -15,15 +21,24 @@ pub enum EndCondition<T: SmoothingOps> {
     Extended
 }
 
-impl<T: SmoothingOps> EndCondition<T> {
-    pub fn from_str(end_condition: &str) -> Self {
+impl<T: SmoothingOps> FromStr for EndCondition<T> {
+    type Err = Error;
+
+    /// Creates an end condition from its name. Only `Zero` and `Extended` are supported, as
+    /// `Given` also needs a value.
+    fn from_str(end_condition: &str) -> Result<Self, Self::Err> {
         match end_condition {
-            "Zero" => Self::Zero,
-            "Extended" => Self::Extended,
-            _ => panic!("Unknown smoothing end condition: {}", end_condition)
+            "Zero" => Ok(Self::Zero),
+            "Extended" => Ok(Self::Extended),
+            _ => Err(Error::InvalidInput(
+                format!("unknown smoothing end condition: {}", end_condition)
+            ))
         }
     }
+}
 
+impl<T: SmoothingOps> EndCondition<T> {
+    /// Returns the values to insert before the start of the data
     pub fn y_start_values(&self, y: &[T], number_of_end_insertions: usize) -> Vec<T> {
         let mut y_start: Vec<T> = Vec::with_capacity(number_of_end_insertions + 1);
 
@@ -48,6 +63,7 @@ impl<T: SmoothingOps> EndCondition<T> {
         y_start
     }
 
+    /// Returns the values to insert after the end of the data
     pub fn y_end_values(&self, y: &[T], number_of_end_insertions: usize) -> Vec<T> {
         let mut y_end: Vec<T> = Vec::with_capacity(number_of_end_insertions);
 
@@ -74,6 +90,8 @@ impl<T: SmoothingOps> EndCondition<T> {
         y_end
     }
 
+    /// Returns the x-values to insert before the start of the data, with a spacing equal to the
+    /// spacing of the first two points multiplied by `delta_x_factor`
     pub fn x_start_values(x: &[Float], number_of_end_insertions: usize, delta_x_factor: Float) -> Vec<Float> {
         let mut x_start: Vec<Float> = Vec::with_capacity(number_of_end_insertions);
 
@@ -86,6 +104,8 @@ impl<T: SmoothingOps> EndCondition<T> {
         x_start
     }
 
+    /// Returns the x-values to insert after the end of the data, with a spacing equal to the
+    /// spacing of the last two points multiplied by `delta_x_factor`
     pub fn x_end_values(x: &[Float], number_of_end_insertions: usize, delta_x_factor: Float) -> Vec<Float> {
         let mut x_end: Vec<Float> = Vec::with_capacity(number_of_end_insertions);
 
@@ -100,6 +120,7 @@ impl<T: SmoothingOps> EndCondition<T> {
         x_end
     }
 
+    /// Returns the x-data extended with inserted values at both ends
     pub fn add_end_values_to_x_data(
         x: &[Float], 
         number_of_end_insertions: usize, 
@@ -118,6 +139,8 @@ impl<T: SmoothingOps> EndCondition<T> {
         x_modified
     }
 
+    /// Returns the y-data extended with inserted values at both ends, based on the end conditions
+    /// for the start and the end
     pub fn add_end_values_to_y_data(
         y: &[T], 
         number_of_end_insertions: usize, 
@@ -170,5 +193,15 @@ mod tests {
 
         assert_eq!(y_modified, y_result);
         assert_eq!(x_modified, x_result);
+    }
+
+    #[test]
+    fn test_from_str() {
+        assert!(matches!("Zero".parse::<EndCondition<Float>>(), Ok(EndCondition::Zero)));
+        assert!(matches!("Extended".parse::<EndCondition<Float>>(), Ok(EndCondition::Extended)));
+        assert!("Unknown".parse::<EndCondition<Float>>().is_err());
+
+        assert!(matches!("Five".parse(), Ok(super::super::polynomial::WindowSize::Five)));
+        assert!("Four".parse::<super::super::polynomial::WindowSize>().is_err());
     }
 }

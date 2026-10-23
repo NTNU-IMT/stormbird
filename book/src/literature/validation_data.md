@@ -15,7 +15,7 @@ This chapter contains useful references for extracting data about the lift and d
 
 The flow around rotor sails is defined by very high lift coefficients and therefore strong tip vortices. They often come with end-plates to specifically reduce the tip losses, and thereby increase lift and reduce drag forces. CFD simulations done on rotor sails in the KSP WIND project indicate that the exact features of the *tip-geometry* can have large impact on the final results. For instance, the foundation geometry can have a large impact on the forces. These types of geometric details will not be part of a simplified line model of a rotor sail directly. As such, it is **generally necessary to tune the models to achieve the right combination of lift and drag**.
 
-Tuning the lift can generally be done by adjusting the values of the lift coefficients in the sectional model, as the 3D lift is generally very close to the 2D lift for a rotor sail. This is because the lift is not dependent on the angle of attack, in the same way as for a wing sail or suction sail.
+Tuning the lift can generally be done by adjusting the lift parameters in the sectional model, as the 3D lift is generally very close to the 2D lift for a rotor sail. This is because the lift is not dependent on the angle of attack, in the same way as for a wing sail or suction sail.
 
 The recommended practice when modeling rotor sails is to first adjust the model of a single sail by comparing it to some high-fidelity data source, and then use the Stormbird library when, for instance, interaction effects are of interest.
 
@@ -25,7 +25,7 @@ The recommended practice when modeling rotor sails is to first adjust the model 
 - **[Design, operation and analysis of wind-assisted cargo ships](https://doi.org/10.1016/j.oceaneng.2020.107603)** (2020), by F. Tillig and more. A paper about methods to set up empirical modeling of wind powered ships. One of the empirical methods presented is for the lift, drag and power consumption of rotor sails, tuned based on full-scale measurements.
 - **[Retrofitting of Flettner Rotors – Results From Sea Trials of the General Cargo Ship "Fehn Pollux](https://www.intmaritimeengineering.org/index.php/ijme/article/view/1146/356)** (2020), by M. Vahs. A paper that really is about how to analyze sea-trial data from a ship equipped with rotor sails. A part of the paper also contains wind tunnel measurements that originates from a bachelor thesis (original source not found), which gives lift and drag as a function of spin ratio.
 - **[Levelling the Playing Field: A Numerical Platform for the Fair Comparison of Wind Propulsion Systems](http://data.hiper-conf.info/Hiper2022_Cortona.pdf)** (2022), by F. C. Gerhardt and more. A paper mostly about the need to have independent analysis of wind propulsion devices. As part of explaining the rotor sail models, CFD results of lift and drag as a function of spin ratio are presented. This presentation also includes a comparison against other available data sources.
-- **[Calculation of Flettner rotor forces using lifting line and CFD methods](https://blueoasis.pt/wp-content/uploads/2023/10/Nutts2023_proceedings_v4.pdf)** (2023), by A. Östman and more. A paper that compares lifting line simulations against CFD simulations for rotor sails. As part of this, there is both two- and three-dimensional data for lift and drag. The two-dimensional data from this paper is used as the default values in the rotating cylinder sectional model in Stormbird.
+- **[Calculation of Flettner rotor forces using lifting line and CFD methods](https://blueoasis.pt/wp-content/uploads/2023/10/Nutts2023_proceedings_v4.pdf)** (2023), by A. Östman and more. A paper that compares lifting line simulations against CFD simulations for rotor sails. As part of this, there is both two- and three-dimensional data for lift and drag. The default parameters in the rotating cylinder sectional model in Stormbird are fitted to the two-dimensional data from this paper.
 - **Aerodynamics of the Flettner rotor at high Reynolds number** (2024), by F. Deybach and more. **Note**: not yet publicly available. Part of the RINA conference on wind propulsion in 2024. Contains experimental results, where a rotor sail is tested in a wind tunnel at different Reynolds numbers and spin ratios, as well as with different end plate configurations. Concludes that the lift is not very sensitive to the Reynolds number.
 
 ### Other data sources
@@ -40,15 +40,26 @@ The KSP WIND project (the project funding the development of Stormbird) has perf
 
 #### Three dimensional data
 
-<div id="rotor-sail-3d-forces"></div>
-<script src="plot_scripts/plot_rotor_sail_3d_data.js"></script>
+<figure>
+    <div id="rotor-sail-3d-forces"></div>
+    <script src="plot_scripts/plot_rotor_sail_3d_data.js"></script>
+    <figcaption>Figure 2: Lift and drag coefficients as a function of spin ratio for three-dimensional rotor sails. The data is from the experiments and CFD simulations listed under relevant papers above, together with the unpublished CFD simulations from the KSP WIND project, with and without the foundation. The data sources use different sail geometries and test conditions, so differences between them are not only due to the method used.</figcaption>
+</figure>
 
 #### Two-dimensional data
 
-<div id="rotor-sail-2d-forces"></div>
-<script src="plot_scripts/plot_rotor_sail_2d_data.js"></script>
+<figure>
+    <div id="rotor-sail-2d-forces"></div>
+    <script src="plot_scripts/plot_rotor_sail_2d_data.js"></script>
+    <figcaption>Figure 3: Two-dimensional lift and drag coefficients as a function of spin ratio for rotor sails, from the wind tunnel experiments by Bordogna et al. (2019) and the CFD simulations by Östman et al. (2023). Only the lift is shown for the experiments, as the measured drag is hard to interpret (see the note in the list of relevant papers).</figcaption>
+</figure>
 
 ## Suction sails
+
+For suction sails there are two aspects to the model that needs tuning. The first is to find good sectional model properties to represent how lift and drag depends on the angle of attack as a function of the fan system settings. This process is largely the same as when tuning a model for a wing sail. The only difference would be that the internal state of the section model changes from a flap angle to typically a non-dimensional suction rate (power coefficient can also be used, but this is a simplification). The second part of the model, which is new, is to find a good correlation between suction rate and power consumed. The last part is typically more challenging to get exact based on published data alone. Below is a list of papers that present some data on the properties of suction sail, although with most focus on the lift and drag, and not really the power consumption.
+
+[comment]: <add a link to a better explanation of how to set up a model for a suction sail>
+
 ### Relevant papers
 - **[Fondation Cousteau and windship propulsion - 1980 - 1985 - System Cousteau - Pechiney](https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf)** (1985), by B. Charrier and more. A paper about the original suction sail concept, known as turbo sails. Part of the presentation is lift and drag data from the sail for different suction rates based on wind tunnel measurements.
 - **[Wind Propulsion for Merchant Vessels](https://repository.tudelft.nl/record/uuid:a681c8e6-552e-45a1-8657-893123a8e06b)** (2017). A master thesis about how to model ships with wind propulsion, that also contains CFD simulations of suction sails, compared against experimental data from the original Turbosail.
@@ -58,10 +69,40 @@ The KSP WIND project (the project funding the development of Stormbird) has perf
 
 #### Three dimensional data
 
-<div id="suction-sail-3d-forces"></div>
-<script src="plot_scripts/plot_suction_sail_3d_data.js"></script>
+The figure below shows the lift and drag coefficients for a three-dimensional model of the Turbosail, measured in a wind tunnel for three different suction rates. The suction rate is given as a suction coefficient, \\( C\_Q \\), defined as:
+
+\\[
+C\_Q = \frac{Q}{A V}
+\\]
+
+where \\( Q \\) is the volume flow through the suction system, \\( A \\) is the wing area and \\( V \\) is the wind velocity. The lift is shown as a function of angle of attack, while the drag is shown as a function of the lift. In the original figure, the drag curves for \\( C\_Q = 0.05 \\) and \\( C\_Q = 0.036 \\) are drawn on top of each other for most of the lift range, and are therefore identical in the digitized data.
+
+<figure>
+    <div id="suction-sail-3d-forces"></div>
+    <script src="plot_scripts/plot_suction_sail_3d_data.js"></script>
+    <figcaption>Figure 4: Three-dimensional lift and drag coefficients for the Turbosail at different suction coefficients, C<sub>Q</sub>. The data is digitized from the wind tunnel experiments presented in <a href="https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf">Fondation Cousteau and windship propulsion - 1980 - 1985</a> (Charrier et al., 1985).</figcaption>
+</figure>
+
+The figure below shows the lift coefficient of the same three-dimensional sail as a function of the power coefficient, \\( C\_P \\), defined as:
+
+\\[
+C\_P = \frac{P}{0.5 \rho A V^3}
+\\]
+
+where \\( P \\) is the input power to the suction system and \\( \rho \\) is the air density. The article does not give details about how this data was obtained, for instance at which angle of attack it applies. It should therefore mainly be seen as an example of the power consumption of a suction sail, rather than as accurate data for model tuning.
+
+<figure>
+    <div id="suction-sail-power"></div>
+    <script src="plot_scripts/plot_suction_sail_power_data.js"></script>
+    <figcaption>Figure 5: Three-dimensional lift coefficient for the Turbosail as a function of the power coefficient, C<sub>P</sub>. The data is digitized from <a href="https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf">Fondation Cousteau and windship propulsion - 1980 - 1985</a> (Charrier et al., 1985).</figcaption>
+</figure>
 
 #### Two dimensional data
 
-<div id="suction-sail-2d-forces"></div>
-<script src="plot_scripts/plot_suction_sail_2d_data.js"></script>
+The figure below shows two-dimensional lift and drag coefficients for the Turbosail section, for a wider range of suction coefficients. As for the three-dimensional data, the lift is shown as a function of angle of attack and the drag as a function of the lift.
+
+<figure>
+    <div id="suction-sail-2d-forces"></div>
+    <script src="plot_scripts/plot_suction_sail_2d_data.js"></script>
+    <figcaption>Figure 6: Two-dimensional lift and drag coefficients for the Turbosail at different suction coefficients, C<sub>Q</sub>. The data is digitized from the wind tunnel experiments presented in <a href="https://www.jmwe.org/uploads/1/0/6/4/106473271/aa_suction_sails_turbosail_ventifoil_cousteau_report.pdf">Fondation Cousteau and windship propulsion - 1980 - 1985</a> (Charrier et al., 1985).</figcaption>
+</figure>

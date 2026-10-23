@@ -16,6 +16,7 @@ use stormath::type_aliases::Float;
 /// The main use case is to stabilize and correct simulations where the lift-induced velocities gets
 /// too high. The main use case for this is correcting rotor sail simulations.
 pub enum VelocityCorrections {
+    /// No correction
     #[default]
     NoCorrection,
     /// The induced velocity is capped using a ratio between the induced velocity and the freestream
@@ -25,6 +26,7 @@ pub enum VelocityCorrections {
 }
 
 impl VelocityCorrections {
+    /// Returns the corrected velocity, or `None` if no correction is applied
     pub fn corrected_velocity(
         &self,
         freestream_velocities: &[SpatialVector],
@@ -67,7 +69,7 @@ impl VelocityCorrections {
                 if induced_velocity_magnitude > max_induced_velocity_magnitude {
                     induced_velocity.normalize() * max_induced_velocity_magnitude
                 } else {
-                    induced_velocity.clone()
+                    *induced_velocity
                 }
             }
         ).collect();

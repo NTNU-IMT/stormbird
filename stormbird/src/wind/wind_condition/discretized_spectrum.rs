@@ -21,15 +21,18 @@ pub struct DiscretizedSpectrum {
 }
 
 impl DiscretizedSpectrum {
+    /// Creates a spectrum from a JSON string. Panics if the string can not be parsed.
     pub fn from_json_string(json_string: &str) -> Self {
         serde_json::from_str(json_string).unwrap()
     }
     
+    /// Creates a spectrum from a JSON file. Panics if the file can not be read or parsed.
     pub fn from_json_file(file_path: &str) -> Self {
         let json_string = std::fs::read_to_string(file_path).unwrap();
         serde_json::from_str(&json_string).unwrap()
     }
     
+    /// Returns the spectrum as a JSON string
     pub fn to_json_string(&self) -> String {
         serde_json::to_string(self).unwrap()
     }

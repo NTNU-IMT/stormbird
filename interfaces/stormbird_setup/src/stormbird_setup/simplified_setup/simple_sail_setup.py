@@ -33,7 +33,7 @@ class SailType(Enum):
             case _:
                 raise ValueError("Unsupported sail type:", self)
                 
-    def add_default_corrections(self, simulation_builder: SimulationBuilder):
+    def add_default_corrections(self, simulation_builder: SimulationBuilder) -> None:
         if self == SailType.RotorSail:
             simulation_builder.simulation_settings.solver.velocity_corrections = VelocityCorrections(
                 type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
@@ -49,7 +49,7 @@ class SailType(Enum):
             case SailType.RotorSail:
                 section_model = SectionModel.rotor_sail_deybach_2024()
             case SailType.SuctionSail:
-                section_model = SectionModel.default_suction_sail_turbosail()
+                section_model = SectionModel.suction_sail_turbosail_charrier_1985()
             case _:
                 raise ValueError("Unsupported sail type:", self.sail_type)
                 
@@ -103,15 +103,12 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                 input_power_model = InputPowerModel.new_polynomial_rotor_sail_model(
                     max_power = np.interp(self.chord_length, diameter_data, nominal_power_data),
                     max_rps = np.interp(self.chord_length, diameter_data, max_rps_data),
-                    area = self.chord_length * self.height
                 )
 
                 wing_builder.input_power_model = input_power_model
-            case SailType.SuctionSail:
-                input_power_model = InputPowerModel.new_from_internal_state_as_power_coefficient()
-                
-                wing_builder.input_power_model = input_power_model
             case _:
+                # The default input power model computes the power from the section model, which
+                # gives the right power for suction sails and zero power for wing sails.
                 pass
 
         return wing_builder
@@ -127,7 +124,6 @@ class SimpleSailSetup(StormbirdSetupBaseModel):
                 max_rps_data = np.array([255.0, 180.0]) / 60.0
                 
                 return ControllerSetPoints.new_default_rotor_sail(
-                    diameter = self.chord_length, 
                     max_rps = np.interp(self.chord_length, diameter_data, max_rps_data)
                 )
             case SailType.SuctionSail:

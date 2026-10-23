@@ -12,20 +12,32 @@ use stormath::type_aliases::Float;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+/// The coordinate system that forces, moments and other vector quantities are given in
 pub enum CoordinateSystem {
+    /// The global, or earth-fixed, coordinate system
     #[default]
     Global,
+    /// The body-fixed coordinate system, which follows the rigid body motion of the line force model
     Body,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Integrated values representing either forces or moments.
+///
+/// The gyroscopic effect is a pure moment, so the `gyroscopic` field is always zero for the
+/// integrated forces.
 pub struct IntegratedValues {
+    /// Value due to the circulatory forces
     pub circulatory: SpatialVector,
+    /// Value due to the viscous lift forces
     pub viscous_lift: SpatialVector,
+    /// Value due to the sectional drag forces
     pub sectional_drag: SpatialVector,
+    /// Value due to the added mass forces
     pub added_mass: SpatialVector,
+    /// Value due to the gyroscopic effect
     pub gyroscopic: SpatialVector,
+    /// Total value
     pub total: SpatialVector,
 }
 
@@ -39,6 +51,9 @@ pub struct SectionalForcesInput {
     pub velocity: Vec<SpatialVector>,
     /// The estimated angle of attack at each control point.
     pub angles_of_attack: Vec<Float>,
+    /// The internal state as it should be supplied to the sectional forces. I.e., with any 
+    /// conversion from the wing internal state applied.
+    pub section_models_internal_state: Vec<Float>,
     /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
     /// the perspective of the wings, **not** the acceleration of the wings themselves.
     pub acceleration: Vec<SpatialVector>,
@@ -58,14 +73,16 @@ pub struct SectionalForces {
     pub viscous_lift: Vec<SpatialVector>,
     /// Forces due to the two dimensional drag on a line element. 
     /// 
-    /// **Note**: this is often the viscous drag, but not always. In can also include three- 
+    /// **Note**: this is often the viscous drag, but not always. It can also include three- 
     /// dimensional effects on the drag, if the model is executed with a simplified approach, for 
     /// instance when neglecting the *self-induced* velocities.
     pub sectional_drag: Vec<SpatialVector>,
     /// Added mass forces on the line element.
     pub added_mass: Vec<SpatialVector>,
-    /// Forces due to gyroscopic effects on the line element.
-    pub gyroscopic: Vec<SpatialVector>,
+    /// Gyroscopic moment from the line element. This is a pure moment, and is therefore not
+    /// included in the total force, but is added directly to the integrated moments.
+    #[serde(default)]
+    pub gyroscopic_moment: Vec<SpatialVector>,
     /// Total forces
     pub total: Vec<SpatialVector>,
     /// The coordinate system of the forces data.
@@ -73,6 +90,8 @@ pub struct SectionalForces {
 }
 
 impl SectionalForces {
+    /// Computes the total force on each line element, as the sum of the circulatory, viscous lift,
+    /// sectional drag and added mass forces
     pub fn compute_total(&mut self) {
         self.total = self.circulatory.clone();
         
@@ -80,7 +99,6 @@ impl SectionalForces {
             self.total[i] += self.viscous_lift[i];
             self.total[i] += self.sectional_drag[i];
             self.total[i] += self.added_mass[i];
-            self.total[i] += self.gyroscopic[i];
         }
     }
 
@@ -104,6 +122,7 @@ impl SectionalForces {
         ).collect()
     }
 
+    /// Integrates the sectional forces over each wing. Virtual line elements are not included.
     pub fn integrate_forces(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
         let mut integrated_values: Vec<IntegratedValues> = Vec::new();
 
@@ -116,7 +135,6 @@ impl SectionalForces {
                     wing_result.viscous_lift += self.viscous_lift[i];
                     wing_result.sectional_drag += self.sectional_drag[i];
                     wing_result.added_mass += self.added_mass[i];
-                    wing_result.gyroscopic += self.gyroscopic[i];
                     wing_result.total += self.total[i];
                 }
             }
@@ -127,12 +145,14 @@ impl SectionalForces {
         integrated_values
     }
 
+    /// Integrates the moments from the sectional forces over each wing, including the gyroscopic
+    /// moments.
     pub fn integrate_moments(&self, line_force_model: &LineForceModel) -> Vec<IntegratedValues> {
         let sectional_circulatory_moments = Self::sectional_moments(line_force_model, &self.circulatory, self.coordinate_system);
         let sectional_viscous_lift_moments = Self::sectional_moments(line_force_model, &self.viscous_lift, self.coordinate_system);
         let sectional_drag_moments = Self::sectional_moments(line_force_model, &self.sectional_drag, self.coordinate_system);
         let sectional_added_mass_moments = Self::sectional_moments(line_force_model, &self.added_mass, self.coordinate_system);
-        let sectional_gyroscopic_moments = Self::sectional_moments(line_force_model, &self.gyroscopic, self.coordinate_system);
+
         let sectional_total_moments = Self::sectional_moments(line_force_model, &self.total, self.coordinate_system);
 
         let mut integrated_values: Vec<IntegratedValues> = Vec::new();
@@ -146,8 +166,12 @@ impl SectionalForces {
                     wing_result.viscous_lift += sectional_viscous_lift_moments[i];
                     wing_result.sectional_drag += sectional_drag_moments[i];
                     wing_result.added_mass += sectional_added_mass_moments[i];
-                    wing_result.gyroscopic += sectional_gyroscopic_moments[i];
                     wing_result.total += sectional_total_moments[i];
+
+                    if let Some(gyroscopic_moment) = self.gyroscopic_moment.get(i) {
+                        wing_result.gyroscopic += *gyroscopic_moment;
+                        wing_result.total += *gyroscopic_moment;
+                    }
                 }
             }
 

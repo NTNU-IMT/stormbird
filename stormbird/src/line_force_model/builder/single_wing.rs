@@ -14,42 +14,88 @@ use stormath::{
 use crate::section_models::SectionModel;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
+use crate::line_force_model::wing_internal_state::InternalCompartments;
+use crate::line_force_model::corrections::force::ForceCorrection;
+use crate::line_force_model::added_mass::AddedMass;
+use crate::line_force_model::gyroscopic_moment::GyroscopicMoment;
 
 #[derive(Debug, Clone)]
 /// Input struct to add a single wing to a line force model
 pub struct SingleWing {
+    /// The span lines of the wing, in the local coordinate system
     pub span_lines_local: Vec<SpanLine>,
+    /// The chord vectors at the control point of each span line, in the local coordinate system
     pub chord_vectors_local: Vec<SpatialVector>,
+    /// The chord length at the control point of each span line
     pub chord_lengths: Vec<Float>,
+    /// Whether each span line is virtual, i.e., only part of the simulation and not of the wing
     pub line_segment_is_virtual: Vec<bool>,
+    /// The section model of the wing
     pub section_model: SectionModel,
+    /// Whether the circulation can be different from zero at the start and the end of the wing
     pub non_zero_circulation_at_ends: [bool; 2],
+    /// Model for the input power to the wing
     pub input_power_model: InputPowerModel,
+    /// The internal compartments of the wing
+    pub internal_compartments: InternalCompartments,
+    /// Empirical corrections of the forces on the wing
+    pub force_correction: ForceCorrection,
+    /// Model for the added mass forces on the wing
+    pub added_mass: AddedMass,
+    /// Model for the gyroscopic moment from the wing
+    pub gyroscopic_moment: GyroscopicMoment,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// A wing is specified by giving a set of points along the span were the chord length and 
-/// section model is set. Between these points the chord length and section model is linearly 
-/// interpolated 
+/// A wing is specified by giving a set of points along the span where the chord vector is set.
+/// Between these points the chord vector is linearly interpolated. The section model is the same
+/// along the whole wing.
 pub struct WingBuilder {
+    /// Points along the span where the chord vectors are given
     pub section_points: Vec<SpatialVector>,
+    /// The chord vector at each section point
     pub chord_vectors: Vec<SpatialVector>,
+    /// The section model of the wing
     pub section_model: SectionModel,
+    /// Optional specification of which span lines are virtual. None of the span lines are virtual
+    /// by default.
     #[serde(default)]
     pub line_segment_is_virtual: Option<Vec<bool>>,
+    /// Whether the circulation can be different from zero at the start and the end of the wing.
+    /// The default is zero circulation at both ends.
     #[serde(default="WingBuilder::default_non_zero_circulation_at_ends")]
     pub non_zero_circulation_at_ends: [bool; 2],
+    /// Optional number of sections for this wing, which overrides the number in the line force
+    /// model builder
     #[serde(default)]
     pub nr_sections: Option<usize>,
+    /// Model for the input power to the wing
     #[serde(default)]
     pub input_power_model: InputPowerModel,
+    #[serde(default)]
+    /// Optional division of the internal volume of the wing into sealed compartments, given as the
+    /// non-dimensional span locations of the boundaries between them, including the ends of the
+    /// wing at -0.5 and 0.5. Only used by section models with an internal flow model, such as
+    /// suction sails with several fans. The default is a single compartment.
+    pub internal_compartment_boundaries: Option<Vec<Float>>,
+    #[serde(default)]
+    /// Optional empirical corrections of the forces on the wing. Not used by default.
+    pub force_correction: ForceCorrection,
+    #[serde(default)]
+    /// Optional model for the added mass forces on the wing. Not used by default.
+    pub added_mass: AddedMass,
+    #[serde(default)]
+    /// Optional model for the gyroscopic moment from the wing. Only allowed together with the
+    /// rotating cylinder section model. Not used by default.
+    pub gyroscopic_moment: GyroscopicMoment,
 }
 
 impl WingBuilder {
+    /// Default value for `non_zero_circulation_at_ends`, which is zero circulation at both ends
     pub fn default_non_zero_circulation_at_ends() -> [bool; 2] {[false, false]}
 
-    /// Returns a vector that contain the distance from along the span to each section point.
+    /// Returns a vector that contains the distance along the span to each section point.
     pub fn specified_sections_span_distance(&self) -> Vec<Float> {
         let mut span_distance: Vec<Float> = Vec::new();
 
@@ -67,6 +113,49 @@ impl WingBuilder {
         }
 
         span_distance
+    }
+
+    /// Returns the internal compartments of the wing.
+    ///
+    /// # Panics
+    /// If the boundaries are not valid, or if more than one compartment is specified for a section
+    /// model that does not use internal compartments.
+    pub fn internal_compartments(&self) -> InternalCompartments {
+        let Some(boundaries) = &self.internal_compartment_boundaries else {
+            return InternalCompartments::default();
+        };
+
+        let compartments = InternalCompartments::new(boundaries.clone()).unwrap_or_else(|error| {
+            panic!("Invalid internal compartments for a wing: {}", error)
+        });
+
+        if compartments.nr_compartments() > 1 && !self.section_model.uses_internal_compartments() {
+            panic!(
+                "Internal compartments are only used by section models with an internal flow \
+                model, i.e., an active air flow foil with the PowerToInternalFlow or \
+                FanSpeedToInternalFlow conversion"
+            );
+        }
+
+        compartments
+    }
+
+    /// Returns the gyroscopic moment model of the wing.
+    ///
+    /// # Panics
+    /// If the model is active for a section model that is not a rotating cylinder, as the internal
+    /// state is then not the rotational speed of the wing.
+    pub fn gyroscopic_moment(&self) -> GyroscopicMoment {
+        if self.gyroscopic_moment.is_active() &&
+            !matches!(self.section_model, SectionModel::RotatingCylinder(_))
+        {
+            panic!(
+                "The gyroscopic moment model is only used together with the rotating cylinder \
+                section model"
+            );
+        }
+
+        self.gyroscopic_moment.clone()
     }
 
     /// Builds the data for a single wing
@@ -146,6 +235,10 @@ impl WingBuilder {
             section_model,
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
             input_power_model: self.input_power_model.clone(),
+            internal_compartments: self.internal_compartments(),
+            force_correction: self.force_correction.clone(),
+            added_mass: self.added_mass.clone(),
+            gyroscopic_moment: self.gyroscopic_moment(),
         }
     }
 }
@@ -159,14 +252,14 @@ mod tests {
     #[test]
     fn test_wing_builder() {
         let chord_length = 5.0;
-        let chord_vector = SpatialVector([chord_length, 0.0, 0.0]);
+        let chord_vector = SpatialVector::from([chord_length, 0.0, 0.0]);
         
         let wing_builder = WingBuilder{
             section_points: vec![
-                SpatialVector([0.0, 0.0, -1.0]),
-                SpatialVector([0.0, 0.0, 0.0]),
-                SpatialVector([0.0, 0.0, 10.0]),
-                SpatialVector([0.0, 0.0, 11.0])
+                SpatialVector::from([0.0, 0.0, -1.0]),
+                SpatialVector::from([0.0, 0.0, 0.0]),
+                SpatialVector::from([0.0, 0.0, 10.0]),
+                SpatialVector::from([0.0, 0.0, 11.0])
             ],
             chord_vectors: vec![
                 chord_vector,
@@ -180,11 +273,27 @@ mod tests {
             ),
             non_zero_circulation_at_ends: [false, false],
             nr_sections: None,
-            input_power_model: InputPowerModel::NoPower
+            ..Default::default()
         };
 
         let single_wing = wing_builder.build(12);
 
         dbg!(single_wing);
+    }
+
+    #[test]
+    fn wing_level_force_models_from_json() {
+        let wing_builder: WingBuilder = serde_json::from_str(r#"{
+            "section_points": [{"x": 0.0, "y": 0.0, "z": 0.0}, {"x": 0.0, "y": 0.0, "z": 1.0}],
+            "chord_vectors": [{"x": 1.0, "y": 0.0, "z": 0.0}, {"x": 1.0, "y": 0.0, "z": 0.0}],
+            "section_model": {"RotatingCylinder": {}},
+            "force_correction": {"lift_induced_drag_correction": 0.01},
+            "added_mass": {"normal_coefficient": 1.0, "chordwise_coefficient": 1.0},
+            "gyroscopic_moment": {"moment_of_inertia": 100.0}
+        }"#).unwrap();
+
+        assert_eq!(wing_builder.force_correction.lift_induced_drag_correction, 0.01);
+        assert_eq!(wing_builder.added_mass.chordwise_coefficient, 1.0);
+        assert_eq!(wing_builder.gyroscopic_moment.moment_of_inertia, 100.0);
     }
 }

@@ -38,4 +38,4 @@ The text in this book will not cover everything! It may also, at times, be outda
 
 - The Stormbird GitHub page can be found [here](https://github.com/NTNU-IMT/stormbird). It contains the core library, utility functionality, interfaces and examples.
 - More specifically, examples of how to use the Python interface of the code can be found [here](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/pystormbird/examples).
-- Automated code documentation can be found [here](https://docs.rs/stormbird/0.9.0/stormbird/) for the core Stormbird library and [here](https://docs.rs/stormath/0.3.0/stormath/) for the Stormath library, which contains mathematical utility functionality written for Stormbird.
+- Automated code documentation can be found [here](https://docs.rs/stormbird/latest/stormbird/) for the core Stormbird library and [here](https://docs.rs/stormath/latest/stormath/) for the Stormath library, which contains mathematical utility functionality written for Stormbird.

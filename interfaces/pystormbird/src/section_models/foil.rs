@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 use pythonize::pythonize;
 
 use stormbird::section_models::foil::Foil as FoilRust;
@@ -19,10 +20,12 @@ pub struct Foil {
 #[pymethods]
 impl Foil {
     #[new]
-    pub fn new(input_string: String) -> Self {
-        Self {
-            data: FoilRust::new_from_string(&input_string).unwrap()
-        }
+    pub fn new(input_string: String) -> PyResult<Self> {
+        let data = FoilRust::new_from_string(&input_string).map_err(|e| {
+            PyValueError::new_err(format!("Failed to parse foil from string: {}", e))
+        })?;
+
+        Ok(Self { data })
     }
 
     pub fn lift_coefficient(&self, angle_of_attack: f64) -> f64 {
@@ -35,7 +38,7 @@ impl Foil {
 
     pub fn as_section_model(&self) -> SectionModel {
         SectionModel {
-            data: SectionModelRust::Foil(self.data.clone())
+            data: SectionModelRust::SingleElementFoil(self.data.clone())
         }
     }
 
@@ -60,33 +63,53 @@ impl Foil {
     }
 
     #[getter]
-    pub fn get_cl_high_order_factor_positive(&self) -> f64 {
-        self.data.cl_high_order_factor_positive
+    pub fn get_cl_slope_reduction_factor_positive(&self) -> f64 {
+        self.data.cl_slope_reduction_factor_positive
     }
 
     #[setter]
-    pub fn set_cl_high_order_factor_positive(&mut self, value: f64) {
-        self.data.cl_high_order_factor_positive= value;
-    }
-    
-    #[getter]
-    pub fn get_cl_high_order_factor_negative(&self) -> f64 {
-        self.data.cl_high_order_factor_negative
-    }
-
-    #[setter]
-    pub fn set_cl_high_order_factor_negative(&mut self, value: f64) {
-        self.data.cl_high_order_factor_negative = value;
+    pub fn set_cl_slope_reduction_factor_positive(&mut self, value: f64) {
+        self.data.cl_slope_reduction_factor_positive = value;
     }
 
     #[getter]
-    pub fn get_cl_high_order_power(&self) -> f64 {
-        self.data.cl_high_order_power
+    pub fn get_cl_slope_reduction_factor_negative(&self) -> f64 {
+        self.data.cl_slope_reduction_factor_negative
     }
 
     #[setter]
-    pub fn set_cl_high_order_power(&mut self, value: f64) {
-        self.data.cl_high_order_power = value;
+    pub fn set_cl_slope_reduction_factor_negative(&mut self, value: f64) {
+        self.data.cl_slope_reduction_factor_negative = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_reduction_onset_angle_positive(&self) -> f64 {
+        self.data.cl_slope_reduction_onset_angle_positive
+    }
+
+    #[setter]
+    pub fn set_cl_slope_reduction_onset_angle_positive(&mut self, value: f64) {
+        self.data.cl_slope_reduction_onset_angle_positive = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_reduction_onset_angle_negative(&self) -> f64 {
+        self.data.cl_slope_reduction_onset_angle_negative
+    }
+
+    #[setter]
+    pub fn set_cl_slope_reduction_onset_angle_negative(&mut self, value: f64) {
+        self.data.cl_slope_reduction_onset_angle_negative = value;
+    }
+
+    #[getter]
+    pub fn get_cl_slope_reduction_range(&self) -> f64 {
+        self.data.cl_slope_reduction_range
+    }
+
+    #[setter]
+    pub fn set_cl_slope_reduction_range(&mut self, value: f64) {
+        self.data.cl_slope_reduction_range = value;
     }
 
     #[getter]
@@ -107,16 +130,6 @@ impl Foil {
     #[setter]
     pub fn set_cd_min(&mut self, value: f64) {
         self.data.cd_min = value;
-    }
-
-    #[getter]
-    pub fn get_angle_cd_min(&self) -> f64 {
-        self.data.angle_cd_min
-    }
-
-    #[setter]
-    pub fn set_angle_cd_min(&mut self, value: f64) {
-        self.data.angle_cd_min = value;
     }
 
     #[getter]
@@ -149,6 +162,7 @@ impl Foil {
         self.data.cd_power_after_stall = value;
     }
 
+
     #[getter]
     pub fn get_mean_positive_stall_angle(&self) -> f64 {
         self.data.mean_positive_stall_angle
@@ -178,6 +192,8 @@ impl Foil {
     pub fn set_stall_range(&mut self, value: f64) {
         self.data.stall_range = value;
     }
+
+
 
     pub fn __str__(&self) -> String {
         self.data.to_string()

@@ -20,10 +20,15 @@ use serde::{Serialize, Deserialize};
 ///
 /// Reference: <https://en.wikipedia.org/wiki/Rigid_body_dynamics>
 pub struct RigidBodyMotion {
+    /// Translation of the body
     pub translation: SpatialVector,
+    /// Rotation of the body, as angles around the x, y and z axes
     pub rotation: SpatialVector,
+    /// Linear velocity of the body
     pub velocity_linear: SpatialVector,
+    /// Angular velocity of the body
     pub velocity_angular: SpatialVector,
+    /// How the rotation angles are applied
     pub rotation_type: RotationType,
 }
 
@@ -59,30 +64,33 @@ impl RigidBodyMotion {
         self.velocity_linear + self.rotation_velocity_at_point(point)
     }
 
+    /// Computes the velocity at several points due to the motion of the rigid body.
     pub fn velocities_at_points(&self, points: &[SpatialVector]) -> Vec<SpatialVector> {
         points.iter()
             .map(|point| self.velocity_at_point(*point))
             .collect()
     }
 
+    /// Sets a new translation, and updates the linear velocity with a first order finite difference
     pub fn update_translation_with_velocity_using_finite_difference(
         &mut self,
         translation: SpatialVector,
         time_step: Float
     ) {
-        let old_translation = self.translation.clone();
+        let old_translation = self.translation;
 
         self.translation = translation;
 
         self.velocity_linear = (self.translation - old_translation) / time_step;
     }
 
+    /// Sets a new rotation, and updates the angular velocity with a first order finite difference
     pub fn update_rotation_with_velocity_using_finite_difference(
         &mut self,
         rotation: SpatialVector,
         time_step: Float
     ) {
-        let old_rotation = self.rotation.clone();
+        let old_rotation = self.rotation;
 
         self.rotation = rotation;
 
@@ -93,9 +101,9 @@ impl RigidBodyMotion {
         // one time step. This seems like a reasonable assumption, but it is not guaranteed.
         for i in 0..3 {
             if rotation_difference[i] > PI {
-                rotation_difference[i] = rotation_difference[i] + TAU;
+                rotation_difference[i] -= TAU;
             } else if rotation_difference[i] < -PI {
-                rotation_difference[i] = rotation_difference[i] + TAU;
+                rotation_difference[i] += TAU;
             }
         }
 
@@ -116,7 +124,7 @@ mod tests {
     /// the rigid body motion struct. It is assumed that any logic mistakes can be detected if the
     /// difference against the finite difference method is large.
     fn compare_motion_against_finite_difference() {
-        let rotation_amplitude = Float::from(45.0).to_radians();
+        let rotation_amplitude = Float::to_radians(45.0);
         let translation_amplitude = 2.1;
 
         let period = 0.5;
@@ -175,4 +183,36 @@ mod tests {
 
         }
      }
+
+    #[test]
+    /// Test that the angular velocity is correct when the rotation angle passes +/- PI, in both
+    /// directions.
+    fn rotation_velocity_across_quadrant_switch() {
+        let time_step = 0.1;
+        let angle_change = 0.2;
+        let allowable_error = 1e-4;
+
+        let start_angles = [PI - 0.5 * angle_change, -PI + 0.5 * angle_change];
+        let end_angles = [-PI + 0.5 * angle_change, PI - 0.5 * angle_change];
+        let expected_velocities = [angle_change / time_step, -angle_change / time_step];
+
+        for i in 0..2 {
+            let mut motion = RigidBodyMotion {
+                rotation: SpatialVector::from([0.0, 0.0, start_angles[i]]),
+                ..Default::default()
+            };
+
+            motion.update_rotation_with_velocity_using_finite_difference(
+                SpatialVector::from([0.0, 0.0, end_angles[i]]),
+                time_step
+            );
+
+            let velocity = motion.velocity_angular[2];
+
+            assert!(
+                (velocity - expected_velocities[i]).abs() < allowable_error,
+                "velocity: {}, expected: {}", velocity, expected_velocities[i]
+            );
+        }
+    }
 }

@@ -70,7 +70,7 @@ class ViscousCoreLength(StormbirdSetupBaseModel):
         return data
 
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         match self.value_type:
             case ViscousCoreLengthType.Relative:
                 return {
@@ -103,7 +103,7 @@ class ViscousCoreLengthEvolution(StormbirdSetupBaseModel):
     value: SinIncreasedViscousCoreLength | None = None
     
     @classmethod
-    def new_sin_increase(cls, *, last_panel_value_absolute: float, evolution_length_factor: float):
+    def new_sin_increase(cls, *, last_panel_value_absolute: float, evolution_length_factor: float) -> "ViscousCoreLengthEvolution":
         return cls(
             value_type = ViscousCoreLengthEvolutionType.SinIncrease,
             value = SinIncreasedViscousCoreLength(
@@ -113,7 +113,7 @@ class ViscousCoreLengthEvolution(StormbirdSetupBaseModel):
         )
     
     @model_serializer
-    def ser_model(self):
+    def ser_model(self) -> dict[str, Any] | str:
         match self.value_type:
             case ViscousCoreLengthEvolutionType.SinIncrease:
                 return {
@@ -136,13 +136,13 @@ class DynamicWakeBuilder(StormbirdSetupBaseModel):
     symmetry_condition: SymmetryCondition = SymmetryCondition.NoSymmetry
     first_panel_relative_length: float = 0.75
     last_panel_relative_length: float = 1.0
-    first_wake_points_direction: FirstWakePointsDirection = FirstWakePointsDirection.Chord
+    first_wake_points_direction: FirstWakePointsDirection = FirstWakePointsDirection.Freestream
     ratio_of_wake_affected_by_induced_velocities: float = 0.0
+    far_field_ratio: float = 5.0
     shape_damping_factor: float = 0.0
     neglect_self_induced_velocities: bool = False
     steady_state_strength_update: bool = False
-    write_wake_data_to_file: bool = False
-    wake_files_folder_path: str = ""
+    initial_relative_wake_length: float = 50.0
     
     @classmethod
     def new_default(

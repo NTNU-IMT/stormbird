@@ -3,6 +3,7 @@ Simulation setup to testing the impact of dynamic wake shapes
 '''
 
 from dataclasses import dataclass
+
 import numpy as np
 
 from pystormbird import SimulationResult
@@ -21,6 +22,8 @@ from stormbird_setup.lifting_line import (
     ViscousCoreLengthEvolution
 )
 
+from wake_visualization import LiveWakeVisualization
+
 @dataclass
 class SimulationCase:
     angle_of_attack_deg: float
@@ -34,7 +37,7 @@ class SimulationCase:
     density = 1.225
     dynamic: bool = False
     dynamic_shape: bool = False
-    export_wake: bool = False
+    visualize_wake: bool = False
     nr_panels_per_line_element: int = 50
 
     @property
@@ -102,10 +105,6 @@ class SimulationCase:
                     evolution_length_factor = 0.5
                 )
 
-            if self.export_wake:
-                wake.wake_files_folder_path = "wake_output"
-                wake.write_wake_data_to_file = True
-
             solver = Iterative(
                 max_iterations_per_time_step = 10,
                 damping_factor=0.1
@@ -159,6 +158,11 @@ class SimulationCase:
         simulation.set_local_wing_angles(wing_angles.tolist())
         simulation.set_rotation_only([0.0, 0.0, -self.wind_angle])
 
+        # The wake is shown in a window that is updated after each time step
+        wake_visualization = LiveWakeVisualization(
+            title = f"Wake: dynamic = {self.dynamic}, dynamic shape = {self.dynamic_shape}"
+        ) if self.visualize_wake else None
+
         result = []
         for i in range(nr_time_steps):
             result.append(
@@ -168,5 +172,11 @@ class SimulationCase:
                     freestream_velocity = freestream_velocity_list
                 )
             )
+
+            if wake_visualization is not None:
+                wake_visualization.update(simulation)
+
+        if wake_visualization is not None:
+            wake_visualization.close()
 
         return result

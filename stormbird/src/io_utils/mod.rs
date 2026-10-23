@@ -8,9 +8,12 @@ use std::fs;
 
 use std::io::Write;
 
+/// Writing of data to CSV files
 pub mod csv_data;
+/// Management of folders
 pub mod folder_management;
 
+/// Writes the text to a file. The file is created if it does not exist, and overwritten if it does.
 pub fn write_text_to_file(file_path: &str, text: &str) -> std::io::Result<()> {
     let mut file = fs::OpenOptions::new()
         .write(true)

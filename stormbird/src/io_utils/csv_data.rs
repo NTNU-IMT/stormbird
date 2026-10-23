@@ -8,6 +8,7 @@ use std::io::Write;
 
 use crate::error::Error;
 
+/// Writes the header and the data to a new file, or appends the data to an existing file
 pub fn create_or_append_header_and_data_strings_file(
     file_path_str: &str,
     header: &str,

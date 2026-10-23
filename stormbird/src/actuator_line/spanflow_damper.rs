@@ -8,14 +8,18 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+/// Model for a force that damps the flow along the span of the line elements
 pub struct SpanflowDamper {
+    /// Coefficient for the force that is linear in the spanwise velocity
     #[serde(default)]
     pub linear_coefficient: Float,
+    /// Coefficient for the force that is quadratic in the spanwise velocity
     #[serde(default)]
     pub squared_coefficient: Float,
 }
 
 impl SpanflowDamper {
+    /// Returns the damping force on a line element, based on the spanwise component of the velocity
     pub fn get_sectional_force(
         &self, 
         chord_length: Float,
@@ -29,8 +33,8 @@ impl SpanflowDamper {
 
         let coefficients = self.linear_coefficient + self.squared_coefficient * spanwise_flow.length();
 
-        let force = common * coefficients * spanwise_flow;
+        
 
-        force
+        common * coefficients * spanwise_flow
     }
 }

@@ -2,10 +2,12 @@
 // Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-/// The complete sail model combines a lifting line simulation with other functionality necessary 
-/// for modeling a sail as a *complete unit*. 
+//! The complete sail model combines a lifting line simulation with other functionality necessary
+//! for modeling a sail as a *complete unit*.
 
+/// Builder for the complete sail model
 pub mod builder;
+/// Settings for the complete sail model
 pub mod settings;
 
 use crate::lifting_line::simulation::Simulation as LiftingLineSimulation;
@@ -35,6 +37,7 @@ use stormath::{
     array_generation,
 };
 use crate::error::Error;
+use crate::line_force_model::wing_internal_state::WingInternalState;
 
 #[derive(Debug, Clone)]
 /// Collection of the necessary functionality to simulate a *complete sail system* using the lifting
@@ -42,9 +45,13 @@ use crate::error::Error;
 /// environment and a control system that adjust the control parameters of the sails based on the
 /// wind conditions.
 pub struct CompleteSailModel {
+    /// The lifting line simulation of the sails
     pub lifting_line_simulation: LiftingLineSimulation,
+    /// The model of the wind environment
     pub wind_environment: WindEnvironment,
+    /// The control system for the sails
     pub controller: Controller,
+    /// Settings that are specific to the complete sail model
     pub settings: CompleteSailModelSettings
 }
 
@@ -122,17 +129,17 @@ impl CompleteSailModel {
     /// 
     /// # Arguments
     /// - `wind_condition`: structure containing variables defining the wind condition.
-    /// - `ship velocity`: The velocity of the ship in m/s
+    /// - `ship_velocity`: The velocity of the ship in m/s
     /// - `controller_loading`: the loading of the controller, meaning how close to the max angle of 
-    /// attack/max spin ratio/max flap angle/max suction rate the sail should be operated at. 1.0 
-    /// means max values, while 0.0 means sails in neutral position 
+    ///   attack/max spin ratio/max flap angle/max suction rate the sail should be operated at. 1.0 
+    ///   means max values, while 0.0 means sails in neutral position 
     pub fn simulate_steady_state_condition(
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
-        let loading_used = controller_loading.min(1.0).max(0.0);
+        let loading_used = controller_loading.clamp(0.0, 1.0);
 
         // Apply initial controller settings based on the wind conditions alone, but which then 
         // neglects the lift-induced velocity.
@@ -192,6 +199,7 @@ impl CompleteSailModel {
         result    
     }
     
+    /// Same as `simulate_steady_state_condition`, but returns the simplified results for each sail
     pub fn simulate_steady_state_condition_simple_output(
         &mut self,
         wind_condition: &WindCondition,
@@ -207,6 +215,8 @@ impl CompleteSailModel {
         full_results.as_simplified()
     }
 
+    /// Same as `simulate_optimal_steady_state_condition`, but returns the simplified results for each
+    /// sail
     pub fn simulate_optimal_steady_state_condition_simple_output(
         &mut self,
         wind_condition: &WindCondition,
@@ -274,6 +284,8 @@ impl CompleteSailModel {
         )
     }
     
+    /// Updates the controller, based on the freestream velocity from the given wind condition and
+    /// ship velocity
     pub fn apply_controller_based_on_wind_condition(
         &mut self,
         current_time: Float,
@@ -296,6 +308,8 @@ impl CompleteSailModel {
         );
     }
     
+    /// Returns the apparent wind velocity at the freestream velocity points, from the given wind
+    /// condition and ship velocity
     pub fn freestream_velocity(
         &self,
         wind_condition: &WindCondition,
@@ -311,11 +325,11 @@ impl CompleteSailModel {
         
         let mut freestream_velocity = Vec::with_capacity(nr_points);
         
-        for i in 0..nr_points {
+        for &point in freestream_velocity_points.iter().take(nr_points) {
             freestream_velocity.push(
                 self.wind_environment.unsteady_apparent_wind_velocity_vector_at_location(
-                    wind_condition, 
-                    freestream_velocity_points[i], 
+                    wind_condition,
+                    point,
                     linear_velocity, 
                     time
                 )
@@ -341,6 +355,7 @@ impl CompleteSailModel {
         freestream_velocity
     }
 
+    /// Updates the controller, based on the given freestream velocity
     pub fn apply_controller_based_on_freestream(
         &mut self,
         current_time: Float,
@@ -352,7 +367,7 @@ impl CompleteSailModel {
         
         let ctrl_points_velocity = &freestream_velocity[0..nr_ctrl_points];
         
-        let controller_input = ControllerInput::new_from_velocity(
+        let controller_inputs = ControllerInput::new_from_velocity(
             loading,
             &self.lifting_line_simulation.line_force_model,
             ctrl_points_velocity,
@@ -363,7 +378,8 @@ impl CompleteSailModel {
         let controller_output = self.controller.update(
             current_time,
             time_step,
-            &controller_input
+            &controller_inputs,
+            &self.lifting_line_simulation.line_force_model
         );
 
         if let Some(output) = &controller_output {
@@ -373,6 +389,7 @@ impl CompleteSailModel {
         }
     }
 
+    /// Updates the controller, based on the result of a simulation
     pub fn apply_controller_based_on_simulation_result(
         &mut self,
         current_time: Float,
@@ -381,7 +398,7 @@ impl CompleteSailModel {
         simulation_result: &SimulationResult
     ) {
         
-        let controller_input = ControllerInput::new_from_simulation_result(
+        let controller_inputs = ControllerInput::new_from_simulation_result(
             loading,
             &self.lifting_line_simulation.line_force_model,
             simulation_result,
@@ -393,7 +410,8 @@ impl CompleteSailModel {
         let controller_output = self.controller.update(
             current_time,
             time_step,
-            &controller_input
+            &controller_inputs,
+            &self.lifting_line_simulation.line_force_model
         );
 
         if let Some(output) = &controller_output {
@@ -403,15 +421,27 @@ impl CompleteSailModel {
         }
     }
     
+    /// Sets the local wing angles of the sails
     pub fn set_local_wing_angles(&mut self, local_wing_angles: &[Float]) {
         self.lifting_line_simulation
             .line_force_model
             .set_local_wing_angles(local_wing_angles);
     }
     
-    pub fn set_section_models_internal_state(&mut self, internal_state: &[Float]) {
+    /// Sets a constant internal state for each sail
+    pub fn set_internal_state(&mut self, internal_state: &[Float]) {
         self.lifting_line_simulation
             .line_force_model
-            .set_section_models_internal_state(internal_state);
+            .set_internal_state(internal_state);
+    }
+
+    /// Sets the internal state of a single wing, which can be constant or vary along the span.
+    ///
+    /// **Note**: if the controller is active, it sets a constant internal state for all wings when
+    /// it updates, which overwrites the internal state set here.
+    pub fn set_wing_internal_state(&mut self, wing_index: usize, internal_state: WingInternalState) {
+        self.lifting_line_simulation
+            .line_force_model
+            .set_wing_internal_state(wing_index, internal_state);
     }
 }

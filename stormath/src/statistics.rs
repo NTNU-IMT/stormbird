@@ -16,8 +16,8 @@ where T:
 {
     let mut sum: T = x[0];
 
-    for i in 1..x.len() {
-        sum = sum + x[i];
+    for &value in &x[1..] {
+        sum = sum + value;
     }
 
     sum / (x.len() as Float)
@@ -43,9 +43,9 @@ where T:
 pub fn max(x: &[Float]) -> Float {
     let mut max = x[0];
 
-    for i in 1..x.len() {
-        if x[i] > max {
-            max = x[i];
+    for &value in &x[1..] {
+        if value > max {
+            max = value;
         }
     }
 
@@ -56,9 +56,9 @@ pub fn max(x: &[Float]) -> Float {
 pub fn min(x: &[Float]) -> Float {
     let mut min = x[0];
 
-    for i in 1..x.len() {
-        if x[i] < min {
-            min = x[i];
+    for &value in &x[1..] {
+        if value < min {
+            min = value;
         }
     }
 

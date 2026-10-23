@@ -28,8 +28,8 @@ pub use lifting_line::complete_sail_model::{
     complete_sail_model_apply_controller_based_on_simulation_result,
     complete_sail_model_local_wing_angles,
     complete_sail_model_set_local_wing_angles,
-    complete_sail_model_section_models_internal_state,
-    complete_sail_model_set_section_models_internal_state,
+    complete_sail_model_internal_state,
+    complete_sail_model_set_internal_state,
 };
 
 pub use lifting_line::simulation::{
@@ -50,8 +50,8 @@ pub use lifting_line::simulation::{
     lifting_line_simulation_set_velocity_angular,
     lifting_line_simulation_local_wing_angles,
     lifting_line_simulation_set_local_wing_angles,
-    lifting_line_simulation_section_models_internal_state,
-    lifting_line_simulation_set_section_models_internal_state,
+    lifting_line_simulation_internal_state,
+    lifting_line_simulation_set_internal_state,
     lifting_line_simulation_reset_previous_circulation_strength,
     lifting_line_simulation_do_step,
     lifting_line_simulation_induced_velocities,

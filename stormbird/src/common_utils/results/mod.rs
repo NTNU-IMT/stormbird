@@ -5,6 +5,9 @@
 //! Results from simulations.
 
 
+/// Results from the lifting line solvers
 pub mod solver;
+/// Results from simulations
 pub mod simulation;
+/// Simplified results, with only the most important values for each sail
 pub mod simplfied;
