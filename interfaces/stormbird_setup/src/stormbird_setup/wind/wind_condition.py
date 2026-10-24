@@ -58,3 +58,12 @@ class WindCondition(StormbirdSetupBaseModel):
             return {_POWER_MODEL_TAG: serialized}
         else:
             return {_CONSTANT_TAG: serialized}
+
+    def steady_true_wind_velocity_at_height(self, height: float) -> float:
+        '''
+        Returns the steady true wind velocity at the given height
+        '''
+        if isinstance(self.velocity_variation, (LogarithmicModel, PowerModel)):
+            return float(self.velocity_variation.velocity_at_height(height))
+
+        return float(self.velocity_variation)

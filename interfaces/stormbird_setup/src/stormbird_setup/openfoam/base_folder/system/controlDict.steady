@@ -1,0 +1,30 @@
+FoamFile
+{
+	version 2.0;
+	format ascii;
+	class dictionary;
+	object controlDict;
+	location "system";
+}
+
+libs
+(
+	"libActuatorLine.so"
+);
+application simpleFoam;
+startFrom latestTime;
+startTime 0;
+stopAt endTime;
+endTime 3000;
+deltaT 1;
+writeInterval 300;
+writeControl runTime;
+purgeWrite 1;
+writeFormat binary;
+writePrecision 9;
+timePrecision 9;
+runTimeModifiable true;
+functions
+{
+}
+

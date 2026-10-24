@@ -88,6 +88,19 @@ class IntensityAndViscosityRatio(StormbirdSetupBaseModel):
     turbulence_intensity: float = 0.01
     eddy_viscosity_ratio: float = 10.0
 
+    def k(self, velocity: float) -> float:
+        '''
+        Turbulent kinetic energy for the given velocity
+        '''
+        return 1.5 * (self.turbulence_intensity * velocity)**2
+
+    def omega(self, velocity: float, viscosity: float) -> float:
+        '''
+        Specific dissipation rate for the given velocity and molecular viscosity, from
+        `omega = k / (r nu)`
+        '''
+        return self.k(velocity) / (self.eddy_viscosity_ratio * viscosity)
+
 
 class AtmosphericBoundaryLayer(StormbirdSetupBaseModel):
     """

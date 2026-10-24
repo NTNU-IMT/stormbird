@@ -1,13 +1,16 @@
-
+import os
 import shutil
-import subprocess
-import pandas as pd
-import matplotlib.pyplot as plt
 import argparse
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+
+from stormbird_setup.spatial_vector import SpatialVector
+from stormbird_setup.openfoam import (
+    SimulationBuilder, GridBuilder, RefinementBuilder, WindCondition, DynamicTimeControl
+)
 
 from stormbird_settings import StormbirdSettings
-from openfoam_settings import OpenFOAMSettings, FolderPaths
-
 
 
 if __name__ == '__main__':
@@ -17,8 +20,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    result_data = []
-
     angle = args.angle_of_attack
 
     stormbird_settings = StormbirdSettings(
@@ -26,34 +27,43 @@ if __name__ == '__main__':
         use_ll_correction=args.use_ll_correction
     )
 
-    folder_paths = FolderPaths(angle_of_attack_deg=angle)
+    span = stormbird_settings.span
 
-    if folder_paths.run_folder.exists():
-        shutil.rmtree(folder_paths.run_folder)
+    simulation_builder = SimulationBuilder(
+        grid=GridBuilder(
+            start_point=SpatialVector(x=-2.0 * span, y=-2.0 * span, z=0.0),
+            end_point=SpatialVector(x=4.0 * span, y=2.0 * span, z=2.0 * span),
+            background_mesh_cells_per_representative_length=2,
+            actuator_line_refinement=RefinementBuilder(cells_per_representative_length=16, padding=5.0),
+        ),
+        wind_condition=WindCondition(
+            direction_coming_from=0.0,
+            velocity_variation=stormbird_settings.velocity
+        ),
+        linear_velocity=SpatialVector(),
+        actuator_line=stormbird_settings.get_actuator_line_setup_builder(),
+        time_control=DynamicTimeControl(time_step=0.1, end_time=20.0, max_courant_number=2.0),
+    )
 
-    shutil.copytree(folder_paths.base_folder, folder_paths.run_folder)
+    run_folder = Path(os.environ['FOAM_RUN']) / 'stormbird_rectangular_wing_example' / f'aoa_{angle}'
 
-    stormbird_settings.write_actuator_line_setup_to_file(folder_paths.run_folder / 'system' /'stormbird_actuator_line.json')
-    stormbird_settings.write_dimensions(folder_paths.run_folder / 'dimensions.txt')
+    if run_folder.exists():
+        shutil.rmtree(run_folder)
 
-    openfoam_settings = OpenFOAMSettings()
+    simulation_builder.write_foam_case(run_folder)
+    simulation_builder.run_foam_case(run_folder)
 
-    openfoam_settings.write_to_file(folder_paths.run_folder / "simulation_settings.txt")
-    openfoam_settings.set_as_environmental_variables()
+    results = simulation_builder.read_results(run_folder)
 
-    subprocess.run(['bash run.sh'], cwd=folder_paths.run_folder, shell=True)
+    force_x = [force / stormbird_settings.force_factor for force in results.forces['force_0.x']]
+    force_y = [force / stormbird_settings.force_factor for force in results.forces['force_0.y']]
 
-    forces_df = pd.read_csv(folder_paths.run_folder / 'postProcessing' / 'stormbird_forces.csv')
-
-    force_x = forces_df['force_0.x'].to_numpy() / stormbird_settings.force_factor
-    force_y = forces_df['force_0.y'].to_numpy() / stormbird_settings.force_factor
-
-    plt.plot(forces_df['time'], force_x, label="x")
-    plt.plot(forces_df['time'], force_y, label="y")
+    plt.plot(results.forces['time'], force_x, label="x")
+    plt.plot(results.forces['time'], force_y, label="y")
 
     print('Last force, x', force_x[-1])
     print('Last force, y', force_y[-1])
 
     plt.legend()
 
-    plt.savefig(folder_paths.run_folder / "force_plot.png", dpi=300, bbox_inches='tight')
+    plt.savefig(run_folder / "force_plot.png", dpi=300, bbox_inches='tight')

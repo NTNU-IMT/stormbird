@@ -61,27 +61,29 @@ Foam::fv::ActuatorLine::ActuatorLine(
 }
 
 void Foam::fv::ActuatorLine::sync_line_force_model_state() {
+    // The controller only runs on the master processor, so the wing angles and internal states it
+    // sets must be copied to the other processors
     int nr_wings = this->model->nr_wings();
 
-    std::vector<double> local_wing_angles;
-
-    for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
-        local_wing_angles.push_back(0.0);
-    }
+    std::vector<double> local_wing_angles(nr_wings, 0.0);
+    std::vector<double> internal_states(nr_wings, 0.0);
 
     if (Pstream::master()) {
         for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
             local_wing_angles[wing_index] = this->model->get_local_wing_angle(wing_index);
+            internal_states[wing_index] = this->model->get_wing_internal_state(wing_index);
         }
     }
 
-    // Sync the wing angles between processors
+    // Sync the values between processors
     for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
         reduce(local_wing_angles[wing_index], sumOp<double>());
+        reduce(internal_states[wing_index], sumOp<double>());
     }
 
     for (int wing_index = 0; wing_index < nr_wings; wing_index++) {
         this->model->set_local_wing_angle(wing_index, local_wing_angles[wing_index]);
+        this->model->set_wing_internal_state(wing_index, internal_states[wing_index]);
     }
 }
 

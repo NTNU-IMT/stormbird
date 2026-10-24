@@ -1,0 +1,56 @@
+FoamFile
+{
+	version 2.0;
+	format ascii;
+	class dictionary;
+	object fvSchemes;
+	location "system";
+}
+
+ddtSchemes
+{
+	default backward;
+}
+
+gradSchemes
+{
+	default Gauss linear;
+	limitedGrad cellLimited Gauss linear 1;
+}
+
+divSchemes
+{
+	div(phi,U) Gauss linearUpwindV limitedGrad;
+	div(phi,k) Gauss limitedLinear 1.00;
+	div(phi,omega) Gauss limitedLinear 1.00;
+	div((nuEff*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+	default Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+	default linear;
+}
+
+snGradSchemes
+{
+	default corrected;
+}
+
+wallDist
+{
+	method meshWave;
+	correctWalls true;
+}
+
+geometry
+{
+	type highAspectRatio;
+	minAspect 10.0;
+	maxAspect 100.0;
+}
+

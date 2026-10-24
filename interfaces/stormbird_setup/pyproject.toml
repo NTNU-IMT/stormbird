@@ -34,7 +34,7 @@ Homepage = "https://github.com/NTNU-IMT/stormbird"
 where = ["src"]
 
 [tool.setuptools.package-data]
-stormbird_setup = ["py.typed"]
+stormbird_setup = ["py.typed", "openfoam/base_folder/**/*"]
 
 [tool.mypy]
 disallow_untyped_defs = true

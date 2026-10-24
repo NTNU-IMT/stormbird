@@ -30,6 +30,7 @@
     - [Corrections](./actuator_line/corrections.md)
     - [OpenFOAM interface](./actuator_line/openfoam_interface.md)
     - [Stormflow](./actuator_line/stormflow.md)
+    - [Scripted setup](./actuator_line/scripted_setup.md)
 - [Other functionalities](./utils/utils_intro.md)
     - [Wind environment](./utils/wind_environment.md)
     - [Control system](./utils/control_system.md)

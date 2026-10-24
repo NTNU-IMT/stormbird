@@ -19,5 +19,3 @@ The content of the folders in this repository can be described as follows:
 
 ## License
 The software is licensed under the GPL3. See [LICENSE](LICENSE) for more.
-
-sd
