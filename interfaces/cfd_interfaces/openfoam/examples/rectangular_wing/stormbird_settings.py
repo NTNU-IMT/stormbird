@@ -1,5 +1,4 @@
 
-import json
 import numpy as np
 
 from dataclasses import dataclass
@@ -65,14 +64,3 @@ class StormbirdSettings():
             al_builder.lifting_line_correction = None
 
         return al_builder
-
-    def write_actuator_line_setup_to_file(self, file_path: str):
-        builder = self.get_actuator_line_setup_builder()
-
-        builder.to_json_file(file_path)
-
-    def write_dimensions(self, file_path):
-        with open(file_path, 'w') as f:
-            f.write(f"chord {self.chord_length};\n")
-            f.write(f"span {self.span};\n")
-            f.write(f"angle_of_attack_deg {self.angle_of_attack_deg};\n")

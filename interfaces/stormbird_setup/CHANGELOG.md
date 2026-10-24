@@ -2,6 +2,10 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.11.1 - 2026-10-24
+### Highlights
+- Added a basic OpenFOAM setup feature for scripting simulations with actuator lines
+
 ## 0.11.0 - 2026-10-23
 ### Highlights
 - New `internal_compartment_boundaries` field in the `WingBuilder`, with the same checks as in the Rust library.

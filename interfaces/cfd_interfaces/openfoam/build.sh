@@ -1,4 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+
+command -v cxxbridge >/dev/null || { echo "cxxbridge not found. Run: cargo install cxxbridge-cmd"; exit 1; }
+
 CPP_AL_FOLDER=../cpp_actuator_line/
 
 cd $CPP_AL_FOLDER

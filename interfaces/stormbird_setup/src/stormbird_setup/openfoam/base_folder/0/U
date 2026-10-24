@@ -1,0 +1,81 @@
+FoamFile
+{
+	version 2.0;
+	format ascii;
+	class volVectorField;
+	object U;
+	location "0";
+}
+
+dimensions [0 1 -1 0 0 0 0];
+internalField uniform (0 0 0);
+boundaryField
+{
+	vertical_sides
+	{
+		// Fixed value where the apparent wind flows into the domain, and zero gradient where it
+		// flows out. The apparent wind is a table of velocity vectors as a function of height.
+		type codedMixed;
+		refValue uniform (0 0 0);
+		refGradient uniform (0 0 0);
+		valueFraction uniform 1;
+		value $internalField;
+		name apparentWindInletOutlet;
+		codeContext
+		{
+			apparentWind
+			{
+				type table;
+				outOfBounds clamp;
+				values
+				(
+					(0 (0 0 0))
+					(1 (0 0 0))
+				);
+			}
+		}
+		codeInclude
+		#{
+			#include "Function1.H"
+		#};
+		code
+		#{
+			const autoPtr<Function1<vector>> apparentWind
+			(
+				Function1<vector>::New("apparentWind", this->codeContext())
+			);
+
+			const vectorField& Cf = this->patch().Cf();
+			const vectorField nf(this->patch().nf());
+
+			vectorField& refValue = this->refValue();
+			scalarField& valueFraction = this->valueFraction();
+
+			forAll(Cf, faceI)
+			{
+				const vector inflowVelocity = apparentWind->value(Cf[faceI].z());
+
+				if ((inflowVelocity & nf[faceI]) > 0) // Outflow
+				{
+					valueFraction[faceI] = 0;
+					refValue[faceI] = Zero;
+				}
+				else // Inflow
+				{
+					valueFraction[faceI] = 1;
+					refValue[faceI] = inflowVelocity;
+				}
+			}
+		#};
+	}
+
+	z_max
+	{
+		type zeroGradient;
+	}
+
+	z_min
+	{
+		type slip;
+	}
+}

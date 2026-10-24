@@ -4,6 +4,7 @@
 
 
 use stormbird::actuator_line::ActuatorLine;
+use stormbird::line_force_model::wing_internal_state::WingInternalState;
 
 use stormath::spatial_vector::SpatialVector;
 
@@ -31,6 +32,9 @@ mod ffi {
 
         fn get_local_wing_angle(&self, index: usize) -> f64;
         fn set_local_wing_angle(&mut self, index: usize, angle: f64);
+
+        fn get_wing_internal_state(&self, index: usize) -> f64;
+        fn set_wing_internal_state(&mut self, index: usize, value: f64);
 
         fn get_ctrl_point_at_index(&self, index: usize) -> [f64; 3];
 
@@ -111,6 +115,23 @@ impl CppActuatorLine {
 
     fn set_local_wing_angle(&mut self, index: usize, angle: f64) {
         self.model.line_force_model.local_wing_angles[index] = angle;
+
+        self.model.line_force_model.update_global_data_representations();
+    }
+
+    /// The internal state of a wing, e.g., the rotational speed of a rotor sail. Only constant
+    /// internal states are supported, which is what the controller sets.
+    fn get_wing_internal_state(&self, index: usize) -> f64 {
+        match &self.model.line_force_model.internal_state[index] {
+            WingInternalState::Constant(value) => *value,
+            WingInternalState::SpanVarying(_) => panic!(
+                "Internal states that vary along the span are not supported in the CFD interface"
+            ),
+        }
+    }
+
+    fn set_wing_internal_state(&mut self, index: usize, value: f64) {
+        self.model.line_force_model.set_wing_internal_state(index, WingInternalState::Constant(value));
     }
 
     fn get_weighted_velocity_sampling_integral_terms_for_cell(
