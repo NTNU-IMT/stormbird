@@ -1,0 +1,5 @@
+# Always use LF line endings, also on Windows. Shell scripts and OpenFOAM files fail with CRLF.
+* text=auto eol=lf
+
+*.png binary
+*.obj text eol=lf
