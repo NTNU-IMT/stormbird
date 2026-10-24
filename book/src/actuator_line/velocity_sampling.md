@@ -22,7 +22,7 @@ Some of the settings are independent of the sampling methods chosen. In particul
 
 ## Direct interpolation
 
-The first and most direct method is to simply use interpolated velocities from the CFD grid at each control point. This method relies on the built in interpolation methods in the CFD solver, which means that the order of the interpolation is also chosen by the CFD solver. For a second order unstructured CFD code, like OpenFOAM, the interpolation will often be linear. To activate this method, simply set the `use_point_sampling` flag to true in the `SamplingSettings`.
+The first and most direct method is to simply use interpolated velocities from the CFD grid at each control point. This method relies on the built in interpolation methods in the CFD solver, which means that the order of the interpolation is also chosen by the CFD solver. For a second order unstructured CFD code, like OpenFOAM, the interpolation will often be linear. To activate this method, simply set the `use_point_sampling` flag to true in the `SamplingSettings`. This method is only available in the OpenFOAM interface. [Stormflow](stormflow.md) always uses the body force weighted estimate below.
 
 ## Body force weighted estimate
 

@@ -6,7 +6,7 @@
     - [General about input and output](./different_versions/io_overview.md)
     - [Python interface](./different_versions/python_interface.md)
     - [Functional Mockup Unit](./different_versions/fmu_version.md)
-    - [OpenFOAM version](./different_versions/openfoam_version.md)
+    - [Actuator lines in CFD solvers](./different_versions/cfd_solvers.md)
 - [Line model](./line_model/line_model_intro.md)
     - [Building a line model](./line_model/building_line_model.md)
     - [Circulation strength](./line_model/circulation_strength.md)

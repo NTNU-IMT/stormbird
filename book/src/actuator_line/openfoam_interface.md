@@ -1,6 +1,6 @@
 # OpenFOAM interface
 
-The actuator line functionality in the core Stormbird library is written in a general way, and could be coupled to any CFD solver. However, at the moment, the only interface made is towards the open-source CFD solver [OpenFOAM](https://openfoam.com/). This chapter describes how the coupling works in practice, and what is necessary to set up a simulation using OpenFOAM together with Stormbird.
+The actuator line functionality in the core Stormbird library is written in a general way, and could be coupled to any CFD solver. At the moment, there are two ready-made couplings: an interface to the open-source CFD solver [OpenFOAM](https://openfoam.com/), and the dedicated solver [Stormflow](./stormflow.md). This chapter describes how the coupling works in practice, and what is necessary to set up a simulation using OpenFOAM together with Stormbird.
 
 ## CFD interfaces
 
