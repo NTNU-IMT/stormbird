@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
-## 0.2.0 - 2026-10-25
+## 0.2.1 - 2026-10-25
 - Updated to stormbird v0.11.1, which is a small change. The main feature is new experimental limits on the lifting line correction (see the stormbird release notes for more)
 
 ## 0.2.0 - 2026-10-23

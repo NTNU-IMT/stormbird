@@ -2,6 +2,9 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.11.1
+- Depends on Stormbird 0.11.1, where the default `induced_velocity_correction_method` in the linearized solver is `NoCorrection`, which avoids a jump in the lift right before stall. See the [Stormbird change log](../../stormbird/CHANGELOG.md).
+
 ## 0.11.0 - 2026-10-23
 - Depends on the published versions of Stormbird 0.11.0 and Stormath 0.4.0, rather than the local versions in the repository.
 - New `ActiveAirFlowFoil` class, including functions for the section internal states and the power for a whole wing, and a new `power_coefficient` function for the `RotatingCylinder` class. The `as_active_air_flow_foil` function on the `VaryingFoil` class was removed, as an active air flow foil now also needs an internal state conversion.

@@ -35,3 +35,7 @@ module-name = "pystormflow._native"
 python-source = "."
 features = ["pyo3/extension-module"]
 profile = "release"
+# The examples are not needed in the source distribution
+exclude = [
+    { path = "examples/**/*", format = "sdist" },
+]

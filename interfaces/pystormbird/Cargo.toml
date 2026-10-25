@@ -17,15 +17,8 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.28.3"}
 pythonize = {version ="0.28.0"}
 
-stormbird = { version = "0.11.0", features = ["parallel"] }
+stormbird = { version = "0.11.1", features = ["parallel"] }
 stormath = "0.4.0"
-
-# Use the local source code of stormbird and stormath, also for the stormath dependency of stormbird,
-# to test changes that are not released yet. Remove this section to build against the released
-# versions.
-[patch.crates-io]
-stormbird = { version = "0.11.1"}
-stormath = { version = "0.4.0" }
 
 [profile.release]
 opt-level = 3
