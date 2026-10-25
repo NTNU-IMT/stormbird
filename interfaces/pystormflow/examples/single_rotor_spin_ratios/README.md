@@ -2,7 +2,7 @@
 
 > **Work in progress.** The setup of actuator line simulations of rotor sails is still being developed. The settings in this example are the current best guess, and are likely to change.
 
-Actuator line simulations of a single rotor sail with Stormflow, for spin ratios from 0 to 4 in steps of 0.5. The results are compared against the data from Deybach et al. (2024), which is also used in the lifting line example in [`pystormbird/examples/3 - rotor_sails`](../../../pystormbird/examples/3%20-%20rotor_sails). The rotor has the same dimensions as in that example: diameter 5 m, height 30 m, standing 1.875 m above the ground.
+Actuator line simulations of a single rotor sail with Stormflow. The results are compared against the data from Deybach et al. (2024), which is also used in the lifting line example in [`pystormbird/examples/3 - rotor_sails`](../../../pystormbird/examples/3%20-%20rotor_sails). The rotor has the same dimensions as in that example: diameter 5 m, height 30 m, standing 1.875 m above the ground.
 
 The same cases can be run with OpenFOAM, using the example in [`cfd_interfaces/openfoam/examples/single_rotor_spin_ratios`](../../../cfd_interfaces/openfoam/examples/single_rotor_spin_ratios).
 
