@@ -4,6 +4,7 @@ Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 """
 
+import math
 import shutil
 import subprocess
 from importlib.resources import as_file, files
@@ -59,8 +60,20 @@ class SimulationBuilder(StormbirdSetupBaseModel):
     @classmethod
     def check_geometries(cls, geometries: list[GeometryBuilder]) -> list[GeometryBuilder]:
         for geometry in geometries:
-            if isinstance(geometry.geometry, Disk):
-                raise ValueError("Disk geometries are not supported in OpenFOAM cases")
+            shape = geometry.geometry
+
+            if isinstance(shape, Disk):
+                if shape.fillet_radius != 0.0:
+                    raise ValueError(
+                        "Disks with a fillet radius are not supported in OpenFOAM cases. Set "
+                        "fillet_radius to 0.0"
+                    )
+
+                if shape.thickness <= 0.0:
+                    raise ValueError(
+                        "Disks in OpenFOAM cases must have a thickness larger than zero, as they are "
+                        "meshed as solid cylinders"
+                    )
 
         return geometries
 
@@ -122,6 +135,8 @@ class SimulationBuilder(StormbirdSetupBaseModel):
         else:
             shutil.copytree(self.base_folder, case_path)
 
+        self._convert_to_lf_line_endings(case_path)
+
         # Empty folders are not included when the package is installed
         (case_path / "constant" / "triSurface").mkdir(parents=True, exist_ok=True)
 
@@ -171,6 +186,22 @@ class SimulationBuilder(StormbirdSetupBaseModel):
         control_dict.pop("libs", None)
 
         write_foam_file(control_dict_path, control_dict)
+
+    @staticmethod
+    def _convert_to_lf_line_endings(case_path: Path) -> None:
+        '''
+        Converts CRLF line endings to LF in all text files in the case folder. The base folder can
+        get CRLF line endings when the package is built on Windows, which makes both bash and
+        OpenFOAM fail. Files containing null bytes are treated as binary, and are not changed.
+        '''
+        for file_path in case_path.rglob("*"):
+            if not file_path.is_file():
+                continue
+
+            content = file_path.read_bytes()
+
+            if b"\r\n" in content and b"\0" not in content:
+                file_path.write_bytes(content.replace(b"\r\n", b"\n"))
 
     def _select_time_control_files(self, case_path: Path) -> None:
         '''
@@ -277,17 +308,30 @@ class SimulationBuilder(StormbirdSetupBaseModel):
             gaussian = self.actuator_line.projection_settings.projection_function
             width_factor = max(gaussian.chord_factor, gaussian.thickness_factor)
 
+            # snappyHexMesh only refines the cells with their center inside the region. The cylinder
+            # is therefore extended by half the diagonal of a background cell, so that all cells that
+            # overlap the refinement zone are refined, also when the zone is smaller than the cells.
+            background_cell_length = (
+                self.representative_length() / self.grid.background_mesh_cells_per_representative_length
+            )
+            margin = 0.5 * math.sqrt(3.0) * background_cell_length
+
             for index, wing_builder in enumerate(self.actuator_line.line_force_model.wing_builders):
                 name = f"actuator_line_{index}"
 
                 chord_lengths = [chord_vector.length() for chord_vector in wing_builder.chord_vectors]
                 mean_chord = sum(chord_lengths) / len(chord_lengths)
 
+                start_point = wing_builder.section_points[0]
+                end_point = wing_builder.section_points[-1]
+
+                axis = (end_point - start_point) * (1.0 / (end_point - start_point).length())
+
                 geometry[name] = {
                     "type": "searchableCylinder",
-                    "point1": wing_builder.section_points[0].as_tuple(),
-                    "point2": wing_builder.section_points[-1].as_tuple(),
-                    "radius": 0.5 * refinement.padding * mean_chord * width_factor,
+                    "point1": (start_point - axis * margin).as_tuple(),
+                    "point2": (end_point + axis * margin).as_tuple(),
+                    "radius": 0.5 * refinement.padding * mean_chord * width_factor + margin,
                 }
 
                 refinement_regions[name] = {"mode": "inside", "levels": [("1e15", level)]}
@@ -337,6 +381,15 @@ class SimulationBuilder(StormbirdSetupBaseModel):
                 "type": "searchableBox",
                 "min": (shape.center - shape.half_extents).as_tuple(),
                 "max": (shape.center + shape.half_extents).as_tuple(),
+            }
+
+        if isinstance(shape, Disk):
+            # Extruded from the center along the normal, as in Stormflow
+            return name, {
+                "type": "searchableCylinder",
+                "point1": shape.center.as_tuple(),
+                "point2": (shape.center + shape.normal.normalize() * shape.thickness).as_tuple(),
+                "radius": shape.radius,
             }
 
         raise ValueError(f"{type(shape).__name__} geometries are not supported in OpenFOAM cases")

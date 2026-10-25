@@ -2,6 +2,12 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## Unreleased
+### Features
+- Two new, experimental, settings in the `LiftingLineCorrectionBuilder` for actuator line simulations, both turned off by default:
+    - `max_correction_ratio`: limits the magnitude of the velocity correction at each control point to a ratio of the magnitude of the sampled velocity. Without a limit, the correction can become larger than the freestream velocity at the ends of wings with a large circulation at the ends, such as rotor sails, which reduces the lift and can make the simulations unstable.
+    - `virtual_extension_factors`: virtual extensions of each wing at the first and the last end, only included in the reference model with the small viscous core. The extensions carry the circulation of the outermost line element, and move the tip vortices away from the ends of the wing, which can be used to represent end plates.
+
 ## 0.11.0 - 2026-10-23
 ### Highlights
 - New structure for the `ActiveAirFlowFoil` section model, intended for suction sails. It now consists of a `VaryingFoil` model for the lift and drag, together with an `InternalStateConversion` that defines how the wing internal state is converted to the internal state of the foil model. Four conversions are available:

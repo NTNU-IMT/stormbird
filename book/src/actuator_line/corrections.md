@@ -41,6 +41,8 @@ pub struct LiftingLineCorrectionBuilder {
     pub initialization_time: Option<f64>,
     pub reference_core_length_factor: f64,
     pub include_wing_interactions: bool,
+    pub max_correction_ratio: Option<f64>,
+    pub virtual_extension_factors: [f64; 2],
 }
 ```
 
@@ -51,6 +53,11 @@ The viscous core length used to represent the actuator line is calculated from t
 The `initialization_time` is optional, and not used by default. If it is set, the correction is gradually ramped up from zero to its full value, using a smooth cosine transition, over the specified time from the start of the simulation. This can be used to avoid large corrections in the start-up phase of a CFD simulation.
 
 The `include_wing_interactions` is set to `false` by default, meaning that the correction is computed for each wing in isolation. If set to `true`, the correction includes the induced velocities from all wings, as described in the [section above](#isolated-wings-or-wing-interactions).
+
+Two additional settings are available, which are still experimental:
+
+- `max_correction_ratio`: optional limit on the magnitude of the velocity correction at each control point, as a ratio of the magnitude of the sampled velocity. The direction of the correction is kept. Not used by default. This can be needed for wings with a large circulation at the ends, such as rotor sails, where the correction can otherwise become larger than the freestream velocity at the ends of the wing.
+- `virtual_extension_factors`: length of a virtual extension of each wing at the first and the last end, relative to the chord length at that end. The extensions are only included in the reference model with the small viscous core, and carry the circulation of the outermost line element, which moves the tip vortices away from the ends of the wing. This can be used to represent end plates. Zero by default, which means no extensions.
 
 Experience from this correction technique is that it works very well for actuator line simulations that only include wings. Even with a **large isotropic projection width**, the result from an actuator line simulation will match the lifting line model almost perfectly. However, it can also create instabilities when combined with complex ship geometries. **The hope is to find a solution to this in the future**, as this type of correction is believed to be very general and promising for practical use cases.
 

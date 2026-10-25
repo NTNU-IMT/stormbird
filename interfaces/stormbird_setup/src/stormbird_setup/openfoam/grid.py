@@ -23,7 +23,8 @@ class RefinementBuilder(StormbirdSetupBaseModel):
     """
     Size of the refinement zone around each wing, which is a cylinder from the first to the last
     section point. The diameter of the cylinder is padding * mean chord length * the largest
-    factor in the Gaussian projection function.
+    factor in the Gaussian projection function. The cylinder is extended by half the diagonal of a
+    background cell, both in radius and at the ends, so that all cells that overlap it are refined.
     """
 
 class GridBuilder(StormbirdSetupBaseModel):

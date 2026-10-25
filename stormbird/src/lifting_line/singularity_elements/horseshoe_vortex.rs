@@ -11,7 +11,7 @@ use crate::line_force_model::span_line::SpanLine;
 
 use super::vortex_line::VortexLine;
 
-const ELBOW_VORTEX_LENGTH_FACTOR: Float = 0.15; // TODO: evaluate the need to have this as a parameter
+pub(crate) const ELBOW_VORTEX_LENGTH_FACTOR: Float = 0.15; // TODO: evaluate the need to have this as a parameter
 
 #[derive(Clone, Debug)]
 /// A horseshoe vortex is the classical building block to represent wings. It consists of a bound

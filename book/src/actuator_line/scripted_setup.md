@@ -68,14 +68,14 @@ simulation_builder = SimulationBuilder(
 Grid settings:
 
 - `background_mesh_cells_per_representative_length`: resolution of the background mesh.
-- `actuator_line_refinement`: refinement zone around each wing, shaped as a cylinder from the first to the last section point. The diameter is `padding` × the mean chord length of the wing × the largest factor in the Gaussian projection function. `None` means no refinement.
+- `actuator_line_refinement`: refinement zone around each wing, shaped as a cylinder from the first to the last section point. The diameter is `padding` × the mean chord length of the wing × the largest factor in the Gaussian projection function. The cylinder is extended by half the diagonal of a background cell, in radius and at the ends, so that all cells that overlap it are refined. `None` means no refinement.
 - `geometry_cells_per_representative_length`: resolution at the surface of the geometries. How far the refinement extends away from the surfaces is controlled by the `snappyHexMesh` settings in the base folder. `None` means no refinement.
 
 Since `snappyHexMesh` refines by splitting cells in two, the actual resolution in a refined region is the background resolution multiplied by a power of two, at least as fine as the requested value.
 
 The number of cells in the background mesh is rounded up along each axis, so that the cells fit the domain exactly and are at least as fine as requested.
 
-All geometries are snapped to, without boundary layers. Supported geometries are triangle meshes, spheres and cuboids. Each geometry becomes a patch in the mesh, named `geometry_<index>` for `geometries` (type `wall`) and `slip_geometry_<index>` for `slip_geometries` (type `patch`), where the index is the position in the list. Triangle mesh files are copied to `constant/triSurface`, and should contain a single group or solid. Feature edges are captured with implicit feature snapping.
+All geometries are snapped to, without boundary layers. Supported geometries are triangle meshes, spheres, cuboids and disks. Disks are meshed as solid cylinders, extruded from the center along the normal, so they must have a thickness larger than zero, and a fillet radius of zero. The cells at the surface must be smaller than the thickness for the disk to be resolved. Each geometry becomes a patch in the mesh, named `geometry_<index>` for `geometries` (type `wall`) and `slip_geometry_<index>` for `slip_geometries` (type `patch`), where the index is the position in the list. Triangle mesh files are copied to `constant/triSurface`, and should contain a single group or solid. Feature edges are captured with implicit feature snapping.
 
 ### Time control
 

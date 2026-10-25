@@ -2,6 +2,19 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.11.3 - 2026-10-24
+### Features
+- Disks are now supported as geometries in OpenFOAM cases, for instance as end disks on rotor sails. They are meshed as solid cylinders, so they must have a thickness larger than zero, and the fillet radius must be zero.
+- The `LiftingLineCorrectionBuilder` has the new, experimental, settings `max_correction_ratio` and `virtual_extension_factors`. They require a version of Stormbird newer than 0.11.0, and are only included in the JSON output when they are set, so the output is unchanged for older versions.
+
+### Bug fixes
+- OpenFOAM cases failed when stormbird_setup was built on Windows, as the files in the base folder got CRLF line endings, which bash and OpenFOAM do not accept. `write_foam_case` now converts all text files in the case folder to LF line endings, and the repository enforces LF line endings with a `.gitattributes` file.
+- The refinement around the actuator lines in OpenFOAM cases was skipped when the refinement zone was small relative to the background cells, as snappyHexMesh only refines the cells with their center inside the zone. The refinement cylinder is now extended by half the diagonal of a background cell, both in radius and at the ends, so that all cells that overlap the zone are refined.
+
+## 0.11.2 - 2026-10-24
+### Bug fixes (which failed, see version 0.11.3 instead)
+- OpenFOAM cases failed when stormbird_setup was built on Windows, as the files in the base folder got CRLF line endings.Tried first updating just the `.gitattributes` file, but that did not work it seamed...
+
 ## 0.11.1 - 2026-10-24
 ### Highlights
 - Added a basic OpenFOAM setup feature for scripting simulations with actuator lines

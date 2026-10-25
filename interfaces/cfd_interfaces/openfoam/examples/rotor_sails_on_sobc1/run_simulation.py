@@ -78,8 +78,8 @@ def actuator_line_builder() -> ActuatorLineBuilder:
 def simulation_builder(end_time: float) -> SimulationBuilder:
     return SimulationBuilder(
         grid=GridBuilder(
-            start_point=SpatialVector(x=-120.0, y=-50.0, z=0.0),
-            end_point=SpatialVector(x=120.0, y=50.0, z=50.0),
+            start_point=SpatialVector(x=-300.0, y=-150.0, z=0.0),
+            end_point=SpatialVector(x=300.0, y=150.0, z=150.0),
             background_mesh_cells_per_representative_length=1,
             actuator_line_refinement=RefinementBuilder(cells_per_representative_length=8, padding=3.0),
             geometry_cells_per_representative_length=4,
