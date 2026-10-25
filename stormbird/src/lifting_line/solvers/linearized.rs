@@ -18,10 +18,15 @@ use super::velocity_corrections::VelocityCorrections;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// How the induced velocities are updated after the viscous correction of the circulation
 pub enum InducedVelocityCorrectionMethod {
-    /// The induced velocities from the linear solution are used
-    NoCorrection,
-    /// The induced velocities are computed again from the corrected circulation
+    /// The induced velocities from the linear solution are used. The circulation is then corrected
+    /// with the same angles of attack as the forces are calculated with, so that the correction is
+    /// consistent with the post-stall lift in the force calculation.
     #[default]
+    NoCorrection,
+    /// The induced velocities are computed again from the corrected circulation. The correction of
+    /// the circulation is then based on different angles of attack than the forces, which can give
+    /// both unstalled circulation and post-stall lift right before stall, seen as a jump in the
+    /// lift.
     FullCorrection
 }
 

@@ -45,7 +45,14 @@ pub enum InternalStateSetPointType {
 #[serde(deny_unknown_fields)]
 /// Set points for the sail that depends on the apparent wind direction
 pub struct ControllerSetPoints {
-    /// The apparent wind directions where the set points are given
+    /// The apparent wind directions where the set points are given.
+    ///
+    /// **Note**: the controller measures the apparent wind direction for each wing as the angle from
+    /// the chord to the velocity, around the span direction of the wing. This is not the same as in
+    /// the wind environment, which measures it around the `wind_rotation_axis`. For sails built from
+    /// the bottom to the top, with the default wind environment, the two have opposite signs, so a
+    /// wind from starboard is negative here. Set points that are mirrored between positive and
+    /// negative directions are not affected. A fix is targeted for the next release.
     pub apparent_wind_directions_data: Vec<Float>,
     /// Optional angle of attack set points at each apparent wind direction
     #[serde(default)]

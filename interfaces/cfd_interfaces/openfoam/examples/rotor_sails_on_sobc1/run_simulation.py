@@ -16,7 +16,8 @@ from stormbird_setup.section_models import SectionModel, RotatingCylinder
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.input_power import InputPowerModel, InputPowerDataType
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
-from stormbird_setup.controller import ControllerBuilder, ControllerSetPoints
+from stormbird_setup.controller import ControllerBuilder
+from stormbird_setup.default_sails import DefaultSail
 from stormbird_setup.actuator_line import (
     ActuatorLineBuilder, LiftingLineCorrectionBuilder, Gaussian, ProjectionSettings,
     SamplingSettings, SolverSettings, SymmetryCondition
@@ -70,7 +71,7 @@ def actuator_line_builder() -> ActuatorLineBuilder:
         sampling_settings=SamplingSettings(remove_span_velocity=True),
         lifting_line_correction=LiftingLineCorrectionBuilder(symmetry_condition=SymmetryCondition.Z),
         controller=ControllerBuilder(
-            set_points=[ControllerSetPoints.new_default_rotor_sail() for _ in ROTOR_POSITIONS]
+            set_points=[DefaultSail.RotorSailDeybach2024.definition().controller_set_points for _ in ROTOR_POSITIONS]
         ),
         write_iterations_full_result=100,
     )

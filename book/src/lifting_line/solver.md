@@ -15,7 +15,10 @@ However, the **procedure above is only the first step**. Due to the assumption o
 1) Calculate the lift-induced velocities and resulting effective angle of attack with the solved circulation strength
 2) Calculate the lift both with a linearized sectional model and the full sectional model, including stall effects
 3) Correct the solved circulation strength by multiplying it with the full lift and dividing it by the linearized lift
-4) Recalculate lift-induced velocities and effective angles of attack for the final force calculations
+
+The forces are then calculated with the corrected circulation strength and the effective angles of attack from step 1. The post-stall lift, which is added to the lift from the circulation in the [force calculations](../line_model/force_calculations.md), is therefore based on the same angles of attack as the correction of the circulation.
+
+An optional fourth step, controlled by the `induced_velocity_correction_method` setting below, recalculates the lift-induced velocities and effective angles of attack from the corrected circulation strength before the forces are calculated. This was the default in earlier versions of Stormbird. However, the circulation is then corrected with different angles of attack than the forces are calculated with. Right before stall, a reduced circulation gives lower lift-induced velocities and therefore a larger angle of attack in the force calculations, so that sections can get both an almost unstalled circulation and post-stall lift. This shows up as a jump in the lift right before stall, and the step is therefore not used by default.
 
 This solver is found to work fine for **quasi-steady** cases, but does also tend to predict **stall at a larger angle of attack** than the full non-linear solver below. However, the stall-issue can be handled by tuning the stall behavior of the sectional model to 3D data of a single sail. For quasi-steady cases it will be significantly faster than running the full non-linear solver described in the next section, and is therefore set to the default solver for such cases.
 
@@ -73,9 +76,14 @@ pub struct Linearized {
     pub disable_viscous_corrections: bool,
     pub induced_velocity_correction_method: InducedVelocityCorrectionMethod
 }
+
+pub enum InducedVelocityCorrectionMethod {
+    NoCorrection,   // Default
+    FullCorrection,
+}
 ```
 
-The only one that could be interesting to modify is the `VelocityCorrections`. They are explained in their own section below. The other two are mainly for testing purposes and not necessary to adjust for normal use cases.
+The only one that could be interesting to modify is the `VelocityCorrections`. They are explained in their own section below. The other two are mainly for testing purposes and not necessary to adjust for normal use cases. The `induced_velocity_correction_method` selects whether the lift-induced velocities are recalculated after the viscous correction (`FullCorrection`) or not (`NoCorrection`), as explained above.
 
 ### Non-linear settings
 

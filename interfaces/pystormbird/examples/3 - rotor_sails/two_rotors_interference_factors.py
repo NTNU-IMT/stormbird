@@ -22,11 +22,10 @@ only difference from the quasi-steady simulation is the viscous core length evol
 import numpy as np
 import matplotlib.pyplot as plt
 from stormbird_setup.spatial_vector import SpatialVector
-from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
 
-import pandas as pd
+import polars as pl
 
-from setup import simulate_single_case
+from setup import simulate_single_case, SolverType
 
 # The variants of the simulation that are compared. Each variant gets its own line style in the plot
 VARIANTS = [
@@ -52,7 +51,7 @@ VARIANTS = [
 if __name__ == "__main__":
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
-    exp_data = pd.read_csv("data/deybach_2026_interference_factors.csv", delimiter=";")
+    exp_data = pl.read_csv("data/deybach_2026_interference_factors.csv", separator=";")
 
     spin_ratio = 2.5
 
@@ -62,7 +61,7 @@ if __name__ == "__main__":
 
     spacing = 4.0 * diameter
 
-    rotations_deg = exp_data["Angular position of the interfering rotor [deg]"]
+    rotations_deg = exp_data["Angular position of the interfering rotor [deg]"].to_numpy()
     n_rotations = len(rotations_deg)
 
     wind_direction_deg = 0.0
@@ -141,14 +140,14 @@ if __name__ == "__main__":
 
     ax.scatter(
         rotations_deg,
-        exp_data["IFD"],
+        exp_data["IFD"].to_numpy(),
         color=default_colors[0],
         label="CD interference, experiment, Deybach et al. (2026)"
     )
 
     ax.scatter(
         rotations_deg,
-        exp_data["IFL"],
+        exp_data["IFL"].to_numpy(),
         color=default_colors[1],
         label="CL interference, experiment, Deybach et al. (2026)"
     )

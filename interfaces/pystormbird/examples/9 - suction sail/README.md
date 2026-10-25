@@ -2,6 +2,15 @@
 
 This example shows how to tune a model of a suction sail to correspond to the original Turbosail, using the `ActiveAirFlowFoil` section model with the `PowerToInternalFlow` conversion. The data is digitized from Charrier et al. (1985), *Fondation Cousteau and windship propulsion 1980 - 1985, System Cousteau - Pechiney*, Journal of Wind Engineering and Industrial Aerodynamics, 20, 39-60.
 
+The resulting model is the default suction sail model in `stormbird_setup`, `DefaultSail.SuctionSailCharrier1985`, and the scripts in this example use it directly. The foil parameters, the internal flow model and the simulation settings are therefore set in `stormbird_setup/default_sails/suction_sails.py`, and any update to the model should be made there. The scripts only set up the geometry of the wind tunnel model, with an aspect ratio of 4 and one end against the wind tunnel wall.
+
+The scripts are:
+
+- `compare_3d_lift_and_drag.py`: compares the lift and drag to the 3D data, with the suction coefficient as the internal state.
+- `tune_power_model.py`: tunes the internal flow model to the power curve, as described below.
+- `compare_default_sail_power_curve.py`: compares the power curve of the default sail model, with the fan power as the internal state, to the experiments.
+- `plot_sectional_data.py`: plots the 2D data.
+
 ## Tuning force model
 The lift and drag model has so far been tuned manually (could probably be automatized later), assuming fixed suction coefficients for the entire sail, that match the experimental data. The 3D data is used for the suction coefficients 0.027, 0.036 and 0.05.
 

@@ -25,10 +25,10 @@ model is then verified with simulations where the power is the internal state.
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stormbird_setup.section_models import InternalFlow
+from stormbird_setup.section_models import InternalFlow, InternalStateConversion
 
 from suction_sail_data import CQ_VALUES_3D, power_curve_data
-from suction_sail_model import SuctionSailModel, SimulationResult
+from suction_sail_model import SuctionSailModel, SimulationResult, SUCTION_COEFFICIENT_DIRECT
 
 # Fixed parameters. Only the ratio porous_fraction / sqrt(loss_coefficient) affects the flow, so the
 # porous fraction is set from the geometry and the loss coefficient is tuned. The fan efficiency
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         np.linspace(0.023, CQ_VALUES_3D[-1], 10),
     ])
 
-    direct_model = SuctionSailModel()
+    direct_model = SuctionSailModel(internal_state_conversion = SUCTION_COEFFICIENT_DIRECT)
 
     cl_max = np.zeros(len(cq_values))
     terms = np.zeros((len(cq_values), len(PARAMETER_NAMES)))
@@ -199,7 +199,12 @@ if __name__ == "__main__":
         porous_fraction = POROUS_FRACTION,
     )
 
-    power_model = SuctionSailModel(internal_flow = internal_flow, fan_efficiency = FAN_EFFICIENCY)
+    power_model = SuctionSailModel(
+        internal_state_conversion = InternalStateConversion.new_power_to_internal_flow(
+            internal_flow = internal_flow,
+            fan_efficiency = FAN_EFFICIENCY
+        )
+    )
 
     power_factor = 0.5 * power_model.density * power_model.area * VELOCITY**3
 

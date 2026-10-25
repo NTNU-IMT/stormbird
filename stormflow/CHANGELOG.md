@@ -2,6 +2,9 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
+## 0.2.0 - 2026-10-25
+- Updated to stormbird v0.11.1, which is a small change. The main feature is new experimental limits on the lifting line correction (see the stormbird release notes for more)
+
 ## 0.2.0 - 2026-10-23
 ### Breaking changes
 - Stormflow now depends on version 0.11.0 of Stormbird and version 0.4.0 of Stormath. The input format for the Stormbird models has changed in Stormbird 0.11.0, so input files may need to be updated. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details. Types from Stormbird and Stormath that are part of the public interface of Stormflow, such as `ActuatorLine` and `SpatialVector`, now come from the new versions.

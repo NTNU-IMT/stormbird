@@ -1,0 +1,33 @@
+# Environment for running the examples. Set it up with `uv sync` in this folder. See README.md.
+
+[project]
+name = "pystormbird-examples"
+version = "0.1.0"
+description = "Examples for the pystormbird and stormbird_setup libraries"
+requires-python = ">=3.12"
+dependencies = [
+    "pystormbird",
+    "stormbird_setup",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "polars",
+    "pyvista",
+    "tqdm",
+]
+
+[dependency-groups]
+# Optional GUI backend for matplotlib, for systems without one, such as WSL. Install with
+# `uv sync --group gui`.
+gui = ["pyqt6"]
+
+[tool.uv]
+# The examples are scripts, not a package to be installed
+package = false
+
+[tool.uv.sources]
+# Both libraries are installed from the source code in this repository. The stormbird_setup library
+# is editable, so changes are used directly. The pystormbird library is compiled from Rust, and must
+# be rebuilt after changes with `uv sync --reinstall-package pystormbird`.
+pystormbird = { path = ".." }
+stormbird_setup = { path = "../../stormbird_setup", editable = true }

@@ -1,7 +1,7 @@
 
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import matplotlib.pyplot as plt
 
 from tqdm import tqdm
@@ -17,6 +17,14 @@ from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrection
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
 from pystormbird.lifting_line import Simulation
+
+def read_csv(file_name: str) -> pl.DataFrame:
+    '''
+    Reads a csv file with digitized data, where the values can contain extra white space.
+    '''
+    return pl.read_csv(file_name, infer_schema=False).with_columns(
+        pl.all().str.strip_chars().cast(pl.Float64)
+    )
 
 if __name__ == "__main__":
     chord = 0.2 + 0.15
@@ -135,11 +143,11 @@ if __name__ == "__main__":
     plt.plot(np.degrees(angles_of_attack)[increasing_indices], np.array(cl)[increasing_indices], label="LL, increasing")
     plt.plot(np.degrees(angles_of_attack)[decreasing_indices], np.array(cl)[decreasing_indices], label="LL, decreasing")
     
-    increasing_cl = pd.read_csv("increasing_cl.csv")
-    decreasing_cl = pd.read_csv("decreasing_cl.csv")
+    increasing_cl = read_csv("increasing_cl.csv")
+    decreasing_cl = read_csv("decreasing_cl.csv")
     
-    plt.plot(increasing_cl["angle"], increasing_cl["cl"], '--', label="Exp, increasing")
-    plt.plot(decreasing_cl["angle"], decreasing_cl["cl"], '--', label="Exp, decreasing")
+    plt.plot(increasing_cl["angle"].to_numpy(), increasing_cl["cl"].to_numpy(), '--', label="Exp, increasing")
+    plt.plot(decreasing_cl["angle"].to_numpy(), decreasing_cl["cl"].to_numpy(), '--', label="Exp, decreasing")
     
     plt.xlim(-10, 35)
     plt.ylim(0, 2.0)

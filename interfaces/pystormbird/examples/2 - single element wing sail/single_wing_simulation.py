@@ -16,11 +16,7 @@ from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
 from stormbird_setup.base_model import StormbirdSetupBaseModel
 
-from enum import Enum
-
-class SolverType(Enum):
-    Linearized = "Linearized"
-    Iterative = "Iterative"
+from stormbird_setup.default_sails import SolverType
 
 class SingleWingSimulation(StormbirdSetupBaseModel):
     '''

@@ -7,11 +7,10 @@ settings works best.
 import numpy as np
 import matplotlib.pyplot as plt
 
-from setup import simulate_single_case
+from setup import simulate_single_case, SolverType
 
-from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
 
-import pandas as pd
+import polars as pl
 
 # These settings are used to generate multiple versions of the simulation, for test purposes
 TEST_SETTINGS = {
@@ -22,7 +21,7 @@ TEST_SETTINGS = {
 }
 
 if __name__ == "__main__":
-    comparison_data = pd.read_csv("data/deybach_2024_single_rotor.csv")
+    comparison_data = pl.read_csv("data/deybach_2024_single_rotor.csv")
     
     spin_ratio = np.arange(0.0, 4.5, 0.25)
     n_spin_ratios = len(spin_ratio)
@@ -84,15 +83,15 @@ if __name__ == "__main__":
 
     # --------------- Comparison data ------------------------
     ax1.plot(
-        comparison_data["spin_ratios"], 
-        comparison_data["cl"], 
+        comparison_data["spin_ratios"].to_numpy(), 
+        comparison_data["cl"].to_numpy(), 
         "-o",
         label="Experiment, Deybach et al. (2024)"
     )
     
     ax2.plot(
-        comparison_data["cl"], 
-        comparison_data["cd"], 
+        comparison_data["cl"].to_numpy(), 
+        comparison_data["cd"].to_numpy(), 
         "-o",
         label="Experiment, Deybach et al. (2024)"
     )

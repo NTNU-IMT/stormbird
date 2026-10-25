@@ -4,7 +4,7 @@
 import numpy as np
 
 from stormbird_setup.spatial_vector import SpatialVector
-from stormbird_setup.section_models import SectionModel
+from stormbird_setup.default_sails import DefaultSail, SolverType
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings, DynamicSettings
 from stormbird_setup.lifting_line.solver import Linearized, Iterative
@@ -12,8 +12,6 @@ from stormbird_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryC
 from stormbird_setup.utils import revolutions_per_second_from_spin_ratio
 
 from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
-
-from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
 
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
@@ -80,7 +78,7 @@ def simulate_single_case(
                 section_points = section_points,
                 chord_vectors = chord_vectors,
                 line_segment_is_virtual = line_segment_is_virtual,
-                section_model = SectionModel.rotor_sail_deybach_2024(),
+                section_model = DefaultSail.RotorSailDeybach2024.section_model(),
                 non_zero_circulation_at_ends = non_zero_circulation_at_ends
             )
         )

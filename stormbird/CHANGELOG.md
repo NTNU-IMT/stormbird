@@ -2,11 +2,17 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
-## Unreleased
+## 0.11.1 - 2026-10-25
 ### Features
 - Two new, experimental, settings in the `LiftingLineCorrectionBuilder` for actuator line simulations, both turned off by default:
     - `max_correction_ratio`: limits the magnitude of the velocity correction at each control point to a ratio of the magnitude of the sampled velocity. Without a limit, the correction can become larger than the freestream velocity at the ends of wings with a large circulation at the ends, such as rotor sails, which reduces the lift and can make the simulations unstable.
     - `virtual_extension_factors`: virtual extensions of each wing at the first and the last end, only included in the reference model with the small viscous core. The extensions carry the circulation of the outermost line element, and move the tip vortices away from the ends of the wing, which can be used to represent end plates.
+
+### Changes
+- The default `induced_velocity_correction_method` in the `Linearized` solver is now `NoCorrection` (was `FullCorrection`). With `FullCorrection`, the circulation is corrected for stall with the angles of attack from the linear solution, while the forces, including the post-stall lift, are calculated with the angles of attack from the corrected circulation. Right before stall, sections could then get both an almost unstalled circulation and post-stall lift, which showed up as a jump in the lift. With `NoCorrection`, the correction and the forces use the same angles of attack, and the lift is smooth through the stall. Models with stall that are tuned with the linearized solver may need to be retuned, or set `FullCorrection` explicitly to keep the old behavior. The initial solution in the `Iterative` solver, with `start_with_linearized_solution`, still uses `FullCorrection`, so that the results of the iterative solver are unchanged.
+
+### Known issues
+- The controller and the wind environment use different definitions of the apparent wind direction. The controller measures it for each wing around the span direction, while the wind environment, and the lookup of inflow corrections, measures it around the `wind_rotation_axis`. For sails built from the bottom to the top, with the default wind environment, the two have opposite signs. Set points that are mirrored between positive and negative apparent wind directions are not affected. A fix is targeted for the next release, which will require set points that are not mirrored to be updated.
 
 ## 0.11.0 - 2026-10-23
 ### Highlights

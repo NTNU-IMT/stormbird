@@ -14,7 +14,7 @@ use crate::common_utils::prelude::*;
 use crate::lifting_line::wake::prelude::*;
 use super::velocity_corrections::VelocityCorrections;
 
-use super::linearized::Linearized;
+use super::linearized::{Linearized, InducedVelocityCorrectionMethod};
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
 /// The variable that is updated in each iteration of the iterative solver
@@ -356,7 +356,12 @@ impl Iterative {
         }
 
         if self.start_with_linearized_solution {
-            let linearized_solver = Linearized::default();
+            // The full correction gives the same initial solution as in earlier versions, which
+            // models tuned with the iterative solver depend on
+            let linearized_solver = Linearized {
+                induced_velocity_correction_method: InducedVelocityCorrectionMethod::FullCorrection,
+                ..Default::default()
+            };
 
             let linearized_result = linearized_solver.solve(
                 line_force_model,

@@ -20,7 +20,13 @@ class VariableToUpdate(Enum):
 class Linearized(StormbirdSetupBaseModel):
     velocity_corrections: VelocityCorrections = VelocityCorrections()
     disable_viscous_corrections: bool = False
-    induced_velocity_correction_method: InducedVelocityCorrectionMethod = InducedVelocityCorrectionMethod.FullCorrection
+    induced_velocity_correction_method: InducedVelocityCorrectionMethod = InducedVelocityCorrectionMethod.NoCorrection
+    """
+    How the induced velocities are updated after the viscous correction. The default, NoCorrection,
+    uses the induced velocities from the linear solution, so that the correction of the circulation
+    and the forces use the same angles of attack. FullCorrection was the default in earlier
+    versions, and can give a jump in the lift right before stall.
+    """
 
 
 class Iterative(StormbirdSetupBaseModel):

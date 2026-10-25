@@ -35,3 +35,16 @@ module-name = "pystormbird._native"
 python-source = "."
 features = ["pyo3/extension-module"]
 profile = "release"
+
+[tool.uv]
+# Rebuild when the Rust code changes, including the local stormbird and stormath libraries that are
+# used as path dependencies, so that `uv sync` in the examples picks up changes automatically
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "src/**/*.rs" },
+    { file = "../../stormbird/Cargo.toml" },
+    { file = "../../stormbird/src/**/*.rs" },
+    { file = "../../stormath/Cargo.toml" },
+    { file = "../../stormath/src/**/*.rs" },
+]

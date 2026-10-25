@@ -1,6 +1,6 @@
 [package]
 name = "pystormflow"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Jarle Kramer <jarle.kramer@gmail.com>"]
 description = "Python interface to the Stormflow CFD solver."
 homepage = "https://github.com/NTNU-IMT/stormbird"
@@ -16,8 +16,8 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = "0.29.0"
 stormath = {version = "0.4.0", features=["single_precision"]}
-stormbird = { version="0.11.0", features=["single_precision"]}
-stormflow = { version="0.2.0" }
+stormbird = { version="0.11.1", features=["single_precision"]}
+stormflow = { version="0.2.1" }
 
 [profile.release]
 opt-level = 3

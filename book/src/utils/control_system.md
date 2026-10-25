@@ -44,6 +44,12 @@ There is one `ControllerSetPoints` for each wing. Each time the controller is up
 
 The set points are given as a function of the apparent wind direction, and are linearly interpolated between the data points. The `angle_of_attack_data` gives the set points for the angle of attack, while the `internal_state_data` gives the set points for the internal state of each wing. Both are optional. If the angle of attack data is not given, the controller sets the local wing angle to zero, and if the internal state data is not given, the controller sets the internal state to zero. All set points are scaled by a *loading* factor, which can be used to reduce the sail forces, for instance in strong winds.
 
+### Sign of the apparent wind direction
+
+**Note**: the apparent wind direction in the set points is currently not defined in the same way as in the [wind environment](./wind_environment.md). The controller measures the apparent wind direction for each wing as the angle from the chord to the velocity, around the **span direction** of the wing. The wind environment measures it from the `zero_direction_vector`, around the `wind_rotation_axis`, which is also how the [inflow corrections](./wind_environment.md) are looked up. For sails that are built from the bottom to the top, in a wind environment where the `wind_rotation_axis` is opposite of the up direction, as by default, the two have opposite signs. That is, a wind from starboard has a positive apparent wind direction in the wind environment, but a negative apparent wind direction in the controller.
+
+This does not affect set points that are mirrored between positive and negative apparent wind directions, such as the [default sail models](../lifting_line/complete_sail_model.md#default-sail-models), as the controller is consistent with itself. However, set points that are different for the two sides of the sail must be given with the sign used by the controller. A fix, where the controller uses the same definition as the wind environment, is targeted for the next release of Stormbird. Set points that are not mirrored will then have to be updated.
+
 ### Angle of attack set points
 The angle of attack set point is reached by rotating each wing around its span axis, i.e., by changing the local wing angle. The `use_effective_angle_of_attack` setting defines how the local wing angle is computed:
 

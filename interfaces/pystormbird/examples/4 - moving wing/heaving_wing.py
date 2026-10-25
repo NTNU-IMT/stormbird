@@ -20,9 +20,7 @@ import numpy as np
 
 from enum import Enum
 
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly
+import matplotlib.pyplot as plt
 
 from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.section_models import SectionModel, Foil
@@ -221,10 +219,11 @@ if __name__ == "__main__":
     
     amplitude = amplitude_factor * chord_length
     
-    colors = plotly.colors.qualitative.Plotly
-    
-    fig = go.Figure()
-    
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    fig = plt.figure(figsize = (10, 5))
+    ax = fig.add_subplot(111)
+
     for freq_index, reduced_frequency in enumerate(reduced_frequencies):
         radial_frequency = radial_frequency_from_reduced_frequency(
             reduced_frequency, velocity = velocity, chord_length = chord_length
@@ -242,8 +241,8 @@ if __name__ == "__main__":
             )
 
             if mode == SimMode.QuasiStatic:
-                dash = "dash"
-                showlegend=False
+                line_style = "--"
+                label = None
 
                 # The three-dimensional lift slope of the wing, used in Theodorsen's model
                 lift_slope = fit_quasi_steady_lift_slope(
@@ -254,17 +253,15 @@ if __name__ == "__main__":
                     velocity = velocity
                 )
             else:
-                dash = "solid"
-                showlegend=True
+                line_style = "-"
+                label = f"reduced frequency {reduced_frequency}"
 
-            fig.add_trace(
-                go.Scatter(
-                    x = time / time[-1],
-                    y = cl,
-                    line=dict(color=colors[freq_index], dash=dash),
-                    name = f"reduced frequency {reduced_frequency}",
-                    showlegend=showlegend
-                )
+            ax.plot(
+                time / time[-1],
+                cl,
+                line_style,
+                color = colors[freq_index],
+                label = label
             )
 
         cl_theodorsen = heave_circulatory_lift_coefficient(
@@ -276,64 +273,23 @@ if __name__ == "__main__":
             lift_slope = lift_slope
         )
 
-        fig.add_trace(
-            go.Scatter(
-                x = time / time[-1],
-                y = cl_theodorsen,
-                line=dict(color=colors[freq_index], dash="dot"),
-                showlegend=False
-            )
-        )
+        ax.plot(time / time[-1], cl_theodorsen, ":", color = colors[freq_index])
 
-    fig.add_trace(
-        go.Scatter(
-            x=[None],
-            y=[None],
-            line=dict(color="grey", dash="solid"),
-            mode="lines",
-            name="Dynamic"
-        )
-    )
-    
-    fig.add_trace(
-        go.Scatter(
-            x=[None],
-            y=[None],
-            line=dict(color="grey", dash="dash"),
-            mode="lines",
-            name="Quasi-static"
-        )
-    )
+    # Legend entries for the line styles
+    ax.plot([], [], "-", color = "grey", label = "Dynamic")
+    ax.plot([], [], "--", color = "grey", label = "Quasi-static")
+    ax.plot([], [], ":", color = "grey", label = "Theodorsen")
 
-    fig.add_trace(
-        go.Scatter(
-            x=[None],
-            y=[None],
-            line=dict(color="grey", dash="dot"),
-            mode="lines",
-            name="Theodorsen"
-        )
-    )
+    ax.set_xlabel("Time / end time")
+    ax.set_ylabel("Lift coefficient")
 
-    fig.update_xaxes(title="Time / end time")
-    fig.update_yaxes(title="Lift coefficient")
-    
-    fig.update_layout(
-        width = 960,
-        height = 480,
-        margin=dict(t=20),
-        legend = dict(
-            orientation = "h",
-            yanchor = "top",
-            y = -0.15,
-            xanchor = "center",
-            x = 0.5
-        )
-    )
+    ax.legend(loc = "upper center", bbox_to_anchor = (0.5, -0.15), ncol = 5)
+
+    plt.tight_layout()
 
     if args.write_plots:
-        fig.write_image("heaving_wing.pdf")
-        fig.write_image("heaving_wing.svg")
-        fig.write_image("heaving_wing.png", scale=2)
-            
-    fig.show()
+        plt.savefig("heaving_wing.pdf")
+        plt.savefig("heaving_wing.svg")
+        plt.savefig("heaving_wing.png", dpi = 200)
+
+    plt.show()

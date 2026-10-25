@@ -2,6 +2,26 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## Unreleased
+### Highlights
+- New `default_sails` module with default sail models, classified by the `DefaultSail` enum. Each model is either a best guess for a generic sail, or tuned to a specific source in the literature: `GenericSingleElementWingSail`, `GenericTwoElementWingSail`, `RotorSailDeybach2024`, `RotorSailOstman2023` and `SuctionSailCharrier1985`.
+- Each default sail gives a `SailDefinition`, which contains the section model, controller set points, solver settings and circulation correction, as well as optional virtual extensions, force corrections and added mass. Models that are tuned to data include the simulation settings from the tuning. For instance, `SuctionSailCharrier1985` uses Gaussian smoothing and a virtual extension at the top, as these settings affect the lift at high suction. The definition is independent of the sail size, and can be scaled to different chord lengths and heights. The maximum revolutions per second of the rotor sails is given as a maximum tip speed, so that it scales with the diameter. The definition is a normal Pydantic model, so custom definitions can be stored as JSON files.
+- Each default sail is available for both the linearized and the iterative lifting line solver, selected with the `SolverType` enum, where the linearized solver is the default. The only difference is the stall angles and, for the suction sail, the stall ranges of the foils, which are set so that the maximum lift, and the angle of attack where it occurs, are about the same for both solvers.
+- New `CompleteSailModelBuilder.new_from_default_sail` class method, which sets up a complete sail model from a default sail or a custom definition, the sail positions, and the chord length and height. The sails are oriented after the up direction and zero direction vector in the wind environment. Sails with the base on the symmetry plane get a non-zero circulation at the base, which is used by the circulation corrections, while sails above the plane, e.g., on a deck, get zero circulation at both ends.
+
+### Breaking changes
+- The default models were moved from the `SectionModel` and `ControllerSetPoints` classes to the `default_sails` module. The `SectionModel` class methods `rotor_sail_deybach_2024`, `rotor_sail_ostman_2023`, `default_wing_sail_single_element`, `default_wing_sail_two_element` and `suction_sail_turbosail_charrier_1985`, and the `ControllerSetPoints` class methods `new_default_wing_sail_single_element`, `new_default_wing_sail_two_element`, `new_default_rotor_sail` and `new_default_suction_sail` are removed. Use, e.g., `DefaultSail.RotorSailDeybach2024.section_model()` and `DefaultSail.RotorSailDeybach2024.controller_set_points(diameter)` instead.
+- `SimpleSailSetup` and `SingleWingSimulation` are removed from the `simplified_setup` module. Use the `default_sails` module instead.
+- The default rotor sails now use the input power from the section model, instead of the polynomial input power model.
+- The maximum angle of attack set points of the default wing sails and suction sail are 5 degrees below the angle of attack where the 2D lift of the foils is at its maximum (at the maximum flap angle or suction coefficient), for each solver type. This gives 12.26 degrees for the single element wing sail (was 15), 6.16 degrees for the two-element wing sail (was 12), and 24.78 degrees for the suction sail (was 27), for the linearized solver.
+- The angle of attack set points of the default wing sails and suction sail are effective angles of attack (`use_effective_angle_of_attack = True`), so that multiple sails are operated close to the set points, also when they affect each other.
+- The `linearized` argument for the Deybach (2024) rotor sail model is removed.
+
+- The default `induced_velocity_correction_method` in the `Linearized` solver is now `NoCorrection` (was `FullCorrection`), as in the Rust library, which avoids a jump in the lift right before stall. The value is always included in the JSON output, so this also changes the results with older versions of Stormbird.
+
+### Bug fixes
+- The controller set points for the suction sail were given as a power coefficient of 0.3, while the section model uses the suction coefficient as the internal state. The set points are now given as suction coefficients, with a maximum of 0.05, which is the highest suction coefficient in the tuned data.
+
 ## 0.11.3 - 2026-10-24
 ### Features
 - Disks are now supported as geometries in OpenFOAM cases, for instance as end disks on rotor sails. They are meshed as solid cylinders, so they must have a thickness larger than zero, and the fillet radius must be zero.

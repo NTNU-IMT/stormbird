@@ -3,41 +3,27 @@ Functions for setting up and running simulations of the three-dimensional suctio
 the paper, shared by the scripts in this example.
 '''
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
+from stormbird_setup.default_sails import DefaultSail, SailDefinition, SolverType
 from stormbird_setup.section_models import (
-    SectionModel,
-    ActiveAirFlowFoil,
-    VaryingFoil,
-    Foil,
     InternalStateConversion,
     InternalStateConversionType,
-    InternalFlow,
 )
 from stormbird_setup.spatial_vector import SpatialVector
-from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
-from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
+from stormbird_setup.line_force_model import LineForceModelBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, QuasiSteadySettings
-from stormbird_setup.lifting_line.solver import Iterative
 from stormbird_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition
 
 from pystormbird.lifting_line import Simulation
 
-from suction_sail_data import CQ_VALUES_3D
-
-# Suction coefficient where the 2D data shows that the suction starts to have a large effect on
-# the lift, and the stall angle at this suction coefficient, from the 2D data
-CQ_THRESHOLD = 0.018
-STALL_ANGLE_AT_THRESHOLD_DEG = 16.0
-
-# The lift at zero angle of attack without suction and at the threshold. The 2D data gives 1.8 and
-# 2.18. The values are reduced, so that the maximum lift of the 3D model at low suction matches the
-# lowest point in the power curve, which is below the maximum lift in the 2D data without suction.
-# The power curve also indicates that the lift increases very little below the threshold.
-CL_ZERO_ANGLE_NO_SUCTION = 1.4
-CL_ZERO_ANGLE_AT_THRESHOLD = 1.5
+# Internal state conversion where the internal state is the suction coefficient, used directly by
+# the foil model. Used when the suction coefficient is given, rather than the power.
+SUCTION_COEFFICIENT_DIRECT = InternalStateConversion(
+    conversion_type = InternalStateConversionType.SuctionCoefficientDirect
+)
 
 @dataclass
 class SimulationResult:
@@ -63,133 +49,64 @@ class SimulationResult:
 
 @dataclass(kw_only=True)
 class SuctionSailModel:
+    '''
+    Lifting line model of the wind tunnel model in the paper, with one end against the wind tunnel
+    wall. The section model and the simulation settings are taken from the sail definition, which is
+    the default suction sail model in stormbird_setup. The version for the iterative solver is used
+    by default, as the model was tuned with it.
+    '''
     chord_length: float = 1.0
     height: float = 4.0
     nr_sections: int = 32
-    virtual_extension_factor: float = 0.1
-    smoothing_length_factor: float = 0.1
     density: float = 1.225
-    # When the internal flow model is not set, the internal state is the suction coefficient.
-    # Otherwise, it is the input power to the fan.
-    internal_flow: InternalFlow | None = None
-    fan_efficiency: float = 0.7
+    sail_definition: SailDefinition = field(
+        default_factory = lambda: DefaultSail.SuctionSailCharrier1985.definition(SolverType.Iterative)
+    )
+    # Replaces the internal state conversion in the sail definition, if set. Without it, the
+    # internal state is the input power to the fan.
+    internal_state_conversion: InternalStateConversion | None = None
 
     @property
     def area(self) -> float:
         return self.chord_length * self.height
 
-    def get_varying_foil(self) -> VaryingFoil:
-        # Foils for zero suction and for the suction coefficients in the 3D data. There is no 3D
-        # data without suction, so the lift for zero suction is based on the 2D data, while the
-        # drag is assumed to be high, as for the other suction coefficients.
-        internal_state_data = [0.0] + CQ_VALUES_3D
-
-        parameters = {
-            "cl_zero_angle": [CL_ZERO_ANGLE_NO_SUCTION, 2.5, 3.3, 3.55],
-            "cl_initial_slope": list(np.array([1.08, 1.25, 1.5, 1.65]) * 2*np.pi),
-            "cd_min": [0.4, 0.3, 0.2, 0.2],
-            "mean_positive_stall_angle": list(np.radians([17.0, 34, 37, 39.5])),
-            "stall_range": list(np.radians([6.0, 10.0, 10.0, 10])),
-            "cl_slope_reduction_factor_positive": [0.5, 0.4, 0.5, 0.5],
-            "cl_slope_reduction_onset_angle_positive": list(np.radians([8.0, 15.0, 12.0, 12.0])),
-            "cd_second_order_factor": [0.12]*4,
-        }
-
-        # The 2D data shows that the suction has a small effect on the lift below a threshold, and
-        # a large effect above. A foil is therefore added at the threshold, between zero suction
-        # and the lowest suction coefficient in the 3D data. The lift at zero angle of attack and
-        # the stall angle are based on the 2D data, while the other parameters are interpolated.
-        # The 2D data shows that the stall angle is close to the value without suction at the
-        # threshold, and only increases for larger suction coefficients.
-        weight = CQ_THRESHOLD / internal_state_data[1]
-
-        for values in parameters.values():
-            values.insert(1, values[0] + weight * (values[1] - values[0]))
-
-        parameters["cl_zero_angle"][1] = CL_ZERO_ANGLE_AT_THRESHOLD
-        parameters["mean_positive_stall_angle"][1] = np.radians(STALL_ANGLE_AT_THRESHOLD_DEG)
-
-        internal_state_data.insert(1, CQ_THRESHOLD)
-
-        foils_data = [
-            Foil(
-                mean_negative_stall_angle = float(np.radians(30.0)),
-                **{name: float(values[i]) for name, values in parameters.items()}
-            ) for i in range(len(internal_state_data))
-        ]
-
-        return VaryingFoil(
-            internal_state_data = internal_state_data,
-            foils_data = foils_data
-        )
-
-    def get_section_model(self) -> SectionModel:
-        if self.internal_flow is None:
-            internal_state_conversion = InternalStateConversion(
-                conversion_type = InternalStateConversionType.SuctionCoefficientDirect
-            )
-        else:
-            internal_state_conversion = InternalStateConversion.new_power_to_internal_flow(
-                internal_flow = self.internal_flow,
-                fan_efficiency = self.fan_efficiency
-            )
-
-        return SectionModel(
-            model = ActiveAirFlowFoil(
-                varying_foil = self.get_varying_foil(),
-                internal_state_conversion = internal_state_conversion
-            )
-        )
-
     def get_line_force_model(self) -> LineForceModelBuilder:
-        chord_vector = SpatialVector(x=self.chord_length)
-    
-        virtual_extension_length = self.virtual_extension_factor * self.height
-    
-        # The wing is oriented along the z-axis, starting at the symmetry plane. The circulation is not
-        # zero at the bottom of the wing, as the wing continues as a mirror image below the plane.
-        # A virtual extension is added at the top to increase induced drag.
-        wing_builder = WingBuilder(
-            section_points = [
-                SpatialVector(x=0.0, y=0.0, z=0.0),
-                SpatialVector(x=0.0, y=0.0, z=self.height),
-                SpatialVector(x=0.0, y=0.0, z=self.height + virtual_extension_length),
-            ],
-            chord_vectors = [chord_vector, chord_vector, chord_vector],
-            section_model = self.get_section_model(),
-            non_zero_circulation_at_ends = (True, False),
-            line_segment_is_virtual = [False, True],
+        # The wing starts at the symmetry plane, which represents the wind tunnel wall. The
+        # circulation is not zero at the bottom of the wing, as the wing continues as a mirror image
+        # below the plane.
+        wing_builder = self.sail_definition.wing_builder(
+            position = SpatialVector(x=0.0, y=0.0, z=0.0),
+            chord_length = self.chord_length,
+            height = self.height,
+            base_on_symmetry_plane = True
         )
-    
+
+        if self.internal_state_conversion is not None:
+            wing_builder.section_model.model.internal_state_conversion = self.internal_state_conversion
+
         line_force_model = LineForceModelBuilder(
             nr_sections = self.nr_sections,
             density = self.density,
-            circulation_correction = CirculationCorrectionBuilder.new_gaussian_smoothing(
-                self.smoothing_length_factor
-            )
+            circulation_correction = self.sail_definition.circulation_correction
         )
-    
+
         line_force_model.add_wing_builder(wing_builder)
 
         return line_force_model
 
     def get_simulation(self) -> Simulation:
         simulation_settings = QuasiSteadySettings(
-            solver = Iterative(
-                max_iterations_per_time_step = 1000,
-                damping_factor = 0.05,
-                start_with_linearized_solution = True
-            ),
+            solver = self.sail_definition.solver,
             wake = QuasiSteadyWakeSettings(
                 symmetry_condition = SymmetryCondition.Z
             )
         )
-    
+
         simulation_builder = SimulationBuilder(
             line_force_model = self.get_line_force_model(),
             simulation_settings = simulation_settings
         )
-    
+
         return Simulation(simulation_builder.to_json_string())
 
     def run_case(

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 import json
 
-from stormbird_setup.simplified_setup.single_wing_simulation import SolverType
+from single_wing_simulation import SolverType
 
 from single_case import simulate_single_case
 
