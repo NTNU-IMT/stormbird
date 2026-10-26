@@ -6,6 +6,9 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 ### Breaking changes
 - The `slip_wall_boundary_override` field of the Stormflow `SimulationBuilder` is removed, and replaced by the new `boundary_condition_type` field, which takes the new `BoundaryConditionType` enum: `WindInletOutlet` (default, as before) or `WindTunnel`, where the x axis goes from the inlet to the outlet, and all the faces along the y and z axes are slip walls. Requires Stormflow 0.3.0 or newer.
 
+### Other changes
+- The OpenFOAM `SimulationBuilder` has the same new `boundary_condition_type` field, using the same `BoundaryConditionType` enum, which is also exported from `stormbird_setup.openfoam`. With `WindTunnel`, the `vertical_sides`, `z_min` and `z_max` patches of the base folder are replaced by the patches `inlet`, `outlet` and `tunnel_walls`, which reuse the conditions of the vertical sides, the top and the bottom, respectively. The apparent wind must be along the positive x axis, which is checked when the builder is created. The default, `WindInletOutlet`, gives the same case as before.
+
 ## 0.11.3 - 2026-10-24
 ### highlights
 - New `default_sails` module with default sail models, classified by the `DefaultSail` enum. Each model is either a best guess for a generic sail, or tuned to a specific source in the literature: `GenericSingleElementWingSail`, `GenericTwoElementWingSail`, `RotorSailDeybach2024`, `RotorSailOstman2023` and `SuctionSailCharrier1985`.

@@ -52,7 +52,7 @@ END_DISK_DIAMETER = 1.5 * DIAMETER
 END_DISK_THICKNESS = 0.625
 
 # Linear lift slope, manually tuned so that the lift match the experimental data at spin ratio of 3
-LIFT_SLOPE = 2.74
+LIFT_SLOPE = 2.7
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
@@ -65,7 +65,7 @@ DENSITY = 1.0
 NR_SECTIONS = 32
 
 # Grid resolution at the rotor, used by both solvers. The chord length is the diameter.
-CELLS_PER_CHORD_LENGTH = 16
+CELLS_PER_CHORD_LENGTH = 8
 
 # Default settings for the mesh convergence tests. The resolutions are run from the lowest to the
 # highest.
@@ -188,7 +188,7 @@ def actuator_line_builder(spin_ratio: float, variant: Variant) -> ActuatorLineBu
     match variant:
         case Variant.EmpiricalCirculationCorrection:
             empirical_circulation_correction = EmpiricalCirculationCorrection(
-                exp_factor = 16.0
+                exp_factor = 32.0
             )
             lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition=SymmetryCondition.Z,
@@ -207,7 +207,10 @@ def actuator_line_builder(spin_ratio: float, variant: Variant) -> ActuatorLineBu
     return ActuatorLineBuilder(
         line_force_model=line_force_model,
         projection_settings=ProjectionSettings(
-            projection_function=Gaussian(chord_factor=0.6, thickness_factor=0.6)
+            projection_function=Gaussian(
+                chord_factor=0.5, 
+                thickness_factor=0.5
+            ),
         ),
         solver_settings=SolverSettings(damping_factor=0.05),
         sampling_settings=SamplingSettings(remove_span_velocity=True),

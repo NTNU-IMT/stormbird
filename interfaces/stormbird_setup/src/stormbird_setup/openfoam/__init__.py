@@ -11,6 +11,7 @@ from .results import ActuatorLineResults
 from .simulation_builder import SimulationBuilder
 from ..stormflow.geometry import GeometryBuilder, Sphere, Cuboid, Disk, TriangleMeshBuilder
 from ..stormflow.turbulence import IntensityAndViscosityRatio
+from ..stormflow.simulation_builder import BoundaryConditionType
 from ..wind import WindCondition, WindEnvironment
 
 __all__ = [
@@ -18,7 +19,7 @@ __all__ = [
     "GridBuilder", "RefinementBuilder",
     "SteadyTimeControl", "DynamicTimeControl",
     "ActuatorLineResults",
-    "SimulationBuilder",
+    "SimulationBuilder", "BoundaryConditionType",
     "GeometryBuilder", "Sphere", "Cuboid", "Disk", "TriangleMeshBuilder",
     "IntensityAndViscosityRatio",
     "WindCondition", "WindEnvironment",

@@ -11,7 +11,7 @@ from importlib.resources import as_file, files
 from pathlib import Path
 
 import numpy as np
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ..base_model import StormbirdSetupBaseModel
 from ..spatial_vector import SpatialVector
@@ -19,6 +19,7 @@ from ..wind import WindCondition, WindEnvironment
 from ..stormflow.geometry import GeometryBuilder, Sphere, Cuboid, Disk, TriangleMeshBuilder
 from ..actuator_line import ActuatorLineBuilder
 from ..stormflow.turbulence import IntensityAndViscosityRatio
+from ..stormflow.simulation_builder import BoundaryConditionType
 from .grid import GridBuilder
 from .time_control import SteadyTimeControl, DynamicTimeControl
 from .results import ActuatorLineResults
@@ -32,6 +33,20 @@ NR_WRITES = 10
 
 # Number of heights in the table of apparent wind velocities at the vertical sides of the domain
 NR_WIND_TABLE_HEIGHTS = 200
+
+# Faces of the wind tunnel patches in the blockMeshDict, using the vertex order of the base folder
+WIND_TUNNEL_PATCH_FACES: dict[str, list[str]] = {
+    "inlet": ["(0 4 7 3)"],
+    "outlet": ["(1 2 6 5)"],
+    "tunnel_walls": ["(0 1 5 4)", "(2 3 7 6)", "(0 3 2 1)", "(4 5 6 7)"],
+}
+
+# The patch in the base folder that each wind tunnel patch takes its boundary conditions from
+WIND_TUNNEL_PATCH_SOURCES: dict[str, str] = {
+    "inlet": "vertical_sides",
+    "outlet": "z_max",
+    "tunnel_walls": "z_min",
+}
 
 
 class SimulationBuilder(StormbirdSetupBaseModel):
@@ -53,6 +68,11 @@ class SimulationBuilder(StormbirdSetupBaseModel):
     or the linear velocity if there is no true wind. The values are the same at all heights.
     """
     time_control: SteadyTimeControl | DynamicTimeControl = Field(default_factory=SteadyTimeControl)
+    boundary_condition_type: BoundaryConditionType = BoundaryConditionType.WindInletOutlet
+    """
+    How the boundary conditions are assigned to the faces of the domain. `WindTunnel` requires the
+    apparent wind to be along the positive x axis.
+    """
     base_folder: str | None = None
     """Path to the OpenFOAM base case to start from. None means the base folder in this package."""
 
@@ -101,6 +121,47 @@ class SimulationBuilder(StormbirdSetupBaseModel):
             raise ValueError("Inflow corrections are not supported in OpenFOAM cases")
 
         return wind_environment
+
+    @model_validator(mode="after")
+    def check_wind_tunnel_inflow(self) -> "SimulationBuilder":
+        '''
+        The wind tunnel boundary conditions only make sense if the flow enters the domain through
+        the inlet at the start of the x axis, and does not flow into the walls. Uses the same check
+        as Stormflow, where the components are compared to the largest inlet velocity, as the
+        velocity may be zero at some heights.
+        '''
+        if self.boundary_condition_type != BoundaryConditionType.WindTunnel:
+            return self
+
+        velocities = [velocity for _, velocity in self._apparent_wind_table()]
+
+        max_velocity = max(math.sqrt(sum(c**2 for c in velocity)) for velocity in velocities)
+
+        if max_velocity == 0.0:
+            raise ValueError("The wind tunnel boundary conditions require a non-zero inlet velocity")
+
+        tolerance = 1e-3 * max_velocity
+
+        for velocity in velocities:
+            x, y, z = velocity
+
+            if x <= -tolerance or abs(y) >= tolerance or abs(z) >= tolerance:
+                raise ValueError(
+                    "The wind tunnel boundary conditions require the apparent wind to be along the "
+                    "positive x axis. Check the wind direction and the linear velocity. Got an "
+                    f"inlet velocity of {velocity}"
+                )
+
+        return self
+
+    def inlet_patch_name(self) -> str:
+        '''
+        The name of the patch where the apparent wind flows into the domain
+        '''
+        if self.boundary_condition_type == BoundaryConditionType.WindTunnel:
+            return "inlet"
+
+        return "vertical_sides"
 
     def representative_length(self) -> float:
         '''
@@ -241,8 +302,10 @@ class SimulationBuilder(StormbirdSetupBaseModel):
 
     def _write_block_mesh_dict(self, case_path: Path) -> None:
         '''
-        Sets the domain size and the number of cells in the background mesh. The boundary patches
-        are kept from the base folder, so the vertices are written in the same order as there.
+        Sets the domain size and the number of cells in the background mesh. The vertices are
+        written in the same order as in the base folder, so that the boundary patches there can be
+        kept. With the wind tunnel boundary conditions, the patches are replaced by the inlet, the
+        outlet and the tunnel walls.
         '''
         file_path = case_path / "system" / "blockMeshDict"
 
@@ -260,6 +323,9 @@ class SimulationBuilder(StormbirdSetupBaseModel):
         block_mesh_dict["blocks"] = [
             f"hex (0 1 2 3 4 5 6 7) ({nx} {ny} {nz}) simpleGrading (1 1 1)"
         ]
+
+        if self.boundary_condition_type == BoundaryConditionType.WindTunnel:
+            block_mesh_dict["boundary"] = _wind_tunnel_boundary_string()
 
         write_foam_file(file_path, block_mesh_dict)
 
@@ -441,7 +507,8 @@ class SimulationBuilder(StormbirdSetupBaseModel):
     def _write_boundary_conditions(self, case_path: Path) -> None:
         '''
         Sets the apparent wind and turbulence in the inflow, and adds boundary conditions for the
-        geometries. No-slip geometries use wall functions for the turbulence.
+        geometries. No-slip geometries use wall functions for the turbulence. With the wind tunnel
+        boundary conditions, the patches of the base folder are replaced by the wind tunnel patches.
         '''
         reference_velocity = self.turbulence_reference_velocity()
 
@@ -465,6 +532,9 @@ class SimulationBuilder(StormbirdSetupBaseModel):
             field = read_foam_file(file_path)
             boundary_field = _sub_dict(field, "boundaryField")
 
+            if self.boundary_condition_type == BoundaryConditionType.WindTunnel:
+                _replace_with_wind_tunnel_patches(boundary_field)
+
             for name, _, is_slip in self.named_geometries():
                 boundary_field[name] = {"type": "slip"} if is_slip else dict(no_slip_condition)
 
@@ -473,7 +543,9 @@ class SimulationBuilder(StormbirdSetupBaseModel):
 
                 field["internalField"] = "uniform " + _vector_string(initial_velocity)
 
-                apparent_wind = _sub_dict(boundary_field, "vertical_sides", "codeContext", "apparentWind")
+                apparent_wind = _sub_dict(
+                    boundary_field, self.inlet_patch_name(), "codeContext", "apparentWind"
+                )
                 apparent_wind["values"] = self._apparent_wind_table()
             elif field_name == "k":
                 field["internalField"] = f"uniform {k}"
@@ -515,6 +587,39 @@ def _sub_dict(data: FoamDict, *keys: str) -> FoamDict:
         data = value
 
     return data
+
+def _wind_tunnel_boundary_string() -> str:
+    '''
+    The boundary list in the blockMeshDict for the wind tunnel patches
+    '''
+    lines = ["("]
+
+    for name, faces in WIND_TUNNEL_PATCH_FACES.items():
+        lines += [f"\t{name}", "\t{", "\t\ttype patch;", "\t\tfaces", "\t\t("]
+        lines += [f"\t\t\t{face}" for face in faces]
+        lines += ["\t\t);", "\t}", ""]
+
+    lines.append(")")
+
+    return "\n".join(lines)
+
+def _replace_with_wind_tunnel_patches(boundary_field: FoamDict) -> None:
+    '''
+    Replaces the patches of the base folder with the wind tunnel patches in the boundary field of a
+    field file. The conditions already in the base folder are reused: the inlet gets the conditions
+    of the vertical sides, the outlet the conditions of the open top, and the walls the slip
+    conditions of the ground.
+    '''
+    sources = {
+        name: _sub_dict(boundary_field, source_name)
+        for name, source_name in WIND_TUNNEL_PATCH_SOURCES.items()
+    }
+
+    for source_name in WIND_TUNNEL_PATCH_SOURCES.values():
+        boundary_field.pop(source_name)
+
+    for name, condition in sources.items():
+        boundary_field[name] = condition
 
 def _vector_string(vector: SpatialVector) -> str:
     x, y, z = vector.as_tuple()

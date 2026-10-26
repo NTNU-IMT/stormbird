@@ -7,6 +7,7 @@ The [stormbird_setup](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces
 - `actuator_line`: an `ActuatorLineBuilder`, as described in the [simulation overview](./simulation_overview.md).
 - `wind_condition` and `linear_velocity`: the true wind and the velocity due to the motion of the ship, which are added together to give the apparent wind in the domain. The optional `wind_environment` field controls how the wind condition is interpreted. See the [wind environment chapter](../utils/wind_environment.md).
 - `geometries` and `slip_geometries`: other structures in the domain, with no-slip and slip walls respectively. Typically created with `GeometryBuilder.new_triangle_mesh(file_path)`.
+- `boundary_condition_type`: how the boundary conditions are assigned to the outer boundaries of the domain, given as a `BoundaryConditionType`, which can be imported from both `stormbird_setup.stormflow` and `stormbird_setup.openfoam`. The default, `WindInletOutlet`, is for wind propulsion devices in the open air, with the ground at the bottom of the domain, an open top, and the apparent wind flowing in and out through the vertical sides. `WindTunnel` is for reproducing wind tunnel experiments, with an inlet at the start of the x axis, an outlet at the end of it, and slip walls on all other faces. It requires the apparent wind to be along the positive x axis. The details for each solver are given in the [Stormflow chapter](./stormflow.md#boundary-conditions) and the [OpenFOAM section](#boundary-conditions) below.
 - `grid`: the domain size and resolution. The resolution is specified as a number of cells per *representative length*, which by default is the average chord length of the wings. It can be set manually with `grid.representative_length`, which is required if there is no actuator line model.
 
 ## Stormflow
@@ -30,7 +31,7 @@ simulation_builder = SimulationBuilder(
 )
 ```
 
-The builder also contains the solver settings (`velocity_solver`, `pressure_solver`, `solver_settings`, `turbulence` and `effective_viscosity`), which all have default values. The JSON string from the builder is the direct input to Stormflow:
+The builder also contains the solver settings (`velocity_solver`, `pressure_solver`, `solver_settings`, `turbulence` and `effective_viscosity`), which all have default values. The boundary conditions are described in the [Stormflow chapter](./stormflow.md#boundary-conditions). The JSON string from the builder is the direct input to Stormflow:
 
 ```python
 from pystormflow import Simulation
@@ -95,6 +96,10 @@ The fields are written 10 times during the simulation, and only the latest write
 
 ### Boundary conditions
 
+The boundary conditions are set up from the patches in the base folder, according to `boundary_condition_type`.
+
+With the default, `WindInletOutlet`, the patches in the base folder are used as they are: `vertical_sides`, `z_max` (top) and `z_min` (bottom):
+
 | Boundary | Velocity | Pressure | Turbulence |
 |---|---|---|---|
 | Vertical sides | Apparent wind where it flows into the domain, zero gradient where it flows out | Zero gradient | Inlet value where the flow enters, zero gradient where it leaves |
@@ -103,7 +108,19 @@ The fields are written 10 times during the simulation, and only the latest write
 | `geometries` | No slip | Zero gradient | Wall functions |
 | `slip_geometries` | Slip | Slip | Slip |
 
-The apparent wind at the vertical sides varies with height, as given by the `wind_condition`, `wind_environment` and `linear_velocity`. It is also used as the initial velocity in the domain, evaluated at 10 m height. Since the base folder assumes that z is up, `wind_environment.up_direction` must be `(0, 0, 1)`. Gusts and inflow corrections are not supported.
+With `WindTunnel`, the patches are replaced by `inlet` (the start of the x axis), `outlet` (the end of the x axis) and `tunnel_walls` (the faces along the y and z axes). The conditions are taken from the patches in the base folder: the inlet gets the conditions of the vertical sides, the outlet the conditions of the top, and the walls the slip conditions of the bottom. A custom base folder must therefore contain the same patches as the default one.
+
+| Boundary | Velocity | Pressure | Turbulence |
+|---|---|---|---|
+| `inlet` | Apparent wind where it flows into the domain, zero gradient where it flows out | Zero gradient | Inlet value where the flow enters, zero gradient where it leaves |
+| `outlet` | Zero gradient | Fixed at zero | Zero gradient |
+| `tunnel_walls` | Slip | Slip | Slip |
+| `geometries` | No slip | Zero gradient | Wall functions |
+| `slip_geometries` | Slip | Slip | Slip |
+
+The apparent wind must be along the positive x axis at all heights in the domain for `WindTunnel`, which is checked when the builder is created. Whether the flow enters the domain is decided from the direction of the apparent wind relative to the boundary, so the whole inlet has a fixed velocity in this case. This is a small difference from Stormflow, where the decision is made from the local velocity in the domain.
+
+In both variants, the apparent wind at the inlet varies with height, as given by the `wind_condition`, `wind_environment` and `linear_velocity`, so the velocity profile can be constant or follow an atmospheric boundary layer. It is also used as the initial velocity in the domain, evaluated at 10 m height. Since the base folder assumes that z is up, `wind_environment.up_direction` must be `(0, 0, 1)`. Gusts and inflow corrections are not supported.
 
 The turbulence is set by `inlet_turbulence`, which is an `IntensityAndViscosityRatio` with the fields `turbulence_intensity` (default 0.01) and `eddy_viscosity_ratio` (default 10). The values are the same at all heights, and are computed as `k = 1.5 (I U)^2` and `omega = k / (r nu)`, where `U` is the true wind velocity at 10 m height, or the magnitude of `linear_velocity` if there is no true wind, and `nu` is the viscosity in the base folder.
 
