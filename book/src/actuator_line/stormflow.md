@@ -26,7 +26,9 @@ Since the boundary layers are not resolved, nothing would force the flow to sepa
 By default, there is no turbulence model, and the `effective_viscosity` is a constant viscosity in the whole domain. Optionally, the realizable k-epsilon RANS model can be used, implemented in the same way as `realizableKE` in OpenFOAM. The main purpose is to make comparisons with conventional RANS solvers easier, as the eddy viscosity has a large effect on the wakes. When the model is used, `effective_viscosity` should be the molecular viscosity.
 
 ### Boundary conditions
-The outer boundaries are defined relative to the up direction of the [wind environment](../utils/wind_environment.md), which must be aligned with one of the grid axes.
+How the boundary conditions are assigned to the outer boundaries is set with the `boundary_condition_type` setting. In both variants, the up direction of the [wind environment](../utils/wind_environment.md) must be aligned with one of the grid axes.
+
+The default, `WindInletOutlet`, is for wind propulsion devices in the open air. The boundaries are defined relative to the up direction:
 
 | Boundary | Velocity | Pressure |
 |---|---|---|
@@ -34,7 +36,15 @@ The outer boundaries are defined relative to the up direction of the [wind envir
 | Top | Zero gradient | Fixed at zero |
 | Bottom | Slip | Zero gradient |
 
-The apparent wind at the sides varies with height, as given by the `wind_condition`, `wind_environment` and `linear_velocity`. All boundaries except the top can be changed to slip walls with the `slip_wall_boundary_override` setting.
+`WindTunnel` is for reproducing wind tunnel experiments. The flow must be along the positive x axis, and the up direction along the y or z axis:
+
+| Boundary | Velocity | Pressure |
+|---|---|---|
+| Start of the x axis (inlet) | Apparent wind where it flows into the domain, zero gradient where it flows out | Zero gradient |
+| End of the x axis (outlet) | Zero gradient | Fixed at zero |
+| All faces along the y and z axes | Slip | Zero gradient |
+
+The apparent wind at the inlet varies with height, as given by the `wind_condition`, `wind_environment` and `linear_velocity`, so it can, for instance, be constant or follow an atmospheric boundary layer.
 
 ## Installation
 `pystormflow` is installed with pip. It is compiled during the installation, so the [Rust toolchain](https://rust-lang.org/) must be installed first:

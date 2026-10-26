@@ -64,13 +64,12 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
         ));
     }
 
-    if let BoundaryCase::DownwardUpDirectionAndSideWalls = boundary_case {
+    if let BoundaryCase::DownwardUpDirectionWindTunnel = boundary_case {
         setup["wind_environment"] = serde_json::json!({
             "up_direction": {"x": 0.0, "y": 0.0, "z": -1.0},
             "wind_rotation_axis": {"x": 0.0, "y": 0.0, "z": -1.0}
         });
-        setup["wind_condition"]["direction_coming_from"] = 0.3.into();
-        setup["slip_wall_boundary_override"] = serde_json::json!([[false, false], [true, true], [false, false]]);
+        setup["boundary_condition_type"] = "WindTunnel".into();
     }
 
     setup.to_string()
@@ -80,10 +79,10 @@ fn setup_string(velocity_platform: &str, pressure_platform: &str, boundary_case:
 enum BoundaryCase {
     /// The boundary conditions of the example: the ground at the start of the z-axis
     Default,
-    /// The up direction along the negative z-axis, which puts the ground at the end of the z-axis,
-    /// and slip walls on both y faces, with an oblique wind, so that slip walls at both the start
-    /// and the end of an axis are exercised.
-    DownwardUpDirectionAndSideWalls,
+    /// The wind tunnel boundary conditions, with the up direction along the negative z-axis, so
+    /// that slip walls at both the start and the end of the y and z axes, and the outlet at the end
+    /// of the x axis, are exercised.
+    DownwardUpDirectionWindTunnel,
     /// The boundary conditions of the example, with an extra slip cuboid standing on the ground
     SlipCuboidOnGround,
     /// The same as `SlipCuboidOnGround`, with the data immersion close to the sharp edges of the
@@ -237,8 +236,8 @@ fn gpu_velocity_solver_matches_cpu_with_gpu_pressure_solver() {
 }
 
 #[test]
-fn gpu_velocity_solver_matches_cpu_with_downward_up_direction_and_side_walls() {
-    assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::DownwardUpDirectionAndSideWalls);
+fn gpu_velocity_solver_matches_cpu_with_downward_up_direction_wind_tunnel() {
+    assert_gpu_velocity_matches_cpu("GPU", BoundaryCase::DownwardUpDirectionWindTunnel);
 }
 
 #[test]
@@ -270,7 +269,7 @@ fn setup_inlet_velocity_magnitude() -> Float {
         &builder.wind_environment,
         &builder.wind_condition,
         builder.linear_velocity,
-        builder.slip_wall_boundary_override,
+        builder.boundary_condition_type,
         &grid
     );
 

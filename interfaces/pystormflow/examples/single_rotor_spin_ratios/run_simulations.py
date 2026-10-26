@@ -10,6 +10,7 @@ import pandas as pd
 from pystormflow import Simulation
 from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.stormflow import (
+    BoundaryConditionType,
     ComputePlatform,
     GridBuilder,
     MultigridSettingsBuilder,
@@ -44,11 +45,7 @@ def simulation_builder(
         pressure_solver=PressureSolverBuilder(
             settings=MultigridSettingsBuilder(compute_platform=compute_platform)
         ),
-        slip_wall_boundary_override = [
-            [False, False],
-            [True, True],
-            [True, False]
-        ]
+        boundary_condition_type=BoundaryConditionType.WindTunnel,
     )
 
 def run_case(spin_ratio: float, variant: Variant, compute_platform: ComputePlatform) -> dict[str, float]:

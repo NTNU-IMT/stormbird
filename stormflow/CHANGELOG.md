@@ -2,6 +2,13 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
+## 0.3.0 - unreleased
+### Breaking changes
+- The `slip_wall_boundary_override` setting is removed, and replaced by the new `boundary_condition_type` setting, which selects how the boundary conditions are assigned to the faces of the domain. Setup files that contain `slip_wall_boundary_override` can no longer be read. There are two variants:
+  - `WindInletOutlet` (default) works exactly as before without the override: the ground is a slip wall, the top is open with a zero pressure, and the remaining faces are inlet/outlet boundaries.
+  - `WindTunnel` is new, and is meant for reproducing wind tunnel experiments. The start of the x axis is the inlet, the end of the x axis is an outlet, with a zero gradient condition on the velocity and the turbulence fields, and a zero pressure, and all the faces along the y and z axes are slip walls. The inlet velocity must be along the positive x axis, and the up direction along the y or z axis, which is checked when the simulation is built. The inlet profile is given by the wind condition, as before.
+- `VelocityBoundaryConditions::new` takes a `BoundaryConditionType` instead of the slip wall override.
+
 ## 0.2.1 - 2026-10-25
 - Updated to stormbird v0.11.1, which is a small change. The main feature is new experimental limits on the lifting line correction (see the stormbird release notes for more)
 

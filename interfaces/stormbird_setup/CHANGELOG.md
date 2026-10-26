@@ -2,6 +2,10 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.11.4 - unreleased
+### Breaking changes
+- The `slip_wall_boundary_override` field of the Stormflow `SimulationBuilder` is removed, and replaced by the new `boundary_condition_type` field, which takes the new `BoundaryConditionType` enum: `WindInletOutlet` (default, as before) or `WindTunnel`, where the x axis goes from the inlet to the outlet, and all the faces along the y and z axes are slip walls. Requires Stormflow 0.3.0 or newer.
+
 ## 0.11.3 - 2026-10-24
 ### highlights
 - New `default_sails` module with default sail models, classified by the `DefaultSail` enum. Each model is either a best guess for a generic sail, or tuned to a specific source in the literature: `GenericSingleElementWingSail`, `GenericTwoElementWingSail`, `RotorSailDeybach2024`, `RotorSailOstman2023` and `SuctionSailCharrier1985`.
