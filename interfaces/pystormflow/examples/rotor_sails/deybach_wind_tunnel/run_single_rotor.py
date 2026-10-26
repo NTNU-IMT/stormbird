@@ -1,7 +1,16 @@
 '''
-Runs actuator line simulations of a single rotor sail with Stormflow, for a range of spin ratios and 
-compares the results against the data from Deybach et al. (2024). See rotor_setup.py for the 
-actuator line model, which is shared with the OpenFOAM version of this example.
+Runs actuator line simulations of a single rotor sail with Stormflow, for a range of spin ratios. See
+rotor_setup.py for the actuator line model and the flow settings, which are shared with the OpenFOAM
+version of this example. By default, only the recommended variant of the model is simulated. Use
+--variant to choose one or more other variants, or all of them:
+
+    python run_single_rotor.py --variant lifting_line no_corrections
+    python run_single_rotor.py --variant all
+
+The force history of each case is stored as a time series in time_series_stormflow, and the results
+are plotted with plotting.py:
+
+    python plotting.py means
 '''
 
 import argparse
@@ -21,26 +30,30 @@ from stormbird_setup.stormflow import (
 from tqdm import tqdm
 
 import rotor_setup
-from plotting import TIME_SERIES_FOLDER, mean_coefficients, time_series_path
+from plotting import Solver, mean_coefficients, time_series_path, write_time_series
 from rotor_setup import Variant
 
-COURANT_NUMBER = 0.75
 
 def simulation_builder(
     spin_ratio: float,
     variant: Variant,
     compute_platform: ComputePlatform,
-    cells_per_chord_length: int = rotor_setup.CELLS_PER_CHORD_LENGTH
+    cells_per_chord_length: int = rotor_setup.CELLS_PER_CHORD_LENGTH,
+    rotor_locations: list[SpatialVector] | None = None
 ) -> SimulationBuilder:
+    '''
+    The domain is the wind tunnel from the experiments, with slip walls on the sides and the top
+    '''
     return SimulationBuilder(
         grid=GridBuilder(
-            start_point=SpatialVector(x=-40.0, y=-1.04*rotor_setup.HEIGHT, z=0.0),
-            end_point=SpatialVector(x=80.0, y=1.04*rotor_setup.HEIGHT, z=rotor_setup.HEIGHT*1.25),
+            start_point=rotor_setup.tunnel_start_point(),
+            end_point=rotor_setup.tunnel_end_point(),
             cells_per_representative_length=(cells_per_chord_length,) * 3,
         ),
         wind_condition=rotor_setup.wind_condition(),
         linear_velocity=SpatialVector(),
-        actuator_line=rotor_setup.actuator_line_builder(spin_ratio, variant),
+        actuator_line=rotor_setup.actuator_line_builder(spin_ratio, variant, rotor_locations),
+        effective_viscosity=rotor_setup.EFFECTIVE_VISCOSITY,
         velocity_solver=VelocitySolverBuilder(compute_platform=compute_platform),
         pressure_solver=PressureSolverBuilder(
             settings=MultigridSettingsBuilder(compute_platform=compute_platform)
@@ -51,10 +64,7 @@ def simulation_builder(
 def run_case(spin_ratio: float, variant: Variant, compute_platform: ComputePlatform) -> dict[str, float]:
     force_history = simulate_force_history(spin_ratio, variant, compute_platform)
 
-    # The full force history is stored, and the mean values are calculated from it when plotting
-    TIME_SERIES_FOLDER.mkdir(exist_ok=True)
-
-    force_history.to_csv(time_series_path(variant, spin_ratio), index=False)
+    write_time_series(force_history, time_series_path(variant, spin_ratio, Solver.Stormflow))
 
     return mean_coefficients(force_history)
 
@@ -62,12 +72,16 @@ def simulate_force_history(
     spin_ratio: float,
     variant: Variant,
     compute_platform: ComputePlatform,
-    cells_per_chord_length: int = rotor_setup.CELLS_PER_CHORD_LENGTH
+    cells_per_chord_length: int = rotor_setup.CELLS_PER_CHORD_LENGTH,
+    rotor_locations: list[SpatialVector] | None = None
 ) -> pd.DataFrame:
     '''
-    Runs a single case, and returns the force on the rotor as a function of time
+    Runs a single case, and returns the force on the first rotor as a function of time. A single
+    rotor at the origin is used if no rotor locations are given.
     '''
-    builder = simulation_builder(spin_ratio, variant, compute_platform, cells_per_chord_length)
+    builder = simulation_builder(
+        spin_ratio, variant, compute_platform, cells_per_chord_length, rotor_locations
+    )
 
     end_time = rotor_setup.END_TIME
 
@@ -80,10 +94,10 @@ def simulate_force_history(
     time = 0.0
 
     with tqdm(
-        total=end_time, 
+        total=end_time,
         bar_format="{l_bar}{bar}| {n:.1f}/{total:.1f} s [elapsed: {elapsed}, remaining: {remaining}]") as progress:
         while time < end_time:
-            time_step = simulation.time_step_from_courant_number(COURANT_NUMBER)
+            time_step = simulation.time_step_from_courant_number(rotor_setup.COURANT_NUMBER)
 
             simulation.do_step(time, time_step)
 
@@ -110,16 +124,16 @@ if __name__ == '__main__':
         help="Spin ratios to simulate"
     )
     parser.add_argument("--cpu", action="store_true", help="Run on the CPU instead of the GPU")
+    rotor_setup.add_variant_argument(parser, "simulate")
 
     args = parser.parse_args()
 
     compute_platform = ComputePlatform.CPU if args.cpu else ComputePlatform.GPU
 
-    variant = Variant.TipLossCorrection
+    for variant in rotor_setup.variants_from_arguments(args.variant):
+        for spin_ratio in args.spin_ratios:
+            print(f"{variant.label}, spin ratio: {spin_ratio}")
 
-    for spin_ratio in args.spin_ratios:
-        print(f"{variant.label}, spin ratio: {spin_ratio}")
+            coefficients = run_case(spin_ratio, variant, compute_platform)
 
-        coefficients = run_case(spin_ratio, variant, compute_platform)
-
-        print(f"cl = {coefficients['cl']:.3f}, cd = {coefficients['cd']:.3f}")
+            print(f"cl = {coefficients['cl']:.3f}, cd = {coefficients['cd']:.3f}")

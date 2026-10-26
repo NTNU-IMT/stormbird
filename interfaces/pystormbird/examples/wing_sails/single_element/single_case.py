@@ -24,7 +24,7 @@ def get_section_model(solver: SolverType):
     As such, the section model for the linearized solver is set to have a lower overall stall angle.
     '''
 
-    # From example 1 - section models
+    # From the section model example, in wing_sails/section_models
     cl_initial_slope = 5.794665  
     cd_min = 0.0186
     cd_second_order_factor = 0.9

@@ -27,7 +27,7 @@ def suction_sail_charrier_1985(solver_type: SolverType = SolverType.Linearized) 
     mirrored foils.
 
     The values are generated with the scripts in the pystormbird example
-    "interfaces/pystormbird/examples/9 - suction sail", and are hard coded here:
+    "interfaces/pystormbird/examples/suction_sails/turbosail", and are hard coded here:
 
     - The foils for the suction coefficients 0.027, 0.036 and 0.05 are tuned manually to the 3D lift
       and drag data (compare_3d_lift_and_drag.py).
