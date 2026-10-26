@@ -27,6 +27,17 @@ class LiftingLineCorrectionBuilder(StormbirdSetupBaseModel):
     from the ends of the wing, which can be used to model end plates. No extensions by default.
     """
 
-class EmpiricalCirculationCorrection(StormbirdSetupBaseModel):
+class TipLossCorrection(StormbirdSetupBaseModel):
+    """
+    Empirical correction of the circulation close to the ends of the wings, with a shape similar to
+    the Prandtl tip loss factor.
+    """
     exp_factor: float = 10.0
-    overall_correction: float = 1.0
+    """
+    Factor that determines how fast the correction approaches one away from the ends of the wings.
+    """
+    maintain_mean_value: bool = True
+    """
+    If true, the corrected circulation on each wing is scaled so that the mean value over the span
+    is the same as before the correction. Requires Stormbird 0.12.0 or newer.
+    """

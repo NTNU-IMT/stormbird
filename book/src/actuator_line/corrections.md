@@ -8,7 +8,7 @@ However, at least when using isotropic force projections, it is often impractica
 
 As explored in the paper by [Churchfield et al., 2017](../literature/simulation_methods.md#an-advanced-actuator-line-method-for-wind-energy-applications-and-beyond-2017), this is an issue that might also be solved by using force projection shapes that are more physically representative of a real wing, i.e. like with anisotropic kernels. However, other techniques are also often used, and the exact effect of the anisotropic force projection width deserves more investigation.
 
-The Stormbird library currently implements two different correction methods based on suggestions from the literature.
+The Stormbird library currently implements two different correction methods based on suggestions from the literature: a lifting line correction of the sampled velocity, and an empirical tip loss correction of the circulation.
 
 ## Lifting line correction for the induced velocity
 
@@ -61,9 +61,9 @@ Two additional settings are available, which are still experimental:
 
 Experience from this correction technique is that it works very well for actuator line simulations that only include wings. Even with a **large isotropic projection width**, the result from an actuator line simulation will match the lifting line model almost perfectly. However, it can also create instabilities when combined with complex ship geometries. **The hope is to find a solution to this in the future**, as this type of correction is believed to be very general and promising for practical use cases.
 
-## Empirical circulation correction
+## Tip loss correction
 
-A more classical correction technique for actuator line simulations is to use an empirical correction factor to the calculated circulation on each wing. As mentioned, the *raw circulation at the tips* is often predicted to be too large. A simple solution is, then, to artificially reduce it based on an analytical correction. There are many small variations in how this is done. A recent discussion about the topic can be found in the paper by [Wimshurst and Willden, 2018](../literature/simulation_methods.md#spanwise-flow-corrections-for-tidal-turbines-2018). The correction in Stormbird follows the following principle:
+A more classical correction technique for actuator line simulations is to use an empirical correction factor to the calculated circulation on each wing, often referred to as a tip loss correction. As mentioned, the *raw circulation at the tips* is often predicted to be too large. A simple solution is, then, to artificially reduce it based on an analytical correction. There are many small variations in how this is done. A recent discussion about the topic can be found in the paper by [Wimshurst and Willden, 2018](../literature/simulation_methods.md#spanwise-flow-corrections-for-tidal-turbines-2018). The correction in Stormbird follows the following principle:
 
 The raw circulation distribution, \\( \Gamma\_{raw} \\), estimated directly from the sampled velocity, is multiplied by a correction function, \\( f\_{cor}(s) \\), that takes the non-dimensional span distance at each wing, \\( s \\) as input, as well as a shape parameter \\( \beta \\). The function has the following shape:
 
@@ -74,20 +74,26 @@ The raw circulation distribution, \\( \Gamma\_{raw} \\), estimated directly from
 The plot below shows how the correction function looks for different values of \\( \beta \\). In general, any value of \\( \beta \\) will force the circulation towards zero at the tips. However, the larger the value, the steeper the reduction towards the tip, and the less effect it has on the inner part of the wing.
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<div id="circulation-correction-plot"></div>
-<script src="plot_scripts/circulation-correction-plot.js"></script>
+<div id="tip-loss-correction-plot"></div>
+<script src="plot_scripts/tip-loss-correction-plot.js"></script>
 
 ### Input structure
 
-To activate this correction, the `EmpiricalCirculationCorrection` structure must be set in the `ActuatorLineBuilder`, as shown below:
+To activate this correction, the `TipLossCorrection` structure must be set as the `tip_loss_correction` in the `ActuatorLineBuilder`. The available options are shown below:
 
 ```rust
-pub struct EmpiricalCirculationCorrection {
+pub struct TipLossCorrection {
     pub exp_factor: f64,
-    pub overall_correction: f64,
+    pub maintain_mean_value: bool,
 }
 ```
 
 The `exp_factor` corresponds to the \\( \beta \\) variable in the equation above. It is set to 10.0 by default, but should ideally always be tuned for the specific case. The idea with this type of correction is to first tune the shape parameter based on simulation of a single wing, and then assume that it can remain constant also when simulating multiple wings or wings on a ship.
 
-The `overall_correction` is a global correction factor applied to the entire circulation distribution, that can be used to either increase or decrease the overall circulation level. It is set to 1.0 by default.
+The `maintain_mean_value` flag is set to true by default. The correction function above is always less than one, so on its own, it reduces the mean circulation on each wing, and therefore also the total lift. When `maintain_mean_value` is true, the corrected circulation on each wing is instead scaled with a constant factor, so that the mean value over the span, weighted with the length of each line segment, is the same as before the correction:
+
+\\[
+  \Gamma\_{cor} = k \, f\_{cor} \, \Gamma\_{raw}, \quad k = \frac{\sum \Gamma\_{raw} \, l}{\sum f\_{cor} \, \Gamma\_{raw} \, l}
+\\]
+
+where \\( l \\) is the length of each line segment, and the sums are taken over all the line segments on the wing. The correction then only changes the shape of the circulation distribution, by moving circulation from the ends of the wing towards the middle. The idea is that the actuator line model is assumed to predict the overall level of the circulation well, while the circulation at the ends is too large. If the sum in the denominator is close to zero compared to the sum of the absolute values of the raw circulation, for instance when the lift on the wing is close to zero, the scaling is skipped to avoid dividing by a very small number. Setting `maintain_mean_value` to false gives the correction without any scaling.

@@ -4,7 +4,7 @@ the mean values are calculated from them when plotting. Run as a script to eithe
 series, or the mean values of all stored simulations against the data from Deybach et al. (2024):
 
     python plotting.py means
-    python plotting.py time-series --spin-ratio 3.0 --variant empirical_correction
+    python plotting.py time-series --spin-ratio 3.0 --variant tip_loss_correction
 
 The plots are shown directly by default. Use --save (before the command) to save them to file instead.
 '''
@@ -235,7 +235,7 @@ if __name__ == '__main__':
         "--spin-ratio", type=float, required=True, help="Spin ratio of the case to plot"
     )
     time_series_parser.add_argument(
-        "--variant", default=Variant.EmpiricalCirculationCorrection.value,
+        "--variant", default=Variant.TipLossCorrection.value,
         choices=[variant.value for variant in Variant], help="Variant of the case to plot"
     )
 

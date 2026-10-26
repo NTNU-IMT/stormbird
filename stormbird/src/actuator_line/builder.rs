@@ -20,7 +20,7 @@ use super::spanflow_damper::SpanflowDamper;
 
 use super::corrections::{
     lifting_line::LiftingLineCorrectionBuilder,
-    empirical_circulation::EmpiricalCirculationCorrection,
+    tip_loss::TipLossCorrection,
 };
 
 
@@ -51,9 +51,9 @@ pub struct ActuatorLineBuilder {
     /// Optional correction of the velocity, based on a lifting line model
     #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
-    /// Optional empirical correction of the circulation
+    /// Optional empirical tip loss correction of the circulation
     #[serde(default)]
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    pub tip_loss_correction: Option<TipLossCorrection>,
     /// Optional damping of the flow along the span
     #[serde(default)]
     pub spanflow_damper: Option<SpanflowDamper>
@@ -80,7 +80,7 @@ impl ActuatorLineBuilder {
             write_iterations_full_result: Self::default_write_iterations_full_result(),
             start_time: 0.0,
             lifting_line_correction: None,
-            empirical_circulation_correction: None,
+            tip_loss_correction: None,
             spanflow_damper: None,
         }
     }
@@ -122,7 +122,7 @@ impl ActuatorLineBuilder {
             sectional_lift_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             sectional_drag_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             lifting_line_correction,
-            empirical_circulation_correction: self.empirical_circulation_correction.clone(),
+            tip_loss_correction: self.tip_loss_correction.clone(),
             spanflow_damper: self.spanflow_damper.clone()
         }
     }

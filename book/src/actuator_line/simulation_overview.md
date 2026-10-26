@@ -17,7 +17,7 @@ pub struct ActuatorLineBuilder {
     pub start_time: f64,
     pub controller: Option<ControllerBuilder>,
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    pub tip_loss_correction: Option<TipLossCorrection>,
     pub spanflow_damper: Option<SpanflowDamper>,
 }
 ```

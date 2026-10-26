@@ -8,7 +8,7 @@ from ..base_model import StormbirdSetupBaseModel
 from ..line_force_model import LineForceModelBuilder
 
 from .settings import ProjectionSettings, SolverSettings, SamplingSettings
-from .corrections import LiftingLineCorrectionBuilder, EmpiricalCirculationCorrection
+from .corrections import LiftingLineCorrectionBuilder, TipLossCorrection
 
 from ..controller import ControllerBuilder
 
@@ -25,4 +25,7 @@ class ActuatorLineBuilder(StormbirdSetupBaseModel):
     Correction of the sampled velocity, based on a lifting line model. Used by default. Set to `None`
     to turn the correction off.
     """
-    empirical_circulation_correction: EmpiricalCirculationCorrection | None = None
+    tip_loss_correction: TipLossCorrection | None = None
+    """
+    Empirical tip loss correction of the circulation. Not used by default.
+    """

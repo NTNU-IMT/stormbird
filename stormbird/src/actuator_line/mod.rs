@@ -41,7 +41,7 @@ use spanflow_damper::SpanflowDamper;
 
 use corrections::{
     lifting_line::LiftingLineCorrection,
-    empirical_circulation::EmpiricalCirculationCorrection,
+    tip_loss::TipLossCorrection,
 };
 
 #[derive(Debug, Clone)]
@@ -74,8 +74,8 @@ pub struct ActuatorLine {
     pub sectional_drag_forces_to_project: Vec<SpatialVector>,
     /// Corrections based on the lifting line model
     pub lifting_line_correction: Option<LiftingLineCorrection>,
-    /// Empirical correction for the circulation strength, also known as a tip loss factor
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    /// Empirical tip loss correction of the circulation strength
+    pub tip_loss_correction: Option<TipLossCorrection>,
     /// Optional model to dampen spanwise flow at the control points
     pub spanflow_damper: Option<SpanflowDamper> 
 }
@@ -295,14 +295,8 @@ impl ActuatorLine {
             &corrected_ctrl_points_velocity
         );
 
-        if let Some(empirical_circulation_correction) = &self.empirical_circulation_correction {
-            let non_dim_span_positions = &self.line_force_model.ctrl_point_spanwise_distance_circulation_model;
-
-            for i in 0..new_estimated_circulation_strength.len() {
-                new_estimated_circulation_strength[i] *= empirical_circulation_correction.correction_factor(
-                    non_dim_span_positions[i]
-                );
-            }
+        if let Some(tip_loss_correction) = &self.tip_loss_correction {
+            tip_loss_correction.apply(&mut new_estimated_circulation_strength, &self.line_force_model);
         }
 
         let previous_strength = if let Some(simulation_result) = &self.simulation_result {

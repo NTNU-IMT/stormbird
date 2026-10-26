@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     compute_platform = ComputePlatform.CPU if args.cpu else ComputePlatform.GPU
 
-    variant = Variant.EmpiricalCirculationCorrection
+    variant = Variant.TipLossCorrection
 
     for spin_ratio in args.spin_ratios:
         print(f"{variant.label}, spin ratio: {spin_ratio}")

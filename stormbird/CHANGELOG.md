@@ -2,6 +2,17 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## 0.12.0 - unreleased
+### Breaking changes
+- The `EmpiricalCirculationCorrection` for actuator line simulations is renamed to `TipLossCorrection`, and the field in the `ActuatorLineBuilder` is renamed from `empirical_circulation_correction` to `tip_loss_correction`. The source file is renamed from `corrections/empirical_circulation.rs` to `corrections/tip_loss.rs`.
+- The `overall_correction` factor in the correction is removed. The correction now rejects unknown fields, so input that still contains `overall_correction` gives an error.
+
+### Features
+- New `maintain_mean_value` setting in the `TipLossCorrection`, turned on by default. When it is on, the corrected circulation on each wing is scaled so that the mean value over the span, weighted with the length of each line segment, is the same as before the correction. The correction then redistributes the circulation from the ends of the wings towards the middle, rather than reducing it. If the mean value of the corrected circulation is close to zero, the scaling is skipped. Set `maintain_mean_value` to false to get the same behavior as before.
+
+### Changes
+- The logic for the tip loss correction is moved from the `ActuatorLine` structure to a new `apply` function on the `TipLossCorrection`.
+
 ## 0.11.1 - 2026-10-25
 ### Features
 - Two new, experimental, settings in the `LiftingLineCorrectionBuilder` for actuator line simulations, both turned off by default:

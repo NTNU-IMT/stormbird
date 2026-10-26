@@ -4,5 +4,5 @@
 
 /// Correction of the velocity, based on a lifting line model
 pub mod lifting_line;
-/// Empirical correction of the circulation
-pub mod empirical_circulation;
+/// Empirical tip loss correction of the circulation
+pub mod tip_loss;

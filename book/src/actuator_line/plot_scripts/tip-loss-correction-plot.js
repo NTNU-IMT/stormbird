@@ -44,4 +44,4 @@ var layout = {
   },
 };
 
-Plotly.newPlot('circulation-correction-plot', traces, layout);
+Plotly.newPlot('tip-loss-correction-plot', traces, layout);

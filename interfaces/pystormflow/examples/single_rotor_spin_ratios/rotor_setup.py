@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 from stormbird_setup.actuator_line import (
     ActuatorLineBuilder,
-    EmpiricalCirculationCorrection,
+    TipLossCorrection,
     Gaussian,
     LiftingLineCorrectionBuilder,
     ProjectionSettings,
@@ -39,6 +39,7 @@ from stormbird_setup.wind import WindCondition
 
 DIAMETER = 5.0
 HEIGHT = 30.0
+ASPECT_RATIO = HEIGHT/DIAMETER
 FOUNDATION_HEIGHT = 1.875
 VELOCITY = 8.0
 
@@ -51,8 +52,9 @@ FOUNDATION_DEPTH_BELOW_GROUND = 1.0
 END_DISK_DIAMETER = 1.5 * DIAMETER
 END_DISK_THICKNESS = 0.625
 
-# Linear lift slope, manually tuned so that the lift match the experimental data at spin ratio of 3
-LIFT_SLOPE = 2.7
+# Linear lift slope, manually tuned so that the lift match the experimental data at a spin ratio
+# around 1
+LIFT_SLOPE = 2.6
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
@@ -88,7 +90,7 @@ class Variant(Enum):
     '''
     NoCorrections = "no_corrections"
     LiftingLineCorrection = "ll_correction"
-    EmpiricalCirculationCorrection = "empirical_correction"
+    TipLossCorrection = "tip_loss_correction"
     
 
     @property
@@ -98,8 +100,8 @@ class Variant(Enum):
                 return "lifting line correction"
             case Variant.NoCorrections:
                 return "no corrections"
-            case Variant.EmpiricalCirculationCorrection:
-                return "empirical correction"
+            case Variant.TipLossCorrection:
+                return "tip loss correction"
 
 def force_factor() -> float:
     return 0.5 * DENSITY * DIAMETER * HEIGHT * VELOCITY**2
@@ -158,7 +160,10 @@ def actuator_line_builder(spin_ratio: float, variant: Variant) -> ActuatorLineBu
             chord_vectors=[SpatialVector(x=DIAMETER), SpatialVector(x=DIAMETER)],
             section_model=section_model(),
             non_zero_circulation_at_ends=(True, True),
-            input_power_model=InputPowerModel(input_power_type=InputPowerDataType.NoPower)
+            input_power_model=InputPowerModel(input_power_type=InputPowerDataType.NoPower),
+            force_correction = ForceCorrection(
+                lift_induced_drag_correction = 0.35/(np.pi*ASPECT_RATIO)
+            )
         )
     )
 
@@ -186,9 +191,9 @@ def actuator_line_builder(spin_ratio: float, variant: Variant) -> ActuatorLineBu
     )
 
     match variant:
-        case Variant.EmpiricalCirculationCorrection:
-            empirical_circulation_correction = EmpiricalCirculationCorrection(
-                exp_factor = 32.0
+        case Variant.TipLossCorrection:
+            tip_loss_correction = TipLossCorrection(
+                exp_factor = 16.0
             )
             lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition=SymmetryCondition.Z,
@@ -199,10 +204,10 @@ def actuator_line_builder(spin_ratio: float, variant: Variant) -> ActuatorLineBu
                 symmetry_condition=SymmetryCondition.Z,
                 max_correction_ratio=MAX_CORRECTION_RATIO
             )
-            empirical_circulation_correction = None
+            tip_loss_correction = None
         case Variant.NoCorrections:
             lifting_line_correction = None
-            empirical_circulation_correction = None
+            tip_loss_correction = None
 
     return ActuatorLineBuilder(
         line_force_model=line_force_model,
@@ -214,7 +219,7 @@ def actuator_line_builder(spin_ratio: float, variant: Variant) -> ActuatorLineBu
         ),
         solver_settings=SolverSettings(damping_factor=0.05),
         sampling_settings=SamplingSettings(remove_span_velocity=True),
-        empirical_circulation_correction=empirical_circulation_correction,
+        tip_loss_correction=tip_loss_correction,
         lifting_line_correction=lifting_line_correction,
         controller=controller,
         write_iterations_full_result=100,

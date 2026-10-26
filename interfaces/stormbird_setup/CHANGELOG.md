@@ -2,8 +2,11 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
-## 0.11.4 - unreleased
+## 0.12.0 - unreleased
 ### Breaking changes
+- Requires Stormbird 0.12.0 or newer for actuator line simulations.
+- The `EmpiricalCirculationCorrection` is renamed to `TipLossCorrection`, and the field in the `ActuatorLineBuilder` is renamed from `empirical_circulation_correction` to `tip_loss_correction`, following the changes in Stormbird 0.12.0.
+- The `overall_correction` field in the correction is removed, and replaced by the new `maintain_mean_value` field, which is true by default. When it is true, the corrected circulation on each wing is scaled so that the mean value over the span is the same as before the correction. Set it to false to get the same behavior as before.
 - The `slip_wall_boundary_override` field of the Stormflow `SimulationBuilder` is removed, and replaced by the new `boundary_condition_type` field, which takes the new `BoundaryConditionType` enum: `WindInletOutlet` (default, as before) or `WindTunnel`, where the x axis goes from the inlet to the outlet, and all the faces along the y and z axes are slip walls. Requires Stormflow 0.3.0 or newer.
 
 ### Other changes

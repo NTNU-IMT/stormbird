@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = "0.29.0"
 stormath = {version = "0.4.0", features=["single_precision"]}
-stormbird = { path = "../../stormbird", version = "0.11.1", features = ["single_precision"] }
+stormbird = { path = "../../stormbird", features = ["single_precision"] }
 stormflow = { path = "../../stormflow", version = "0.3.0" }
 
 [profile.release]
