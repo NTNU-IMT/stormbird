@@ -10,6 +10,7 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 - The `slip_wall_boundary_override` field of the Stormflow `SimulationBuilder` is removed, and replaced by the new `boundary_condition_type` field, which takes the new `BoundaryConditionType` enum: `WindInletOutlet` (default, as before) or `WindTunnel`, where the x axis goes from the inlet to the outlet, and all the faces along the y and z axes are slip walls. Requires Stormflow 0.3.0 or newer.
 
 ### Other changes
+- New `application` field in the `TipLossCorrection`, which takes the new `TipLossApplication` enum (`Circulation` by default, or `ProjectedForces`), following the changes in Stormbird 0.12.0. With `ProjectedForces`, the correction is only applied to the forces that are projected to the CFD grid. The enum is exported from `stormbird_setup.actuator_line`.
 - The OpenFOAM `SimulationBuilder` has the same new `boundary_condition_type` field, using the same `BoundaryConditionType` enum, which is also exported from `stormbird_setup.openfoam`. With `WindTunnel`, the `vertical_sides`, `z_min` and `z_max` patches of the base folder are replaced by the patches `inlet`, `outlet` and `tunnel_walls`, which reuse the conditions of the vertical sides, the top and the bottom, respectively. The apparent wind must be along the positive x axis, which is checked when the builder is created. The default, `WindInletOutlet`, gives the same case as before.
 
 ## 0.11.3 - 2026-10-24

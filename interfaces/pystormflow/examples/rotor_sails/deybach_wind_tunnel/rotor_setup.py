@@ -24,6 +24,7 @@ from stormbird_setup.actuator_line import (
     SamplingSettings,
     SolverSettings,
     SymmetryCondition,
+    TipLossApplication,
     TipLossCorrection,
 )
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
@@ -74,7 +75,7 @@ LIFT_SLOPE = 2.6
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
-MAX_CORRECTION_RATIO = 1.0
+MAX_CORRECTION_RATIO = 2.0
 
 # Both solvers are incompressible, with the pressure divided by the density. The projected forces
 # are not divided by the density, so it must be one in the line force model.
@@ -90,7 +91,7 @@ EFFECTIVE_VISCOSITY = 1e-4
 COURANT_NUMBER = 0.75
 
 # Grid resolution at the rotor, used by both solvers. The chord length is the diameter.
-CELLS_PER_CHORD_LENGTH = 8
+CELLS_PER_CHORD_LENGTH = 12
 
 # Default settings for the mesh convergence tests. The resolutions are run from the lowest to the
 # highest.
@@ -102,10 +103,10 @@ SPIN_RATIOS = np.arange(0.5, 4.01, 0.5).tolist()
 # The rotor speed is increased linearly from zero over this time, to get a smooth start
 SPIN_UP_TIME = 5.0
 
-END_TIME = 20.0
+END_TIME = 40.0
 
 # The forces are averaged over the last part of the simulation
-AVERAGING_TIME = 5.0
+AVERAGING_TIME = 10.0
 
 # Settings for the two rotor case, the same as in the lifting line example and the experiments by
 # Deybach et al. (2026). The interfering rotor is placed at different angular positions around the
@@ -122,10 +123,13 @@ class Variant(Enum):
     LiftingLine = "lifting_line"
     TipLossAndLiftingLine = "tip_loss_and_lifting_line"
     TipLossAndLiftingLineAndAdditionalCDi = "tip_loss_and_lifting_line_and_additional_cdi"
+    ProjectedTipLossAndLiftingLine = "projected_tip_loss_and_lifting_line"
 
     @property
     def label(self) -> str:
         match self:
+            case Variant.ProjectedTipLossAndLiftingLine:
+                return "projected tip loss and lifting line"
             case Variant.LiftingLine:
                 return "lifting line"
             case Variant.NoCorrections:
@@ -136,7 +140,7 @@ class Variant(Enum):
                 return "tip loss and lifting line and additional CDi"
 
 # The recommended variant, used when no variant is given to the scripts
-DEFAULT_VARIANT = Variant.TipLossAndLiftingLineAndAdditionalCDi
+DEFAULT_VARIANT = Variant.ProjectedTipLossAndLiftingLine
 
 # Shorthand for all variants on the command line
 ALL_VARIANTS = "all"
@@ -280,6 +284,19 @@ def actuator_line_builder(
         case Variant.TipLossAndLiftingLine | Variant.TipLossAndLiftingLineAndAdditionalCDi:
             tip_loss_correction = TipLossCorrection(
                 exp_factor = 16.0
+            )
+            lifting_line_correction = LiftingLineCorrectionBuilder(
+                symmetry_condition=SymmetryCondition.Z,
+                max_correction_ratio=MAX_CORRECTION_RATIO
+            )
+        case Variant.ProjectedTipLossAndLiftingLine:
+            # The tip loss only smears the tip vortices in the CFD domain. The forces on the rotor
+            # are computed from the uncorrected circulation, and the lifting line correction adds
+            # the lift-induced velocities from the uncorrected circulation, so that no additional
+            # lift-induced drag should be necessary.
+            tip_loss_correction = TipLossCorrection(
+                exp_factor = 16.0,
+                application = TipLossApplication.ProjectedForces
             )
             lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition=SymmetryCondition.Z,

@@ -7,8 +7,8 @@ version of this example. By default, only the recommended variant of the model i
     python run_single_rotor.py --variant lifting_line no_corrections
     python run_single_rotor.py --variant all
 
-The force history of each case is stored as a time series in time_series_stormflow, and the results
-are plotted with plotting.py:
+The force history of each case is stored as a time series in time_series_single_rotor_stormflow, and
+the results are plotted with plotting.py:
 
     python plotting.py means
 '''

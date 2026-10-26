@@ -41,7 +41,7 @@ use spanflow_damper::SpanflowDamper;
 
 use corrections::{
     lifting_line::LiftingLineCorrection,
-    tip_loss::TipLossCorrection,
+    tip_loss::{TipLossCorrection, TipLossApplication},
 };
 
 #[derive(Debug, Clone)]
@@ -68,6 +68,10 @@ pub struct ActuatorLine {
     pub ctrl_points_velocity: Vec<SpatialVector>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
+    /// The circulation strength that the projected forces are computed from. Equal to the
+    /// circulation in the simulation result, unless the tip loss correction is only applied to the
+    /// projected forces.
+    pub projected_circulation_strength: Vec<Float>,
     /// Lift forces that are projected back to the CFD domain
     pub sectional_lift_forces_to_project: Vec<SpatialVector>,
     /// Drag forces that are projected back to the CFD domain
@@ -224,16 +228,23 @@ impl ActuatorLine {
         };
 
         if let Some(lifting_line_correction) = &self.lifting_line_correction {
-            let last_circulation_strength = if let Some(result) = &self.simulation_result {
-                result.force_input.circulation_strength.clone()
-            } else {
-                vec![0.0; self.line_force_model.nr_span_lines()]
-            };
+            let (last_circulation_strength, last_projected_circulation_strength) =
+                if let Some(result) = &self.simulation_result {
+                    (
+                        result.force_input.circulation_strength.clone(),
+                        self.projected_circulation_strength.clone()
+                    )
+                } else {
+                    let zero_strength = vec![0.0; self.line_force_model.nr_span_lines()];
+
+                    (zero_strength.clone(), zero_strength)
+                };
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
                 &self.ctrl_points_velocity,
                 &last_circulation_strength,
+                &last_projected_circulation_strength,
                 time - self.start_time
             );
 
@@ -296,7 +307,9 @@ impl ActuatorLine {
         );
 
         if let Some(tip_loss_correction) = &self.tip_loss_correction {
-            tip_loss_correction.apply(&mut new_estimated_circulation_strength, &self.line_force_model);
+            if tip_loss_correction.application == TipLossApplication::Circulation {
+                tip_loss_correction.apply(&mut new_estimated_circulation_strength, &self.line_force_model);
+            }
         }
 
         let previous_strength = if let Some(simulation_result) = &self.simulation_result {
@@ -312,6 +325,19 @@ impl ActuatorLine {
             circulation_strength.push(
                 previous_strength[i] + self.solver_settings.damping_factor * strength_difference
             );
+        }
+
+        // The tip loss correction of the projected forces is applied after the damping, so that
+        // the damping only acts on the uncorrected circulation
+        self.projected_circulation_strength = circulation_strength.clone();
+
+        if let Some(tip_loss_correction) = &self.tip_loss_correction {
+            if tip_loss_correction.application == TipLossApplication::ProjectedForces {
+                tip_loss_correction.apply(
+                    &mut self.projected_circulation_strength,
+                    &self.line_force_model
+                );
+            }
         }
 
         let residual = self.line_force_model.average_residual_absolute(
@@ -372,7 +398,12 @@ impl ActuatorLine {
         let ctrl_points_velocity = &self.ctrl_points_velocity; //self.corrected_ctrl_points_velocity(time);
         
         if let Some(simulation_result) = &self.simulation_result {
-            let circulatory_forces = &simulation_result.sectional_forces.circulatory;
+            // Same as the circulatory forces in the simulation result, but computed from the
+            // projected circulation
+            let circulatory_forces = self.line_force_model.sectional_circulatory_forces(
+                &self.projected_circulation_strength,
+                &simulation_result.force_input.velocity
+            );
 
             for (line_index, &circulatory_force) in circulatory_forces.iter().enumerate().take(nr_span_lines) {
                 let mut lift_force = circulatory_force;

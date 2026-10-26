@@ -4,6 +4,8 @@ Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 """
 
+from enum import Enum
+
 from ..base_model import StormbirdSetupBaseModel
 
 from ..lifting_line.wake import SymmetryCondition
@@ -27,6 +29,23 @@ class LiftingLineCorrectionBuilder(StormbirdSetupBaseModel):
     from the ends of the wing, which can be used to model end plates. No extensions by default.
     """
 
+class TipLossApplication(Enum):
+    """
+    Where the tip loss correction is applied in an actuator line simulation.
+    """
+    Circulation = "Circulation"
+    """
+    The correction is applied to the estimated circulation, and therefore affects both the forces on
+    the wings and the forces that are projected to the CFD grid.
+    """
+    ProjectedForces = "ProjectedForces"
+    """
+    The correction is only applied to the circulation used for the forces that are projected to the
+    CFD grid. The forces on the wings are computed from the uncorrected circulation. If a lifting
+    line correction is used, the model with the viscous core uses the projected circulation, while
+    the reference model uses the uncorrected circulation.
+    """
+
 class TipLossCorrection(StormbirdSetupBaseModel):
     """
     Empirical correction of the circulation close to the ends of the wings, with a shape similar to
@@ -40,4 +59,8 @@ class TipLossCorrection(StormbirdSetupBaseModel):
     """
     If true, the corrected circulation on each wing is scaled so that the mean value over the span
     is the same as before the correction. Requires Stormbird 0.12.0 or newer.
+    """
+    application: TipLossApplication = TipLossApplication.Circulation
+    """
+    Where the correction is applied. Requires Stormbird 0.12.0 or newer.
     """

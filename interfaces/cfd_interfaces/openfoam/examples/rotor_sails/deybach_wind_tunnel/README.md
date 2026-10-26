@@ -47,4 +47,4 @@ python run_two_rotors.py --angular-positions 0 30 90
 python plot_results.py interference
 ```
 
-The lifting line correction uses the `max_correction_ratio` setting, which is not part of Stormbird 0.11.0. Until it is released, the OpenFOAM interface must be built against the local version of the Stormbird library in this repository.
+The examples use settings that require Stormbird 0.12.0 or newer, such as the `application` setting in the tip loss correction, which is used by the default variant. The OpenFOAM interface is built against the local version of Stormbird in this repository, so it must be built, with `build.sh`, from the same version of the repository as the examples.

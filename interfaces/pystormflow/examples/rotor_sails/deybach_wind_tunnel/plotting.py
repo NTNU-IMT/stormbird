@@ -83,7 +83,7 @@ class Solver(Enum):
                 )
 
 def time_series_folder(solver: Solver) -> Path:
-    return solver.folder / f"time_series_{solver.value}"
+    return solver.folder / f"time_series_single_rotor_{solver.value}"
 
 def mesh_convergence_time_series_folder(solver: Solver) -> Path:
     return solver.folder / f"time_series_mesh_convergence_{solver.value}"

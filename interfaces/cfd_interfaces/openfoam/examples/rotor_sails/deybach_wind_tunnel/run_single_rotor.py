@@ -12,8 +12,8 @@ variants, or all of them:
 Everything except the mesh is imported from the Stormflow example: the actuator line model, the
 domain (the wind tunnel), the flow settings and the post-processing of the forces are imported from
 rotor_setup.py, and the results are stored and plotted with plotting.py, in the same way as for
-Stormflow. The force history of each case is stored as a time series in time_series_openfoam, and
-the results are plotted with plot_results.py:
+Stormflow. The force history of each case is stored as a time series in
+time_series_single_rotor_openfoam, and the results are plotted with plot_results.py:
 
     python plot_results.py means
 

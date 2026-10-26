@@ -9,6 +9,20 @@ use stormath::consts::PI;
 
 use crate::line_force_model::LineForceModel;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// Determines where the tip loss correction is applied in an actuator line simulation
+pub enum TipLossApplication {
+    #[default]
+    /// The correction is applied to the estimated circulation, and therefore affects both the
+    /// forces on the wings and the forces that are projected to the CFD grid
+    Circulation,
+    /// The correction is only applied to the circulation used for the forces that are projected to
+    /// the CFD grid. The forces on the wings are computed from the uncorrected circulation. If a
+    /// lifting line correction is used, the model with the viscous core uses the projected
+    /// circulation, while the reference model uses the uncorrected circulation.
+    ProjectedForces,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 /// Empirical correction of the circulation close to the ends of the wings, with a shape similar to
@@ -21,6 +35,9 @@ pub struct TipLossCorrection {
     /// span is the same as before the correction
     #[serde(default = "TipLossCorrection::default_maintain_mean_value")]
     pub maintain_mean_value: bool,
+    /// Where the correction is applied
+    #[serde(default)]
+    pub application: TipLossApplication,
 }
 
 impl Default for TipLossCorrection {
@@ -28,6 +45,7 @@ impl Default for TipLossCorrection {
         Self {
             exp_factor: Self::default_exp_factor(),
             maintain_mean_value: Self::default_maintain_mean_value(),
+            application: TipLossApplication::default(),
         }
     }
 }
@@ -96,6 +114,8 @@ mod tests {
 
     use stormath::spatial_vector::SpatialVector;
 
+    use crate::actuator_line::ActuatorLine;
+    use crate::actuator_line::builder::ActuatorLineBuilder;
     use crate::line_force_model::builder::LineForceModelBuilder;
     use crate::line_force_model::builder::single_wing::WingBuilder;
     use crate::section_models::SectionModel;
@@ -103,6 +123,10 @@ mod tests {
 
     /// Two straight wings along the z-axis, with different span lengths
     fn two_wings() -> LineForceModel {
+        two_wings_builder().build()
+    }
+
+    fn two_wings_builder() -> LineForceModelBuilder {
         let mut builder = LineForceModelBuilder::new(16);
 
         for (x, span) in [(0.0, 30.0), (20.0, 15.0)] {
@@ -117,7 +141,49 @@ mod tests {
             });
         }
 
-        builder.build()
+        builder
+    }
+
+    /// An actuator line model of the two wings after one time step with a uniform velocity that
+    /// gives a non-zero angle of attack
+    fn actuator_line_after_one_step(tip_loss_correction: Option<TipLossCorrection>) -> ActuatorLine {
+        let mut actuator_line = ActuatorLineBuilder {
+            tip_loss_correction,
+            ..ActuatorLineBuilder::new(two_wings_builder())
+        }.build();
+
+        actuator_line.ctrl_points_velocity = vec![
+            SpatialVector::from([8.0, 1.0, 0.0]);
+            actuator_line.line_force_model.nr_span_lines()
+        ];
+
+        actuator_line.do_step(0.0, 0.1);
+
+        actuator_line
+    }
+
+    fn result_circulation_strength(actuator_line: &ActuatorLine) -> Vec<Float> {
+        actuator_line.simulation_result.as_ref().unwrap().force_input.circulation_strength.clone()
+    }
+
+    /// Checks that the corrected circulation, relative to the raw circulation, is clearly smaller
+    /// at the first end of each wing than in the middle
+    fn assert_reduced_at_the_ends(
+        corrected: &[Float],
+        raw: &[Float],
+        line_force_model: &LineForceModel
+    ) {
+        for wing_indices in &line_force_model.wing_indices {
+            let end_index = wing_indices.start;
+            let middle_index = (wing_indices.start + wing_indices.end) / 2;
+
+            assert!(raw[end_index].abs() > 1e-3);
+
+            let end_ratio = corrected[end_index] / raw[end_index];
+            let middle_ratio = corrected[middle_index] / raw[middle_index];
+
+            assert!(end_ratio < 0.75 * middle_ratio);
+        }
     }
 
     fn wing_integrals(circulation_strength: &[Float], line_force_model: &LineForceModel) -> Vec<Float> {
@@ -180,6 +246,79 @@ mod tests {
         for (raw, corrected) in raw_integrals.iter().zip(corrected_integrals.iter()) {
             assert!(corrected < raw);
         }
+    }
+
+    #[test]
+    fn application_is_deserialized_with_circulation_as_default() {
+        let correction: TipLossCorrection = serde_json::from_str(
+            r#"{"exp_factor": 16.0, "application": "ProjectedForces"}"#
+        ).unwrap();
+
+        assert_eq!(correction.application, TipLossApplication::ProjectedForces);
+
+        let correction: TipLossCorrection = serde_json::from_str("{}").unwrap();
+
+        assert_eq!(correction.application, TipLossApplication::Circulation);
+    }
+
+    #[test]
+    fn application_to_projected_forces_only_changes_the_projection() {
+        let without_correction = actuator_line_after_one_step(None);
+        let with_correction = actuator_line_after_one_step(Some(TipLossCorrection {
+            application: TipLossApplication::ProjectedForces,
+            ..Default::default()
+        }));
+
+        let raw_circulation_strength = result_circulation_strength(&without_correction);
+
+        // The forces on the wings are not affected
+        assert_eq!(result_circulation_strength(&with_correction), raw_circulation_strength);
+        assert_eq!(without_correction.projected_circulation_strength, raw_circulation_strength);
+
+        let line_force_model = &with_correction.line_force_model;
+
+        // The projected circulation is reduced at the ends...
+        assert_reduced_at_the_ends(
+            &with_correction.projected_circulation_strength,
+            &raw_circulation_strength,
+            line_force_model
+        );
+
+        for wing_indices in &line_force_model.wing_indices {
+            // ...but the total projected lift on each wing is the same, as the mean value is
+            // maintained and the velocity is uniform
+            let total_projected_lift = |actuator_line: &ActuatorLine| -> SpatialVector {
+                wing_indices.clone()
+                    .map(|i| actuator_line.sectional_lift_forces_to_project[i])
+                    .sum()
+            };
+
+            let lift_without_correction = total_projected_lift(&without_correction);
+            let lift_with_correction = total_projected_lift(&with_correction);
+
+            assert!(
+                (lift_with_correction - lift_without_correction).length() <
+                1e-4 * lift_without_correction.length()
+            );
+        }
+    }
+
+    #[test]
+    fn application_to_circulation_changes_the_forces_on_the_wings() {
+        let without_correction = actuator_line_after_one_step(None);
+        let with_correction = actuator_line_after_one_step(Some(TipLossCorrection::default()));
+
+        let raw_circulation_strength = result_circulation_strength(&without_correction);
+        let corrected_circulation_strength = result_circulation_strength(&with_correction);
+
+        assert_reduced_at_the_ends(
+            &corrected_circulation_strength,
+            &raw_circulation_strength,
+            &with_correction.line_force_model
+        );
+
+        // The projected forces are computed from the same circulation as the forces on the wings
+        assert_eq!(with_correction.projected_circulation_strength, corrected_circulation_strength);
     }
 
     #[test]

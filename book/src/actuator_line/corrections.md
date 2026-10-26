@@ -19,6 +19,8 @@ For each time step in the simulation, the circulation strength from the previous
 
 This is done by first computing the lift-induced velocities from a lifting line wake model with a viscous core equal to the projection width, and then doing the same calculation with very small core length. The difference in the induced velocity between the two wake models at each control point can then be used to correct the sampled velocity from the CFD grid.
 
+Normally, the same circulation distribution is used in both wake models. The exception is when the [tip loss correction](#tip-loss-correction) is only applied to the projected forces. The circulation used for the projected forces then differs from the circulation used for the forces on the wings. The wake model with the viscous core represents what is induced in the CFD domain, and therefore uses the projected circulation, while the wake model with the small core uses the circulation from the forces on the wings. See the [section on the application of the tip loss correction](#application-to-the-projected-forces-only) for more.
+
 ### Wake shape
 One challenge with such an approach is that the shape of the wake must be assumed somehow. This is a trivial task if there is only a single wing, but more difficult if there are multiple wings in close proximity OR wings standing on a ship superstructure. However, the point of the lifting line corrections is **only to compute the error due to a too large projection width**. The effect of a viscous core on the induced velocities is most significant from the wake close to the wing. The effect from the vortices far downstream should be small. The exact wake shape for the correction may, therefore, not be that important.
 
@@ -85,6 +87,12 @@ To activate this correction, the `TipLossCorrection` structure must be set as th
 pub struct TipLossCorrection {
     pub exp_factor: f64,
     pub maintain_mean_value: bool,
+    pub application: TipLossApplication,
+}
+
+pub enum TipLossApplication {
+    Circulation,
+    ProjectedForces,
 }
 ```
 
@@ -97,3 +105,25 @@ The `maintain_mean_value` flag is set to true by default. The correction functio
 \\]
 
 where \\( l \\) is the length of each line segment, and the sums are taken over all the line segments on the wing. The correction then only changes the shape of the circulation distribution, by moving circulation from the ends of the wing towards the middle. The idea is that the actuator line model is assumed to predict the overall level of the circulation well, while the circulation at the ends is too large. If the sum in the denominator is close to zero compared to the sum of the absolute values of the raw circulation, for instance when the lift on the wing is close to zero, the scaling is skipped to avoid dividing by a very small number. Setting `maintain_mean_value` to false gives the correction without any scaling.
+
+The `application` field determines where the correction is applied. The default, `Circulation`, applies the correction to the estimated circulation, as described above. Both the forces on the wings and the forces projected to the CFD grid are then computed from the corrected circulation. The other option, `ProjectedForces`, is explained in the next section.
+
+### Application to the projected forces only
+
+> **Experimental:** this option is new, and has so far only been tested for rotor sails. The recommended settings may change.
+
+The tip loss correction can also be used for a different purpose than correcting a too large circulation at the tips: to **stabilize** simulations of wings with a large circulation at the ends, such as rotor sails. The circulation on a rotor sail is almost constant along the span, which gives very strong tip vortices. When combined with the [lifting line correction](#lifting-line-correction-for-the-induced-velocity), this has been found to give unstable simulations. Reducing the circulation towards the ends smears the tip vortex over a larger part of the span, which stabilizes the simulation. However, if the correction is applied to the circulation itself, it also changes the forces on the wing. In particular, it reduces the lift-induced drag, as the circulation distribution is no longer as close to a constant distribution, which then must be corrected for in some other way.
+
+Setting `application` to `ProjectedForces` separates the two effects. The circulation estimated from the sampled velocity, \\( \Gamma\_{raw} \\), is used for all the forces on the wings, and is the circulation that is written in the results. The tip loss correction is only applied to a copy of the circulation, \\( \Gamma\_{proj} \\), that is used for the forces projected to the CFD grid. As such, only the tip vortices in the CFD domain are smeared out. The correction is applied after the damping of the circulation in the [solver](simulation_overview.md#running-a-simulation), so that the damping only acts on the uncorrected circulation.
+
+This option is primarily intended to be combined with the lifting line correction. The two wake models in the lifting line correction then use different circulation distributions:
+
+\\[
+  \mathbf{u}\_{cor} = \mathbf{u}\_{CFD} + \mathbf{u}\_{ref}(\Gamma\_{raw}) - \mathbf{u}\_{visc}(\Gamma\_{proj})
+\\]
+
+where \\( \mathbf{u}\_{ref} \\) is the induced velocity from the wake model with the small viscous core, and \\( \mathbf{u}\_{visc} \\) is the induced velocity from the wake model with the viscous core equal to the projection width. The idea is that the sampled velocity, \\( \mathbf{u}\_{CFD} \\), contains the induced velocities from the smeared, projected, circulation, which is removed by the last term. The corrected velocity is then approximately the velocity from a lifting line model with the uncorrected circulation. In other words, the smearing of the tip vortices in the CFD domain is purposely neglected when the forces on the wings are calculated, which means that the lift-induced drag from the full tip vortices is kept, without any need for additional corrections.
+
+With `maintain_mean_value` set to true, the total projected lift on each wing is the same as the lift computed from the uncorrected circulation. Setting it to false with this option will, therefore, project less lift to the CFD domain than what is acting on the wings, which is generally not what is wanted.
+
+**Note on the limit of the lifting line correction:** with an almost constant circulation, the velocity correction becomes very large at the outermost line elements, and a large part of the lift-induced drag comes from these elements. A low value for the `max_correction_ratio` in the lifting line correction will cut this part of the correction, and therefore also a large part of the lift-induced drag. For rotor sails, a value of 2.0 has been found to work better than 1.0 when the tip loss correction is only applied to the projected forces. This is likely sensitive to the number of line elements, as the correction at the outermost elements depends on how close they are to the end of the wing.
