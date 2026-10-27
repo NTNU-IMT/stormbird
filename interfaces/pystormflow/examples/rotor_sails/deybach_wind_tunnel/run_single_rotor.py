@@ -54,7 +54,10 @@ def simulation_builder(
         linear_velocity=SpatialVector(),
         actuator_line=rotor_setup.actuator_line_builder(spin_ratio, variant, rotor_locations),
         effective_viscosity=rotor_setup.EFFECTIVE_VISCOSITY,
-        velocity_solver=VelocitySolverBuilder(compute_platform=compute_platform),
+        velocity_solver=VelocitySolverBuilder(
+            compute_platform=compute_platform,
+            max_velocity_factor = 4.0
+        ),
         pressure_solver=PressureSolverBuilder(
             settings=MultigridSettingsBuilder(compute_platform=compute_platform)
         ),
