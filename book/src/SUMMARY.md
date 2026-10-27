@@ -19,6 +19,7 @@
     - [Varying foil model](./sectional_models/varying_foil_model.md)
     - [Active air flow foil](./sectional_models/active_air_flow_foil.md)
     - [Rotating cylinder](./sectional_models/rotating_cylinder.md)
+    - [Dynamic stall](./sectional_models/dynamic_stall.md)
 - [Lifting line simulations](./lifting_line/lifting_line_intro.md)
     - [Simulation overview](./lifting_line/simulation_overview.md)
     - [Solver](./lifting_line/solver.md)

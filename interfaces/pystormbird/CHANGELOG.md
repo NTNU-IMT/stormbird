@@ -2,6 +2,9 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.12.0 - unreleased
+- Builds against the local source code of Stormbird 0.12.0 and Stormath, through a `[patch.crates-io]` section in `Cargo.toml`, to test the new dynamic stall model. The model is set through the JSON input to the simulation, so no changes to the Python interface are needed.
+
 ## 0.11.1
 - Depends on Stormbird 0.11.1, where the default `induced_velocity_correction_method` in the linearized solver is `NoCorrection`, which avoids a jump in the lift right before stall. See the [Stormbird change log](../../stormbird/CHANGELOG.md).
 

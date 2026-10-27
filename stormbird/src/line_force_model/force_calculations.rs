@@ -15,6 +15,7 @@
 //! - [`section_models_internal_state`](LineForceModel::section_models_internal_state)
 //! - [`wing_segment_flow_conditions`](LineForceModel::wing_segment_flow_conditions)
 //! - [`lift_coefficients_total`](LineForceModel::lift_coefficients_total)
+//! - [`dynamic_stall_state`](LineForceModel::dynamic_stall_state)
 //! - [`lift_coefficients_pre_stall_with_stall_drop_off`](LineForceModel::lift_coefficients_pre_stall_with_stall_drop_off)
 //! - [`lift_coefficients_post_stall_with_stall_weight`](LineForceModel::lift_coefficients_post_stall_with_stall_weight)
 //! - [`lift_coefficients_linear`](LineForceModel::lift_coefficients_linear)
@@ -39,6 +40,8 @@
 //! - [`calculate_simulation_result`](LineForceModel::calculate_simulation_result)
 
 use crate::section_models::SegmentFlowConditions;
+use crate::section_models::foil::Foil;
+use crate::section_models::dynamic_stall::DynamicStallSegmentState;
 
 use super::*;
 
@@ -220,15 +223,67 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Returns the pre-stall lift coefficient on each line element, reduced by the amount of stall
+    /// Evaluates the dynamic stall model on a single line element, if the wing has a dynamic stall
+    /// model. Returns the foil model at the current internal state, together with the state of the
+    /// dynamic stall model at the current time step. The evaluation is based on the state from the
+    /// last completed time step, and does not change the model.
+    ///
+    /// Returns `None` if the wing does not have a dynamic stall model.
+    ///
+    /// # Arguments
+    /// * `index` - the global index of the line element
+    /// * `angle_of_attack` - the angle of attack at the control point
+    /// * `internal_state` - the internal state of the section model at the control point
+    /// * `velocity` - the velocity vector at the control point
+    pub fn dynamic_stall_state(
+        &self,
+        index: usize,
+        angle_of_attack: Float,
+        internal_state: Float,
+        velocity: SpatialVector,
+    ) -> Option<(Foil, DynamicStallSegmentState)> {
+        let wing_index = self.wing_index_from_global(index);
+
+        let dynamic_stall = self.dynamic_stall[wing_index].as_ref()?;
+
+        let foil = DynamicStallModel::foil(&self.section_models[wing_index], internal_state)?;
+
+        let state = dynamic_stall.evaluate(
+            index - self.wing_indices[wing_index].start,
+            &foil,
+            angle_of_attack,
+            velocity.length(),
+            self.chord_lengths[index]
+        );
+
+        Some((foil, state))
+    }
+
+    /// Returns the pre-stall lift coefficient on each line element, reduced by the amount of stall.
+    /// For wings with a dynamic stall model, the dynamic amount of stall is used.
+    ///
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
+    /// * `velocity` - the velocity vector at each control point. Only used by the dynamic stall
+    ///   model.
     pub fn lift_coefficients_pre_stall_with_stall_drop_off(
         &self, 
         angles_of_attack: &[Float],
-        internal_states: &[Float]
+        internal_states: &[Float],
+        velocity: &[SpatialVector]
     ) -> Vec<Float> {
 
         (0..self.nr_span_lines()).map(
             |index| {
+                if let Some((foil, state)) = self.dynamic_stall_state(
+                    index, angles_of_attack[index], internal_states[index], velocity[index]
+                ) {
+                    return DynamicStallModel::lift_coefficient_pre_stall_with_stall_drop_off(
+                        &foil, angles_of_attack[index], &state
+                    );
+                }
+
                 let wing_index  = self.wing_index_from_global(index);
 
                 self.section_models[wing_index].lift_coefficient_pre_stall_with_stall_drop_off(
@@ -239,14 +294,30 @@ impl LineForceModel {
         ).collect()
     }
 
-    /// Returns the post-stall lift coefficient on each line element, weighted by the amount of stall
+    /// Returns the post-stall lift coefficient on each line element, weighted by the amount of
+    /// stall. For wings with a dynamic stall model, the dynamic amount of stall is used.
+    ///
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
+    /// * `velocity` - the velocity vector at each control point. Only used by the dynamic stall
+    ///   model.
     pub fn lift_coefficients_post_stall_with_stall_weight(
         &self,
         angles_of_attack: &[Float],
-        internal_states: &[Float]
+        internal_states: &[Float],
+        velocity: &[SpatialVector]
     ) -> Vec<Float> {
         (0..self.nr_span_lines()).map(
             |index| {
+                if let Some((foil, state)) = self.dynamic_stall_state(
+                    index, angles_of_attack[index], internal_states[index], velocity[index]
+                ) {
+                    return DynamicStallModel::lift_coefficient_post_stall_with_stall_weight(
+                        &foil, angles_of_attack[index], &state
+                    );
+                }
+
                 let wing_index  = self.wing_index_from_global(index);
 
                 self.section_models[wing_index].lift_coefficient_post_stall_with_stall_weight(
@@ -345,13 +416,15 @@ impl LineForceModel {
     ) -> Vec<Float> {
         let mut cl = self.lift_coefficients_pre_stall_with_stall_drop_off(
             angles_of_attack, 
-            internal_states
+            internal_states,
+            velocity
         ); 
         
         if self.force_calculation_settings.include_viscous_lift_in_the_circulation {
             let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(
                 angles_of_attack,
-                internal_states
+                internal_states,
+                velocity
             );
             
             for i in 0..cl.len() {
@@ -517,7 +590,8 @@ impl LineForceModel {
         } else {
             let cl_viscous = self.lift_coefficients_post_stall_with_stall_weight(
                 angles_of_attack,
-                internal_states
+                internal_states,
+                velocity
             );
     
             (0..self.nr_span_lines()).map(
@@ -694,7 +768,8 @@ impl LineForceModel {
     ) -> Vec<Float> {
         let cl = self.lift_coefficients_pre_stall_with_stall_drop_off(
             angles_of_attack, 
-            internal_states
+            internal_states,
+            velocity
         );
 
         (0..self.nr_span_lines()).map(
@@ -721,7 +796,8 @@ impl LineForceModel {
         
         let cl_direct = self.lift_coefficients_pre_stall_with_stall_drop_off(
             angles_of_attack, 
-            internal_states
+            internal_states,
+            velocity
         );
 
         (0..self.nr_span_lines()).map(|i_span| {

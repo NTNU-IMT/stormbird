@@ -10,7 +10,7 @@ from pydantic import Field, model_validator
 
 from ..base_model import StormbirdSetupBaseModel
 from ..spatial_vector import SpatialVector
-from ..section_models import SectionModel, RotatingCylinder
+from ..section_models import SectionModel, RotatingCylinder, DynamicStallModelBuilder
 from ..line_force_model import WingBuilder, ForceCorrection, AddedMass
 from ..controller import ControllerSetPoints
 from ..circulation_corrections import CirculationCorrectionBuilder
@@ -62,6 +62,11 @@ class SailDefinition(StormbirdSetupBaseModel):
     """
     force_correction: ForceCorrection | None = None
     added_mass: AddedMass | None = None
+    dynamic_stall: DynamicStallModelBuilder | None = None
+    """
+    Optional dynamic stall model. Only used in dynamic lifting line simulations, so the definition
+    can not be used in quasi-steady simulations when it is set. Not used by default.
+    """
 
     @model_validator(mode='after')
     def check_parameters(self) -> "SailDefinition":
@@ -140,7 +145,8 @@ class SailDefinition(StormbirdSetupBaseModel):
             line_segment_is_virtual = line_segment_is_virtual if any(line_segment_is_virtual) else None,
             non_zero_circulation_at_ends = (base_on_symmetry_plane, False),
             force_correction = self.force_correction,
-            added_mass = self.added_mass
+            added_mass = self.added_mass,
+            dynamic_stall = self.dynamic_stall
         )
 
     def scaled_controller_set_points(self, chord_length: float) -> ControllerSetPoints:

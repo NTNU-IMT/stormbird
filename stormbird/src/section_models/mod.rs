@@ -13,6 +13,8 @@ pub mod varying_foil;
 pub mod rotating_cylinder;
 /// Section model of a foil that uses active air flow, e.g. suction.
 pub mod active_air_flow_foil;
+/// Dynamic stall model that can be combined with the section models that build on the foil model
+pub mod dynamic_stall;
 
 use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;

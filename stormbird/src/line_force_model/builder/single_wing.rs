@@ -12,6 +12,7 @@ use stormath::{
 };
 
 use crate::section_models::SectionModel;
+use crate::section_models::dynamic_stall::{DynamicStallModel, DynamicStallModelBuilder};
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
 use crate::line_force_model::wing_internal_state::InternalCompartments;
@@ -44,6 +45,8 @@ pub struct SingleWing {
     pub added_mass: AddedMass,
     /// Model for the gyroscopic moment from the wing
     pub gyroscopic_moment: GyroscopicMoment,
+    /// Optional dynamic stall model for the wing
+    pub dynamic_stall: Option<DynamicStallModelBuilder>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -89,6 +92,11 @@ pub struct WingBuilder {
     /// Optional model for the gyroscopic moment from the wing. Only allowed together with the
     /// rotating cylinder section model. Not used by default.
     pub gyroscopic_moment: GyroscopicMoment,
+    #[serde(default)]
+    /// Optional dynamic stall model for the wing. Only allowed together with section models that
+    /// build on the foil model, and only used in dynamic lifting line simulations. Not used by
+    /// default.
+    pub dynamic_stall: Option<DynamicStallModelBuilder>,
 }
 
 impl WingBuilder {
@@ -156,6 +164,22 @@ impl WingBuilder {
         }
 
         self.gyroscopic_moment.clone()
+    }
+
+    /// Returns the builder for the dynamic stall model of the wing, if any.
+    ///
+    /// # Panics
+    /// If the model is set for a section model that is not built on the foil model.
+    pub fn dynamic_stall(&self) -> Option<DynamicStallModelBuilder> {
+        if self.dynamic_stall.is_some() && !DynamicStallModel::is_supported(&self.section_model) {
+            panic!(
+                "The dynamic stall model is only used together with section models that build on \
+                the foil model, i.e., single element foils, multi element foils and active air \
+                flow foils"
+            );
+        }
+
+        self.dynamic_stall.clone()
     }
 
     /// Builds the data for a single wing
@@ -239,6 +263,7 @@ impl WingBuilder {
             force_correction: self.force_correction.clone(),
             added_mass: self.added_mass.clone(),
             gyroscopic_moment: self.gyroscopic_moment(),
+            dynamic_stall: self.dynamic_stall(),
         }
     }
 }

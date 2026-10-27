@@ -168,7 +168,8 @@ impl Linearized {
 
             let cl_full = line_force_model.lift_coefficients_pre_stall_with_stall_drop_off(
                 &angles_of_attack,
-                &internal_states
+                &internal_states,
+                &ctrl_points_velocity
             );
 
             for i in 0..circulation_strength.len() {

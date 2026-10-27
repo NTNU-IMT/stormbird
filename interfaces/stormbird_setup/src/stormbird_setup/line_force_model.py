@@ -6,7 +6,12 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 
 from .base_model import StormbirdSetupBaseModel
 from .spatial_vector import SpatialVector
-from .section_models import SectionModel, RotatingCylinder
+from .section_models import (
+    SectionModel,
+    RotatingCylinder,
+    EffectiveWindSensor,
+    DynamicStallModelBuilder
+)
 
 from .circulation_corrections import CirculationCorrectionBuilder
 
@@ -68,6 +73,24 @@ class WingBuilder(StormbirdSetupBaseModel):
     force_correction: ForceCorrection | None = None
     added_mass: AddedMass | None = None
     gyroscopic_moment: GyroscopicMoment | None = None
+    dynamic_stall: DynamicStallModelBuilder | None = None
+
+    @model_validator(mode='after')
+    def check_dynamic_stall(self) -> "WingBuilder":
+        '''
+        The dynamic stall model modifies the stall in the foil model, and is therefore only allowed
+        together with section models that build on the foil model.
+        '''
+        if (
+            self.dynamic_stall is not None and
+            isinstance(self.section_model.model, (RotatingCylinder, EffectiveWindSensor))
+        ):
+            raise ValueError(
+                "The dynamic stall model is only used together with section models that build on "
+                "the foil model, i.e., Foil, MultiElementFoil and ActiveAirFlowFoil"
+            )
+
+        return self
 
     @model_validator(mode='after')
     def check_gyroscopic_moment(self) -> "WingBuilder":
@@ -179,6 +202,10 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     def add_wing_builder(self, wing_builder: WingBuilder) -> None:
         self.wing_builders.append(wing_builder)
         self.local_wing_angles.append(0.0)
+
+    def has_dynamic_stall(self) -> bool:
+        '''Returns true if any of the wings have a dynamic stall model'''
+        return any(wing_builder.dynamic_stall is not None for wing_builder in self.wing_builders)
 
     def spans(self) -> list[float]:
         '''The span of each wing, see `WingBuilder.span`'''

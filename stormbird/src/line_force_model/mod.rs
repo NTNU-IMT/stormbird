@@ -41,6 +41,7 @@ mod tests;
 
 use crate::common_utils::prelude::*;
 use crate::section_models::SectionModel;
+use crate::section_models::dynamic_stall::DynamicStallModel;
 use wing_internal_state::{WingInternalState, SpanVariation, InternalCompartments};
 use crate::controller::output::ControllerOutput;
 
@@ -134,6 +135,9 @@ pub struct LineForceModel {
     pub added_mass: Vec<AddedMass>,
     /// Models for the gyroscopic moment from each wing. Only used for rotor sails.
     pub gyroscopic_moments: Vec<GyroscopicMoment>,
+    /// Optional dynamic stall models for each wing, including the memory effects for each line
+    /// segment. Only used in dynamic lifting line simulations.
+    pub dynamic_stall: Vec<Option<DynamicStallModel>>,
     /// Settings for the force calculation
     pub force_calculation_settings: ForceCalculationSettings,
 }
@@ -182,6 +186,7 @@ impl LineForceModel {
             force_corrections: Vec::new(),
             added_mass: Vec::new(),
             gyroscopic_moments: Vec::new(),
+            dynamic_stall: Vec::new(),
             force_calculation_settings: ForceCalculationSettings::default()
         }
     }
@@ -233,6 +238,9 @@ impl LineForceModel {
         self.force_corrections.push(wing.force_correction.clone());
         self.added_mass.push(wing.added_mass.clone());
         self.gyroscopic_moments.push(wing.gyroscopic_moment.clone());
+        self.dynamic_stall.push(
+            wing.dynamic_stall.as_ref().map(|builder| builder.build(wing.span_lines_local.len()))
+        );
 
         self.update_global_data_representations();
     }

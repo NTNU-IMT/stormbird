@@ -42,6 +42,8 @@ impl Simulation {
     ) -> Result<Self, Error> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
+        builder.check_settings()?;
+
         Ok(builder.build())
     }
 
@@ -97,7 +99,8 @@ impl Simulation {
         );
 
         self.first_time_step_completed = true;
-        
+
+        self.line_force_model.reset_dynamic_stall();
 
         self.previous_circulation_strength = vec![0.0; self.line_force_model.nr_span_lines()];
     }
@@ -107,6 +110,7 @@ impl Simulation {
     /// # Steps that are performed in this function:
     /// - Updated the wake from the previous time step.
     /// - Solve for new circulation strength with updated wake structure
+    /// - Calculate the forces, and update the state of the dynamic stall models, if any
     ///
     /// # Arguments
     /// - `time`: The current time of the simulation.
@@ -120,6 +124,8 @@ impl Simulation {
         freestream_velocity: &[SpatialVector],
     ) -> SimulationResult {
         self.line_force_model.update_global_data_representations();
+
+        self.line_force_model.set_dynamic_stall_time_step(time_step);
 
         let ctrl_points_freestream_range = 0..self.line_force_model.nr_span_lines();
         let wake_points_freestream_range = self.line_force_model.nr_span_lines()..freestream_velocity.len();
@@ -207,11 +213,19 @@ impl Simulation {
         
         self.flow_derivatives.update(&solver_result.output_ctrl_points_velocity);
 
-        self.line_force_model.calculate_simulation_result(
+        let simulation_result = self.line_force_model.calculate_simulation_result(
             &solver_result, 
             &ctrl_point_acceleration, 
             time
-        )
+        );
+
+        // The forces must be calculated before the update, so that they are based on the same
+        // state of the dynamic stall models as the solver
+        self.line_force_model.update_dynamic_stall_state(
+            &solver_result.output_ctrl_points_velocity
+        );
+
+        simulation_result
     }
 
     /// Serialize the current wake as a legacy VTK PolyData buffer, so the wake geometry and

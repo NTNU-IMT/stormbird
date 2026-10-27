@@ -111,6 +111,19 @@ class SimulationBuilder(StormbirdSetupBaseModel):
                     data['simulation_settings'] = DynamicSettings(**settings_data['Dynamic'])
         return data
 
+    @model_validator(mode='after')
+    def check_dynamic_stall(self) -> "SimulationBuilder":
+        '''
+        The dynamic stall model depends on the time history of the flow, and is therefore only
+        allowed in dynamic simulations.
+        '''
+        if self.line_force_model.has_dynamic_stall() and not self.dynamic():
+            raise ValueError(
+                "The dynamic stall model can only be used together with dynamic simulation settings"
+            )
+
+        return self
+
     @model_serializer
     def ser_model(self) -> dict[str, Any]:
         line_force_model_dict = self.line_force_model.model_dump(exclude_none=True)

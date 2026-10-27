@@ -161,6 +161,10 @@ impl CompleteSailModel {
 
         // Iterate until the local wing angles converge
         while iteration < self.settings.max_controller_iterations && max_change_in_wing_angles > self.settings.allowed_angle_error {
+            // The iterations are not a time history, so the dynamic stall models, if any, should
+            // give static values
+            self.lifting_line_simulation.line_force_model.reset_dynamic_stall();
+
             result = self.do_step(
                 iteration as Float,
                 1.0,

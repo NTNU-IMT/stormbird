@@ -244,4 +244,56 @@ impl LineForceModel {
 
         self.update_global_data_representations();
     }
+
+    /// Returns true if any of the wings have a dynamic stall model
+    pub fn has_dynamic_stall(&self) -> bool {
+        self.dynamic_stall.iter().any(|model| model.is_some())
+    }
+
+    /// Sets the time step to use in the dynamic stall models for the next evaluations. Should be
+    /// called before solving for the circulation strength in a new time step.
+    pub fn set_dynamic_stall_time_step(&mut self, time_step: Float) {
+        for model in self.dynamic_stall.iter_mut().flatten() {
+            model.set_time_step(time_step);
+        }
+    }
+
+    /// Resets the state of the dynamic stall models, so that they give static values until the
+    /// next completed time step.
+    pub fn reset_dynamic_stall(&mut self) {
+        for model in self.dynamic_stall.iter_mut().flatten() {
+            model.reset();
+        }
+    }
+
+    /// Updates the state of the dynamic stall models after a completed time step. Should be called
+    /// once per time step, after the forces are calculated, using the final velocity at the control
+    /// points from the solver.
+    pub fn update_dynamic_stall_state(&mut self, ctrl_points_velocity: &[SpatialVector]) {
+        if !self.has_dynamic_stall() {
+            return;
+        }
+
+        let angles_of_attack = self.angles_of_attack(ctrl_points_velocity, CoordinateSystem::Global);
+        let internal_states = self.section_models_internal_state(ctrl_points_velocity);
+
+        for wing_index in 0..self.nr_wings() {
+            if self.dynamic_stall[wing_index].is_none() {
+                continue;
+            }
+
+            let segment_states = self.wing_indices[wing_index].clone().map(|index| {
+                self.dynamic_stall_state(
+                    index,
+                    angles_of_attack[index],
+                    internal_states[index],
+                    ctrl_points_velocity[index]
+                ).map(|(_, state)| state).unwrap_or_default()
+            }).collect();
+
+            if let Some(model) = &mut self.dynamic_stall[wing_index] {
+                model.commit(segment_states);
+            }
+        }
+    }
 }

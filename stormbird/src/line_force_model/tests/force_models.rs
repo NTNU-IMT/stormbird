@@ -193,3 +193,29 @@ fn gyroscopic_moment_requires_rotating_cylinder() {
         ..wing_builder(SectionModel::default())
     });
 }
+
+#[test]
+fn dynamic_stall_from_json() {
+    let wing_builder: WingBuilder = serde_json::from_str(r#"{
+        "section_points": [{"x": 0.0, "y": 0.0, "z": 0.0}, {"x": 0.0, "y": 0.0, "z": 1.0}],
+        "chord_vectors": [{"x": 1.0, "y": 0.0, "z": 0.0}, {"x": 1.0, "y": 0.0, "z": 0.0}],
+        "section_model": {"SingleElementFoil": {}},
+        "dynamic_stall": {"separation_time_constant": 4.0}
+    }"#).unwrap();
+
+    let line_force_model = build(wing_builder);
+
+    let dynamic_stall = line_force_model.dynamic_stall[0].as_ref().unwrap();
+
+    assert_eq!(dynamic_stall.separation_time_constant, 4.0);
+    assert_eq!(dynamic_stall.segment_states.len(), line_force_model.nr_span_lines());
+}
+
+#[test]
+#[should_panic]
+fn dynamic_stall_requires_foil_section_model() {
+    build(WingBuilder {
+        dynamic_stall: Some(Default::default()),
+        ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
+    });
+}
