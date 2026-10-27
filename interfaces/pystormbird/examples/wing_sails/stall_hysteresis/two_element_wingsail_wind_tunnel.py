@@ -1,5 +1,7 @@
 
 
+import argparse
+
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
@@ -7,12 +9,11 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from stormbird_setup.spatial_vector import SpatialVector
-from stormbird_setup.section_models import SectionModel, Foil
+from stormbird_setup.section_models import SectionModel, Foil, DynamicStallModelBuilder
 from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
 from stormbird_setup.lifting_line.solver import Iterative
 from stormbird_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
-from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrections
 
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
@@ -27,24 +28,52 @@ def read_csv(file_name: str) -> pl.DataFrame:
     )
 
 if __name__ == "__main__":
+    argument_parser = argparse.ArgumentParser()
+    argument_parser.add_argument(
+        "--quasi-steady",
+        action="store_true",
+        help="Use quasi-steady simulation settings instead of dynamic. Also turns off dynamic stall"
+    )
+    argument_parser.add_argument(
+        "--no-dynamic-stall",
+        action="store_true",
+        help="Turn off the dynamic stall model in the dynamic simulation"
+    )
+
+    args = argument_parser.parse_args()
+
+    dynamic = not args.quasi_steady
+    use_dynamic_stall = not args.no_dynamic_stall
+
     chord = 0.2 + 0.15
     start_height = 0.1
     span = 1.0
+    virtual_extension = 0.05 * span
     nr_sections = 32
-    velocity = 8.0
+    velocity = 30.0
     density = 1.225
     
     force_factor = 0.5 * density * chord * span * velocity**2
     
+    time_step = 0.25 * chord / velocity
+    
+    dynamic_stall = DynamicStallModelBuilder(
+        pressure_time_constant = 1.7,
+        separation_time_constant = 3.0
+    ) if (dynamic and use_dynamic_stall) else None
+    
     wing_builder = WingBuilder(
         section_points=[
             SpatialVector(z=start_height),
-            SpatialVector(z=start_height + span)
+            SpatialVector(z=start_height + span),
+            SpatialVector(z=start_height + span + virtual_extension)
         ],
         chord_vectors = [
             SpatialVector(x=chord),
+            SpatialVector(x=chord),
             SpatialVector(x=chord)
         ],
+        line_segment_is_virtual = [False, True],
         section_model = SectionModel(
             model=Foil(
                 cl_zero_angle=1.3,
@@ -52,7 +81,8 @@ if __name__ == "__main__":
                 stall_range = np.radians(10.0),
                 cl_max_after_stall = 0.75
             )
-        )
+        ),
+        dynamic_stall = dynamic_stall
     )
     
     line_force_model = LineForceModelBuilder(
@@ -65,21 +95,25 @@ if __name__ == "__main__":
     
     line_force_model.add_wing_builder(wing_builder)
     
-    wake = QuasiSteadyWakeSettings(
-        symmetry_condition=SymmetryCondition.Z,
-    )
-    
-    solver = Iterative(
-        max_iterations_per_time_step=200,
-        damping_factor = 0.02,
-        velocity_corrections=VelocityCorrections.new_max_induced_velocity_magnitude()
-    )
-    
     simulation_builder = SimulationBuilder(
         line_force_model = line_force_model,
-        simulation_settings = QuasiSteadySettings(
-            wake = wake,
-            solver = solver
+        simulation_settings = DynamicSettings(
+            wake = DynamicWakeBuilder(
+                symmetry_condition = SymmetryCondition.Z,
+                first_panel_relative_length = time_step * velocity / chord
+            ),
+            solver = Iterative(
+                max_iterations_per_time_step=20,
+                damping_factor = 0.25
+            )
+        ) if dynamic else QuasiSteadySettings(
+            wake = QuasiSteadyWakeSettings(
+                symmetry_condition = SymmetryCondition.Z,
+            ),
+            solver = Iterative(
+                max_iterations_per_time_step=200,
+                damping_factor = 0.05
+            )
         ),
     )
     
@@ -94,7 +128,6 @@ if __name__ == "__main__":
     dalpha_dt = np.radians(0.5)
     
     end_time = np.radians(100.0) / dalpha_dt
-    time_step = 0.25 * chord / velocity
     
     nr_time_steps = int(end_time / time_step)
     
@@ -122,8 +155,6 @@ if __name__ == "__main__":
         angles_of_attack.append(-local_wing_angle)
         
         simulation.set_local_wing_angles([local_wing_angle])
-        
-        #simulation.reset_previous_circulation_strength()
         
         result = simulation.do_step(
             time = time,
