@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.section_models import SectionModel, Foil, DynamicStallModelBuilder
-from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
+from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder, ForceCalculationSettings
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
 from stormbird_setup.lifting_line.solver import Iterative
 from stormbird_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
@@ -77,12 +77,12 @@ if __name__ == "__main__":
         section_model = SectionModel(
             model=Foil(
                 cl_zero_angle=1.3,
-                mean_positive_stall_angle=np.radians(14.0),
-                stall_range = np.radians(10.0),
+                mean_positive_stall_angle=np.radians(12.0),
+                stall_range = np.radians(5.0),
                 cl_max_after_stall = 0.75
             )
         ),
-        dynamic_stall = dynamic_stall
+        dynamic_stall = dynamic_stall,
     )
     
     line_force_model = LineForceModelBuilder(
@@ -90,6 +90,9 @@ if __name__ == "__main__":
         density = density,
         circulation_correction = CirculationCorrectionBuilder.new_gaussian_smoothing(
             smoothing_length_factor = 0.05
+        ),
+        force_calculation_settings = ForceCalculationSettings(
+            include_viscous_lift_in_the_circulation = True
         )
     )
     
