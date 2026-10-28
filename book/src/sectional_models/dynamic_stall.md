@@ -55,6 +55,17 @@ Both lags are implemented with a *deficiency function*, \\(D\\), which is a disc
 
 The lagged signal is then \\(x_i - D_i\\). A time constant of zero turns the lag off, so that the lagged signal is equal to the input.
 
+The plot below illustrates how the deficiency function works. The input is a pulse that starts at a given time, increases linearly to one over the ramp width, stays at one for the hold width, and then decreases linearly back to zero over the ramp width again. With a hold width of zero, the pulse is a triangle, which is similar to an angle of attack that goes quickly through stall and back again. With a ramp width of zero, the pulse is rectangular, which shows the classical step response of a first order lag. The lagged signal is computed with the discrete deficiency function, and is held constant through each time step, as in a simulation. For comparison, the plot also shows the continuous first order lag, \\(dy/d\tau = (x - y) / T\\), which the deficiency function approximates. The difference between the two shows the error from the discrete approximation, which grows with the time step relative to the time constant.
+
+<link rel="stylesheet" href="interactive/model_explorer.css">
+
+<div data-deficiency-function-explorer>
+    <noscript>The interactive plot requires JavaScript.</noscript>
+</div>
+
+<script src="interactive/model_explorer.js"></script>
+<script src="interactive/deficiency_function_explorer.js"></script>
+
 #### Step 1: Pressure lag
 
 When the angle of attack changes, the pressure distribution over the foil, and in particular the suction peak near the leading edge, does not respond instantaneously. Since the separation of the boundary layer is driven by the pressure gradient, the separation responds to this lagged pressure distribution rather than to the instantaneous angle of attack. This is represented by applying a first order lag to the angle of attack, with a time constant \\(T_p\\):
