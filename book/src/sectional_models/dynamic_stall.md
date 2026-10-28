@@ -34,7 +34,7 @@ The dynamic stall model in Stormbird keeps the core idea of the LB model, i.e., 
 2. **The lift is used instead of the normal force.** This follows from the point above, as the foil model gives the lift directly. The model by Hansen, Gaunaa and Madsen uses the lift in the same way. It also means that the chordwise force from the LB model is not needed.
 3. **The pressure lag is applied to the angle of attack directly.** In the LB model, the lag is applied to the attached flow normal force, which is then converted back to an angle of attack. For a linear relationship with a constant slope and zero-lift angle, this is mathematically identical to applying the lag directly to the angle of attack. The linear lift in the foil model uses \\(\sin(\alpha)\\), which can not be inverted for angles above 90 degrees, so the lag is applied to the angle of attack directly to make the model valid for all angles. The differences in the angle of attack are computed as the smallest difference between the angles, so that a change from 179 to -179 degrees is treated as an increase of 2 degrees, and not a decrease of 358 degrees.
 4. **The input to the pressure lag is the effective angle of attack from the simulation.** In the original LB model, the input comes from the attached flow module, including both circulatory and non-circulatory contributions. As this module is omitted, the input is instead the effective angle of attack at each control point, which already includes the induced velocities from the dynamic wake.
-5. **The time constants are constant.** In the original LB model, and many implementations of it, the separation time constant is modified depending on whether the foil is loading or unloading, and on the state of the leading edge vortex. In Stormbird, the time constants are constant, and do not depend on the internal state of the section model either, e.g., flap angle or suction rate. This is a simplification, but the error is believed to be small, and it keeps the number of parameters to tune low. It can be revisited when the leading edge vortex model is added.
+5. **The time constants are constant.** In the original LB model, and many implementations of it, the separation time constant is modified depending on whether the foil is loading or unloading, and on the state of the leading edge vortex. In Stormbird, the time constants are constant, and do not depend on the internal state of the section model either, e.g., flap angle or suction rate. This is a simplification, but the error is believed to be small, and it keeps the number of parameters to tune low.
 6. **Only the stall is lagged.** The optional [slope reduction](foil_model.md#slope-reduction) in the pre-stall lift, which can represent separation that develops gradually before the full stall, is not part of the amount of stall, and is therefore not lagged. In addition, the drag is not affected by the dynamic stall model at the moment.
 
 #### Non-dimensional time and the deficiency function
@@ -101,7 +101,97 @@ In other words, this part of the model collapses down to two time constants, \\(
 
 ### Leading edge vortex creation
 
-TO COME
+When the angle of attack increases rapidly through the static stall angle, the flow does not only separate gradually from the trailing edge. At some point, the high suction peak near the leading edge can no longer be sustained, and the flow separates at the leading edge as well. This forms a strong vortex that is first fed by vorticity from the leading edge, and then travels downstream over the suction side of the foil. While the vortex is above the foil, its low pressure core gives an extra suction force, so that the lift becomes significantly higher than the maximum static value. When the vortex passes the trailing edge, it is shed into the wake, and the lift drops suddenly, often to values below the static post-stall lift. This is the lift overshoot, followed by an abrupt stall, that is characteristic of *deep dynamic stall*.
+
+#### The original formulation
+
+In the LB model, the vortex is not modelled explicitly. Instead, the extra force from the vortex is modelled as an accumulation of the force that is *lost* due to separation. The idea is that the circulation that the separated flow is no longer able to keep bound to the foil, is instead collected in the vortex, and gives a force as long as the vortex is above the foil. The input to the vortex model, often called the *vortex feed*, is the difference between the linear, attached flow, normal force and the normal force from the Kirchhoff relationship, evaluated with the dynamic separation point:
+
+\\[
+    C_{v,i} = C_{n,linear,i} \left(1 - \left(\frac{1 + \sqrt{f_i''}}{2}\right)^2 \right)
+\\]
+
+The vortex normal force, \\(C_n^v\\), is then found with the same type of deficiency function as the time lags, but with a separate time constant for the decay of the vortex, \\(T_v\\):
+
+\\[
+    C_{n,i}^v = C_{n,i-1}^v e^{-\Delta \tau / T_v} + (C_{v,i} - C_{v,i-1}) e^{-\Delta \tau / (2 T_v)}
+\\]
+
+That is, the vortex force increases when the vortex feed increases, i.e., when more of the flow separates, and decays exponentially with the time constant \\(T_v\\) otherwise. When the vortex feed is constant, the vortex force therefore goes to zero.
+
+However, the vortex is only fed while it is above the foil. This is controlled with an onset criterion and a *vortex time*, \\(\tau_v\\), which tracks the position of the vortex:
+
+- **Onset.** The leading edge separation is assumed to start when the lagged normal force from the pressure lag, \\(C_n'\\), exceeds a critical value, \\(C_{n1}\\). This is meant to represent a critical pressure at the leading edge. The critical value is a separate parameter, found from static foil data, typically close to the normal force at the static stall angle. As the lagged normal force is used, the onset is delayed relative to the static stall angle, as the pressure distribution needs time to build up.
+- **Vortex time.** After the onset, the vortex time increases with the non-dimensional time step, \\(\tau_{v,i} = \tau_{v,i-1} + \Delta \tau\\), and is reset to zero when the onset criterion is no longer met. The vortex is assumed to travel over the chord at a constant fraction of the free stream velocity, so that it reaches the trailing edge after a fixed non-dimensional time, \\(T_{vl}\\).
+- **Feeding and shedding.** The increments in the vortex feed are only added while the vortex is above the foil, i.e., \\(0 < \tau_v \leq T_{vl}\\). After the vortex has passed the trailing edge, the vortex force only decays.
+
+The vortex force is added to the normal force from the separation model, so that the total dynamic normal force is the sum of the two.
+
+In addition, the original model, and many implementations of it, include several further adjustments related to the vortex:
+
+- The decay of the vortex force is accelerated after the vortex has passed the trailing edge, typically by halving \\(T_v\\).
+- The separation time constant, \\(T_f\\), is modified depending on the vortex time and on whether the foil is loading or unloading.
+- The center of pressure of the vortex force moves with the vortex, which gives a characteristic variation in the pitching moment.
+- Some versions allow for secondary vortices, which are shed with a period of \\(T_{vl}\\) as long as the onset criterion is met.
+
+The core of the model is therefore two additional time constants, \\(T_v\\) and \\(T_{vl}\\), and the critical normal force, \\(C_{n1}\\). Typical values reported for a NACA 0012 profile at low Mach numbers are around \\(T_v \approx 6\\) and \\(T_{vl} \approx 7\\), while for instance OpenFAST uses \\(T_{vl} = 11\\) as default.
+
+#### Differences from the original formulation
+
+The vortex model in Stormbird keeps the core of the LB vortex model, i.e., a vortex feed that is accumulated with a deficiency function, and a vortex time that controls when the vortex is fed. The adaptations follow the same principles as for the separation model: the force from the vortex is connected to the amount of stall rather than the Kirchhoff relationship, and as much as possible is taken directly from the foil model, so that the number of new parameters is kept low. The differences are as follows:
+
+1. **The vortex feed is the lift lost due to the dynamic stall.** In the LB model, the vortex feed is the difference between the attached flow force and the force from the separation model. The equivalent in Stormbird is the difference between the pre-stall lift and the dynamic lift from the separation model, which, from the blend in [step 3](#step-3-dynamic-lift), simplifies to the dynamic amount of stall times the difference between the pre-stall and post-stall lift. This keeps the physical interpretation of the original model, i.e., that the lift that is lost due to stall is collected in the vortex, without the need for the Kirchhoff relationship. As for the separation model, the lift is used instead of the normal force.
+2. **The onset criterion is given by the stall angle in the foil model.** In the LB model, the onset is given by a separate parameter, the critical normal force, which is typically set close to the force at the static stall angle. In Stormbird, the onset is instead defined as the point where the lagged angle of attack from the pressure lag, \\(\alpha_f\\), exceeds the mean stall angle in the foil model. This is the same as saying that the static amount of stall at the lagged angle of attack, \\(s'\\), is larger than 0.5. This removes the need for a separate parameter, it is valid for both positive and negative angles of attack, with different stall angles, and it automatically follows changes in the stall angle due to the internal state of the section model, such as flap angle or suction rate. It also keeps the same physical interpretation as the original criterion, as the onset is still delayed by the pressure lag. Note that the critical normal force in the LB model is typically set at the break in the static force curve, which, in the foil model, occurs somewhat before the mean stall angle, as the blend starts to reduce the lift before the amount of stall reaches 0.5. The onset in Stormbird is therefore slightly later than a direct translation of the original criterion would give. However, the difference is not believed to be important, for two reasons. First, the vortex feed is proportional to the dynamic amount of stall, so it is small in the early part of the stall regardless of when the onset happens. Second, the onset mainly controls when the vortex is shed, which is also controlled by \\(T_{vl}\\). A different onset can therefore largely be compensated by tuning \\(T_{vl}\\). An onset based on the start of the stall transition, for instance \\(|\alpha_f| > \alpha_s - \Delta_s\\), was considered, but not chosen, as it makes the onset sensitive to the stall range, which is sometimes set large to represent a gradual stall. If more control over the onset turns out to be necessary, a natural extension is to replace the value of 0.5 with an optional parameter for the critical amount of stall.
+3. **No modifications of the time constants.** All the time constants are constant, also after the vortex has passed the trailing edge, for the same reasons as given for the separation model. This means that the vortex force decays somewhat slower after the vortex has passed the trailing edge than in the original model.
+4. **No pitching moment.** The section models in Stormbird do not compute a pitching moment, so the movement of the center of pressure is not needed.
+5. **No secondary vortices.** Only one vortex is created for each time the onset criterion is met. A new vortex requires that the lagged angle of attack goes below the stall angle first.
+6. **Only the lift is affected.** In the LB model, the vortex force is a normal force, which therefore also contributes to the drag. As for the separation model, the vortex model only affects the lift at the moment.
+
+#### Step 4: Vortex feed
+
+The vortex feed is the difference between the pre-stall lift and the dynamic lift from [step 3](#step-3-dynamic-lift), which can be written as:
+
+\\[
+    C_{L,v,feed,i} = C_{L,pre-stall}(\alpha_i) - C_{L,dynamic,i} = s_i'' \left( C_{L,pre-stall}(\alpha_i) - C_{L,post-stall}(\alpha_i) \right)
+\\]
+
+#### Step 5: Vortex onset and vortex time
+
+The vortex time, \\(\tau_v\\), is increased with the non-dimensional time step as long as the lagged angle of attack is above the mean stall angle, and reset to zero otherwise:
+
+\\[
+    \tau_{v,i} =
+    \begin{cases}
+        \tau_{v,i-1} + \Delta \tau & \text{if } s(\alpha_{f,i}) > 0.5 \\\\
+        0 & \text{otherwise}
+    \end{cases}
+\\]
+
+The vortex is above the foil, and therefore fed, when \\(0 < \tau_{v,i} \leq T_{vl}\\).
+
+#### Step 6: Vortex lift
+
+The vortex lift coefficient, \\(C_{L,v}\\), is found with the same deficiency function as in the other steps, with the time constant \\(T_v\\), but where the increment in the vortex feed is only included while the vortex is above the foil:
+
+\\[
+    C_{L,v,i} =
+    \begin{cases}
+        C_{L,v,i-1} e^{-\Delta \tau / T_v} + (C_{L,v,feed,i} - C_{L,v,feed,i-1}) e^{-\Delta \tau / (2 T_v)} & \text{if } 0 < \tau_{v,i} \leq T_{vl} \\\\
+        C_{L,v,i-1} e^{-\Delta \tau / T_v} & \text{otherwise}
+    \end{cases}
+\\]
+
+The total dynamic lift is then the sum of the lift from the separation model and the vortex lift:
+
+\\[
+    C_{L,total,i} = C_{L,dynamic,i} + C_{L,v,i}
+\\]
+
+The vortex lift is treated as part of the stall related lift. That is, it is handled in the same way as the post-stall lift, which by default is a separate viscous lift force, and only included in the circulation if the `include_viscous_lift_in_the_circulation` setting is used.
+
+The vortex model also recovers the static lift in steady conditions. When the angle of attack is constant, the vortex feed is constant, so that no new vortex lift is added, and any existing vortex lift decays to zero. The vortex time also makes the model robust in deep stall, where the difference between the pre-stall and the post-stall lift can be large. Small variations in the angle of attack around a constant value well above the stall angle, for instance due to waves, will only give vortex lift during the first \\(T_{vl}\\) after the lagged angle of attack exceeded the stall angle. After that, the vortex model only gives a decaying lift, until the angle of attack goes below the stall angle again.
+
+In other words, the vortex model adds two new time constants, \\(T_v\\) and \\(T_{vl}\\), while the onset criterion and the vortex feed come directly from the foil model. A time constant \\(T_v\\) of zero turns the vortex model off, in the same way as for the other time constants.
 
 ## Implementation
 
@@ -113,13 +203,17 @@ The dynamic stall model is set for each wing, through the optional `dynamic_stal
 pub struct DynamicStallModelBuilder {
     pub pressure_time_constant: f64,
     pub separation_time_constant: f64,
+    pub vortex_time_constant: f64,
+    pub vortex_passage_time: f64,
 }
 ```
 
 - `pressure_time_constant`: the non-dimensional time constant for the pressure lag, \\(T_p\\). The default value is 1.7.
 - `separation_time_constant`: the non-dimensional time constant for the separation lag, \\(T_f\\). The default value is 3.0.
+- `vortex_time_constant`: the non-dimensional time constant for the decay of the leading edge vortex lift, \\(T_v\\). The default value is 6.0.
+- `vortex_passage_time`: the non-dimensional time it takes for the leading edge vortex to pass the trailing edge, \\(T_{vl}\\). The default value is 7.0.
 
-Both time constants must be zero or larger, where zero turns the corresponding lag off. The model is not used by default. To activate it with the default values, it is enough to give an empty object in the JSON input:
+All the time constants must be zero or larger, where zero turns the corresponding lag off. A `vortex_time_constant` of zero turns the leading edge vortex off, so that only the time lags in the separation are used. The model is not used by default. To activate it with the default values, it is enough to give an empty object in the JSON input:
 
 ```json
 {
@@ -141,7 +235,9 @@ wing_builder = WingBuilder(
     section_model = ...,
     dynamic_stall = DynamicStallModelBuilder(
         pressure_time_constant = 1.7,
-        separation_time_constant = 3.0
+        separation_time_constant = 3.0,
+        vortex_time_constant = 6.0,
+        vortex_passage_time = 7.0
     )
 )
 ```
@@ -152,7 +248,7 @@ The model depends on the time history of the flow, and is therefore only used in
 
 ### Internal state and time stepping
 
-When the line force model is built, each wing with a dynamic stall model gets a `DynamicStallModel`, which contains both the parameters and the state from the last completed time step for each line segment on the wing. That is, the angle of attack, the deficiency functions, and the amounts of stall. The structure is defined together with the section models, as it is fundamentally a two dimensional model, while the line force model holds one optional model for each wing.
+When the line force model is built, each wing with a dynamic stall model gets a `DynamicStallModel`, which contains both the parameters and the state from the last completed time step for each line segment on the wing. That is, the angle of attack, the deficiency functions, the amounts of stall, the vortex feed, the vortex time, and the vortex lift. The structure is defined together with the section models, as it is fundamentally a two dimensional model, while the line force model holds one optional model for each wing.
 
 The solvers in the lifting line simulation evaluate the lift many times per time step. The dynamic stall model is therefore always evaluated based on the state from the last completed time step, and the state is not changed during the iterations. In each time step, the simulation does the following:
 
@@ -161,6 +257,6 @@ The solvers in the lifting line simulation evaluate the lift many times per time
 3. Computes the forces, with the same state as in the solver.
 4. Updates the state of the dynamic stall models, based on the final velocity at the control points from the solver.
 
-In the first time step, there is no time history available, so the model gives the static values, and the state is initialized from the result. The state is also reset when the simulation is initialized again, for instance in the `do_multiple_steps` function of the complete sail model. The steady state functions of the complete sail model reset the state before each iteration, as the iterations are not a time history, so that the results are always based on the static foil model.
+In the first time step, there is no time history available, so the model gives the static values, and the state is initialized from the result. The state is also reset when the simulation is initialized again, for instance in the `do_multiple_steps` function of the complete sail model. The steady state functions of the complete sail model reset the state before each iteration, as the iterations are not a time history, so that the results are always based on the static foil model. When the state is initialized at an angle of attack above the stall angle, any leading edge vortex is assumed to have passed the trailing edge a long time ago, so that a new vortex is only created after the lagged angle of attack has been below the stall angle first.
 
-The dynamic amount of stall affects both the pre-stall lift, which is used for the circulation, and the post-stall lift, which is used either for the viscous lift force or in the circulation, depending on the `include_viscous_lift_in_the_circulation` setting. See the [circulation strength chapter](../line_model/circulation_strength.md) for more.
+The dynamic amount of stall affects both the pre-stall lift, which is used for the circulation, and the post-stall lift, which is used either for the viscous lift force or in the circulation, depending on the `include_viscous_lift_in_the_circulation` setting. The lift from the leading edge vortex is added to the post-stall lift, and is therefore treated in the same way. See the [circulation strength chapter](../line_model/circulation_strength.md) for more.

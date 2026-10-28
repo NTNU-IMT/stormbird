@@ -14,7 +14,6 @@
 //! - [`angles_of_attack`](LineForceModel::angles_of_attack)
 //! - [`section_models_internal_state`](LineForceModel::section_models_internal_state)
 //! - [`wing_segment_flow_conditions`](LineForceModel::wing_segment_flow_conditions)
-//! - [`lift_coefficients_total`](LineForceModel::lift_coefficients_total)
 //! - [`dynamic_stall_state`](LineForceModel::dynamic_stall_state)
 //! - [`lift_coefficients_pre_stall_with_stall_drop_off`](LineForceModel::lift_coefficients_pre_stall_with_stall_drop_off)
 //! - [`lift_coefficients_post_stall_with_stall_weight`](LineForceModel::lift_coefficients_post_stall_with_stall_weight)
@@ -199,28 +198,6 @@ impl LineForceModel {
                 compartment_index: compartments.index_of(non_dim_span_location),
             }
         }).collect()
-    }
-
-    /// Returns the local lift coefficient on each line element.
-    ///
-    /// # Arguments
-    /// * `angles_of_attack` - the angle of attack at each control point
-    /// * `internal_states` - the internal state of the section model at each control point
-    pub fn lift_coefficients_total(
-        &self, 
-        angles_of_attack: &[Float],
-        internal_states: &[Float]
-    ) -> Vec<Float> {  
-        (0..self.nr_span_lines()).map(
-            |index| {
-                let wing_index  = self.wing_index_from_global(index);
-
-                self.section_models[wing_index].lift_coefficient(
-                    angles_of_attack[index], 
-                    internal_states[index]
-                )
-            }
-        ).collect()
     }
 
     /// Evaluates the dynamic stall model on a single line element, if the wing has a dynamic stall

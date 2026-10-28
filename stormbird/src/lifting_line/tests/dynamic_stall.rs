@@ -89,6 +89,8 @@ fn zero_time_constants_give_the_same_result_as_without_dynamic_stall() {
     let mut simulation_dynamic = dynamic_simulation(Some(DynamicStallModelBuilder {
         pressure_time_constant: 0.0,
         separation_time_constant: 0.0,
+        vortex_time_constant: 0.0,
+        ..Default::default()
     }));
 
     let lift_static = lift_during_ramp(&mut simulation_static, max_angle, nr_time_steps);

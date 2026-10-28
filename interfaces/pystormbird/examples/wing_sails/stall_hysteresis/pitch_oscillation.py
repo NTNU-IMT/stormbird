@@ -1,8 +1,8 @@
 '''
 Demonstration of the dynamic stall model, using a wing with a sinusoidal variation in the angle of
-attack that goes through stall. The oscillation is run for several reduced frequencies, both with
-and without the dynamic stall model, and compared against a quasi-steady sweep of the angle of
-attack.
+attack that goes through stall. The oscillation is run for several reduced frequencies, without the
+dynamic stall model, with the dynamic stall model but without the leading edge vortex, and with the
+full dynamic stall model, and compared against a quasi-steady sweep of the angle of attack.
 '''
 
 import numpy as np
@@ -44,10 +44,15 @@ time_step = non_dimensional_time_step * chord / (2.0 * velocity)
 
 dynamic_stall = DynamicStallModelBuilder(
     pressure_time_constant = 1.7,
-    separation_time_constant = 3.0
+    separation_time_constant = 3.0,
+    vortex_time_constant = 6.0,
+    vortex_passage_time = 7.0
 )
 
-def build_simulation(*, dynamic: bool, use_dynamic_stall: bool) -> Simulation:
+# A vortex time constant of zero turns the leading edge vortex off
+dynamic_stall_without_vortex = dynamic_stall.model_copy(update={"vortex_time_constant": 0.0})
+
+def build_simulation(*, dynamic: bool, dynamic_stall: DynamicStallModelBuilder | None) -> Simulation:
     wing_builder = WingBuilder(
         section_points = [
             SpatialVector(z=0.0),
@@ -58,7 +63,7 @@ def build_simulation(*, dynamic: bool, use_dynamic_stall: bool) -> Simulation:
             SpatialVector(x=chord)
         ],
         section_model = SectionModel(model=Foil()),
-        dynamic_stall = dynamic_stall if use_dynamic_stall else None
+        dynamic_stall = dynamic_stall
     )
 
     line_force_model = LineForceModelBuilder(
@@ -120,7 +125,7 @@ def quasi_steady_sweep() -> tuple[np.ndarray, np.ndarray]:
     Static reference, where the angle of attack is increased in small steps over the range of the
     oscillation
     '''
-    simulation = build_simulation(dynamic=False, use_dynamic_stall=False)
+    simulation = build_simulation(dynamic=False, dynamic_stall=None)
     freestream = freestream_velocity(simulation)
 
     angles_of_attack = np.linspace(
@@ -134,12 +139,12 @@ def quasi_steady_sweep() -> tuple[np.ndarray, np.ndarray]:
 
     return angles_of_attack, np.array(cl)
 
-def oscillation(reduced_frequency: float, use_dynamic_stall: bool) -> tuple[np.ndarray, np.ndarray]:
+def oscillation(reduced_frequency: float, dynamic_stall: DynamicStallModelBuilder | None, label: str) -> tuple[np.ndarray, np.ndarray]:
     '''
     Runs the oscillation for the given reduced frequency, and returns the angle of attack and lift
     coefficient for the last period
     '''
-    simulation = build_simulation(dynamic=True, use_dynamic_stall=use_dynamic_stall)
+    simulation = build_simulation(dynamic=True, dynamic_stall=dynamic_stall)
     freestream = freestream_velocity(simulation)
 
     angular_frequency = 2.0 * velocity * reduced_frequency / chord
@@ -151,7 +156,7 @@ def oscillation(reduced_frequency: float, use_dynamic_stall: bool) -> tuple[np.n
     angles_of_attack = []
     cl = []
 
-    for time_index in tqdm(range(nr_time_steps), desc=f"k = {reduced_frequency}, dynamic stall = {use_dynamic_stall}"):
+    for time_index in tqdm(range(nr_time_steps), desc=f"k = {reduced_frequency}, {label}"):
         time = time_index * time_step
 
         angle_of_attack = mean_angle + angle_amplitude * np.sin(angular_frequency * time)
@@ -169,12 +174,16 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(1, len(reduced_frequencies), sharey=True, figsize=(5 * len(reduced_frequencies), 4.5))
 
     for ax, reduced_frequency in zip(axes, reduced_frequencies):
-        angles_without, cl_without = oscillation(reduced_frequency, use_dynamic_stall=False)
-        angles_with, cl_with = oscillation(reduced_frequency, use_dynamic_stall=True)
-
         ax.plot(np.degrees(static_angles), static_cl, 'k--', label="Quasi-steady")
-        ax.plot(np.degrees(angles_without), cl_without, label="Dynamic wake")
-        ax.plot(np.degrees(angles_with), cl_with, label="Dynamic wake + dynamic stall")
+
+        for label, model in [
+            ("Dynamic wake", None),
+            ("Dynamic wake + dynamic stall, no vortex", dynamic_stall_without_vortex),
+            ("Dynamic wake + dynamic stall", dynamic_stall),
+        ]:
+            angles, cl = oscillation(reduced_frequency, model, label)
+
+            ax.plot(np.degrees(angles), cl, label=label)
 
         ax.set_title(f"k = {reduced_frequency}")
         ax.set_xlabel("Angle of attack [deg]")

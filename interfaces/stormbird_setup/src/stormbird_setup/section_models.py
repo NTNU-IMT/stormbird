@@ -481,17 +481,29 @@ class DynamicStallModelBuilder(StormbirdSetupBaseModel):
 
     The model applies two first order time lags to the stall in the foil model: one to the angle of
     attack, representing the lag in the pressure distribution, and one to the amount of stall,
-    representing the lag in the boundary layer separation. The time constants are
-    non-dimensional, given in semi-chords travelled, i.e., relative to c / (2 V). A value of zero
-    turns the corresponding lag off. Values that are not set use the defaults in Stormbird, which
-    are 1.7 for the pressure time constant and 3.0 for the separation time constant.
+    representing the lag in the boundary layer separation. In addition, it adds the lift from a
+    leading edge vortex, which is created when the lagged angle of attack exceeds the stall angle,
+    decays with the vortex time constant, and is only fed until it has passed the trailing edge,
+    after the vortex passage time.
+
+    The time constants are non-dimensional, given in semi-chords travelled, i.e., relative to
+    c / (2 V). A value of zero turns the corresponding lag, or the vortex, off. Values that are not
+    set use the defaults in Stormbird, which are 1.7 for the pressure time constant, 3.0 for the
+    separation time constant, 6.0 for the vortex time constant and 7.0 for the vortex passage time.
     '''
     pressure_time_constant: float | None = None
     separation_time_constant: float | None = None
+    vortex_time_constant: float | None = None
+    vortex_passage_time: float | None = None
 
     @model_validator(mode='after')
     def check_time_constants(self) -> "DynamicStallModelBuilder":
-        for name in ("pressure_time_constant", "separation_time_constant"):
+        for name in (
+            "pressure_time_constant",
+            "separation_time_constant",
+            "vortex_time_constant",
+            "vortex_passage_time"
+        ):
             value = getattr(self, name)
 
             if value is not None and value < 0.0:

@@ -18,6 +18,13 @@
 //! The lift is then computed from the same blend as in the foil model, with the curves evaluated at
 //! the instantaneous angle of attack, but weighted with s'' rather than s(α).
 //!
+//! In addition, the model includes the extra lift from a leading edge vortex. The vortex is fed by
+//! the lift that is lost due to the dynamic stall, i.e., s'' times the difference between the
+//! pre-stall and post-stall lift. The feed is accumulated with a deficiency function with the time
+//! constant T_v, but only while the vortex is above the foil. The vortex is created when the lagged
+//! angle of attack exceeds the mean stall angle, i.e., when s' > 0.5, and passes the trailing edge
+//! after the non-dimensional time T_vl. After that, the vortex lift only decays.
+//!
 //! The model is fundamentally a two dimensional model, but it is kept as a separate structure from
 //! the foil models, as it has an internal state, i.e., the memory effects for each line segment on
 //! a wing. The model is designed to be used in a time stepping simulation, where the solver can
@@ -54,13 +61,28 @@ pub struct DynamicStallSegmentState {
     pub separation_deficiency: Float,
     /// The dynamic amount of stall, s'', which is used to compute the lift
     pub amount_of_stall: Float,
+    /// The lift coefficient that feeds the leading edge vortex, i.e., the lift lost due to the
+    /// dynamic stall: s'' (C_L,pre-stall - C_L,post-stall)
+    pub vortex_feed: Float,
+    /// The non-dimensional time since the leading edge vortex was created, τ_v. Is zero when the
+    /// lagged angle of attack is below the stall angle.
+    pub vortex_time: Float,
+    /// The lift coefficient from the leading edge vortex, C_L,v
+    pub vortex_lift: Float,
 }
 
 impl DynamicStallSegmentState {
     /// The state in steady conditions, where both deficiency functions are zero, and the dynamic
-    /// amount of stall is equal to the static value.
+    /// amount of stall is equal to the static value. There is no vortex lift, and if the foil is
+    /// stalled, the leading edge vortex is assumed to have passed the trailing edge a long time ago.
     pub fn steady(foil: &Foil, angle_of_attack: Float) -> Self {
         let amount_of_stall = foil.amount_of_stall(angle_of_attack);
+
+        let vortex_time = if vortex_onset(amount_of_stall) {
+            Float::INFINITY
+        } else {
+            0.0
+        };
 
         Self {
             angle_of_attack,
@@ -68,6 +90,9 @@ impl DynamicStallSegmentState {
             lagged_angle_amount_of_stall: amount_of_stall,
             separation_deficiency: 0.0,
             amount_of_stall,
+            vortex_feed: vortex_feed(foil, angle_of_attack, amount_of_stall),
+            vortex_time,
+            vortex_lift: 0.0,
         }
     }
 
@@ -85,6 +110,10 @@ pub struct DynamicStallModel {
     pub pressure_time_constant: Float,
     /// Non-dimensional time constant for the lag in the boundary layer separation, T_f
     pub separation_time_constant: Float,
+    /// Non-dimensional time constant for the decay of the leading edge vortex lift, T_v
+    pub vortex_time_constant: Float,
+    /// Non-dimensional time it takes for the leading edge vortex to pass the trailing edge, T_vl
+    pub vortex_passage_time: Float,
     /// The dimensional time step of the current time step. Must be set before the model is
     /// evaluated, with [`DynamicStallModel::set_time_step`].
     pub time_step: Float,
@@ -194,12 +223,36 @@ impl DynamicStallModel {
         // The discrete lag is not strictly guaranteed to stay within the range of the input
         let amount_of_stall = (lagged_angle_amount_of_stall - separation_deficiency).clamp(0.0, 1.0);
 
+        // Step 4: vortex feed, i.e., the lift lost due to the dynamic stall
+        let vortex_feed = vortex_feed(foil, angle_of_attack, amount_of_stall);
+
+        // Step 5: vortex onset and vortex time
+        let vortex_time = if vortex_onset(lagged_angle_amount_of_stall) {
+            previous.vortex_time + delta_s
+        } else {
+            0.0
+        };
+
+        // Step 6: vortex lift, which is only fed while the vortex is above the foil
+        let (decay, increment_weight) = lag_factors(delta_s, self.vortex_time_constant);
+
+        let vortex_is_above_foil = vortex_time > 0.0 && vortex_time <= self.vortex_passage_time;
+
+        let vortex_lift = if vortex_is_above_foil {
+            previous.vortex_lift * decay + (vortex_feed - previous.vortex_feed) * increment_weight
+        } else {
+            previous.vortex_lift * decay
+        };
+
         DynamicStallSegmentState {
             angle_of_attack,
             pressure_deficiency,
             lagged_angle_amount_of_stall,
             separation_deficiency,
             amount_of_stall,
+            vortex_feed,
+            vortex_time,
+            vortex_lift,
         }
     }
 
@@ -231,13 +284,15 @@ impl DynamicStallModel {
         foil.lift_coefficient_pre_stall_raw(angle_of_attack) * (1.0 - state.amount_of_stall)
     }
 
-    /// The post-stall lift coefficient, weighted by the dynamic amount of stall
+    /// The post-stall lift coefficient, weighted by the dynamic amount of stall, plus the lift from
+    /// the leading edge vortex, which is treated as part of the stall related lift.
     pub fn lift_coefficient_post_stall_with_stall_weight(
         foil: &Foil,
         angle_of_attack: Float,
         state: &DynamicStallSegmentState
     ) -> Float {
-        foil.lift_coefficient_post_stall_raw(angle_of_attack) * state.amount_of_stall
+        foil.lift_coefficient_post_stall_raw(angle_of_attack) * state.amount_of_stall +
+            state.vortex_lift
     }
 }
 
@@ -256,6 +311,21 @@ fn lag_factors(delta_s: Float, time_constant: Float) -> (Float, Float) {
         (-delta_s / time_constant).exp(),
         (-delta_s / (2.0 * time_constant)).exp()
     )
+}
+
+/// The lift coefficient that feeds the leading edge vortex, i.e., the difference between the
+/// pre-stall lift and the dynamic lift, which simplifies to s'' (C_L,pre-stall - C_L,post-stall)
+fn vortex_feed(foil: &Foil, angle_of_attack: Float, amount_of_stall: Float) -> Float {
+    amount_of_stall * (
+        foil.lift_coefficient_pre_stall_raw(angle_of_attack) -
+        foil.lift_coefficient_post_stall_raw(angle_of_attack)
+    )
+}
+
+/// The onset criterion for the leading edge vortex: the lagged angle of attack is above the mean
+/// stall angle, which is the same as the static amount of stall at the lagged angle being above 0.5
+fn vortex_onset(lagged_angle_amount_of_stall: Float) -> bool {
+    lagged_angle_amount_of_stall > 0.5
 }
 
 /// Wraps an angle to the range [-π, π), so that differences between angles close to ±π are
