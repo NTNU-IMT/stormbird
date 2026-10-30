@@ -20,9 +20,15 @@ The force history of each case is stored as a time series in time_series_two_rot
 the results are plotted with plotting.py:
 
     python plotting.py interference
+
+The flow fields at the end of each case can also be exported as VTK files with --export-vtk. The VTK
+files are stored in vtk_two_rotors_stormflow, with the same name as the time series. The VTK file of
+the single rotor case is only exported if the single rotor case is simulated, and is then stored in
+vtk_single_rotor_stormflow.
 '''
 
 import argparse
+from pathlib import Path
 
 import pandas as pd
 from stormbird_setup.stormflow import ComputePlatform
@@ -36,7 +42,22 @@ from plotting import (
     two_rotors_time_series_path,
     write_time_series,
 )
-from run_single_rotor import run_case, simulate_force_history
+from rotor_setup import Variant
+from run_single_rotor import add_vtk_arguments, run_case, simulate_force_history
+
+
+def two_rotors_vtk_path(variant: Variant, angular_position: float) -> Path:
+    '''
+    The path of the VTK file of a two rotor case. The name of the file is the same as the name of
+    the time series.
+    '''
+    return (
+        Solver.Stormflow.folder / f"vtk_two_rotors_{Solver.Stormflow.value}" /
+        two_rotors_time_series_path(
+            variant, angular_position, Solver.Stormflow
+        ).with_suffix(".vtk").name
+    )
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -47,6 +68,7 @@ if __name__ == '__main__':
     )
     rotor_setup.add_variant_argument(parser, "simulate")
     parser.add_argument("--cpu", action="store_true", help="Run on the CPU instead of the GPU")
+    add_vtk_arguments(parser)
 
     args = parser.parse_args()
 
@@ -69,7 +91,7 @@ if __name__ == '__main__':
         else:
             print(f"{variant.label}, single rotor")
 
-            single_coefficients = run_case(spin_ratio, variant, compute_platform)
+            single_coefficients = run_case(spin_ratio, variant, compute_platform, args.export_vtk)
 
         print(
             f"cl = {single_coefficients['cl']:.3f}, cd = {single_coefficients['cd']:.3f}",
@@ -83,7 +105,10 @@ if __name__ == '__main__':
                 spin_ratio,
                 variant,
                 compute_platform,
-                rotor_locations=rotor_setup.two_rotors_locations(angular_position)
+                rotor_locations=rotor_setup.two_rotors_locations(angular_position),
+                vtk_export_path=(
+                    two_rotors_vtk_path(variant, angular_position) if args.export_vtk else None
+                )
             )
 
             write_time_series(

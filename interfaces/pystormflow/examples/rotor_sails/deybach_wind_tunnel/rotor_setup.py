@@ -50,7 +50,7 @@ MODEL_SCALE_DIAMETER = 0.4
 MODEL_SCALE_HEIGHT = 2.4
 MODEL_SCALE_FOUNDATION_HEIGHT = 0.15
 
-MODEL_SCALE_TUNNEL_LENGTH = 10.0
+MODEL_SCALE_TUNNEL_LENGTH = 15.0
 MODEL_SCALE_TUNNEL_WIDTH = 5.0
 MODEL_SCALE_TUNNEL_HEIGHT = 3.0
 
@@ -67,25 +67,25 @@ VELOCITY = 8.0
 TUNNEL_LENGTH = MODEL_SCALE_TUNNEL_LENGTH * SCALE_FACTOR
 TUNNEL_WIDTH = MODEL_SCALE_TUNNEL_WIDTH * SCALE_FACTOR
 TUNNEL_HEIGHT = MODEL_SCALE_TUNNEL_HEIGHT * SCALE_FACTOR
-TUNNEL_INLET_DISTANCE = 40.0
+TUNNEL_INLET_DISTANCE = 75.0
 
 # Linear lift slope, manually tuned so that the lift match the experimental data at a spin ratio
 # around 1
-LIFT_SLOPE = 2.6
+LIFT_SLOPE = 2.8
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
-MAX_CORRECTION_RATIO = 2.0
+MAX_CORRECTION_RATIO = 2.25
 
 # Both solvers are incompressible, with the pressure divided by the density. The projected forces
 # are not divided by the density, so it must be one in the line force model.
 DENSITY = 1.0
 
-NR_SECTIONS = 32
+NR_SECTIONS = 40
 
 # Both solvers are run without a turbulence model, with this constant kinematic viscosity in the
 # whole domain
-EFFECTIVE_VISCOSITY = 1e-4
+EFFECTIVE_VISCOSITY = 1.5e-5
 
 # Maximum Courant number, used to set the time step in both solvers
 COURANT_NUMBER = 0.75
@@ -141,6 +141,8 @@ class Variant(Enum):
 
 # The recommended variant, used when no variant is given to the scripts
 DEFAULT_VARIANT = Variant.ProjectedTipLossAndLiftingLine
+
+TIP_LOSS_EXP_FACTOR = 32
 
 # Shorthand for all variants on the command line
 ALL_VARIANTS = "all"
@@ -283,7 +285,7 @@ def actuator_line_builder(
     match variant:
         case Variant.TipLossAndLiftingLine | Variant.TipLossAndLiftingLineAndAdditionalCDi:
             tip_loss_correction = TipLossCorrection(
-                exp_factor = 16.0
+                exp_factor = TIP_LOSS_EXP_FACTOR
             )
             lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition=SymmetryCondition.Z,
@@ -295,12 +297,13 @@ def actuator_line_builder(
             # the lift-induced velocities from the uncorrected circulation, so that no additional
             # lift-induced drag should be necessary.
             tip_loss_correction = TipLossCorrection(
-                exp_factor = 16.0,
+                exp_factor = TIP_LOSS_EXP_FACTOR,
                 application = TipLossApplication.ProjectedForces
             )
             lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition=SymmetryCondition.Z,
-                max_correction_ratio=MAX_CORRECTION_RATIO
+                max_correction_ratio=MAX_CORRECTION_RATIO,
+                include_wing_interactions=False
             )
         case Variant.LiftingLine:
             lifting_line_correction = LiftingLineCorrectionBuilder(
@@ -316,8 +319,8 @@ def actuator_line_builder(
         line_force_model=line_force_model,
         projection_settings=ProjectionSettings(
             projection_function=Gaussian(
-                chord_factor=0.5,
-                thickness_factor=0.5
+                chord_factor=0.6,
+                thickness_factor=0.6
             ),
         ),
         solver_settings=SolverSettings(damping_factor=0.05),

@@ -480,7 +480,7 @@ def plot_interference_factors(
     ax.set_xlabel("Angular position of the interfering rotor [deg]")
     ax.set_ylabel("Interference factor")
 
-    ax.set_ylim(0.5, 2.5)
+    ax.set_ylim(0.0, 2.2)
     ax.set_xlim(-180, 180)
 
     ax.legend()

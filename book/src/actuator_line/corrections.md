@@ -73,11 +73,18 @@ The raw circulation distribution, \\( \Gamma\_{raw} \\), estimated directly from
   f\_{cor}(s) = \frac{2.0}{\pi}\cos^{-1}(e^{-\beta (0.5 - |s|)})
 \\]
 
-The plot below shows how the correction function looks for different values of \\( \beta \\). In general, any value of \\( \beta \\) will force the circulation towards zero at the tips. However, the larger the value, the steeper the reduction towards the tip, and the less effect it has on the inner part of the wing.
+The plot below shows how the correction function looks for different values of \\( \beta \\), which can be adjusted with the slider, or by typing in a value, below the plot. In general, any value of \\( \beta \\) will force the circulation towards zero at the tips. However, the larger the value, the steeper the reduction towards the tip, and the less effect it has on the inner part of the wing.
 
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<div id="tip-loss-correction-plot"></div>
-<script src="plot_scripts/tip-loss-correction-plot.js"></script>
+The plot also shows the corrected circulation, relative to the raw circulation, for a wing with a constant raw circulation along the span when the mean value is maintained, as explained in the [input structure section](#input-structure) below. The constant raw circulation is shown as a dashed line.
+
+<link rel="stylesheet" href="../sectional_models/interactive/model_explorer.css">
+
+<div data-tip-loss-correction-explorer>
+    <noscript>The interactive plot requires JavaScript.</noscript>
+</div>
+
+<script src="../sectional_models/interactive/model_explorer.js"></script>
+<script src="interactive/tip_loss_correction_explorer.js"></script>
 
 ### Input structure
 

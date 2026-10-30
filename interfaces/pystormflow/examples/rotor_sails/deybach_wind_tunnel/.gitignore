@@ -3,3 +3,6 @@
 *.csv
 *.json
 .ruff_cache
+*.vtk
+/vtk_single_rotor_stormflow
+/vtk_two_rotors_stormflow
