@@ -100,13 +100,21 @@ impl Linearized {
 
         let internal_states = line_force_model.section_models_internal_state(&ctrl_points_velocity);
 
-        let cl_linear = line_force_model.lift_coefficients_linear(
+        // The linear lift uses the same internal state as the full lift, i.e., the lagged internal
+        // state for wings with a dynamic stall model
+        let dynamic_internal_states = line_force_model.dynamic_internal_states(
             &angles_of_attack,
             &internal_states,
+            &ctrl_points_velocity
+        );
+
+        let cl_linear = line_force_model.lift_coefficients_linear(
+            &angles_of_attack,
+            &dynamic_internal_states,
         );
 
         // Extract lift derivatives
-        let dcl_dalpha = line_force_model.lift_coefficients_derivatives(&internal_states);
+        let dcl_dalpha = line_force_model.lift_coefficients_derivatives(&dynamic_internal_states);
 
         // Create equation system
         let mut equation_matrix = Matrix::new_default([nr_unknowns, nr_unknowns]);
@@ -161,9 +169,15 @@ impl Linearized {
 
             let internal_states = line_force_model.section_models_internal_state(&ctrl_points_velocity);
 
-            let cl_linear = line_force_model.lift_coefficients_linear(
+            let dynamic_internal_states = line_force_model.dynamic_internal_states(
                 &angles_of_attack,
                 &internal_states,
+                &ctrl_points_velocity
+            );
+
+            let cl_linear = line_force_model.lift_coefficients_linear(
+                &angles_of_attack,
+                &dynamic_internal_states,
             );
 
             let (cl_full, _) = line_force_model.lift_coefficients_pre_and_post_stall(

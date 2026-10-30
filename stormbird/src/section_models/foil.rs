@@ -233,10 +233,28 @@ impl Foil {
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
+        self.drag_coefficient_with_amount_of_stall(
+            angle_of_attack,
+            self.amount_of_stall(angle_of_attack)
+        )
+    }
+
+    /// Calculates the drag coefficient for a given angle of attack and amount of stall, as a blend
+    /// between the pre-stall and the post-stall drag.
+    ///
+    /// The amount of stall is given as an argument, so that it can come from other sources than
+    /// the static value, [`Foil::amount_of_stall`], such as a dynamic stall model.
+    ///
+    /// # Arguments
+    /// * `angle_of_attack` - Angle of attack in radians.
+    /// * `amount_of_stall` - The amount of stall, between 0 (no stall) and 1 (full stall)
+    pub fn drag_coefficient_with_amount_of_stall(
+        &self,
+        angle_of_attack: Float,
+        amount_of_stall: Float
+    ) -> Float {
         let cd_pre_stall  = self.drag_coefficient_pre_stall(angle_of_attack);
         let cd_post_stall = self.cd_max_after_stall * angle_of_attack.sin().abs().powf(self.cd_power_after_stall);
-
-        let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
         cd_pre_stall * (1.0 - amount_of_stall) + amount_of_stall * cd_post_stall
     }

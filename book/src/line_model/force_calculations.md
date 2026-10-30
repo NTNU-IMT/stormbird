@@ -46,7 +46,7 @@ The default value is `false`. If it is set to `true`, the post-stall lift is inc
 
 ### 3 - Sectional drag
 
-Sectional drag is, usually[^sectional_drag_note], the viscous drag on each line segment. It is calculated directly from the drag function in the [sectional model](../sectional_models/sectional_models_intro.md). The direction is always parallel to the local flow.
+Sectional drag is, usually[^sectional_drag_note], the viscous drag on each line segment. It is calculated directly from the drag function in the [sectional model](../sectional_models/sectional_models_intro.md). The direction is always parallel to the local flow. For wings with a [dynamic stall model](../sectional_models/dynamic_stall.md), the drag is computed with the same dynamic amount of stall and internal state as the lift.
 
 The sectional drag also includes the drag from the [lift-induced drag correction](#lift-induced-drag-correction), if it is used.
 

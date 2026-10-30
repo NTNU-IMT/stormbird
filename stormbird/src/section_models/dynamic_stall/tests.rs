@@ -14,8 +14,8 @@ fn foil() -> Foil {
 
 fn model(pressure_time_constant: Float, separation_time_constant: Float) -> DynamicStallModel {
     let mut model = DynamicStallModelBuilder {
-        pressure_time_constant,
-        separation_time_constant,
+        pressure_time_constant: Some(pressure_time_constant),
+        separation_time_constant: Some(separation_time_constant),
         ..Default::default()
     }.build(1);
 
@@ -27,11 +27,18 @@ fn model(pressure_time_constant: Float, separation_time_constant: Float) -> Dyna
 /// Evaluates the model at the given angle of attack and commits the result, as done at the end of
 /// each time step in a simulation.
 fn step(model: &mut DynamicStallModel, foil: &Foil, angle_of_attack: Float) -> DynamicStallSegmentState {
-    let state = model.evaluate(0, foil, angle_of_attack, VELOCITY, CHORD_LENGTH);
+    let state = evaluate(model, foil, angle_of_attack);
 
     model.commit(vec![state]);
 
     state
+}
+
+/// Evaluates the model for a single element foil, with zero internal state
+fn evaluate(model: &DynamicStallModel, foil: &Foil, angle_of_attack: Float) -> DynamicStallSegmentState {
+    let section_model = SectionModel::SingleElementFoil(foil.clone());
+
+    model.evaluate(0, &section_model, angle_of_attack, 0.0, VELOCITY, CHORD_LENGTH)
 }
 
 fn delta_s(model: &DynamicStallModel) -> Float {
@@ -46,7 +53,7 @@ fn uninitialized_model_gives_static_values() {
     for angle_in_degrees in [-170.0, -25.0, -10.0, 0.0, 10.0, 19.0, 25.0, 90.0, 170.0] {
         let angle_of_attack = Float::to_radians(angle_in_degrees);
 
-        let state = model.evaluate(0, &foil, angle_of_attack, VELOCITY, CHORD_LENGTH);
+        let state = evaluate(&model, &foil, angle_of_attack);
 
         assert_eq!(state.amount_of_stall, foil.amount_of_stall(angle_of_attack));
 
@@ -209,42 +216,50 @@ fn reset_gives_static_values() {
 
     let angle_of_attack = Float::to_radians(30.0);
 
-    let state = model.evaluate(0, &foil, angle_of_attack, VELOCITY, CHORD_LENGTH);
+    let state = evaluate(&model, &foil, angle_of_attack);
 
     assert_eq!(state.amount_of_stall, foil.amount_of_stall(angle_of_attack));
 }
 
 #[test]
-fn only_foil_section_models_are_supported() {
-    assert!(DynamicStallModel::is_supported(&SectionModel::SingleElementFoil(Foil::default())));
-    assert!(!DynamicStallModel::is_supported(&SectionModel::RotatingCylinder(Default::default())));
-    assert!(!DynamicStallModel::is_supported(&SectionModel::EffectiveWindSensor));
+fn only_foil_section_models_use_the_stall_model() {
+    assert!(DynamicStallModel::uses_foil_stall_model(&SectionModel::SingleElementFoil(Foil::default())));
+    assert!(!DynamicStallModel::uses_foil_stall_model(&SectionModel::RotatingCylinder(Default::default())));
+    assert!(!DynamicStallModel::uses_foil_stall_model(&SectionModel::EffectiveWindSensor));
 }
 
 #[test]
 fn builder_from_json() {
     let default_builder: DynamicStallModelBuilder = serde_json::from_str("{}").unwrap();
 
-    assert_eq!(default_builder.pressure_time_constant, DynamicStallModelBuilder::default_pressure_time_constant());
-    assert_eq!(default_builder.separation_time_constant, DynamicStallModelBuilder::default_separation_time_constant());
-    assert_eq!(default_builder.vortex_time_constant, DynamicStallModelBuilder::default_vortex_time_constant());
-    assert_eq!(default_builder.vortex_passage_time, DynamicStallModelBuilder::default_vortex_passage_time());
+    assert!(!default_builder.has_foil_parameters());
+    assert_eq!(default_builder.internal_state_time_constant, 0.0);
+
+    let default_model = default_builder.build(1);
+
+    assert_eq!(default_model.pressure_time_constant, DynamicStallModelBuilder::default_pressure_time_constant());
+    assert_eq!(default_model.separation_time_constant, DynamicStallModelBuilder::default_separation_time_constant());
+    assert_eq!(default_model.vortex_time_constant, DynamicStallModelBuilder::default_vortex_time_constant());
+    assert_eq!(default_model.vortex_passage_time, DynamicStallModelBuilder::default_vortex_passage_time());
+    assert_eq!(default_model.internal_state_time_constant, 0.0);
 
     let builder: DynamicStallModelBuilder = serde_json::from_str(
         r#"{
             "pressure_time_constant": 2.0,
             "separation_time_constant": 4.0,
             "vortex_time_constant": 5.0,
-            "vortex_passage_time": 9.0
+            "vortex_passage_time": 9.0,
+            "internal_state_time_constant": 1.0
         }"#
     ).unwrap();
 
-    assert_eq!(builder.pressure_time_constant, 2.0);
-    assert_eq!(builder.separation_time_constant, 4.0);
-    assert_eq!(builder.vortex_time_constant, 5.0);
-    assert_eq!(builder.vortex_passage_time, 9.0);
-
     let model = builder.build(5);
+
+    assert_eq!(model.pressure_time_constant, 2.0);
+    assert_eq!(model.separation_time_constant, 4.0);
+    assert_eq!(model.vortex_time_constant, 5.0);
+    assert_eq!(model.vortex_passage_time, 9.0);
+    assert_eq!(model.internal_state_time_constant, 1.0);
 
     assert_eq!(model.segment_states.len(), 5);
     assert!(!model.is_initialized);
@@ -254,7 +269,7 @@ fn builder_from_json() {
 #[should_panic]
 fn negative_time_constants_are_not_allowed() {
     DynamicStallModelBuilder {
-        pressure_time_constant: -1.0,
+        pressure_time_constant: Some(-1.0),
         ..Default::default()
     }.build(1);
 }
@@ -263,15 +278,15 @@ fn negative_time_constants_are_not_allowed() {
 #[should_panic]
 fn negative_vortex_time_constants_are_not_allowed() {
     DynamicStallModelBuilder {
-        vortex_passage_time: -1.0,
+        vortex_passage_time: Some(-1.0),
         ..Default::default()
     }.build(1);
 }
 
 fn model_with_vortex(vortex_time_constant: Float, vortex_passage_time: Float) -> DynamicStallModel {
     let mut model = DynamicStallModelBuilder {
-        vortex_time_constant,
-        vortex_passage_time,
+        vortex_time_constant: Some(vortex_time_constant),
+        vortex_passage_time: Some(vortex_passage_time),
         ..Default::default()
     }.build(1);
 
@@ -283,7 +298,7 @@ fn model_with_vortex(vortex_time_constant: Float, vortex_passage_time: Float) ->
 /// The total lift coefficient, computed in the same way as in the line force model: the lift from
 /// the section model with the dynamic amount of stall, plus the vortex lift
 fn total_lift_coefficient(foil: &Foil, angle_of_attack: Float, state: &DynamicStallSegmentState) -> Float {
-    let lift_input = state.lift_input();
+    let lift_input = state.input();
 
     let (cl_pre_stall, cl_post_stall) = SectionModel::SingleElementFoil(foil.clone())
         .lift_coefficients_pre_and_post_stall(angle_of_attack, 0.0, lift_input.amount_of_stall);
@@ -452,4 +467,185 @@ fn deficiency_function_is_zero_without_time_constant() {
     for time_constant in [0.0, -1.0] {
         assert_eq!(DynamicStallModel::deficiency_function(0.5, 1.0, 0.1, time_constant), 0.0);
     }
+}
+
+fn rotating_cylinder() -> SectionModel {
+    SectionModel::RotatingCylinder(
+        crate::section_models::rotating_cylinder::RotatingCylinder::default()
+    )
+}
+
+fn model_with_internal_state_lag(internal_state_time_constant: Float) -> DynamicStallModel {
+    let mut model = DynamicStallModelBuilder {
+        internal_state_time_constant,
+        ..Default::default()
+    }.build(1);
+
+    model.set_time_step(TIME_STEP);
+
+    model
+}
+
+/// Evaluates the model for the given section model and internal state, at zero angle of attack,
+/// and commits the result
+fn step_internal_state(
+    model: &mut DynamicStallModel,
+    section_model: &SectionModel,
+    internal_state: Float
+) -> DynamicStallSegmentState {
+    let state = model.evaluate(0, section_model, 0.0, internal_state, VELOCITY, CHORD_LENGTH);
+
+    model.commit(vec![state]);
+
+    state
+}
+
+#[test]
+fn internal_state_lag_is_off_by_default() {
+    let section_model = rotating_cylinder();
+    let mut model = DynamicStallModelBuilder::default().build(1);
+
+    model.set_time_step(TIME_STEP);
+
+    step_internal_state(&mut model, &section_model, 1.0);
+
+    for internal_state in [3.0, 2.0, -1.0] {
+        let state = step_internal_state(&mut model, &section_model, internal_state);
+
+        assert_eq!(state.lagged_internal_state(), internal_state);
+        assert_eq!(state.input().internal_state, Some(internal_state));
+    }
+}
+
+#[test]
+fn internal_state_lag_follows_the_deficiency_function() {
+    let section_model = rotating_cylinder();
+
+    let time_constant = 2.0;
+    let mut model = model_with_internal_state_lag(time_constant);
+
+    let delta_s = delta_s(&model);
+
+    let initial_state = 1.0;
+    let final_state = 3.0;
+
+    step_internal_state(&mut model, &section_model, initial_state);
+
+    let mut expected_deficiency = 0.0;
+
+    for i in 0..50 {
+        let state = step_internal_state(&mut model, &section_model, final_state);
+
+        expected_deficiency = if i == 0 {
+            (final_state - initial_state) * (-delta_s / (2.0 * time_constant)).exp()
+        } else {
+            expected_deficiency * (-delta_s / time_constant).exp()
+        };
+
+        assert!((state.internal_state_deficiency - expected_deficiency).abs() < 1e-12);
+        assert!(state.lagged_internal_state() < final_state);
+        assert!(state.lagged_internal_state() > initial_state);
+    }
+}
+
+#[test]
+fn rotating_cylinder_only_uses_the_internal_state_lag() {
+    let section_model = rotating_cylinder();
+    let mut model = model_with_internal_state_lag(2.0);
+
+    step_internal_state(&mut model, &section_model, 1.0);
+
+    let state = step_internal_state(&mut model, &section_model, 3.0);
+
+    assert!(state.internal_state_deficiency > 0.0);
+    assert_eq!(state.amount_of_stall, 0.0);
+    assert_eq!(state.vortex_lift, 0.0);
+    assert_eq!(state.pressure_deficiency, 0.0);
+    assert_eq!(state.separation_deficiency, 0.0);
+}
+
+#[test]
+fn constant_internal_state_gives_static_values() {
+    let section_model = rotating_cylinder();
+    let mut model = model_with_internal_state_lag(2.0);
+
+    for _ in 0..10 {
+        let state = step_internal_state(&mut model, &section_model, 2.5);
+
+        assert_eq!(state.internal_state_deficiency, 0.0);
+        assert_eq!(state.lagged_internal_state(), 2.5);
+    }
+}
+
+#[test]
+fn foil_parameters_are_only_allowed_for_foil_models() {
+    let internal_state_only = DynamicStallModelBuilder {
+        internal_state_time_constant: 1.0,
+        ..Default::default()
+    };
+
+    internal_state_only.check_section_model(&rotating_cylinder());
+    internal_state_only.check_section_model(&SectionModel::SingleElementFoil(Foil::default()));
+
+    DynamicStallModelBuilder {
+        separation_time_constant: Some(4.0),
+        ..Default::default()
+    }.check_section_model(&SectionModel::SingleElementFoil(Foil::default()));
+}
+
+#[test]
+#[should_panic]
+fn foil_parameters_are_not_allowed_for_rotating_cylinders() {
+    DynamicStallModelBuilder {
+        separation_time_constant: Some(4.0),
+        ..Default::default()
+    }.check_section_model(&rotating_cylinder());
+}
+
+#[test]
+#[should_panic]
+fn negative_internal_state_time_constants_are_not_allowed() {
+    DynamicStallModelBuilder {
+        internal_state_time_constant: -1.0,
+        ..Default::default()
+    }.build(1);
+}
+
+#[test]
+fn drag_uses_the_dynamic_amount_of_stall() {
+    let foil = foil();
+    let section_model = SectionModel::SingleElementFoil(foil.clone());
+
+    let mut model = model(1.7, 3.0);
+
+    let angle_after_stall = Float::to_radians(30.0);
+
+    step(&mut model, &foil, Float::to_radians(10.0));
+
+    let state = step(&mut model, &foil, angle_after_stall);
+
+    let input = state.input();
+
+    let cd_dynamic = section_model.drag_coefficient(angle_after_stall, 0.0, input.amount_of_stall);
+    let cd_static = section_model.drag_coefficient(angle_after_stall, 0.0, None);
+
+    assert!(state.amount_of_stall < foil.amount_of_stall(angle_after_stall));
+    assert!(
+        (cd_dynamic - foil.drag_coefficient_with_amount_of_stall(angle_after_stall, state.amount_of_stall)).abs() < 1e-12
+    );
+    assert!((cd_static - foil.drag_coefficient(angle_after_stall)).abs() < 1e-12);
+    assert!(cd_dynamic < cd_static);
+
+    // The static drag is recovered in steady conditions
+    let mut last_state = state;
+
+    for _ in 0..2000 {
+        last_state = step(&mut model, &foil, angle_after_stall);
+    }
+
+    let cd_final = section_model.drag_coefficient(
+        angle_after_stall, 0.0, last_state.input().amount_of_stall
+    );
+
+    assert!((cd_final - cd_static).abs() < 1e-6);
 }

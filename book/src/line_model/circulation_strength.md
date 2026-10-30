@@ -46,7 +46,7 @@ pub fn circulation_strength_raw(
 
 Note that, by default, only the pre-stall part of the lift coefficient from the sectional model is used to calculate the circulation strength. The post-stall part of the lift is instead treated as a separate *viscous lift* force, which does not affect the lift-induced velocities. This can be changed with the `include_viscous_lift_in_the_circulation` setting, in which case `lift_coefficients_for_circulation` returns the sum of the pre-stall and post-stall parts. The same lift coefficient is used when computing the residual in the solvers. See the [force calculations chapter](./force_calculations.md) for more.
 
-For wings with a [dynamic stall model](../sectional_models/dynamic_stall.md), the split between the pre-stall and the post-stall lift is based on the dynamic amount of stall rather than the static value. This is the reason why the velocity is also given to the lift coefficient function, as the dynamic stall model needs it to compute the non-dimensional time step. The pre-stall and post-stall parts are computed together, so that the dynamic stall model is only evaluated once for each line element.
+For wings with a [dynamic stall model](../sectional_models/dynamic_stall.md), the split between the pre-stall and the post-stall lift is based on the dynamic amount of stall rather than the static value, and the lift is computed with the lagged internal state, if that lag is used. This is the reason why the velocity is also given to the lift coefficient function, as the dynamic stall model needs it to compute the non-dimensional time step. The pre-stall and post-stall parts are computed together, so that the dynamic stall model is only evaluated once for each line element.
 
 ## Optional corrections
 

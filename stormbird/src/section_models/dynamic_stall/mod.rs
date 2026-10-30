@@ -15,11 +15,11 @@
 //!    lagged angle of attack, s' = s(α_f), with the time constant T_f. This gives the dynamic
 //!    amount of stall, s''.
 //!
-//! The lift is then computed from the same blend as in the foil model, with the curves evaluated at
-//! the instantaneous angle of attack, but weighted with s'' rather than s(α). The model itself does
-//! not compute the lift. Instead, it gives the effects that enter the lift, as a
-//! [`DynamicStallLiftInput`](crate::section_models::dynamic_stall::DynamicStallLiftInput), which
-//! is combined with the section model by the user of the model.
+//! The lift and the drag are then computed from the same blends as in the foil model, with the
+//! curves evaluated at the instantaneous angle of attack, but weighted with s'' rather than s(α).
+//! The model itself does not compute the forces. Instead, it gives the effects that enter the force
+//! coefficients, as a [`DynamicStallInput`](crate::section_models::dynamic_stall::DynamicStallInput),
+//! which is combined with the section model by the user of the model.
 //!
 //! In addition, the model includes the extra lift from a leading edge vortex. The vortex is fed by
 //! the lift that is lost due to the dynamic stall, i.e., s'' times the difference between the
@@ -29,10 +29,17 @@
 //! after the non-dimensional time T_vl. After that, the vortex lift only decays. The vortex lift is
 //! treated as part of the stall related lift, i.e., added to the post-stall lift.
 //!
+//! **Experimental**: the model can also apply a first order lag to the internal state of the
+//! section model, with the time constant T_i. This is applied before all the other steps, so that
+//! the section model is evaluated with the lagged internal state. It is mostly intended for
+//! rotating cylinders, where the internal state is the spin ratio, and is the only part of the
+//! model that is used for section models that are not built on the foil model. The lag is off by
+//! default.
+//!
 //! The model is fundamentally a two dimensional model, but it is kept as a separate structure from
-//! the foil models, as it has an internal state, i.e., the memory effects for each line segment on
-//! a wing. The model is designed to be used in a time stepping simulation, where the solver can
-//! evaluate the lift many times per time step. The evaluation is therefore always based on the
+//! the section models, as it has an internal state, i.e., the memory effects for each line segment
+//! on a wing. The model is designed to be used in a time stepping simulation, where the solver can
+//! evaluate the forces many times per time step. The evaluation is therefore always based on the
 //! state from the last completed time step, and does not change the state. The state is updated
 //! explicitly with
 //! [`DynamicStallModel::commit`](crate::section_models::dynamic_stall::DynamicStallModel::commit)
@@ -56,7 +63,14 @@ pub use builder::DynamicStallModelBuilder;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 /// The state of the dynamic stall model for a single line segment at a single time step.
+///
+/// For section models that are not built on the foil model, only the internal state, the internal
+/// state deficiency and the angle of attack are used. The other values are then zero.
 pub struct DynamicStallSegmentState {
+    /// The instantaneous internal state of the section model
+    pub internal_state: Float,
+    /// The deficiency function for the lag in the internal state, D_i
+    pub internal_state_deficiency: Float,
     /// The instantaneous angle of attack, α
     pub angle_of_attack: Float,
     /// The deficiency function for the lag in the pressure distribution, D_p
@@ -65,7 +79,7 @@ pub struct DynamicStallSegmentState {
     pub lagged_angle_amount_of_stall: Float,
     /// The deficiency function for the lag in the boundary layer separation, D_s
     pub separation_deficiency: Float,
-    /// The dynamic amount of stall, s'', which is used to compute the lift
+    /// The dynamic amount of stall, s'', which is used to compute the lift and the drag
     pub amount_of_stall: Float,
     /// The lift coefficient that feeds the leading edge vortex, i.e., the lift lost due to the
     /// dynamic stall: s'' (C_L,pre-stall - C_L,post-stall)
@@ -78,10 +92,18 @@ pub struct DynamicStallSegmentState {
 }
 
 impl DynamicStallSegmentState {
-    /// The state in steady conditions, where both deficiency functions are zero, and the dynamic
+    /// The state in steady conditions, where all deficiency functions are zero, and the dynamic
     /// amount of stall is equal to the static value. There is no vortex lift, and if the foil is
     /// stalled, the leading edge vortex is assumed to have passed the trailing edge a long time ago.
-    pub fn steady(foil: &Foil, angle_of_attack: Float) -> Self {
+    pub fn steady(section_model: &SectionModel, angle_of_attack: Float, internal_state: Float) -> Self {
+        let Some(foil) = section_model.foil(internal_state) else {
+            return Self {
+                internal_state,
+                angle_of_attack,
+                ..Default::default()
+            };
+        };
+
         let amount_of_stall = foil.amount_of_stall(angle_of_attack);
 
         let vortex_time = if vortex_onset(amount_of_stall) {
@@ -91,15 +113,22 @@ impl DynamicStallSegmentState {
         };
 
         Self {
+            internal_state,
+            internal_state_deficiency: 0.0,
             angle_of_attack,
             pressure_deficiency: 0.0,
             lagged_angle_amount_of_stall: amount_of_stall,
             separation_deficiency: 0.0,
             amount_of_stall,
-            vortex_feed: vortex_feed(foil, angle_of_attack, amount_of_stall),
+            vortex_feed: vortex_feed(&foil, angle_of_attack, amount_of_stall),
             vortex_time,
             vortex_lift: 0.0,
         }
+    }
+
+    /// The lagged internal state, x - D_i
+    pub fn lagged_internal_state(&self) -> Float {
+        self.internal_state - self.internal_state_deficiency
     }
 
     /// The lagged angle of attack, α_f = α - D_p, wrapped to the range [-π, π)
@@ -107,10 +136,11 @@ impl DynamicStallSegmentState {
         wrapped_angle(self.angle_of_attack - self.pressure_deficiency)
     }
 
-    /// The parts of the state that enter the lift, i.e., the dynamic amount of stall and the vortex
-    /// lift
-    pub fn lift_input(&self) -> DynamicStallLiftInput {
-        DynamicStallLiftInput {
+    /// The parts of the state that enter the force coefficients, i.e., the lagged internal state,
+    /// the dynamic amount of stall and the vortex lift
+    pub fn input(&self) -> DynamicStallInput {
+        DynamicStallInput {
+            internal_state: Some(self.lagged_internal_state()),
             amount_of_stall: Some(self.amount_of_stall),
             vortex_lift: self.vortex_lift,
         }
@@ -118,24 +148,31 @@ impl DynamicStallSegmentState {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-/// The effects of the dynamic stall model that enter the lift on a single line segment.
+/// The effects of the dynamic stall model that enter the force coefficients on a single line
+/// segment.
 ///
-/// The lift is computed from the section model, with the amount of stall given here, plus the
-/// vortex lift. Note that the lift curves in the section model are always evaluated at the
-/// instantaneous angle of attack. The lagged angle of attack is only used internally in the
-/// dynamic stall model, to compute the amount of stall.
-pub struct DynamicStallLiftInput {
+/// The lift and the drag are computed from the section model, with the internal state and the
+/// amount of stall given here, and the vortex lift is added to the lift. Note that the lift and
+/// drag curves in the section model are always evaluated at the instantaneous angle of attack. The
+/// lagged angle of attack is only used internally in the dynamic stall model, to compute the amount
+/// of stall.
+pub struct DynamicStallInput {
+    /// The internal state to use in the section model for the force coefficients. `None` means
+    /// that the instantaneous internal state is used. Not used for the power.
+    pub internal_state: Option<Float>,
     /// The amount of stall to use in the section model. `None` means that the static amount of
-    /// stall from the section model itself is used.
+    /// stall from the section model itself is used. Ignored for section models that are not built
+    /// on the foil model.
     pub amount_of_stall: Option<Float>,
     /// The lift coefficient from the leading edge vortex, which is treated as part of the stall
     /// related lift, i.e., added to the post-stall lift.
     pub vortex_lift: Float,
 }
 
-impl DynamicStallLiftInput {
-    /// The input in steady conditions, or for wings without a dynamic stall model: the static
-    /// amount of stall from the section model, and no vortex lift
+impl DynamicStallInput {
+    /// The input in steady conditions, or for wings without a dynamic stall model: the
+    /// instantaneous internal state, the static amount of stall from the section model, and no
+    /// vortex lift
     pub fn steady() -> Self {
         Self::default()
     }
@@ -153,6 +190,9 @@ pub struct DynamicStallModel {
     pub vortex_time_constant: Float,
     /// Non-dimensional time it takes for the leading edge vortex to pass the trailing edge, T_vl
     pub vortex_passage_time: Float,
+    /// **Experimental**. Non-dimensional time constant for the lag in the internal state of the
+    /// section model, T_i
+    pub internal_state_time_constant: Float,
     /// The dimensional time step of the current time step. Must be set before the model is
     /// evaluated, with [`DynamicStallModel::set_time_step`].
     pub time_step: Float,
@@ -164,9 +204,10 @@ pub struct DynamicStallModel {
 }
 
 impl DynamicStallModel {
-    /// Returns true if the dynamic stall model can be used together with the section model. This
-    /// is the case for all section models that are built on the foil model.
-    pub fn is_supported(section_model: &SectionModel) -> bool {
+    /// Returns true if the stall part of the dynamic stall model, i.e., everything except the lag
+    /// in the internal state, is used together with the section model. This is the case for all
+    /// section models that are built on the foil model.
+    pub fn uses_foil_stall_model(section_model: &SectionModel) -> bool {
         matches!(
             section_model,
             SectionModel::SingleElementFoil(_) |
@@ -233,25 +274,46 @@ impl DynamicStallModel {
     ///
     /// # Arguments
     /// * `local_index` - the index of the line segment on the wing
-    /// * `foil` - the foil model of the line segment, at the current internal state
+    /// * `section_model` - the section model of the wing
     /// * `angle_of_attack` - the instantaneous angle of attack
+    /// * `internal_state` - the instantaneous internal state of the section model
     /// * `velocity` - the magnitude of the velocity at the control point
     /// * `chord_length` - the chord length of the line segment
     pub fn evaluate(
         &self,
         local_index: usize,
-        foil: &Foil,
+        section_model: &SectionModel,
         angle_of_attack: Float,
+        internal_state: Float,
         velocity: Float,
         chord_length: Float,
     ) -> DynamicStallSegmentState {
         if !self.is_initialized {
-            return DynamicStallSegmentState::steady(foil, angle_of_attack);
+            return DynamicStallSegmentState::steady(section_model, angle_of_attack, internal_state);
         }
 
         let previous = &self.segment_states[local_index];
 
         let delta_s = self.non_dimensional_time_step(velocity, chord_length);
+
+        // Step 0: internal state lag. The rest of the model uses the lagged internal state.
+        let internal_state_deficiency = Self::deficiency_function(
+            previous.internal_state_deficiency,
+            internal_state - previous.internal_state,
+            delta_s,
+            self.internal_state_time_constant
+        );
+
+        let lagged_internal_state = internal_state - internal_state_deficiency;
+
+        let Some(foil) = section_model.foil(lagged_internal_state) else {
+            return DynamicStallSegmentState {
+                internal_state,
+                internal_state_deficiency,
+                angle_of_attack,
+                ..Default::default()
+            };
+        };
 
         // Step 1: pressure lag, applied to the angle of attack
         let pressure_deficiency = Self::deficiency_function(
@@ -277,7 +339,7 @@ impl DynamicStallModel {
         let amount_of_stall = (lagged_angle_amount_of_stall - separation_deficiency).clamp(0.0, 1.0);
 
         // Step 4: vortex feed, i.e., the lift lost due to the dynamic stall
-        let vortex_feed = vortex_feed(foil, angle_of_attack, amount_of_stall);
+        let vortex_feed = vortex_feed(&foil, angle_of_attack, amount_of_stall);
 
         // Step 5: vortex onset and vortex time
         let vortex_time = if vortex_onset(lagged_angle_amount_of_stall) {
@@ -304,6 +366,8 @@ impl DynamicStallModel {
         );
 
         DynamicStallSegmentState {
+            internal_state,
+            internal_state_deficiency,
             angle_of_attack,
             pressure_deficiency,
             lagged_angle_amount_of_stall,

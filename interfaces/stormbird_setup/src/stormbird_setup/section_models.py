@@ -475,26 +475,34 @@ class EffectiveWindSensor(StormbirdSetupBaseModel):
 
 class DynamicStallModelBuilder(StormbirdSetupBaseModel):
     '''
-    Dynamic stall model for section models that build on the foil model, i.e., Foil,
-    MultiElementFoil and ActiveAirFlowFoil. The model is set for each wing in the WingBuilder, and
-    can only be used in dynamic lifting line simulations.
+    Dynamic stall model for a wing. The model is set for each wing in the WingBuilder, and can only
+    be used in dynamic lifting line simulations.
 
-    The model applies two first order time lags to the stall in the foil model: one to the angle of
-    attack, representing the lag in the pressure distribution, and one to the amount of stall,
-    representing the lag in the boundary layer separation. In addition, it adds the lift from a
-    leading edge vortex, which is created when the lagged angle of attack exceeds the stall angle,
-    decays with the vortex time constant, and is only fed until it has passed the trailing edge,
-    after the vortex passage time.
+    For section models that build on the foil model, i.e., Foil, MultiElementFoil and
+    ActiveAirFlowFoil, the model applies two first order time lags to the stall in the foil model:
+    one to the angle of attack, representing the lag in the pressure distribution, and one to the
+    amount of stall, representing the lag in the boundary layer separation. The dynamic amount of
+    stall is used for both the lift and the drag. In addition, it adds the lift from a leading edge
+    vortex, which is created when the lagged angle of attack exceeds the stall angle, decays with
+    the vortex time constant, and is only fed until it has passed the trailing edge, after the
+    vortex passage time.
+
+    Experimental: the model can also apply a first order time lag to the internal state of the
+    section model, with the internal state time constant. This is mostly intended for rotor sails,
+    where the internal state is the spin ratio, and is the only parameter that can be set for
+    section models that do not build on the foil model. The lag is off by default.
 
     The time constants are non-dimensional, given in semi-chords travelled, i.e., relative to
     c / (2 V). A value of zero turns the corresponding lag, or the vortex, off. Values that are not
     set use the defaults in Stormbird, which are 1.7 for the pressure time constant, 3.0 for the
-    separation time constant, 6.0 for the vortex time constant and 7.0 for the vortex passage time.
+    separation time constant, 6.0 for the vortex time constant, 7.0 for the vortex passage time and
+    0.0 for the internal state time constant.
     '''
     pressure_time_constant: float | None = None
     separation_time_constant: float | None = None
     vortex_time_constant: float | None = None
     vortex_passage_time: float | None = None
+    internal_state_time_constant: float | None = None
 
     @model_validator(mode='after')
     def check_time_constants(self) -> "DynamicStallModelBuilder":
@@ -502,7 +510,8 @@ class DynamicStallModelBuilder(StormbirdSetupBaseModel):
             "pressure_time_constant",
             "separation_time_constant",
             "vortex_time_constant",
-            "vortex_passage_time"
+            "vortex_passage_time",
+            "internal_state_time_constant"
         ):
             value = getattr(self, name)
 
@@ -510,6 +519,19 @@ class DynamicStallModelBuilder(StormbirdSetupBaseModel):
                 raise ValueError(f"The {name} can not be negative. Value: {value}")
 
         return self
+
+    def has_foil_parameters(self) -> bool:
+        '''
+        Returns true if any of the parameters for the stall in the foil model are set
+        '''
+        return any(
+            value is not None for value in (
+                self.pressure_time_constant,
+                self.separation_time_constant,
+                self.vortex_time_constant,
+                self.vortex_passage_time
+            )
+        )
 
 class SectionModel(StormbirdSetupBaseModel):
     model: Foil | MultiElementFoil | ActiveAirFlowFoil | RotatingCylinder | EffectiveWindSensor

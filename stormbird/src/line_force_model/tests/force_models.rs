@@ -15,6 +15,7 @@ use crate::line_force_model::corrections::force::ForceCorrection;
 use crate::line_force_model::added_mass::AddedMass;
 use crate::line_force_model::gyroscopic_moment::GyroscopicMoment;
 use crate::section_models::rotating_cylinder::RotatingCylinder;
+use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
 
 const CHORD_LENGTH: Float = 2.0;
 const DENSITY: Float = 1.2;
@@ -212,10 +213,28 @@ fn dynamic_stall_from_json() {
 }
 
 #[test]
+fn dynamic_stall_with_internal_state_lag_for_rotating_cylinder() {
+    let line_force_model = build(WingBuilder {
+        dynamic_stall: Some(DynamicStallModelBuilder {
+            internal_state_time_constant: 2.0,
+            ..Default::default()
+        }),
+        ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
+    });
+
+    let dynamic_stall = line_force_model.dynamic_stall[0].as_ref().unwrap();
+
+    assert_eq!(dynamic_stall.internal_state_time_constant, 2.0);
+}
+
+#[test]
 #[should_panic]
-fn dynamic_stall_requires_foil_section_model() {
+fn dynamic_stall_parameters_require_foil_section_model() {
     build(WingBuilder {
-        dynamic_stall: Some(Default::default()),
+        dynamic_stall: Some(DynamicStallModelBuilder {
+            separation_time_constant: Some(4.0),
+            ..Default::default()
+        }),
         ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
     });
 }

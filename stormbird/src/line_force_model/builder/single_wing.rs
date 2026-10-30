@@ -12,7 +12,7 @@ use stormath::{
 };
 
 use crate::section_models::SectionModel;
-use crate::section_models::dynamic_stall::{DynamicStallModel, DynamicStallModelBuilder};
+use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
 use crate::line_force_model::wing_internal_state::InternalCompartments;
@@ -93,9 +93,9 @@ pub struct WingBuilder {
     /// rotating cylinder section model. Not used by default.
     pub gyroscopic_moment: GyroscopicMoment,
     #[serde(default)]
-    /// Optional dynamic stall model for the wing. Only allowed together with section models that
-    /// build on the foil model, and only used in dynamic lifting line simulations. Not used by
-    /// default.
+    /// Optional dynamic stall model for the wing. Only used in dynamic lifting line simulations.
+    /// The parameters for the stall are only allowed together with section models that build on
+    /// the foil model. Not used by default.
     pub dynamic_stall: Option<DynamicStallModelBuilder>,
 }
 
@@ -169,14 +169,11 @@ impl WingBuilder {
     /// Returns the builder for the dynamic stall model of the wing, if any.
     ///
     /// # Panics
-    /// If the model is set for a section model that is not built on the foil model.
+    /// If the parameters for the stall in the foil model are set for a section model that is not
+    /// built on the foil model.
     pub fn dynamic_stall(&self) -> Option<DynamicStallModelBuilder> {
-        if self.dynamic_stall.is_some() && !DynamicStallModel::is_supported(&self.section_model) {
-            panic!(
-                "The dynamic stall model is only used together with section models that build on \
-                the foil model, i.e., single element foils, multi element foils and active air \
-                flow foils"
-            );
+        if let Some(dynamic_stall) = &self.dynamic_stall {
+            dynamic_stall.check_section_model(&self.section_model);
         }
 
         self.dynamic_stall.clone()

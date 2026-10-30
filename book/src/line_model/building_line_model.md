@@ -80,7 +80,7 @@ The `force_correction`, `added_mass` and `gyroscopic_moment` are optional models
 - `added_mass`: a strip theory model of the [added mass forces](./force_calculations.md#4---added-mass).
 - `gyroscopic_moment`: a model of the [gyroscopic moment](./force_calculations.md#5---gyroscopic-moment) from a rotor sail. Can only be used together with the rotating cylinder section model.
 
-The `dynamic_stall` is an optional [dynamic stall model](../sectional_models/dynamic_stall.md) for the wing, which adds time lags to the stall in the section model. It can only be used together with section models that build on the foil model, and only in dynamic lifting line simulations. It is not used by default.
+The `dynamic_stall` is an optional [dynamic stall model](../sectional_models/dynamic_stall.md) for the wing, which adds time lags to the stall in the section model. The parameters for the stall can only be used together with section models that build on the foil model, while the experimental lag on the internal state can be used for all section models. The model is only used in dynamic lifting line simulations, and it is not used by default.
 
 When building a line force model from a wing builder, the wings are divided into multiple line segments based on the data in the `WingBuilder` structure. Each point in between the specified points are linearly interpolated [^interpolation_note].
 

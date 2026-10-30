@@ -78,16 +78,21 @@ class WingBuilder(StormbirdSetupBaseModel):
     @model_validator(mode='after')
     def check_dynamic_stall(self) -> "WingBuilder":
         '''
-        The dynamic stall model modifies the stall in the foil model, and is therefore only allowed
-        together with section models that build on the foil model.
+        The parameters for the stall in the dynamic stall model modify the stall in the foil model,
+        and are therefore only allowed together with section models that build on the foil model.
+        The internal state time constant can be used for all section models.
         '''
         if (
             self.dynamic_stall is not None and
+            self.dynamic_stall.has_foil_parameters() and
             isinstance(self.section_model.model, (RotatingCylinder, EffectiveWindSensor))
         ):
             raise ValueError(
-                "The dynamic stall model is only used together with section models that build on "
-                "the foil model, i.e., Foil, MultiElementFoil and ActiveAirFlowFoil"
+                "The parameters for the stall in the dynamic stall model, i.e., "
+                "pressure_time_constant, separation_time_constant, vortex_time_constant and "
+                "vortex_passage_time, are only used together with section models that build on the "
+                "foil model, i.e., Foil, MultiElementFoil and ActiveAirFlowFoil. Only the "
+                "internal_state_time_constant can be set for other section models."
             )
 
         return self
