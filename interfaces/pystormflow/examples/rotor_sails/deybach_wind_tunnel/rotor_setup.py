@@ -71,11 +71,11 @@ TUNNEL_INLET_DISTANCE = 75.0
 
 # Linear lift slope, manually tuned so that the lift match the experimental data at a spin ratio
 # around 1
-LIFT_SLOPE = 2.6
+LIFT_SLOPE = 2.75
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
-MAX_CORRECTION_RATIO = 2.25
+MAX_CORRECTION_RATIO = 2.0
 
 # Both solvers are incompressible, with the pressure divided by the density. The projected forces
 # are not divided by the density, so it must be one in the line force model.
