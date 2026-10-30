@@ -50,9 +50,7 @@ fn uninitialized_model_gives_static_values() {
 
         assert_eq!(state.amount_of_stall, foil.amount_of_stall(angle_of_attack));
 
-        let cl_dynamic =
-            DynamicStallModel::lift_coefficient_pre_stall_with_stall_drop_off(&foil, angle_of_attack, &state) +
-            DynamicStallModel::lift_coefficient_post_stall_with_stall_weight(&foil, angle_of_attack, &state);
+        let cl_dynamic = total_lift_coefficient(&foil, angle_of_attack, &state);
 
         let cl_static = foil.lift_coefficient(angle_of_attack);
 
@@ -282,9 +280,15 @@ fn model_with_vortex(vortex_time_constant: Float, vortex_passage_time: Float) ->
     model
 }
 
+/// The total lift coefficient, computed in the same way as in the line force model: the lift from
+/// the section model with the dynamic amount of stall, plus the vortex lift
 fn total_lift_coefficient(foil: &Foil, angle_of_attack: Float, state: &DynamicStallSegmentState) -> Float {
-    DynamicStallModel::lift_coefficient_pre_stall_with_stall_drop_off(foil, angle_of_attack, state) +
-    DynamicStallModel::lift_coefficient_post_stall_with_stall_weight(foil, angle_of_attack, state)
+    let lift_input = state.lift_input();
+
+    let (cl_pre_stall, cl_post_stall) = SectionModel::SingleElementFoil(foil.clone())
+        .lift_coefficients_pre_and_post_stall(angle_of_attack, 0.0, lift_input.amount_of_stall);
+
+    cl_pre_stall + cl_post_stall + lift_input.vortex_lift
 }
 
 /// Ramps the angle of attack from 10 to 40 degrees in the given number of steps, and holds it at
@@ -419,5 +423,33 @@ fn zero_vortex_passage_time_turns_the_vortex_off() {
 
     for state in ramp_through_stall(&mut model, &foil, 40, 200) {
         assert!(state.vortex_lift.abs() < 1e-12);
+    }
+}
+
+#[test]
+fn deficiency_function_gives_the_discrete_step_response() {
+    let delta_s = 0.1;
+    let time_constant = 2.0;
+
+    // A unit step in the input at the first time step, and a constant input afterwards
+    let mut deficiency = DynamicStallModel::deficiency_function(0.0, 1.0, delta_s, time_constant);
+
+    for i in 1..50 {
+        deficiency = DynamicStallModel::deficiency_function(deficiency, 0.0, delta_s, time_constant);
+
+        let expected = (-delta_s / (2.0 * time_constant)).exp() *
+            (-(i as Float) * delta_s / time_constant).exp();
+
+        assert!(
+            (deficiency - expected).abs() < 1e-12,
+            "Wrong deficiency after {} steps: {} (expected {})", i, deficiency, expected
+        );
+    }
+}
+
+#[test]
+fn deficiency_function_is_zero_without_time_constant() {
+    for time_constant in [0.0, -1.0] {
+        assert_eq!(DynamicStallModel::deficiency_function(0.5, 1.0, 0.1, time_constant), 0.0);
     }
 }

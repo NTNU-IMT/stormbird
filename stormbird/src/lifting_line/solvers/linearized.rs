@@ -166,7 +166,7 @@ impl Linearized {
                 &internal_states,
             );
 
-            let cl_full = line_force_model.lift_coefficients_pre_stall_with_stall_drop_off(
+            let (cl_full, _) = line_force_model.lift_coefficients_pre_and_post_stall(
                 &angles_of_attack,
                 &internal_states,
                 &ctrl_points_velocity

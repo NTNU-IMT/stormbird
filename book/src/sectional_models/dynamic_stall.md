@@ -10,6 +10,38 @@ There are three basic building blocks in the LB dynamic stall model. The first i
 
 When the flow over a foil starts to separate due to stalling, or reattaches after having stalled earlier, it may be seen as the separation point moving along the chord, causing differences in the generated lift as a result. However, this does not happen instantaneously for a given angle of attack. Viscous effects in the boundary layer can cause significant time-lag in how fast the flow is able to separate. Or in other words, if an angle of attack exceeds the stall angle for just a very short amount of time, the flow might not have time to separate. Similarly, when the angle of attack is reduced below the stall angle again, the flow needs time to reattach. The result is a hysteresis loop in the lift, where the lift is higher than the static value when the angle of attack increases through stall, and lower when it decreases. The LB model introduces a mathematical framework for applying a time scale to how fast a separated flow is allowed to develop and disappear.
 
+#### Non-dimensional time and the deficiency function
+
+The LB model introduces dynamics to several variables (described further down) through something labeled *deficiency functions*, which is a discrete approximation of a first order lag. That is, it is a function that can introduce time lags to variables in a generic way, that is controlled through parameters that adjust the amount of lag. This section describes the basics of the general deficiency function, which is then later used throughout the different steps of the dynamic stall model.
+
+The time lags are defined in non-dimensional time, \\(\tau\\), measured in semi-chords travelled, where \\(V\\) is the local velocity, \\(t\\) is the time, and \\(c\\) is the local chord length (often given the symbol \\(s\\) in the literature, but here \\(s\\) is used for the amount of stall):
+
+\\[
+  \tau = \frac{2 V t}{c}
+\\]
+
+In discrete time, \\(\Delta \tau = 2 V \Delta t / c\\) is the non-dimensional time step, \\(i\\) is the current time index, and \\(i-1\\) is the previous time index. The local velocity is taken as the magnitude of the velocity at the control point in each time step.
+
+For an input signal \\(x\\) and a time constant \\(T\\), the deficiency function, \\(D\\), depends on the current and previous value of the input, the previous value of the deficiency function itself, and the time constant:
+
+\\[
+  D_{i} = D_{i-1} e^{-\Delta \tau/ T} + (x_i - x_{i-1})e^{-\Delta \tau / (2 T)}
+\\]
+
+The lagged signal is then \\(x_i - D_i\\). A time constant of zero turns the lag off, so that the lagged signal is equal to the input. The same function is used for all the lags in the model, and is available as `DynamicStallModel::deficiency_function` in the Rust library.
+
+The plot below illustrates how the deficiency function works. The input is a pulse that starts at a given time, increases linearly to one over the ramp width, stays at one for the hold width, and then decreases linearly back to zero over the ramp width again. With a hold width of zero, the pulse is a triangle, which is similar to an angle of attack that goes quickly through stall and back again. With a ramp width of zero, the pulse is rectangular, which shows the classical step response of a first order lag. The lagged signal is computed with the discrete deficiency function, and is held constant through each time step, as in a simulation. For comparison, the plot also shows the continuous first order lag, \\(dy/d\tau = (x - y) / T\\), which the deficiency function approximates. The difference between the two shows the error from the discrete approximation, which grows with the time step relative to the time constant.
+
+<link rel="stylesheet" href="interactive/model_explorer.css">
+
+<div data-deficiency-function-explorer>
+    <noscript>The interactive plot requires JavaScript.</noscript>
+</div>
+
+<script src="interactive/model_explorer.js"></script>
+<script src="interactive/deficiency_function_explorer.js"></script>
+
+
 #### The original formulation
 
 In the original LB model, the degree of separation is described by an *effective separation point*, \\( f(\alpha) \\). It is non-dimensional, and takes the value 1 when the flow is separating cleanly on the trailing edge and goes towards zero when the separation point moves towards the leading edge. The relationship between the separation point and the force on the foil comes from Kirchhoff flow theory for a flat plate, where the separation point is forced to move. It is applied to the normal force on the foil section (i.e., not only the lift force, but a combination of lift and drag into a normal force), where \\( C_{n,static}(\alpha) \\) is the full non-linear static normal force coefficient and \\(C_{n,linear}(\alpha)\\) is the linearized version of the same coefficient:
@@ -37,34 +69,6 @@ The dynamic stall model in Stormbird keeps the core idea of the LB model, i.e., 
 5. **The time constants are constant.** In the original LB model, and many implementations of it, the separation time constant is modified depending on whether the foil is loading or unloading, and on the state of the leading edge vortex. In Stormbird, the time constants are constant, and do not depend on the internal state of the section model either, e.g., flap angle or suction rate. This is a simplification, but the error is believed to be small, and it keeps the number of parameters to tune low.
 6. **Only the stall is lagged.** The optional [slope reduction](foil_model.md#slope-reduction) in the pre-stall lift, which can represent separation that develops gradually before the full stall, is not part of the amount of stall, and is therefore not lagged. In addition, the drag is not affected by the dynamic stall model at the moment.
 
-#### Non-dimensional time and the deficiency function
-
-The time lags are defined in non-dimensional time, \\(\tau\\), measured in semi-chords travelled, where \\(V\\) is the local velocity, \\(t\\) is the time, and \\(c\\) is the local chord length (often given the symbol \\(s\\) in the literature, but here \\(s\\) is used for the amount of stall):
-
-\\[
-  \tau = \frac{2 V t}{c}
-\\]
-
-In discrete time, \\(\Delta \tau = 2 V \Delta t / c\\) is the non-dimensional time step, \\(i\\) is the current time index, and \\(i-1\\) is the previous time index. The local velocity is taken as the magnitude of the velocity at the control point in each time step.
-
-Both lags are implemented with a *deficiency function*, \\(D\\), which is a discrete approximation of a first order lag. For an input signal \\(x\\) and a time constant \\(T\\), it depends on the current and previous value of the input, the previous value of the deficiency function itself, and the time constant:
-
-\\[
-  D_{i} = D_{i-1} e^{-\Delta \tau/ T} + (x_i - x_{i-1})e^{-\Delta \tau / (2 T)}
-\\]
-
-The lagged signal is then \\(x_i - D_i\\). A time constant of zero turns the lag off, so that the lagged signal is equal to the input.
-
-The plot below illustrates how the deficiency function works. The input is a pulse that starts at a given time, increases linearly to one over the ramp width, stays at one for the hold width, and then decreases linearly back to zero over the ramp width again. With a hold width of zero, the pulse is a triangle, which is similar to an angle of attack that goes quickly through stall and back again. With a ramp width of zero, the pulse is rectangular, which shows the classical step response of a first order lag. The lagged signal is computed with the discrete deficiency function, and is held constant through each time step, as in a simulation. For comparison, the plot also shows the continuous first order lag, \\(dy/d\tau = (x - y) / T\\), which the deficiency function approximates. The difference between the two shows the error from the discrete approximation, which grows with the time step relative to the time constant.
-
-<link rel="stylesheet" href="interactive/model_explorer.css">
-
-<div data-deficiency-function-explorer>
-    <noscript>The interactive plot requires JavaScript.</noscript>
-</div>
-
-<script src="interactive/model_explorer.js"></script>
-<script src="interactive/deficiency_function_explorer.js"></script>
 
 #### Step 1: Pressure lag
 
@@ -269,5 +273,7 @@ The solvers in the lifting line simulation evaluate the lift many times per time
 4. Updates the state of the dynamic stall models, based on the final velocity at the control points from the solver.
 
 In the first time step, there is no time history available, so the model gives the static values, and the state is initialized from the result. The state is also reset when the simulation is initialized again, for instance in the `do_multiple_steps` function of the complete sail model. The steady state functions of the complete sail model reset the state before each iteration, as the iterations are not a time history, so that the results are always based on the static foil model. When the state is initialized at an angle of attack above the stall angle, any leading edge vortex is assumed to have passed the trailing edge a long time ago, so that a new vortex is only created after the lagged angle of attack has been below the stall angle first.
+
+The dynamic stall model does not compute the lift itself. Instead, it only gives the effects that enter the lift on each line segment: the dynamic amount of stall and the vortex lift. The lift is then computed in two passes. First, the dynamic stall model is evaluated for each wing that has one, while wings without a dynamic stall model use the static amount of stall and no vortex lift. Second, the lift is computed from the section model, where the amount of stall from the first pass replaces the static value. The pre-stall and post-stall lift curves are always evaluated at the instantaneous angle of attack, so the lagged angle of attack is only used internally in the dynamic stall model.
 
 The dynamic amount of stall affects both the pre-stall lift, which is used for the circulation, and the post-stall lift, which is used either for the viscous lift force or in the circulation, depending on the `include_viscous_lift_in_the_circulation` setting. The lift from the leading edge vortex is added to the post-stall lift, and is therefore treated in the same way. See the [circulation strength chapter](../line_model/circulation_strength.md) for more.

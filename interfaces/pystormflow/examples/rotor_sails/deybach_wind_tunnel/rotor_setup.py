@@ -71,7 +71,7 @@ TUNNEL_INLET_DISTANCE = 75.0
 
 # Linear lift slope, manually tuned so that the lift match the experimental data at a spin ratio
 # around 1
-LIFT_SLOPE = 2.8
+LIFT_SLOPE = 2.6
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
@@ -91,7 +91,7 @@ EFFECTIVE_VISCOSITY = 1.5e-5
 COURANT_NUMBER = 0.75
 
 # Grid resolution at the rotor, used by both solvers. The chord length is the diameter.
-CELLS_PER_CHORD_LENGTH = 12
+CELLS_PER_CHORD_LENGTH = 10
 
 # Default settings for the mesh convergence tests. The resolutions are run from the lowest to the
 # highest.
@@ -142,7 +142,7 @@ class Variant(Enum):
 # The recommended variant, used when no variant is given to the scripts
 DEFAULT_VARIANT = Variant.ProjectedTipLossAndLiftingLine
 
-TIP_LOSS_EXP_FACTOR = 32
+TIP_LOSS_EXP_FACTOR = 16
 
 # Shorthand for all variants on the command line
 ALL_VARIANTS = "all"

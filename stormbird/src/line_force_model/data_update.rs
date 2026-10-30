@@ -278,18 +278,14 @@ impl LineForceModel {
         let internal_states = self.section_models_internal_state(ctrl_points_velocity);
 
         for wing_index in 0..self.nr_wings() {
-            if self.dynamic_stall[wing_index].is_none() {
+            let Some(segment_states) = self.wing_dynamic_stall_states(
+                wing_index,
+                &angles_of_attack,
+                &internal_states,
+                ctrl_points_velocity
+            ) else {
                 continue;
-            }
-
-            let segment_states = self.wing_indices[wing_index].clone().map(|index| {
-                self.dynamic_stall_state(
-                    index,
-                    angles_of_attack[index],
-                    internal_states[index],
-                    ctrl_points_velocity[index]
-                ).map(|(_, state)| state).unwrap_or_default()
-            }).collect();
+            };
 
             if let Some(model) = &mut self.dynamic_stall[wing_index] {
                 model.commit(segment_states);

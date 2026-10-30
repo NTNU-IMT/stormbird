@@ -16,21 +16,27 @@
 //!    amount of stall, s''.
 //!
 //! The lift is then computed from the same blend as in the foil model, with the curves evaluated at
-//! the instantaneous angle of attack, but weighted with s'' rather than s(α).
+//! the instantaneous angle of attack, but weighted with s'' rather than s(α). The model itself does
+//! not compute the lift. Instead, it gives the effects that enter the lift, as a
+//! [`DynamicStallLiftInput`](crate::section_models::dynamic_stall::DynamicStallLiftInput), which
+//! is combined with the section model by the user of the model.
 //!
 //! In addition, the model includes the extra lift from a leading edge vortex. The vortex is fed by
 //! the lift that is lost due to the dynamic stall, i.e., s'' times the difference between the
 //! pre-stall and post-stall lift. The feed is accumulated with a deficiency function with the time
 //! constant T_v, but only while the vortex is above the foil. The vortex is created when the lagged
 //! angle of attack exceeds the mean stall angle, i.e., when s' > 0.5, and passes the trailing edge
-//! after the non-dimensional time T_vl. After that, the vortex lift only decays.
+//! after the non-dimensional time T_vl. After that, the vortex lift only decays. The vortex lift is
+//! treated as part of the stall related lift, i.e., added to the post-stall lift.
 //!
 //! The model is fundamentally a two dimensional model, but it is kept as a separate structure from
 //! the foil models, as it has an internal state, i.e., the memory effects for each line segment on
 //! a wing. The model is designed to be used in a time stepping simulation, where the solver can
 //! evaluate the lift many times per time step. The evaluation is therefore always based on the
 //! state from the last completed time step, and does not change the state. The state is updated
-//! explicitly with [`DynamicStallModel::commit`] when a time step is completed.
+//! explicitly with
+//! [`DynamicStallModel::commit`](crate::section_models::dynamic_stall::DynamicStallModel::commit)
+//! when a time step is completed.
 
 /// Builder for the dynamic stall model
 pub mod builder;
@@ -100,6 +106,39 @@ impl DynamicStallSegmentState {
     pub fn lagged_angle_of_attack(&self) -> Float {
         wrapped_angle(self.angle_of_attack - self.pressure_deficiency)
     }
+
+    /// The parts of the state that enter the lift, i.e., the dynamic amount of stall and the vortex
+    /// lift
+    pub fn lift_input(&self) -> DynamicStallLiftInput {
+        DynamicStallLiftInput {
+            amount_of_stall: Some(self.amount_of_stall),
+            vortex_lift: self.vortex_lift,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+/// The effects of the dynamic stall model that enter the lift on a single line segment.
+///
+/// The lift is computed from the section model, with the amount of stall given here, plus the
+/// vortex lift. Note that the lift curves in the section model are always evaluated at the
+/// instantaneous angle of attack. The lagged angle of attack is only used internally in the
+/// dynamic stall model, to compute the amount of stall.
+pub struct DynamicStallLiftInput {
+    /// The amount of stall to use in the section model. `None` means that the static amount of
+    /// stall from the section model itself is used.
+    pub amount_of_stall: Option<Float>,
+    /// The lift coefficient from the leading edge vortex, which is treated as part of the stall
+    /// related lift, i.e., added to the post-stall lift.
+    pub vortex_lift: Float,
+}
+
+impl DynamicStallLiftInput {
+    /// The input in steady conditions, or for wings without a dynamic stall model: the static
+    /// amount of stall from the section model, and no vortex lift
+    pub fn steady() -> Self {
+        Self::default()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -136,21 +175,6 @@ impl DynamicStallModel {
         )
     }
 
-    /// Returns the foil model that the section model uses for the given internal state, or `None`
-    /// if the section model is not built on the foil model.
-    pub fn foil(section_model: &SectionModel, internal_state: Float) -> Option<Foil> {
-        match section_model {
-            SectionModel::SingleElementFoil(foil) => Some(foil.clone()),
-            SectionModel::MultiElementFoil(varying_foil) => Some(
-                varying_foil.get_foil(internal_state)
-            ),
-            SectionModel::ActiveAirFlowFoil(active_air_flow_foil) => Some(
-                active_air_flow_foil.varying_foil.get_foil(internal_state)
-            ),
-            SectionModel::RotatingCylinder(_) | SectionModel::EffectiveWindSensor => None,
-        }
-    }
-
     /// Sets the dimensional time step to use for the next evaluations of the model
     pub fn set_time_step(&mut self, time_step: Float) {
         self.time_step = time_step;
@@ -173,6 +197,33 @@ impl DynamicStallModel {
         } else {
             0.0
         }
+    }
+
+    /// The discrete deficiency function, which is used for all the first order lags in the model:
+    ///
+    /// D_i = D_{i-1} * exp(-Δs / T) + Δx_i * exp(-Δs / (2 T))
+    ///
+    /// For a lagged signal, the increment is the change in the input since the last time step,
+    /// Δx_i = x_i - x_{i-1}, and the lagged signal is x_i - D_i. A time constant of zero, or less,
+    /// turns the lag off, i.e., the deficiency function is always zero.
+    ///
+    /// # Arguments
+    /// * `previous_deficiency` - the value of the deficiency function at the last time step, D_{i-1}
+    /// * `increment` - the increment in the input, Δx_i
+    /// * `delta_s` - the non-dimensional time step, Δs
+    /// * `time_constant` - the non-dimensional time constant of the lag, T
+    pub fn deficiency_function(
+        previous_deficiency: Float,
+        increment: Float,
+        delta_s: Float,
+        time_constant: Float
+    ) -> Float {
+        if time_constant <= 0.0 {
+            return 0.0;
+        }
+
+        previous_deficiency * (-delta_s / time_constant).exp() +
+            increment * (-delta_s / (2.0 * time_constant)).exp()
     }
 
     /// Evaluates the state of the model for a single line segment at the current time step, based
@@ -203,22 +254,24 @@ impl DynamicStallModel {
         let delta_s = self.non_dimensional_time_step(velocity, chord_length);
 
         // Step 1: pressure lag, applied to the angle of attack
-        let (decay, increment_weight) = lag_factors(delta_s, self.pressure_time_constant);
-
-        let angle_increment = wrapped_angle(angle_of_attack - previous.angle_of_attack);
-
-        let pressure_deficiency = previous.pressure_deficiency * decay +
-            angle_increment * increment_weight;
+        let pressure_deficiency = Self::deficiency_function(
+            previous.pressure_deficiency,
+            wrapped_angle(angle_of_attack - previous.angle_of_attack),
+            delta_s,
+            self.pressure_time_constant
+        );
 
         let lagged_angle_of_attack = wrapped_angle(angle_of_attack - pressure_deficiency);
 
         // Step 2: separation lag, applied to the amount of stall at the lagged angle of attack
         let lagged_angle_amount_of_stall = foil.amount_of_stall(lagged_angle_of_attack);
 
-        let (decay, increment_weight) = lag_factors(delta_s, self.separation_time_constant);
-
-        let separation_deficiency = previous.separation_deficiency * decay +
-            (lagged_angle_amount_of_stall - previous.lagged_angle_amount_of_stall) * increment_weight;
+        let separation_deficiency = Self::deficiency_function(
+            previous.separation_deficiency,
+            lagged_angle_amount_of_stall - previous.lagged_angle_amount_of_stall,
+            delta_s,
+            self.separation_time_constant
+        );
 
         // The discrete lag is not strictly guaranteed to stay within the range of the input
         let amount_of_stall = (lagged_angle_amount_of_stall - separation_deficiency).clamp(0.0, 1.0);
@@ -233,16 +286,22 @@ impl DynamicStallModel {
             0.0
         };
 
-        // Step 6: vortex lift, which is only fed while the vortex is above the foil
-        let (decay, increment_weight) = lag_factors(delta_s, self.vortex_time_constant);
-
+        // Step 6: vortex lift, which is only fed while the vortex is above the foil. Otherwise, the
+        // increment is zero, so that the vortex lift only decays.
         let vortex_is_above_foil = vortex_time > 0.0 && vortex_time <= self.vortex_passage_time;
 
-        let vortex_lift = if vortex_is_above_foil {
-            previous.vortex_lift * decay + (vortex_feed - previous.vortex_feed) * increment_weight
+        let vortex_feed_increment = if vortex_is_above_foil {
+            vortex_feed - previous.vortex_feed
         } else {
-            previous.vortex_lift * decay
+            0.0
         };
+
+        let vortex_lift = Self::deficiency_function(
+            previous.vortex_lift,
+            vortex_feed_increment,
+            delta_s,
+            self.vortex_time_constant
+        );
 
         DynamicStallSegmentState {
             angle_of_attack,
@@ -274,43 +333,6 @@ impl DynamicStallModel {
         self.segment_states = segment_states;
         self.is_initialized = true;
     }
-
-    /// The pre-stall lift coefficient, reduced by the dynamic amount of stall
-    pub fn lift_coefficient_pre_stall_with_stall_drop_off(
-        foil: &Foil,
-        angle_of_attack: Float,
-        state: &DynamicStallSegmentState
-    ) -> Float {
-        foil.lift_coefficient_pre_stall_raw(angle_of_attack) * (1.0 - state.amount_of_stall)
-    }
-
-    /// The post-stall lift coefficient, weighted by the dynamic amount of stall, plus the lift from
-    /// the leading edge vortex, which is treated as part of the stall related lift.
-    pub fn lift_coefficient_post_stall_with_stall_weight(
-        foil: &Foil,
-        angle_of_attack: Float,
-        state: &DynamicStallSegmentState
-    ) -> Float {
-        foil.lift_coefficient_post_stall_raw(angle_of_attack) * state.amount_of_stall +
-            state.vortex_lift
-    }
-}
-
-/// Returns the factors used in the discrete deficiency function for a first order lag:
-///
-/// D_i = D_{i-1} * exp(-Δs / T) + (x_i - x_{i-1}) * exp(-Δs / (2 T))
-///
-/// The first value is the decay of the previous deficiency, and the second value is the weight of
-/// the increment in the input. A time constant of zero, or less, turns the lag off.
-fn lag_factors(delta_s: Float, time_constant: Float) -> (Float, Float) {
-    if time_constant <= 0.0 {
-        return (0.0, 0.0);
-    }
-
-    (
-        (-delta_s / time_constant).exp(),
-        (-delta_s / (2.0 * time_constant)).exp()
-    )
 }
 
 /// The lift coefficient that feeds the leading edge vortex, i.e., the difference between the
