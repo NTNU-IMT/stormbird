@@ -26,6 +26,7 @@ pub struct SectionalForcesInput {
     pub velocity: Vec<SpatialVector>,
     pub angles_of_attack: Vec<f64>,
     pub section_models_internal_state: Vec<f64>,
+    pub amount_of_stall: Vec<f64>,
     pub acceleration: Vec<SpatialVector>,
     pub rotation_velocity: SpatialVector,
     pub coordinate_system: CoordinateSystem,
@@ -34,7 +35,9 @@ pub struct SectionalForcesInput {
 
 Each element in the vectors in the `SectionalForcesInput` corresponds to a line element in the `LineForceModel`. Both the velocity and the acceleration are a combination of freestream conditions, induced velocities, and motion velocities. 
 
-The `section_models_internal_state` is the internal state given to the section model on each line element, which is converted from the internal state set on the wing (see the [control variables](#control-variables) below). For some section models, the conversion depends on the local velocity, which means that the motion can also affect the section internal states. For instance, the spin ratio of a rotor sail with a constant rotational speed changes when the felt velocity changes, and the suction coefficient of a suction sail with a constant fan power varies with the local flow conditions. The motion velocities can either be automatically calculated based on finite difference and the time history of the motion or set manually if the variables are available from some other sources (e.g., a rigid body solver of a ship).
+The `section_models_internal_state` is the internal state given to the section model on each line element, which is converted from the internal state set on the wing (see the [control variables](#control-variables) below). For some section models, the conversion depends on the local velocity, which means that the motion can also affect the section internal states. For instance, the spin ratio of a rotor sail with a constant rotational speed changes when the felt velocity changes, and the suction coefficient of a suction sail with a constant fan power varies with the local flow conditions. The `amount_of_stall` is the amount of stall used for the lift and drag on each line element, between 0 (no stall) and 1 (full stall), as explained in the [foil model chapter](../sectional_models/foil_model.md). For wings with a [dynamic stall model](../sectional_models/dynamic_stall.md), this is the dynamic amount of stall. The value is zero for section models that do not build on the foil model, such as the rotating cylinder. It is only an output, and is not used by the force calculations.
+
+The motion velocities can either be automatically calculated based on finite difference and the time history of the motion or set manually if the variables are available from some other sources (e.g., a rigid body solver of a ship).
 
 ## Control variables
 

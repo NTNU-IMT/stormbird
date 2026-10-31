@@ -3,6 +3,9 @@ Copyright (C) 2024, NTNU
 Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 """
+import warnings
+
+from pydantic import model_validator
 
 from ..base_model import StormbirdSetupBaseModel
 from ..line_force_model import LineForceModelBuilder
@@ -29,3 +32,24 @@ class ActuatorLineBuilder(StormbirdSetupBaseModel):
     """
     Empirical tip loss correction of the circulation. Not used by default.
     """
+
+    @model_validator(mode='after')
+    def check_dynamic_stall_damping(self) -> "ActuatorLineBuilder":
+        '''
+        The damping of the circulation acts as an additional time lag, which also affects the
+        dynamic response of the forces. Gives a warning if a dynamic stall model is used together
+        with a damping factor below one.
+        '''
+        damping_factor = self.solver_settings.damping_factor
+
+        if self.line_force_model.has_dynamic_stall() and damping_factor < 1.0:
+            time_lag = 1.0 / damping_factor if damping_factor > 0.0 else float('inf')
+
+            warnings.warn(
+                "The actuator line model has a dynamic stall model, but the damping factor of the "
+                f"circulation is {damping_factor}. The damping acts as an additional time lag of "
+                f"about {time_lag:.1f} time steps, which also affects the dynamic "
+                "response of the forces."
+            )
+
+        return self

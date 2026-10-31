@@ -17,6 +17,7 @@
 //! - [`wing_dynamic_stall_states`](LineForceModel::wing_dynamic_stall_states)
 //! - [`dynamic_stall_inputs`](LineForceModel::dynamic_stall_inputs)
 //! - [`dynamic_internal_states`](LineForceModel::dynamic_internal_states)
+//! - [`amounts_of_stall`](LineForceModel::amounts_of_stall)
 //! - [`lift_coefficients_pre_and_post_stall`](LineForceModel::lift_coefficients_pre_and_post_stall)
 //! - [`lift_coefficients_for_circulation`](LineForceModel::lift_coefficients_for_circulation)
 //! - [`lift_coefficients_linear`](LineForceModel::lift_coefficients_linear)
@@ -296,6 +297,42 @@ impl LineForceModel {
             .collect()
     }
 
+    /// Returns the amount of stall that is used for the lift and drag on each line element. This
+    /// is the dynamic amount of stall for wings with a dynamic stall model, and the static value
+    /// from the foil model otherwise. Section models that are not built on the foil model have no
+    /// amount of stall, and get the value zero.
+    ///
+    /// # Arguments
+    /// * `angles_of_attack` - the angle of attack at each control point
+    /// * `internal_states` - the internal state of the section model at each control point
+    /// * `velocity` - the velocity vector at each control point. Only used by the dynamic stall
+    ///   model.
+    pub fn amounts_of_stall(
+        &self,
+        angles_of_attack: &[Float],
+        internal_states: &[Float],
+        velocity: &[SpatialVector]
+    ) -> Vec<Float> {
+        let inputs = self.dynamic_stall_inputs(angles_of_attack, internal_states, velocity);
+
+        (0..self.nr_span_lines()).map(
+            |index| {
+                let wing_index = self.wing_index_from_global(index);
+
+                let input = &inputs[index];
+
+                let internal_state = input.internal_state.unwrap_or(internal_states[index]);
+
+                match self.section_models[wing_index].foil(internal_state) {
+                    Some(foil) => input.amount_of_stall.unwrap_or_else(
+                        || foil.amount_of_stall(angles_of_attack[index])
+                    ),
+                    None => 0.0
+                }
+            }
+        ).collect()
+    }
+
     /// Returns the pre-stall lift coefficient, reduced by the amount of stall, and the post-stall
     /// lift coefficient, weighted by the amount of stall, on each line element. For wings with a
     /// dynamic stall model, the lagged internal state and the dynamic amount of stall are used, and
@@ -524,6 +561,12 @@ impl LineForceModel {
             &solver_result.output_ctrl_points_velocity
         );
 
+        let amount_of_stall = self.amounts_of_stall(
+            &angles_of_attack,
+            &section_models_internal_state,
+            &solver_result.output_ctrl_points_velocity
+        );
+
         let nr_span_lines = self.nr_span_lines();
 
         let mut acceleration = ctrl_point_acceleration.to_vec();
@@ -549,6 +592,7 @@ impl LineForceModel {
             velocity,
             angles_of_attack,
             section_models_internal_state,
+            amount_of_stall,
             acceleration,
             rotation_velocity,
             coordinate_system: self.output_coordinate_system

@@ -59,6 +59,7 @@ fn force_input(
         velocity: vec![velocity; nr_span_lines],
         angles_of_attack: vec![Float::to_radians(30.0); nr_span_lines],
         section_models_internal_state: vec![0.0; nr_span_lines],
+        amount_of_stall: vec![0.0; nr_span_lines],
         acceleration: vec![acceleration; nr_span_lines],
         rotation_velocity,
         coordinate_system: CoordinateSystem::Global,

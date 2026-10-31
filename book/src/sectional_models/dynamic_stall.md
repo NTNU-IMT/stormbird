@@ -302,7 +302,9 @@ The full model is used together with section models that build on the foil model
 
 Note that an empty object has no effect for a rotating cylinder, as the lag in the internal state is off by default.
 
-The model depends on the time history of the flow, and is therefore only used in lifting line simulations with [dynamic simulation settings](../lifting_line/simulation_overview.md). Using it together with quasi-steady settings gives an error. The model is not yet implemented for actuator line simulations.
+The model depends on the time history of the flow, and can therefore only be used in lifting line simulations with [dynamic simulation settings](../lifting_line/simulation_overview.md), or in [actuator line simulations](../actuator_line/simulation_overview.md). Using it together with quasi-steady settings gives an error.
+
+From the perspective of the dynamic stall model, an actuator line simulation is equivalent to a dynamic lifting line simulation. The time variation in the circulatory lift is resolved by the shed vorticity in both cases, in the dynamic wake for the lifting line and in the CFD domain for the actuator line, so the same model and parameters are used for both.
 
 ### Internal state and time stepping
 
@@ -313,7 +315,9 @@ The solvers in the lifting line simulation evaluate the lift many times per time
 1. Sets the time step in the dynamic stall models, which is needed to compute the non-dimensional time step.
 2. Solves for the circulation strength, where the dynamic amount of stall is used in the lift coefficients.
 3. Computes the forces, with the same state as in the solver.
-4. Updates the state of the dynamic stall models, based on the final velocity at the control points from the solver.
+4. Updates the state of the dynamic stall models, based on the angles of attack, internal states and velocities in the force input of the result, i.e., the same values as the forces are computed from.
+
+In actuator line simulations, the model is updated in the same way, but the CFD solver may call the actuator line model several times per time step, e.g., in each outer iteration. The time given to the actuator line model is therefore used to detect when a new time step starts. The state is then updated from the last result of the previous time step, before the time step is changed. Calls with the same time are all evaluated from the same state.
 
 In the first time step, there is no time history available, so the model gives the static values, and the state is initialized from the result. The state is also reset when the simulation is initialized again, for instance in the `do_multiple_steps` function of the complete sail model. The steady state functions of the complete sail model reset the state before each iteration, as the iterations are not a time history, so that the results are always based on the static foil model. When the state is initialized at an angle of attack above the stall angle, any leading edge vortex is assumed to have passed the trailing edge a long time ago, so that a new vortex is only created after the lagged angle of attack has been below the stall angle first.
 

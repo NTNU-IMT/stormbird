@@ -267,22 +267,25 @@ impl LineForceModel {
     }
 
     /// Updates the state of the dynamic stall models after a completed time step. Should be called
-    /// once per time step, after the forces are calculated, using the final velocity at the control
-    /// points from the solver.
-    pub fn update_dynamic_stall_state(&mut self, ctrl_points_velocity: &[SpatialVector]) {
+    /// once per time step, with the force input from the final solution of the time step, and
+    /// before the time step of the dynamic stall models is changed.
+    ///
+    /// The angles of attack and the internal states are taken directly from the force input, so
+    /// that the state is based on the same values as the forces, even if the geometry or the
+    /// internal states of the model have been changed afterwards, e.g., by a controller. Only the
+    /// magnitude of the velocity is used, so the coordinate system of the force input does not
+    /// matter.
+    pub fn update_dynamic_stall_state(&mut self, force_input: &SectionalForcesInput) {
         if !self.has_dynamic_stall() {
             return;
         }
 
-        let angles_of_attack = self.angles_of_attack(ctrl_points_velocity, CoordinateSystem::Global);
-        let internal_states = self.section_models_internal_state(ctrl_points_velocity);
-
         for wing_index in 0..self.nr_wings() {
             let Some(segment_states) = self.wing_dynamic_stall_states(
                 wing_index,
-                &angles_of_attack,
-                &internal_states,
-                ctrl_points_velocity
+                &force_input.angles_of_attack,
+                &force_input.section_models_internal_state,
+                &force_input.velocity
             ) else {
                 continue;
             };

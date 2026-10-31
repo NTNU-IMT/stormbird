@@ -20,6 +20,9 @@ pub mod corrections;
 /// Damping of the flow along the span
 pub mod spanflow_damper;
 
+#[cfg(test)]
+mod tests;
+
 use stormath::smoothing::gaussian::gaussian_kernel;
 
 use stormath::spatial_vector::SpatialVector;
@@ -149,8 +152,15 @@ impl ActuatorLine {
     ///
     /// It solves for the circulation strength and computes the simulation result based on the
     /// current estimate of the control point velocities.
+    ///
+    /// The function can be called several times per time step, e.g., in each outer iteration of
+    /// the CFD solver. The time is used to detect when a new time step starts. The state of the
+    /// dynamic stall models, if any, is then updated with the last result from the previous time
+    /// step, so that it is only updated once per time step.
     pub fn do_step(&mut self, time: Float, time_step: Float){
         if time >= self.start_time {
+            self.update_dynamic_stall_state(time, time_step);
+
             let solver_result = self.solve(time, time_step);
 
             let ctrl_point_acceleration = vec![
@@ -172,6 +182,28 @@ impl ActuatorLine {
         }
 
         self.current_iteration += 1;
+    }
+
+    /// Updates the dynamic stall models, if any, at the start of a call to
+    /// [`do_step`](ActuatorLine::do_step).
+    ///
+    /// If the time is larger than the time of the last simulation result, a new time step has
+    /// started, and the state is updated with the force input from the last result. This must be
+    /// done before the time step is changed, so that the state is updated with the time step it was
+    /// computed with. Calls with the same time as the last result, e.g., from outer iterations in
+    /// the CFD solver, are evaluated from the same state.
+    fn update_dynamic_stall_state(&mut self, time: Float, time_step: Float) {
+        if !self.line_force_model.has_dynamic_stall() {
+            return;
+        }
+
+        if let Some(simulation_result) = &self.simulation_result {
+            if time > simulation_result.time {
+                self.line_force_model.update_dynamic_stall_state(&simulation_result.force_input);
+            }
+        }
+
+        self.line_force_model.set_dynamic_stall_time_step(time_step);
     }
 
     /// Function to update the controller in the model, if the controller is present.

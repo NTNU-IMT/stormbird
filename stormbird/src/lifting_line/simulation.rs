@@ -221,9 +221,7 @@ impl Simulation {
 
         // The forces must be calculated before the update, so that they are based on the same
         // state of the dynamic stall models as the solver
-        self.line_force_model.update_dynamic_stall_state(
-            &solver_result.output_ctrl_points_velocity
-        );
+        self.line_force_model.update_dynamic_stall_state(&simulation_result.force_input);
 
         simulation_result
     }

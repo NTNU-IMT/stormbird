@@ -475,8 +475,8 @@ class EffectiveWindSensor(StormbirdSetupBaseModel):
 
 class DynamicStallModelBuilder(StormbirdSetupBaseModel):
     '''
-    Dynamic stall model for a wing. The model is set for each wing in the WingBuilder, and can only
-    be used in dynamic lifting line simulations.
+    Dynamic stall model for a wing. The model is set for each wing in the WingBuilder, and can be
+    used in dynamic lifting line simulations and in actuator line simulations.
 
     For section models that build on the foil model, i.e., Foil, MultiElementFoil and
     ActiveAirFlowFoil, the model applies two first order time lags to the stall in the foil model:

@@ -91,6 +91,16 @@ impl ActuatorLineBuilder {
 
         let nr_span_lines = line_force_model.nr_span_lines();
 
+        if line_force_model.has_dynamic_stall() && self.solver_settings.damping_factor < 1.0 {
+            eprintln!(
+                "Warning: the actuator line model has a dynamic stall model, but the damping \
+                factor of the circulation is {}. The damping acts as an additional time lag of \
+                about {:.1} time steps, which also affects the dynamic response of the forces.",
+                self.solver_settings.damping_factor,
+                1.0 / self.solver_settings.damping_factor
+            );
+        }
+
         let controller = self.controller.as_ref().map(|controller_builder| controller_builder
                     .build(&line_force_model)
                     .expect("Could not build the controller"));
