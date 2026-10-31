@@ -1142,6 +1142,8 @@ dependencies = [
 [[package]]
 name = "stormbird"
 version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58dd3ef773ce702fd01e8928fd09c122b71dfe0d611850d1c066cc775e212929"
 dependencies = [
  "serde",
  "serde_json",
@@ -1151,6 +1153,8 @@ dependencies = [
 [[package]]
 name = "stormflow"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af8cf495075d36001dbac15413c67142fd30915a5ced8dc28a0eba76e8c8ba2c"
 dependencies = [
  "bytemuck",
  "clap",

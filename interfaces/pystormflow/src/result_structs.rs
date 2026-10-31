@@ -4,8 +4,11 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pyo3::exceptions::{PyIOError, PyValueError};
 
 use stormath::type_aliases::Float;
+
+use stormbird::error::Error;
 
 use stormbird::common_utils::results::simulation::SimulationResult as SimulationResultRust;
 use stormbird::common_utils::forces_and_moments::SectionalForces as SectionalForcesRust;
@@ -33,6 +36,20 @@ impl SectionalForcesInput {
     #[getter]
     pub fn angles_of_attack(&self) -> Vec<Float> {
         self.data.angles_of_attack.clone()
+    }
+
+    #[getter]
+    /// The internal state given to the section model on each line element
+    pub fn section_models_internal_state(&self) -> Vec<Float> {
+        self.data.section_models_internal_state.clone()
+    }
+
+    #[getter]
+    /// The amount of stall used for the lift and drag on each line element. This is the dynamic
+    /// amount of stall for wings with a dynamic stall model, and zero for section models that are
+    /// not built on the foil model.
+    pub fn amount_of_stall(&self) -> Vec<Float> {
+        self.data.amount_of_stall.clone()
     }
 
     #[getter]
@@ -123,17 +140,21 @@ pub struct SimulationResult {
 #[pymethods]
 impl SimulationResult {
     #[classmethod]
-    pub fn from_json_file(_cls: &Bound<'_, PyType>, file_path: String) -> SimulationResult {
-        let data = SimulationResultRust::from_json(&file_path).unwrap();
-        
-        SimulationResult { data }
+    pub fn from_json_file(_cls: &Bound<'_, PyType>, file_path: String) -> PyResult<SimulationResult> {
+        let data = SimulationResultRust::from_json(&file_path).map_err(|e| {
+            Self::read_file_error(&file_path, e)
+        })?;
+
+        Ok(SimulationResult { data })
     }
     
     #[classmethod]
-    pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> Vec<SimulationResult> {
-        let rust_vector = SimulationResultRust::result_history_from_file(&file_path).unwrap();
+    pub fn result_history_from_file(_cls: &Bound<'_, PyType>, file_path: String) -> PyResult<Vec<SimulationResult>> {
+        let rust_vector = SimulationResultRust::result_history_from_file(&file_path).map_err(|e| {
+            Self::read_file_error(&file_path, e)
+        })?;
 
-        rust_vector.iter().map(|v| SimulationResult { data: v.clone() }).collect()
+        Ok(rust_vector.iter().map(|v| SimulationResult { data: v.clone() }).collect())
     }
 
     #[getter]
@@ -207,5 +228,18 @@ impl SimulationResult {
 
     pub fn write_to_file(&self, file_path: String) {
         self.data.write_to_file(&file_path).expect("Error from write to file")
+    }
+}
+
+impl SimulationResult {
+    /// Converts an error from reading a result file to a Python error. Errors from reading the
+    /// file become an OSError, while errors from parsing the content become a ValueError.
+    fn read_file_error(file_path: &str, error: Error) -> PyErr {
+        let message = format!("Failed to read simulation result from file {}: {}", file_path, error);
+
+        match error {
+            Error::IoError(_) => PyIOError::new_err(message),
+            _ => PyValueError::new_err(message),
+        }
     }
 }

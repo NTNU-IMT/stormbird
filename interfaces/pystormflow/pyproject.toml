@@ -35,7 +35,8 @@ module-name = "pystormflow._native"
 python-source = "."
 features = ["pyo3/extension-module"]
 profile = "release"
-# The examples are not needed in the source distribution
+# The examples and the notes for the maintainer are not needed in the source distribution
 exclude = [
     { path = "examples/**/*", format = "sdist" },
+    { path = "maintainer_cheat_sheet.md", format = "sdist" },
 ]

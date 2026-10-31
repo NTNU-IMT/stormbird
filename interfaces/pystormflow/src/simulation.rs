@@ -1,6 +1,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use pyo3::exceptions::PyValueError;
 
 use stormath::type_aliases::Float;
 use stormflow::simulation::Simulation as SimulationRust;
@@ -15,10 +16,12 @@ pub struct Simulation {
 #[pymethods]
 impl Simulation {
     #[new]
-    pub fn new(setup_string: String) -> Self {
-        Self {
-            data: SimulationRust::new_from_string(&setup_string).unwrap()
-        }
+    pub fn new(setup_string: String) -> PyResult<Self> {
+        let data = SimulationRust::new_from_string(&setup_string).map_err(|e| {
+            PyValueError::new_err(format!("Failed to create simulation from string: {}", e))
+        })?;
+
+        Ok(Self { data })
     }
 
     pub fn time_step_from_courant_number(&self, courant_number: Float) -> Float {
