@@ -88,6 +88,49 @@ fn dynamic_stall_is_not_allowed_in_quasi_steady_simulations() {
 }
 
 #[test]
+fn negative_time_constants_give_an_error() {
+    let builder = SimulationBuilder::new(
+        line_force_model_builder(Some(DynamicStallModelBuilder {
+            separation_time_constant: Some(-1.0),
+            ..Default::default()
+        })),
+        SimulationSettings::Dynamic(DynamicSettings::default()),
+    );
+
+    assert!(builder.check_settings().is_err());
+    assert!(Simulation::new_from_string(&serde_json::to_string(&builder).unwrap()).is_err());
+}
+
+#[test]
+fn foil_parameters_for_a_rotor_give_an_error() {
+    let mut line_force_model = LineForceModelBuilder::new(10);
+
+    line_force_model.add_wing(WingBuilder {
+        section_points: vec![
+            SpatialVector::from([0.0, 0.0, 0.0]),
+            SpatialVector::from([0.0, 0.0, 5.0]),
+        ],
+        chord_vectors: vec![
+            SpatialVector::from([1.0, 0.0, 0.0]),
+            SpatialVector::from([1.0, 0.0, 0.0]),
+        ],
+        section_model: SectionModel::RotatingCylinder(RotatingCylinder::default()),
+        dynamic_stall: Some(DynamicStallModelBuilder {
+            pressure_time_constant: Some(1.0),
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+
+    let builder = SimulationBuilder::new(
+        line_force_model,
+        SimulationSettings::Dynamic(DynamicSettings::default()),
+    );
+
+    assert!(builder.check_settings().is_err());
+}
+
+#[test]
 fn zero_time_constants_give_the_same_result_as_without_dynamic_stall() {
     let max_angle = Float::to_radians(35.0);
     let nr_time_steps = 40;

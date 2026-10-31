@@ -104,9 +104,12 @@ impl SimulationBuilder {
         Self::new_from_string(&string)
     }
 
-    /// Checks that the settings are consistent. At the moment, this only checks that dynamic stall
-    /// models are only used together with a dynamic simulation.
+    /// Checks that the settings are consistent. At the moment, this checks the settings of the line
+    /// force model, see [`LineForceModelBuilder::check_settings`], and that dynamic stall models
+    /// are only used together with a dynamic simulation.
     pub fn check_settings(&self) -> Result<(), Error> {
+        self.line_force_model.check_settings()?;
+
         let has_dynamic_stall = self.line_force_model.wing_builders.iter()
             .any(|wing_builder| wing_builder.dynamic_stall.is_some());
 

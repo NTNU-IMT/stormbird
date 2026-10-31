@@ -13,6 +13,7 @@ use stormath::{
 
 use crate::section_models::SectionModel;
 use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
+use crate::error::Error;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
 use crate::line_force_model::wing_internal_state::InternalCompartments;
@@ -166,14 +167,23 @@ impl WingBuilder {
         self.gyroscopic_moment.clone()
     }
 
+    /// Checks that the dynamic stall model of the wing, if any, is valid for the section model of
+    /// the wing, see [`DynamicStallModelBuilder::check`].
+    pub fn check_dynamic_stall(&self) -> Result<(), Error> {
+        match &self.dynamic_stall {
+            Some(dynamic_stall) => dynamic_stall.check(&self.section_model),
+            None => Ok(())
+        }
+    }
+
     /// Returns the builder for the dynamic stall model of the wing, if any.
     ///
     /// # Panics
-    /// If the parameters for the stall in the foil model are set for a section model that is not
-    /// built on the foil model.
+    /// If the dynamic stall model is not valid for the section model, see
+    /// [`check_dynamic_stall`](WingBuilder::check_dynamic_stall).
     pub fn dynamic_stall(&self) -> Option<DynamicStallModelBuilder> {
-        if let Some(dynamic_stall) = &self.dynamic_stall {
-            dynamic_stall.check_section_model(&self.section_model);
+        if let Err(error) = self.check_dynamic_stall() {
+            panic!("Invalid dynamic stall model: {}", error);
         }
 
         self.dynamic_stall.clone()

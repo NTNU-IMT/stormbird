@@ -180,7 +180,9 @@ impl Linearized {
                 &dynamic_internal_states,
             );
 
-            let (cl_full, _) = line_force_model.lift_coefficients_pre_and_post_stall(
+            // The same part of the lift as the circulation should correspond to, i.e., including
+            // the post-stall lift if it is included in the circulation
+            let cl_full = line_force_model.lift_coefficients_for_circulation(
                 &angles_of_attack,
                 &internal_states,
                 &ctrl_points_velocity

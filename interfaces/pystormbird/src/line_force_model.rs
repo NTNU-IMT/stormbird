@@ -26,6 +26,10 @@ impl LineForceModel {
             PyValueError::new_err(format!("Failed to create line force model from string: {}", e))
         })?;
 
+        builder.check_settings().map_err(|e| {
+            PyValueError::new_err(format!("Invalid settings for the line force model: {}", e))
+        })?;
+
         Ok(Self { data: builder.build() })
     }
 

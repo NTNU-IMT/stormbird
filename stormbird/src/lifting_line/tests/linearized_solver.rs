@@ -18,6 +18,16 @@ use stormath::type_aliases::Float;
 /// Lift coefficients for a rectangular wing with a sharp stall, for the given angles of attack,
 /// simulated with the given linearized solver
 fn lift_coefficients(angles_of_attack_deg: &[Float], solver: &Linearized) -> Vec<Float> {
+    lift_coefficients_with_settings(angles_of_attack_deg, solver, false)
+}
+
+/// Same as [`lift_coefficients`], but with the option to include the viscous lift in the
+/// circulation
+fn lift_coefficients_with_settings(
+    angles_of_attack_deg: &[Float],
+    solver: &Linearized,
+    include_viscous_lift_in_the_circulation: bool
+) -> Vec<Float> {
     let aspect_ratio = 5.0;
     let freestream_velocity = SpatialVector::from([1.0, 0.0, 0.0]);
 
@@ -42,6 +52,9 @@ fn lift_coefficients(angles_of_attack_deg: &[Float], solver: &Linearized) -> Vec
             }),
             ..Default::default()
         });
+
+        line_force_model.force_calculation_settings.include_viscous_lift_in_the_circulation =
+            include_viscous_lift_in_the_circulation;
 
         let mut simulation = SimulationBuilder {
             line_force_model,
@@ -110,4 +123,28 @@ fn viscous_correction_without_lift_jump_before_stall() {
         "The viscous correction should not increase the lift. Max relative excess: {}",
         excess_default
     );
+}
+
+#[test]
+/// When the viscous lift is included in the circulation, there is no separate viscous lift force,
+/// so the viscous correction of the circulation must include the post-stall lift. Otherwise, the
+/// post-stall lift is lost. Well above the stall angle, where most of the lift is post-stall lift,
+/// the lift should therefore be similar with and without the viscous lift in the circulation.
+fn viscous_lift_in_the_circulation_keeps_the_post_stall_lift() {
+    let angles_of_attack_deg = [30.0, 45.0];
+    let solver = Linearized::default();
+
+    let cl_separate = lift_coefficients_with_settings(&angles_of_attack_deg, &solver, false);
+    let cl_in_circulation = lift_coefficients_with_settings(&angles_of_attack_deg, &solver, true);
+
+    for (cl_separate, cl_in_circulation) in cl_separate.iter().zip(cl_in_circulation.iter()) {
+        assert!(*cl_separate > 0.1);
+
+        assert!(
+            (cl_in_circulation - cl_separate).abs() < 0.2 * cl_separate,
+            "The post-stall lift is not kept when it is included in the circulation. \
+            Separate viscous lift = {}, viscous lift in the circulation = {}",
+            cl_separate, cl_in_circulation
+        );
+    }
 }

@@ -10,6 +10,7 @@ use stormath::type_aliases::Float;
 
 use super::{DynamicStallModel, DynamicStallSegmentState};
 use crate::section_models::SectionModel;
+use crate::error::Error;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -67,21 +68,51 @@ impl DynamicStallModelBuilder {
         self.vortex_passage_time.is_some()
     }
 
-    /// Checks that the builder can be used together with the given section model.
-    ///
-    /// # Panics
-    /// If any of the parameters for the stall in the foil model are set, and the section model is
-    /// not built on the foil model.
-    pub fn check_section_model(&self, section_model: &SectionModel) {
+    /// Checks that the builder is valid for the given section model, i.e., that the time
+    /// constants are valid, see
+    /// [`check_time_constants`](DynamicStallModelBuilder::check_time_constants), and that the
+    /// parameters for the stall in the foil model are only set for section models that are built
+    /// on the foil model.
+    pub fn check(&self, section_model: &SectionModel) -> Result<(), Error> {
+        self.check_time_constants()?;
+
         if self.has_foil_parameters() && !DynamicStallModel::uses_foil_stall_model(section_model) {
-            panic!(
+            return Err(Error::CustomStringError(
                 "The parameters for the stall in the dynamic stall model, i.e., \
                 pressure_time_constant, separation_time_constant, vortex_time_constant and \
                 vortex_passage_time, are only used together with section models that build on the \
                 foil model, i.e., single element foils, multi element foils and active air flow \
                 foils. Only the internal_state_time_constant can be set for other section models."
-            );
+                    .to_string()
+            ));
         }
+
+        Ok(())
+    }
+
+    /// Checks that none of the time constants are negative. Values that are not set use the
+    /// default values, which are always valid.
+    pub fn check_time_constants(&self) -> Result<(), Error> {
+        let time_constants = [
+            ("pressure_time_constant", self.pressure_time_constant),
+            ("separation_time_constant", self.separation_time_constant),
+            ("vortex_time_constant", self.vortex_time_constant),
+            ("vortex_passage_time", self.vortex_passage_time),
+            ("internal_state_time_constant", Some(self.internal_state_time_constant)),
+        ];
+
+        for (name, value) in time_constants {
+            if let Some(value) = value {
+                if value < 0.0 {
+                    return Err(Error::CustomStringError(format!(
+                        "The time constants in the dynamic stall model can not be negative, but \
+                        {} = {}", name, value
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Builds the dynamic stall model for a wing with the given number of line segments.
@@ -98,26 +129,8 @@ impl DynamicStallModelBuilder {
         let vortex_passage_time = self.vortex_passage_time
             .unwrap_or_else(Self::default_vortex_passage_time);
 
-        let time_constants = [
-            pressure_time_constant,
-            separation_time_constant,
-            vortex_time_constant,
-            vortex_passage_time,
-            self.internal_state_time_constant,
-        ];
-
-        if time_constants.iter().any(|value| *value < 0.0) {
-            panic!(
-                "The time constants in the dynamic stall model can not be negative. \
-                pressure_time_constant = {}, separation_time_constant = {}, \
-                vortex_time_constant = {}, vortex_passage_time = {}, \
-                internal_state_time_constant = {}",
-                pressure_time_constant,
-                separation_time_constant,
-                vortex_time_constant,
-                vortex_passage_time,
-                self.internal_state_time_constant
-            );
+        if let Err(error) = self.check_time_constants() {
+            panic!("{}", error);
         }
 
         DynamicStallModel {

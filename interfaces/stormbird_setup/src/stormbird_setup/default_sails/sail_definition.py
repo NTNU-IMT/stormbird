@@ -64,8 +64,9 @@ class SailDefinition(StormbirdSetupBaseModel):
     added_mass: AddedMass | None = None
     dynamic_stall: DynamicStallModelBuilder | None = None
     """
-    Optional dynamic stall model. Only used in dynamic lifting line simulations, so the definition
-    can not be used in quasi-steady simulations when it is set. Not used by default.
+    Optional dynamic stall model. Only used in dynamic lifting line simulations and actuator line
+    simulations, so the definition can not be used in quasi-steady simulations when it is set. Not
+    used by default.
     """
 
     @model_validator(mode='after')

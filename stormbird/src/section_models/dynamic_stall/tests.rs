@@ -584,22 +584,36 @@ fn foil_parameters_are_only_allowed_for_foil_models() {
         ..Default::default()
     };
 
-    internal_state_only.check_section_model(&rotating_cylinder());
-    internal_state_only.check_section_model(&SectionModel::SingleElementFoil(Foil::default()));
+    internal_state_only.check(&rotating_cylinder()).unwrap();
+    internal_state_only.check(&SectionModel::SingleElementFoil(Foil::default())).unwrap();
 
     DynamicStallModelBuilder {
         separation_time_constant: Some(4.0),
         ..Default::default()
-    }.check_section_model(&SectionModel::SingleElementFoil(Foil::default()));
+    }.check(&SectionModel::SingleElementFoil(Foil::default())).unwrap();
 }
 
 #[test]
-#[should_panic]
 fn foil_parameters_are_not_allowed_for_rotating_cylinders() {
-    DynamicStallModelBuilder {
+    assert!(DynamicStallModelBuilder {
         separation_time_constant: Some(4.0),
         ..Default::default()
-    }.check_section_model(&rotating_cylinder());
+    }.check(&rotating_cylinder()).is_err());
+}
+
+#[test]
+fn check_gives_an_error_for_negative_time_constants() {
+    let foil = SectionModel::SingleElementFoil(Foil::default());
+
+    assert!(DynamicStallModelBuilder {
+        vortex_time_constant: Some(-1.0),
+        ..Default::default()
+    }.check(&foil).is_err());
+
+    assert!(DynamicStallModelBuilder {
+        internal_state_time_constant: -1.0,
+        ..Default::default()
+    }.check(&rotating_cylinder()).is_err());
 }
 
 #[test]

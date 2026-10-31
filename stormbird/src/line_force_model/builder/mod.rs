@@ -88,6 +88,17 @@ impl LineForceModelBuilder {
         self.wing_builders.push(wing_builder);
     }
 
+    /// Checks that the settings for each wing are consistent. At the moment, this checks that the
+    /// dynamic stall models, if any, are valid for the section models, see
+    /// [`WingBuilder::check_dynamic_stall`].
+    pub fn check_settings(&self) -> Result<(), Error> {
+        for wing_builder in &self.wing_builders {
+            wing_builder.check_dynamic_stall()?;
+        }
+
+        Ok(())
+    }
+
     /// Builds the line force model
     pub fn build(&self) -> LineForceModel {
         self.build_with_nr_sections(self.nr_sections)
