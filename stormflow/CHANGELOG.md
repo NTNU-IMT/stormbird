@@ -2,12 +2,17 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
-## 0.3.0 - unreleased
+## 0.3.0 - 2026-10-31
 ### Breaking changes
+- Stormflow now depends on version 0.12.0 of Stormbird. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details of what that update entails
 - The `slip_wall_boundary_override` setting is removed, and replaced by the new `boundary_condition_type` setting, which selects how the boundary conditions are assigned to the faces of the domain. Setup files that contain `slip_wall_boundary_override` can no longer be read. There are two variants:
   - `WindInletOutlet` (default) works exactly as before without the override: the ground is a slip wall, the top is open with a zero pressure, and the remaining faces are inlet/outlet boundaries.
   - `WindTunnel` is new, and is meant for reproducing wind tunnel experiments. The start of the x axis is the inlet, the end of the x axis is an outlet, with a zero gradient condition on the velocity and the turbulence fields, and a zero pressure, and all the faces along the y and z axes are slip walls. The inlet velocity must be along the positive x axis, and the up direction along the y or z axis, which is checked when the simulation is built. The inlet profile is given by the wind condition, as before.
 - `VelocityBoundaryConditions::new` takes a `BoundaryConditionType` instead of the slip wall override.
+- The default `wind_rotation_axis` in the wind environment is now the negative z axis in Stormbird 0.12.0, so the wind direction is measured clockwise seen from above. Setup files that do not set the `wind_environment`, or its `wind_rotation_axis`, get the wind from the opposite side for wind directions that are not along the x axis. The same applies to the `--wind-direction-deg` option. The SOBC1 examples are updated, from a wind direction of 90 to -90 degrees, so that they have the same inflow as before.
+
+### Other changes
+- The dynamic stall model in Stormbird 0.12.0 can be used in the actuator line model, by setting it on the wings in the setup file. The state of the model is updated once per time step.
 
 ## 0.2.1 - 2026-10-25
 - Updated to stormbird v0.11.1, which is a small change. The main feature is new experimental limits on the lifting line correction (see the stormbird release notes for more)

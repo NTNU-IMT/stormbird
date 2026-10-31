@@ -7,7 +7,7 @@
   },
   "effective_viscosity": 0.00001,
   "wind_condition": {
-    "direction_coming_from": 1.570796327,
+    "direction_coming_from": -1.570796327,
     "velocity_variation": {
       "PowerModel": {
         "reference_velocity": 8.0

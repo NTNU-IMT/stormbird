@@ -16,7 +16,7 @@ Run `stormflow --help` for all options. The most important ones, in addition to 
 
 - `-c`, `--courant-number`: the Courant number used to compute the time step. The default is 0.75.
 - `-n`, `--nr-of-cores`: the number of CPU cores to use. The default, 0, uses all available cores.
-- `-w`, `--wind-direction-deg`: overrides the wind direction in the setup file, in degrees.
+- `-w`, `--wind-direction-deg`: overrides the wind direction in the setup file, in degrees. The direction is measured around the `wind_rotation_axis` of the wind environment, which is the negative z axis by default, i.e., clockwise seen from above.
 - `-s`, `--wing-internal-states`: sets the [internal state](https://jarlekramer.github.io/stormbird_book_pages/sectional_models/sectional_models_intro.html) of each wing in the actuator line model, e.g., the revolutions per second of a rotor sail, or the flap angle of a multi-element wing sail. The internal state can not be given in the setup file, so this option is the way to set it when no controller is used. Give either one value per wing, in the same order as the wings in the setup file, or a single value that is used for all wings. The values are separated by spaces, e.g., `-s -1.273 -1.273`. They can also be separated by commas, but then the values must be attached to the option with `=` if the first value is negative, e.g., `-s=-1.273,-1.273`. If the setup file defines a controller, the controller overwrites the values at its first update. The old name of the option, `--section-models-internal-state`, still works.
 
 For instance, the rotor sail examples should be run with the rotational speeds they are set up for:
