@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
-## 0.12.0 - unreleased
+## 0.12.0 - 2026-10-31
 ### Breaking changes
 - `InflowCorrectionsSingleDirection.from_simulation_results_aligned_with_freestream` is replaced by `InflowCorrectionsSingleDirection.from_simulation_result`, which takes the wind environment, the wind condition and the ship velocity as input, rather than a single freestream velocity. The measured velocity at each control point is compared with the undisturbed apparent wind at the same location, so the function also works with inflow conditions that vary with height. The angle correction is computed from the velocity vectors, around the up direction, rather than from the angle of attack, so the sails no longer need to be aligned with the flow.
 - Requires Stormbird 0.12.0 or newer for actuator line simulations.

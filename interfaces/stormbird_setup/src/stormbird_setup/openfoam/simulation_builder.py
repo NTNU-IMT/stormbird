@@ -133,7 +133,7 @@ class SimulationBuilder(StormbirdSetupBaseModel):
         if self.boundary_condition_type != BoundaryConditionType.WindTunnel:
             return self
 
-        velocities = [velocity for _, velocity in self._apparent_wind_table()]
+        velocities = [velocity for _, velocity in self._apparent_wind_profile()]
 
         max_velocity = max(math.sqrt(sum(c**2 for c in velocity)) for velocity in velocities)
 
@@ -554,13 +554,13 @@ class SimulationBuilder(StormbirdSetupBaseModel):
 
             write_foam_file(file_path, field)
 
-    def _apparent_wind_table(self) -> list[FoamValue]:
+    def _apparent_wind_profile(self) -> list[tuple[float, tuple[float, float, float]]]:
         '''
         The apparent wind velocity as a function of the vertical coordinate, covering the domain
         '''
         z_coordinates = np.linspace(self.grid.start_point.z, self.grid.end_point.z, NR_WIND_TABLE_HEIGHTS)
 
-        table: list[FoamValue] = []
+        profile = []
 
         for z in z_coordinates:
             velocity = self.wind_environment.steady_apparent_wind_velocity_vector_at_location(
@@ -569,9 +569,15 @@ class SimulationBuilder(StormbirdSetupBaseModel):
                 self.linear_velocity
             )
 
-            table.append((float(z), velocity.as_tuple()))
+            profile.append((float(z), velocity.as_tuple()))
 
-        return table
+        return profile
+
+    def _apparent_wind_table(self) -> list[FoamValue]:
+        '''
+        The apparent wind profile as a table in an OpenFOAM file
+        '''
+        return [(z, velocity) for z, velocity in self._apparent_wind_profile()]
 
 
 def _sub_dict(data: FoamDict, *keys: str) -> FoamDict:
