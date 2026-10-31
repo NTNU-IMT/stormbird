@@ -6,7 +6,7 @@ The stormbird library is a Rust crate with a Python interface as well as several
 ## Philosophy
 The point of this library is to implement the different input structures as Python classes that inherits from the Pydantic base model class. This allows for typed-checked creation of setup data, which is also easily converted to and from json strings, which is often the direct input to Stormbird. 
 
-The Python interface to Stormbird is called pystormbird. However, stormbird_setup does **NOT** require pystormbird to be installed **AND** it is supposed to be agnostic in terms of the flavor of Stormbird that is used. For instance, this library should be equally useful for setting up models for the FMU-version, the Python version, and the OpenFOAM version (actuator line simulations) of Stormbird.
+The Python interface to Stormbird is called pystormbird. However, stormbird_setup does **NOT** require pystormbird to be installed **AND** it is supposed to be agnostic in terms of the flavor of Stormbird that is used. For instance, this library should be equally useful for setting up models for the FMU-version, the Python version, and the OpenFOAM version (actuator line simulations) of Stormbird. The only exception is the force tuning of the inflow corrections in the wind environment, which runs lifting line simulations, and therefore needs pystormbird as an optional dependency (see below).
 
 In addition, since the point is to simplify the setup, it also contains simplified builders for *typical* simulations that may be performed with Stormbird.
 
@@ -21,6 +21,12 @@ Or, it should also be available on PyPi, and therefore through
 
 ```
 pip install stormbird_setup
+```
+
+To also install pystormbird, which is needed for the force tuning of the inflow corrections, use the `force-tuning` extra:
+
+```
+pip install stormbird_setup[force-tuning]
 ```
 
 ## Publishing to PyPI (maintainer cheat-sheet)

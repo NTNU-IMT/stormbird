@@ -5,6 +5,7 @@ This file contains an overview of the changes made to pystormbird, the Python in
 ## 0.12.0 - unreleased
 - Builds against the local source code of Stormbird 0.12.0 and Stormath, through a `[patch.crates-io]` section in `Cargo.toml`, to test the new dynamic stall model. The model is set through the JSON input to the simulation, so no changes to the Python interface are needed.
 - Creating a `LineForceModel` with an invalid dynamic stall model raises a `ValueError`, rather than a panic. The same applies to simulations and complete sail models, through the checks in Stormbird.
+- New `WindCondition.from_json_string` class method, which creates a wind condition from a JSON string with the same format as in Stormbird, e.g., from the `WindCondition` class in stormbird_setup. The existing constructors are kept.
 - New `amount_of_stall` property on the `SectionalForcesInput` class, with the amount of stall used for the lift and drag on each line element. For wings with a dynamic stall model, this is the dynamic amount of stall.
 
 ## 0.11.1

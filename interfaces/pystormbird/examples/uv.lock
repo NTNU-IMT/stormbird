@@ -1204,7 +1204,7 @@ wheels = [
 
 [[package]]
 name = "stormbird-setup"
-version = "0.11.3"
+version = "0.12.0"
 source = { editable = "../../stormbird_setup" }
 dependencies = [
     { name = "numpy" },
