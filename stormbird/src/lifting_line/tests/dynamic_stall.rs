@@ -15,6 +15,7 @@ use crate::lifting_line::simulation_builder::{
     DynamicSettings,
 };
 use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
+use crate::test_utils::tolerance;
 
 const VELOCITY: Float = 10.0;
 const TIME_STEP: Float = 0.01;
@@ -150,7 +151,7 @@ fn zero_time_constants_give_the_same_result_as_without_dynamic_stall() {
     for (static_force, dynamic_force) in forces_static.iter().zip(forces_dynamic.iter()) {
         for i in 0..3 {
             assert!(
-                (static_force[i] - dynamic_force[i]).abs() <= 1e-9 * static_force[i].abs().max(1.0),
+                (static_force[i] - dynamic_force[i]).abs() <= tolerance(1e-9, 1e-5) * static_force[i].abs().max(1.0),
                 "Different forces with zero time constants: static = {:?}, dynamic = {:?}",
                 static_force, dynamic_force
             );
@@ -233,7 +234,7 @@ fn rotor_without_internal_state_lag_gives_the_same_result_as_without_dynamic_sta
     for (static_force, dynamic_force) in forces_static.iter().zip(forces_dynamic.iter()) {
         for i in 0..3 {
             assert!(
-                (static_force[i] - dynamic_force[i]).abs() <= 1e-9 * static_force[i].abs().max(1.0),
+                (static_force[i] - dynamic_force[i]).abs() <= tolerance(1e-9, 1e-5) * static_force[i].abs().max(1.0),
                 "Different forces without internal state lag: static = {:?}, dynamic = {:?}",
                 static_force, dynamic_force
             );

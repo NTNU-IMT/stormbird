@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
-## 0.12.0 - unreleased
+## 0.12.0 - 2026-10-31
 ### Breaking changes
 - The default `wind_rotation_axis` in the `WindEnvironment` is changed from the positive to the negative z-axis, i.e., opposite of the default up direction, so that the wind direction is measured clockwise seen from above. This is the same default as in stormbird_setup, and the convention that is described in the book. Wind environments that are created from JSON without a `wind_rotation_axis` get the opposite sign of the wind direction. Set `wind_rotation_axis` to `{"x": 0.0, "y": 0.0, "z": 1.0}` to get the same behavior as before.
 - The `EmpiricalCirculationCorrection` for actuator line simulations is renamed to `TipLossCorrection`, and the field in the `ActuatorLineBuilder` is renamed from `empirical_circulation_correction` to `tip_loss_correction`. The source file is renamed from `corrections/empirical_circulation.rs` to `corrections/tip_loss.rs`.

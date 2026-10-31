@@ -284,11 +284,11 @@ impl LiftingLineCorrection {
                 wake_length
             );
 
-            for i in 0..nr_span_lines {
+            for (i, span_line) in wing_span_lines.iter().enumerate() {
                 let u_i_extensions = self.extension_induced_velocity(
                     &extension_vortices,
                     reference_circulation_strength,
-                    wing_span_lines[i].ctrl_point()
+                    span_line.ctrl_point()
                 );
 
                 u_i_correction.push(
@@ -418,7 +418,7 @@ impl LiftingLineCorrection {
 
         let mut vortices = Vec::with_capacity(2);
 
-        for end_index in 0..2 {
+        for (end_index, end_span_point_velocity) in end_span_point_velocities.iter().enumerate() {
             let extension_factor = self.virtual_extension_factors[end_index];
 
             if extension_factor <= 0.0 {
@@ -446,7 +446,7 @@ impl LiftingLineCorrection {
                 }
             };
 
-            let wake_vector = wake_length * end_span_point_velocities[end_index].normalize();
+            let wake_vector = wake_length * end_span_point_velocity.normalize();
 
             vortices.push((
                 HorseshoeVortex::new(
@@ -508,6 +508,7 @@ mod tests {
     use crate::line_force_model::builder::single_wing::WingBuilder;
     use crate::section_models::SectionModel;
     use crate::section_models::foil::Foil;
+use crate::test_utils::tolerance;
 
     const CHORD_LENGTH: Float = 5.0;
 
@@ -637,7 +638,7 @@ mod tests {
             assert!(limited[i].length() <= max_magnitude * (1.0 + 1e-9));
 
             // The direction is kept
-            assert!(limited[i].normalize().dot(unlimited[i].normalize()) > 1.0 - 1e-9);
+            assert!(limited[i].normalize().dot(unlimited[i].normalize()) > 1.0 - tolerance(1e-9, 1e-6));
         }
 
         // The limit is active at the ends, where the correction is largest

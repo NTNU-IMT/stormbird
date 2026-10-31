@@ -3,6 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use super::*;
+use crate::test_utils::tolerance;
 
 const VELOCITY: Float = 10.0;
 const CHORD_LENGTH: Float = 2.0;
@@ -62,7 +63,7 @@ fn uninitialized_model_gives_static_values() {
         let cl_static = foil.lift_coefficient(angle_of_attack);
 
         assert!(
-            (cl_dynamic - cl_static).abs() < 1e-12,
+            (cl_dynamic - cl_static).abs() < tol(),
             "Static lift not recovered at {} degrees: dynamic = {}, static = {}",
             angle_in_degrees, cl_dynamic, cl_static
         );
@@ -82,10 +83,10 @@ fn constant_angle_of_attack_gives_static_values() {
             let state = step(&mut model, &foil, angle_of_attack);
 
             assert!(
-                (state.amount_of_stall - foil.amount_of_stall(angle_of_attack)).abs() < 1e-12
+                (state.amount_of_stall - foil.amount_of_stall(angle_of_attack)).abs() < tol()
             );
-            assert!(state.pressure_deficiency.abs() < 1e-12);
-            assert!(state.separation_deficiency.abs() < 1e-12);
+            assert!(state.pressure_deficiency.abs() < tol());
+            assert!(state.separation_deficiency.abs() < tol());
         }
     }
 }
@@ -109,7 +110,7 @@ fn pressure_lag_follows_the_deficiency_function() {
 
     let expected_deficiency = angle_increment * (-delta_s / (2.0 * time_constant)).exp();
 
-    assert!((state.pressure_deficiency - expected_deficiency).abs() < 1e-12);
+    assert!((state.pressure_deficiency - expected_deficiency).abs() < tol());
 
     // The following steps, where the angle of attack is constant
     let mut expected_deficiency = expected_deficiency;
@@ -119,7 +120,7 @@ fn pressure_lag_follows_the_deficiency_function() {
 
         expected_deficiency *= (-delta_s / time_constant).exp();
 
-        assert!((state.pressure_deficiency - expected_deficiency).abs() < 1e-12);
+        assert!((state.pressure_deficiency - expected_deficiency).abs() < tol());
     }
 }
 
@@ -135,7 +136,7 @@ fn zero_time_constants_give_static_values() {
 
         let state = step(&mut model, &foil, angle_of_attack);
 
-        assert!((state.amount_of_stall - foil.amount_of_stall(angle_of_attack)).abs() < 1e-12);
+        assert!((state.amount_of_stall - foil.amount_of_stall(angle_of_attack)).abs() < tol());
     }
 }
 
@@ -156,8 +157,8 @@ fn stall_is_delayed_when_the_angle_of_attack_increases() {
     for _ in 0..2000 {
         let state = step(&mut model, &foil, angle_after_stall);
 
-        assert!(state.amount_of_stall < static_amount_of_stall + 1e-12);
-        assert!(state.amount_of_stall >= previous_amount_of_stall - 1e-12);
+        assert!(state.amount_of_stall < static_amount_of_stall + tol());
+        assert!(state.amount_of_stall >= previous_amount_of_stall - tol());
 
         previous_amount_of_stall = state.amount_of_stall;
     }
@@ -200,7 +201,7 @@ fn angle_differences_are_wrapped() {
     // Going from 179 to -179 degrees is an increase of 2 degrees, through 180 degrees
     let state = step(&mut model, &foil, Float::to_radians(-179.0));
 
-    assert!(state.pressure_deficiency.abs() < Float::to_radians(2.0) + 1e-12);
+    assert!(state.pressure_deficiency.abs() < Float::to_radians(2.0) + tol());
     assert!(state.pressure_deficiency > 0.0);
     assert!((state.lagged_angle_of_attack().abs() - Float::to_radians(179.0)).abs() < Float::to_radians(1.0));
 }
@@ -333,7 +334,7 @@ fn steady_state_has_no_vortex_lift() {
         for _ in 0..10 {
             let state = step(&mut model, &foil, angle_of_attack);
 
-            assert!(state.vortex_lift.abs() < 1e-12);
+            assert!(state.vortex_lift.abs() < tol());
         }
     }
 }
@@ -351,7 +352,7 @@ fn vortex_is_created_when_the_lagged_angle_exceeds_the_stall_angle() {
         assert_eq!(state.vortex_time > 0.0, lagged_angle_above_stall);
 
         if state.vortex_time == 0.0 {
-            assert!(state.vortex_lift.abs() < 1e-12);
+            assert!(state.vortex_lift.abs() < tol());
         }
     }
 }
@@ -370,8 +371,8 @@ fn vortex_increases_the_lift_during_a_fast_ramp() {
     let mut max_lift_with_vortex: Float = 0.0;
 
     for (state_without, state_with) in states_without_vortex.iter().zip(states_with_vortex.iter()) {
-        assert!(state_without.vortex_lift.abs() < 1e-12);
-        assert!(state_with.vortex_lift >= -1e-12);
+        assert!(state_without.vortex_lift.abs() < tol());
+        assert!(state_with.vortex_lift >= -tol());
 
         // The vortex does not affect the separation model
         assert_eq!(state_without.amount_of_stall, state_with.amount_of_stall);
@@ -412,7 +413,7 @@ fn vortex_lift_only_decays_after_the_vortex_has_passed() {
         let (previous, current) = (&window[0], &window[1]);
 
         if current.vortex_time > vortex_passage_time {
-            assert!((current.vortex_lift - previous.vortex_lift * decay).abs() < 1e-12);
+            assert!((current.vortex_lift - previous.vortex_lift * decay).abs() < tol());
 
             nr_steps_after_passage += 1;
         }
@@ -437,7 +438,7 @@ fn zero_vortex_passage_time_turns_the_vortex_off() {
     let mut model = model_with_vortex(6.0, 0.0);
 
     for state in ramp_through_stall(&mut model, &foil, 40, 200) {
-        assert!(state.vortex_lift.abs() < 1e-12);
+        assert!(state.vortex_lift.abs() < tol());
     }
 }
 
@@ -456,7 +457,7 @@ fn deficiency_function_gives_the_discrete_step_response() {
             (-(i as Float) * delta_s / time_constant).exp();
 
         assert!(
-            (deficiency - expected).abs() < 1e-12,
+            (deficiency - expected).abs() < tol(),
             "Wrong deficiency after {} steps: {} (expected {})", i, deficiency, expected
         );
     }
@@ -542,7 +543,7 @@ fn internal_state_lag_follows_the_deficiency_function() {
             expected_deficiency * (-delta_s / time_constant).exp()
         };
 
-        assert!((state.internal_state_deficiency - expected_deficiency).abs() < 1e-12);
+        assert!((state.internal_state_deficiency - expected_deficiency).abs() < tol());
         assert!(state.lagged_internal_state() < final_state);
         assert!(state.lagged_internal_state() > initial_state);
     }
@@ -645,9 +646,9 @@ fn drag_uses_the_dynamic_amount_of_stall() {
 
     assert!(state.amount_of_stall < foil.amount_of_stall(angle_after_stall));
     assert!(
-        (cd_dynamic - foil.drag_coefficient_with_amount_of_stall(angle_after_stall, state.amount_of_stall)).abs() < 1e-12
+        (cd_dynamic - foil.drag_coefficient_with_amount_of_stall(angle_after_stall, state.amount_of_stall)).abs() < tol()
     );
-    assert!((cd_static - foil.drag_coefficient(angle_after_stall)).abs() < 1e-12);
+    assert!((cd_static - foil.drag_coefficient(angle_after_stall)).abs() < tol());
     assert!(cd_dynamic < cd_static);
 
     // The static drag is recovered in steady conditions
@@ -662,4 +663,9 @@ fn drag_uses_the_dynamic_amount_of_stall() {
     );
 
     assert!((cd_final - cd_static).abs() < 1e-6);
+}
+
+/// Absolute tolerance for comparisons that are exact apart from round-off errors
+fn tol() -> Float {
+    tolerance(1e-12, 1e-5)
 }

@@ -12,6 +12,7 @@ use crate::line_force_model::builder::single_wing::WingBuilder;
 use crate::section_models::SectionModel;
 use crate::section_models::foil::Foil;
 use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
+use crate::test_utils::tolerance;
 
 use super::ActuatorLine;
 use super::builder::ActuatorLineBuilder;
@@ -85,7 +86,7 @@ fn ramp(actuator_line: &mut ActuatorLine, nr_iterations_per_step: usize) -> (Vec
 fn assert_all_close(a: &[Float], b: &[Float]) {
     for (a, b) in a.iter().zip(b.iter()) {
         assert!(
-            (a - b).abs() <= 1e-9 * a.abs().max(1.0),
+            (a - b).abs() <= tolerance(1e-9, 1e-5) * a.abs().max(1.0),
             "Different values: {} != {}", a, b
         );
     }
