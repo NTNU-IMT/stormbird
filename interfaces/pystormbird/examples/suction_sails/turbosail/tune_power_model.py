@@ -18,12 +18,15 @@ coefficient. The power for the whole wing is then:
     P = sum_i s_i Q_i / eta = sum_i 0.5 rho A_i U_i^3 Cq_i sigma_i / eta
 
 This is linear in K, cp_no_suction and cp_suction_gradient, which are therefore found with linear
-least squares, using simulations with a constant suction coefficient along the span. The tuned
-model is then verified with simulations where the power is the internal state.
+least squares, using simulations with a constant suction coefficient along the span. The least
+squares problem is bounded, so that the parameters are always valid in the internal flow model: the
+loss coefficient must be larger than zero, and the gradient can not be positive. The tuned model is
+then verified with simulations where the power is the internal state.
 '''
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import lsq_linear
 
 from stormbird_setup.section_models import InternalFlow, InternalStateConversion
 
@@ -38,11 +41,21 @@ FAN_EFFICIENCY = 0.7
 
 PARAMETER_NAMES = ["loss_coefficient", "cp_no_suction", "cp_suction_gradient"]
 
+# The bounds of the tuned parameters, from the requirements of the internal flow model. The loss
+# coefficient must be strictly larger than zero, so the lower bound is a small positive value.
+PARAMETER_BOUNDS = {
+    "loss_coefficient": (1e-3, np.inf),
+    "cp_no_suction": (-np.inf, np.inf),
+    "cp_suction_gradient": (-np.inf, 0.0),
+}
+
 # The parameters that are kept fixed, with their values, while the others are tuned. The three
 # parameters can not all be tuned, as the effect of the gradient on the power is close to a
-# combination of the effects of the other two. Here, the external pressure is assumed to be zero
-# without suction, so that it is only the suction that lowers it.
-FIXED_PARAMETERS = {"cp_no_suction": 0.0}
+# combination of the effects of the other two. Here, the external pressure without suction is set
+# to a moderate suction pressure. With zero external pressure without suction, the loss coefficient
+# ends at the lower bound, i.e., the power curve can only be matched without any loss over the
+# porous surface. The values are used in the default suction sail model in stormbird_setup.
+FIXED_PARAMETERS = {"cp_no_suction": -0.5}
 
 # Other choices of fixed parameters, which are compared to show the effect of the choice
 COMPARED_FIXED_PARAMETERS = [
@@ -89,12 +102,13 @@ def fit_parameters(
     cp_target: np.ndarray,
     error_weight: np.ndarray,
     fixed_parameters: dict[str, float]
-) -> tuple[dict[str, float], float]:
+) -> tuple[dict[str, float], float, list[str]]:
     '''
-    Finds the parameters that are not fixed with linear least squares, where the error in the power
-    coefficient is multiplied with the given weight. Returns all the parameters, and the condition
-    number of the scaled problem, which shows how well the tuned parameters are determined by the
-    data.
+    Finds the parameters that are not fixed with bounded linear least squares, where the error in
+    the power coefficient is multiplied with the given weight, and the parameters are limited by
+    PARAMETER_BOUNDS. Returns all the parameters, the condition number of the scaled problem, which
+    shows how well the tuned parameters are determined by the data, and the names of the tuned
+    parameters that ended at a bound.
     '''
     tuned = [i for i, name in enumerate(PARAMETER_NAMES) if name not in fixed_parameters]
     fixed = [i for i, name in enumerate(PARAMETER_NAMES) if name in fixed_parameters]
@@ -104,16 +118,31 @@ def fit_parameters(
     matrix = error_weight[:, None] * terms[:, tuned]
     rhs = error_weight * (cp_target - terms[:, fixed] @ fixed_values)
 
-    # The columns are normalized, so that the condition number does not depend on the units
+    # The columns are normalized, so that the condition number does not depend on the units. The
+    # bounds are scaled in the same way as the unknowns.
     column_norms = np.linalg.norm(matrix, axis=0)
 
-    solution, _, _, singular_values = np.linalg.lstsq(matrix / column_norms, rhs)
+    lower_bounds = np.array([PARAMETER_BOUNDS[PARAMETER_NAMES[i]][0] for i in tuned]) * column_norms
+    upper_bounds = np.array([PARAMETER_BOUNDS[PARAMETER_NAMES[i]][1] for i in tuned]) * column_norms
+
+    # The bounded-variable least squares method ends exactly on the active bounds, so that they can
+    # be detected from the active mask
+    solution = lsq_linear(
+        matrix / column_norms, rhs, bounds = (lower_bounds, upper_bounds), method = "bvls"
+    )
+
+    singular_values = np.linalg.svd(matrix / column_norms, compute_uv = False)
 
     parameters = dict(fixed_parameters)
-    for i, value in zip(tuned, solution / column_norms):
+    at_bound = []
+
+    for i, value, active in zip(tuned, solution.x / column_norms, solution.active_mask):
         parameters[PARAMETER_NAMES[i]] = float(value)
 
-    return parameters, singular_values[0] / singular_values[-1]
+        if active != 0:
+            at_bound.append(PARAMETER_NAMES[i])
+
+    return parameters, singular_values[0] / singular_values[-1], at_bound
 
 
 def parameter_vector(parameters: dict[str, float]) -> np.ndarray:
@@ -169,7 +198,7 @@ if __name__ == "__main__":
     # Comparison of different choices of fixed parameters
     print()
     for fixed_parameters in COMPARED_FIXED_PARAMETERS:
-        parameters, condition_number = fit_parameters(
+        parameters, condition_number, at_bound = fit_parameters(
             terms[in_range], cp_target, error_weight, fixed_parameters
         )
 
@@ -181,15 +210,22 @@ if __name__ == "__main__":
             f"{label:30s}: " +
             ", ".join(f"{name} = {parameters[name]:8.3f}" for name in PARAMETER_NAMES) +
             f", condition number = {condition_number:6.1f}" +
-            f", RMS scaled distance = {np.sqrt(np.mean(distance**2)):.4f}"
+            f", RMS scaled distance = {np.sqrt(np.mean(distance**2)):.4f}" +
+            (f", at bound: {', '.join(at_bound)}" if at_bound else "")
         )
 
-    parameters, _ = fit_parameters(terms[in_range], cp_target, error_weight, FIXED_PARAMETERS)
+    parameters, _, at_bound = fit_parameters(terms[in_range], cp_target, error_weight, FIXED_PARAMETERS)
 
     cp_fit = terms @ parameter_vector(parameters)
 
     print()
     print(f"Used: {parameters}")
+
+    if at_bound:
+        print(
+            f"Note: {', '.join(at_bound)} ended at the bound, so the power curve can not be matched "
+            "as well as without the bounds. Consider other choices of fixed parameters."
+        )
 
     # Verification, with the power as the internal state
     internal_flow = InternalFlow(

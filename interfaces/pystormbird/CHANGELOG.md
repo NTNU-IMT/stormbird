@@ -2,11 +2,11 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
-## 0.12.0 - unreleased
-- Builds against the local source code of Stormbird 0.12.0 and Stormath, through a `[patch.crates-io]` section in `Cargo.toml`, to test the new dynamic stall model. The model is set through the JSON input to the simulation, so no changes to the Python interface are needed.
-- Creating a `LineForceModel` with an invalid dynamic stall model raises a `ValueError`, rather than a panic. The same applies to simulations and complete sail models, through the checks in Stormbird.
+## 0.12.0 - 2026-10-31
+- Depends on the published version of Stormbird 0.12.0. The main new feature is the dynamic stall model, which is set through the JSON input to the simulation, so it does not need any changes to the Python interface. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for all the changes to the underlying models, including changes to the input format and default values.
+- Creating a `LineForceModel` with invalid settings, e.g., an invalid dynamic stall model, raises a `ValueError`, rather than a panic.
 - New `WindCondition.from_json_string` class method, which creates a wind condition from a JSON string with the same format as in Stormbird, e.g., from the `WindCondition` class in stormbird_setup. The existing constructors are kept.
-- New `amount_of_stall` property on the `SectionalForcesInput` class, with the amount of stall used for the lift and drag on each line element. For wings with a dynamic stall model, this is the dynamic amount of stall.
+- New `amount_of_stall` property on the `SectionalForcesInput` class.
 
 ## 0.11.1
 - Depends on Stormbird 0.11.1, where the default `induced_velocity_correction_method` in the linearized solver is `NoCorrection`, which avoids a jump in the lift right before stall. See the [Stormbird change log](../../stormbird/CHANGELOG.md).

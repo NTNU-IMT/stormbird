@@ -40,7 +40,9 @@ def suction_sail_charrier_1985(solver_type: SolverType = SolverType.Linearized) 
       2.18 to 1.5, as for zero suction, and the other parameters are interpolated between the
       foils for zero suction and 0.027.
     - The internal flow model is tuned to the power curve, with the porous fraction and fan
-      efficiency fixed, and cp_no_suction fixed at zero (tune_power_model.py).
+      efficiency fixed, and cp_no_suction fixed at -0.5 (tune_power_model.py). The tuning is
+      bounded, so that the parameters are valid. With cp_no_suction fixed at zero, the loss
+      coefficient ends at the lower bound, i.e., without any loss over the porous surface.
 
     The tuning was done with a lifting line model of the wind tunnel model, with an aspect ratio of 4
     and one end against the wind tunnel wall. The lift and drag of other sail geometries will
@@ -103,9 +105,9 @@ def suction_sail_charrier_1985(solver_type: SolverType = SolverType.Linearized) 
     ]
 
     internal_flow = InternalFlow(
-        cp_no_suction = 0.0,
-        cp_suction_gradient = -102.08,
-        loss_coefficient = 10.345,
+        cp_no_suction = -0.5,
+        cp_suction_gradient = -74.945,
+        loss_coefficient = 21.414,
         porous_fraction = 0.25,
     )
 
