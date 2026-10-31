@@ -44,6 +44,14 @@ impl SectionalForcesInput {
     }
 
     #[getter]
+    /// The amount of stall used for the lift and drag on each line element. This is the dynamic
+    /// amount of stall for wings with a dynamic stall model, and zero for section models that are
+    /// not built on the foil model.
+    pub fn amount_of_stall(&self) -> Vec<f64> {
+        self.data.amount_of_stall.clone()
+    }
+
+    #[getter]
     pub fn acceleration(&self) -> Vec<[f64; 3]> {
         self.data.acceleration.iter().map(|v| v.0).collect()
     }

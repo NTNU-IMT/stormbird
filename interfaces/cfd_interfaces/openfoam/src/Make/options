@@ -20,4 +20,5 @@ LIB_LIBS = \
     -lturbulenceModels \
     -lincompressibleTurbulenceModels \
     -lcompressibleTurbulenceModels \
+    -lfvOptions \
     -L../rust_build -lcpp_actuator_line

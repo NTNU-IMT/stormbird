@@ -6,7 +6,7 @@ The stormbird library is a Rust crate with a Python interface as well as several
 ## Philosophy
 The point of this library is to implement the different input structures as Python classes that inherits from the Pydantic base model class. This allows for typed-checked creation of setup data, which is also easily converted to and from json strings, which is often the direct input to Stormbird. 
 
-The Python interface to Stormbird is called pystormbird. However, stormbird_setup does **NOT** require pystormbird to be installed **AND** it is supposed to be agnostic in terms of the flavor of Stormbird that is used. For instance, this library should be equally useful for setting up models for the FMU-version, the Python version, and the OpenFOAM version (actuator line simulations) of Stormbird.
+The Python interface to Stormbird is called pystormbird. However, stormbird_setup does **NOT** require pystormbird to be installed **AND** it is supposed to be agnostic in terms of the flavor of Stormbird that is used. For instance, this library should be equally useful for setting up models for the FMU-version, the Python version, and the OpenFOAM version (actuator line simulations) of Stormbird. The only exception is the force tuning of the inflow corrections in the wind environment, which runs lifting line simulations, and therefore needs pystormbird as an optional dependency (see below).
 
 In addition, since the point is to simplify the setup, it also contains simplified builders for *typical* simulations that may be performed with Stormbird.
 
@@ -23,20 +23,8 @@ Or, it should also be available on PyPi, and therefore through
 pip install stormbird_setup
 ```
 
-## Publishing to PyPI (maintainer cheat-sheet)
+To also install pystormbird, which is needed for the force tuning of the inflow corrections, use the `force-tuning` extra:
 
-> This section is a reminder for the main developer. Only the package owner has upload rights to PyPI.
-
-This is a pure Python package, so both a source distribution and a wheel are uploaded.
-
-1. Bump `version` in `pyproject.toml` and update `CHANGELOG.md`.
-2. Remove old build artifacts and build:
-   ```bash
-   rm -rf dist build
-   pip install build twine
-   python -m build
-   ```
-3. Upload with an API token from PyPI (username `__token__`, password = the token):
-   ```bash
-   twine upload dist/*
-   ```
+```
+pip install stormbird_setup[force-tuning]
+```

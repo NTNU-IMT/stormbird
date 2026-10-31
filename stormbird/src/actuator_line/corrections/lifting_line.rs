@@ -138,24 +138,33 @@ impl LiftingLineCorrection {
     ///
     /// Whether each wing is treated in isolation, or whether the interactions between wings are
     /// included, is determined by the `include_wing_interactions` field.
+    ///
+    /// The model with the viscous core represents the velocities that are induced in the CFD
+    /// domain, and therefore uses the circulation that the projected forces are computed from. The
+    /// reference model, including the virtual extensions, uses the circulation that the forces on
+    /// the wings are computed from. The two are equal, unless a tip loss correction is only applied
+    /// to the projected forces.
     pub fn velocity_correction(
         &self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
-        circulation_strength: &[Float],
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
         time: Float,
     ) -> Vec<SpatialVector> {
         let mut u_i_correction = if self.include_wing_interactions {
             self.velocity_correction_all_wings(
                 line_force_model,
                 ctrl_points_velocity,
-                circulation_strength
+                reference_circulation_strength,
+                projected_circulation_strength
             )
         } else {
             self.velocity_correction_isolated_wings(
                 line_force_model,
                 ctrl_points_velocity,
-                circulation_strength
+                reference_circulation_strength,
+                projected_circulation_strength
             )
         };
 
@@ -191,7 +200,8 @@ impl LiftingLineCorrection {
         &self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
-        circulation_strength: &[Float],
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
         let span_lines = &line_force_model.span_lines_global;
         let chord_lengths = &line_force_model.chord_lengths;
@@ -209,7 +219,11 @@ impl LiftingLineCorrection {
                 wind_indices.clone()
             ];
 
-            let wing_circulation_strength = &circulation_strength[
+            let wing_reference_circulation_strength = &reference_circulation_strength[
+                wind_indices.clone()
+            ];
+
+            let wing_projected_circulation_strength = &projected_circulation_strength[
                 wind_indices.clone()
             ];
 
@@ -256,11 +270,11 @@ impl LiftingLineCorrection {
             );
 
             frozen_wake_viscous.update_induced_velocities_at_control_points(
-                wing_circulation_strength
+                wing_projected_circulation_strength
             );
 
             frozen_wake_default.update_induced_velocities_at_control_points(
-                wing_circulation_strength
+                wing_reference_circulation_strength
             );
 
             let extension_vortices = self.extension_vortices(
@@ -270,11 +284,11 @@ impl LiftingLineCorrection {
                 wake_length
             );
 
-            for i in 0..nr_span_lines {
+            for (i, span_line) in wing_span_lines.iter().enumerate() {
                 let u_i_extensions = self.extension_induced_velocity(
                     &extension_vortices,
-                    circulation_strength,
-                    wing_span_lines[i].ctrl_point()
+                    reference_circulation_strength,
+                    span_line.ctrl_point()
                 );
 
                 u_i_correction.push(
@@ -295,7 +309,8 @@ impl LiftingLineCorrection {
         &self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
-        circulation_strength: &[Float],
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
         let span_lines = &line_force_model.span_lines_global;
         let nr_span_lines = span_lines.len();
@@ -356,24 +371,24 @@ impl LiftingLineCorrection {
             let mut u_i_default = SpatialVector::default();
 
             for col_index in 0..nr_span_lines {
-                let strength = circulation_strength[col_index];
+                u_i_viscous += projected_circulation_strength[col_index] *
+                    self.unit_strength_induced_velocity(
+                        &horseshoe_vortices_viscous[col_index],
+                        ctrl_point,
+                        point_mirrored
+                    );
 
-                u_i_viscous += strength * self.unit_strength_induced_velocity(
-                    &horseshoe_vortices_viscous[col_index],
-                    ctrl_point,
-                    point_mirrored
-                );
-
-                u_i_default += strength * self.unit_strength_induced_velocity(
-                    &horseshoe_vortices_default[col_index],
-                    ctrl_point,
-                    point_mirrored
-                );
+                u_i_default += reference_circulation_strength[col_index] *
+                    self.unit_strength_induced_velocity(
+                        &horseshoe_vortices_default[col_index],
+                        ctrl_point,
+                        point_mirrored
+                    );
             }
 
             u_i_default += self.extension_induced_velocity(
                 &extension_vortices,
-                circulation_strength,
+                reference_circulation_strength,
                 ctrl_point
             );
 
@@ -403,7 +418,7 @@ impl LiftingLineCorrection {
 
         let mut vortices = Vec::with_capacity(2);
 
-        for end_index in 0..2 {
+        for (end_index, end_span_point_velocity) in end_span_point_velocities.iter().enumerate() {
             let extension_factor = self.virtual_extension_factors[end_index];
 
             if extension_factor <= 0.0 {
@@ -431,7 +446,7 @@ impl LiftingLineCorrection {
                 }
             };
 
-            let wake_vector = wake_length * end_span_point_velocities[end_index].normalize();
+            let wake_vector = wake_length * end_span_point_velocity.normalize();
 
             vortices.push((
                 HorseshoeVortex::new(
@@ -493,6 +508,7 @@ mod tests {
     use crate::line_force_model::builder::single_wing::WingBuilder;
     use crate::section_models::SectionModel;
     use crate::section_models::foil::Foil;
+use crate::test_utils::tolerance;
 
     const CHORD_LENGTH: Float = 5.0;
 
@@ -526,9 +542,75 @@ mod tests {
         velocity: &[SpatialVector],
         circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
+        split_correction(builder, line_force_model, velocity, circulation_strength, circulation_strength)
+    }
+
+    fn split_correction(
+        builder: LiftingLineCorrectionBuilder,
+        line_force_model: &LineForceModel,
+        velocity: &[SpatialVector],
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
+    ) -> Vec<SpatialVector> {
         builder.build(0.6, line_force_model).velocity_correction(
-            line_force_model, velocity, circulation_strength, 0.0
+            line_force_model,
+            velocity,
+            reference_circulation_strength,
+            projected_circulation_strength,
+            0.0
         )
+    }
+
+    #[test]
+    fn reference_and_projected_circulation_are_used_in_the_right_models() {
+        let (line_force_model, velocity, circulation_strength) = single_wing();
+        let zero_circulation_strength = vec![0.0; circulation_strength.len()];
+
+        // A tapered projected circulation, so that it differs from the reference
+        let nr_span_lines = circulation_strength.len();
+        let projected_circulation_strength: Vec<Float> = (0..nr_span_lines).map(|i| {
+            let s = (i as Float + 0.5) / nr_span_lines as Float - 0.5;
+            circulation_strength[i] * (1.0 - 4.0 * s * s)
+        }).collect();
+
+        for include_wing_interactions in [false, true] {
+            let settings = || LiftingLineCorrectionBuilder {
+                virtual_extension_factors: [0.4, 1.0],
+                include_wing_interactions,
+                ..Default::default()
+            };
+
+            let reference_only = split_correction(
+                settings(), &line_force_model, &velocity,
+                &circulation_strength, &zero_circulation_strength
+            );
+
+            let viscous_only = split_correction(
+                settings(), &line_force_model, &velocity,
+                &zero_circulation_strength, &circulation_strength
+            );
+
+            // The reference model, with the small viscous core, is close to singular at the ends,
+            // while the model with the viscous core is not
+            assert!(reference_only[0].length() > 2.0 * viscous_only[0].length());
+
+            // The correction is linear in the two circulation distributions
+            let split = split_correction(
+                settings(), &line_force_model, &velocity,
+                &circulation_strength, &projected_circulation_strength
+            );
+
+            let projected_only = split_correction(
+                settings(), &line_force_model, &velocity,
+                &zero_circulation_strength, &projected_circulation_strength
+            );
+
+            for i in 0..split.len() {
+                let expected = reference_only[i] + projected_only[i];
+
+                assert!((split[i] - expected).length() < 1e-9 * (1.0 + expected.length()));
+            }
+        }
     }
 
     #[test]
@@ -556,7 +638,7 @@ mod tests {
             assert!(limited[i].length() <= max_magnitude * (1.0 + 1e-9));
 
             // The direction is kept
-            assert!(limited[i].normalize().dot(unlimited[i].normalize()) > 1.0 - 1e-9);
+            assert!(limited[i].normalize().dot(unlimited[i].normalize()) > 1.0 - tolerance(1e-9, 1e-6));
         }
 
         // The limit is active at the ends, where the correction is largest
@@ -600,8 +682,21 @@ mod tests {
             ..Default::default()
         };
 
-        let isolated = correction(settings(false), &line_force_model, &velocity, &circulation_strength);
-        let all_wings = correction(settings(true), &line_force_model, &velocity, &circulation_strength);
+        // Different reference and projected circulation, to check that both versions use them in
+        // the same way
+        let projected_circulation_strength: Vec<Float> = circulation_strength.iter()
+            .enumerate()
+            .map(|(i, value)| value * (0.5 + 0.03 * i as Float))
+            .collect();
+
+        let isolated = split_correction(
+            settings(false), &line_force_model, &velocity,
+            &circulation_strength, &projected_circulation_strength
+        );
+        let all_wings = split_correction(
+            settings(true), &line_force_model, &velocity,
+            &circulation_strength, &projected_circulation_strength
+        );
 
         for (u_isolated, u_all_wings) in isolated.iter().zip(&all_wings) {
             assert!((*u_isolated - *u_all_wings).length() < 1e-9 * (1.0 + u_isolated.length()));

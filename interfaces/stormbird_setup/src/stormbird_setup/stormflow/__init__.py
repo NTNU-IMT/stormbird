@@ -33,7 +33,7 @@ from .turbulence import (
     WallTreatment,
     ConvectionScheme,
 )
-from .simulation_builder import SimulationBuilder
+from .simulation_builder import SimulationBuilder, BoundaryConditionType
 from ..wind import WindCondition, WindEnvironment
 
 __all__ = [
@@ -65,6 +65,7 @@ __all__ = [
     "WallTreatment",
     "ConvectionScheme",
     "SimulationBuilder",
+    "BoundaryConditionType",
     "WindCondition",
     "WindEnvironment",
 ]

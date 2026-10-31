@@ -3,6 +3,9 @@
 
 class WindCondition:
     @classmethod
+    def from_json_string(cls, json_string: str) -> "WindCondition": ...
+
+    @classmethod
     def new_constant(
         cls, *, direction_coming_from: float, velocity: float
     ) -> "WindCondition": ...

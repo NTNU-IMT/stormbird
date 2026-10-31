@@ -1,5 +1,8 @@
 
+use serde::{Serialize, Deserialize};
+
 use stormath::spatial_vector::SpatialVector;
+use stormath::type_aliases::Float;
 
 use stormbird::wind::{
     environment::WindEnvironment,
@@ -11,6 +14,23 @@ use crate::grid::INTERIOR_OFFSET;
 use crate::grid::boundary_face::BoundaryFace;
 
 use rayon::prelude::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// How the boundary conditions are assigned to the faces of the domain. The pressure and the
+/// turbulence boundary conditions follow the velocity boundary conditions.
+pub enum BoundaryConditionType {
+    /// For wind propulsion devices in the open air: the face at the bottom of the domain, relative
+    /// to the up direction of the wind environment, is the ground, which is a slip wall. The face
+    /// at the top is open, with a zero gradient condition on the velocity and a zero pressure. All
+    /// the remaining faces are inlet/outlet boundaries. Default.
+    #[default]
+    WindInletOutlet,
+    /// For reproducing wind tunnel experiments: the start of the x axis is the inlet, and the end
+    /// of the x axis is an outlet, with a zero gradient condition on the velocity and a zero
+    /// pressure. All the faces along the y and z axes are slip walls. Requires the inlet velocity
+    /// to be along the positive x axis, and the up direction to be along the y or z axis.
+    WindTunnel,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum VelocityBoundaryCondition {
@@ -52,7 +72,7 @@ impl VelocityBoundaryConditions {
         wind_environment: &WindEnvironment,
         wind_condition: &WindCondition,
         linear_velocity: SpatialVector,
-        slip_wall_boundary_override: [[bool; 2]; 3],
+        boundary_condition_type: BoundaryConditionType,
         grid: &Grid,
     ) -> Self {
         let up_direction = wind_environment.up_direction;
@@ -79,27 +99,39 @@ impl VelocityBoundaryConditions {
             }
         }
 
-        let mut face_conditions = [[VelocityBoundaryCondition::InletOutlet; 2]; 3];
+        let face_conditions = match boundary_condition_type {
+            BoundaryConditionType::WindInletOutlet => {
+                let mut face_conditions = [[VelocityBoundaryCondition::InletOutlet; 2]; 3];
 
-        // The ground is at the start of the up axis if the up direction points along the positive
-        // axis, and at the end of it otherwise. The opposite face is the open top of the domain.
-        let (ground_face_index, top_face_index) = if up_direction[up_axis] > 0.0 {
-            (0, 1)
-        } else {
-            (1, 0)
+                // The ground is at the start of the up axis if the up direction points along the
+                // positive axis, and at the end of it otherwise. The opposite face is the open top
+                // of the domain.
+                let (ground_face_index, top_face_index) = if up_direction[up_axis] > 0.0 {
+                    (0, 1)
+                } else {
+                    (1, 0)
+                };
+
+                face_conditions[up_axis][ground_face_index] = VelocityBoundaryCondition::SlipWall;
+                face_conditions[up_axis][top_face_index] = VelocityBoundaryCondition::ZeroGradient;
+
+                face_conditions
+            },
+            BoundaryConditionType::WindTunnel => {
+                assert!(
+                    up_axis != 0,
+                    "The wind tunnel boundary conditions require the up direction to be along the \
+                     y or z axis, as the x axis is the flow direction. Got {:?}",
+                    up_direction
+                );
+
+                [
+                    [VelocityBoundaryCondition::InletOutlet, VelocityBoundaryCondition::ZeroGradient],
+                    [VelocityBoundaryCondition::SlipWall; 2],
+                    [VelocityBoundaryCondition::SlipWall; 2],
+                ]
+            },
         };
-
-        face_conditions[up_axis][ground_face_index] = VelocityBoundaryCondition::SlipWall;
-        face_conditions[up_axis][top_face_index] = VelocityBoundaryCondition::ZeroGradient;
-
-        // A bit of a hacky way to apply override the BC to slip walls if the user has set to so
-        for axis_index in 0..3 {
-            for face_index in 0..2 {
-                if slip_wall_boundary_override[axis_index][face_index] {
-                    face_conditions[axis_index][face_index] = VelocityBoundaryCondition::SlipWall;
-                }
-            }
-        }
 
         let inlet_velocity_profile = Self::compute_inlet_velocity_profile(
             wind_environment,
@@ -109,10 +141,43 @@ impl VelocityBoundaryConditions {
             grid
         );
 
+        if let BoundaryConditionType::WindTunnel = boundary_condition_type {
+            Self::assert_inflow_along_positive_x(&inlet_velocity_profile);
+        }
+
         Self {
             face_conditions,
             up_axis,
             inlet_velocity_profile
+        }
+    }
+
+    /// The wind tunnel boundary conditions only make sense if the flow enters the domain through
+    /// the inlet at the start of the x axis, and does not flow into the slip walls. The inlet
+    /// velocity may be zero at some heights, for instance below the water plane with a
+    /// logarithmic profile, so the components are compared to the largest inlet velocity.
+    fn assert_inflow_along_positive_x(inlet_velocity_profile: &[SpatialVector]) {
+        let max_inlet_velocity = inlet_velocity_profile.iter()
+            .map(|velocity| velocity.length())
+            .fold(0.0, Float::max);
+
+        assert!(
+            max_inlet_velocity > 0.0,
+            "The wind tunnel boundary conditions require a non-zero inlet velocity"
+        );
+
+        let tolerance = 1e-3 * max_inlet_velocity;
+
+        for velocity in inlet_velocity_profile {
+            assert!(
+                velocity[0] > -tolerance &&
+                velocity[1].abs() < tolerance &&
+                velocity[2].abs() < tolerance,
+                "The wind tunnel boundary conditions require the inlet velocity to be along the \
+                 positive x axis. Check the wind direction and the linear velocity. Got an inlet \
+                 velocity of {:?}",
+                velocity
+            );
         }
     }
 
@@ -330,7 +395,7 @@ mod tests {
 
     fn boundary_conditions(
         up_direction: SpatialVector,
-        slip_wall_boundary_override: [[bool; 2]; 3],
+        boundary_condition_type: BoundaryConditionType,
         grid: &Grid
     ) -> VelocityBoundaryConditions {
         let wind_environment = WindEnvironment {
@@ -343,7 +408,7 @@ mod tests {
             &wind_environment,
             &WindCondition::new_constant(0.0, 10.0),
             SpatialVector::default(),
-            slip_wall_boundary_override,
+            boundary_condition_type,
             grid
         )
     }
@@ -364,7 +429,7 @@ mod tests {
             (SpatialVector([0.0, 0.0, 1.0]), 0, 1),
             (SpatialVector([0.0, 0.0, -1.0]), 1, 0),
         ] {
-            let velocity_bcs = boundary_conditions(up_direction, [[false; 2]; 3], &grid);
+            let velocity_bcs = boundary_conditions(up_direction, BoundaryConditionType::WindInletOutlet, &grid);
             let pressure_bcs = PressureBoundaryConditions::new_from_velocity_boundary_conditions(&velocity_bcs);
 
             assert!(matches!(velocity_bcs.face_conditions[2][ground_face], VelocityBoundaryCondition::SlipWall));
@@ -375,57 +440,107 @@ mod tests {
         }
     }
 
+    /// The wind tunnel has the inlet at the start of the x axis, and the outlet, with the zero
+    /// pressure, at the end of it. All other faces are slip walls, independent of the up direction.
     #[test]
-    #[should_panic]
-    fn overriding_the_top_to_a_slip_wall_is_rejected() {
+    fn wind_tunnel_has_the_outlet_at_the_end_of_the_x_axis() {
         let grid = test_grid();
-        let velocity_bcs = boundary_conditions(
-            SpatialVector([0.0, 0.0, 1.0]), [[false; 2], [false; 2], [false, true]], &grid
-        );
 
-        PressureBoundaryConditions::new_from_velocity_boundary_conditions(&velocity_bcs);
+        for up_direction in [
+            SpatialVector([0.0, 0.0, 1.0]),
+            SpatialVector([0.0, 0.0, -1.0]),
+            SpatialVector([0.0, 1.0, 0.0]),
+        ] {
+            let velocity_bcs = boundary_conditions(up_direction, BoundaryConditionType::WindTunnel, &grid);
+            let pressure_bcs = PressureBoundaryConditions::new_from_velocity_boundary_conditions(&velocity_bcs);
+
+            assert!(matches!(velocity_bcs.face_conditions[0][0], VelocityBoundaryCondition::InletOutlet));
+            assert!(matches!(velocity_bcs.face_conditions[0][1], VelocityBoundaryCondition::ZeroGradient));
+
+            assert!(matches!(pressure_bcs.condition(0, 0), PressureBoundaryCondition::ZeroGradient));
+            assert!(matches!(pressure_bcs.condition(0, 1), PressureBoundaryCondition::ZeroValue));
+
+            for axis_index in 1..3 {
+                for face_index in 0..2 {
+                    assert!(matches!(velocity_bcs.face_conditions[axis_index][face_index], VelocityBoundaryCondition::SlipWall));
+                    assert!(matches!(pressure_bcs.condition(axis_index, face_index), PressureBoundaryCondition::ZeroGradient));
+                }
+            }
+        }
     }
 
-    /// Slip walls on both x faces: the normal (x) component is zero on the wall and mirrored with
-    /// the opposite sign across it, while the tangential components are mirrored with the same sign.
+    #[test]
+    #[should_panic]
+    fn wind_tunnel_rejects_an_up_direction_along_the_x_axis() {
+        let grid = test_grid();
+
+        boundary_conditions(SpatialVector([1.0, 0.0, 0.0]), BoundaryConditionType::WindTunnel, &grid);
+    }
+
+    #[test]
+    #[should_panic]
+    fn wind_tunnel_rejects_inflow_that_is_not_along_the_x_axis() {
+        let grid = test_grid();
+
+        let wind_environment = WindEnvironment {
+            up_direction: SpatialVector([0.0, 0.0, 1.0]),
+            wind_rotation_axis: SpatialVector([0.0, 0.0, 1.0]),
+            ..Default::default()
+        };
+
+        VelocityBoundaryConditions::new(
+            &wind_environment,
+            &WindCondition::new_constant(0.0, 10.0),
+            SpatialVector([0.0, 2.0, 0.0]),
+            BoundaryConditionType::WindTunnel,
+            &grid
+        );
+    }
+
+    /// Slip walls on both y faces of the wind tunnel: the normal (y) component is zero on the wall
+    /// and mirrored with the opposite sign across it, while the tangential components are mirrored
+    /// with the same sign.
     #[test]
     fn slip_walls_are_symmetry_planes_on_both_faces() {
         let grid = test_grid();
-        let bcs = boundary_conditions(SpatialVector([0.0, 0.0, 1.0]), [[true, true], [false; 2], [false; 2]], &grid);
+        let bcs = boundary_conditions(SpatialVector([0.0, 0.0, 1.0]), BoundaryConditionType::WindTunnel, &grid);
 
         let mut velocity = unique_velocity(&grid);
         let original = velocity.clone();
 
         bcs.set_ghost_cells(&grid, &mut velocity);
 
-        // A column away from the other faces, so only the x faces affect it
-        let cell = |i: usize| grid.flat_index_on_extended_grid([i, 5, 5]);
+        // A column away from the other faces, so only the y faces affect it
+        let cell = |i: usize| grid.flat_index_on_extended_grid([5, i, 5]);
+
+        let n = 1;
+        let tangential = [0, 2];
 
         let o = INTERIOR_OFFSET;
         let last_interior = N + o - 1;
 
         // Start of the axis: the face of ghost cell `o - 1` is on the wall
-        assert_eq!(velocity[cell(o - 1)][0], 0.0);
+        assert_eq!(velocity[cell(o - 1)][n], 0.0);
         for layer in 1..o {
-            assert_eq!(velocity[cell(o - 1 - layer)][0], -original[cell(o - 1 + layer)][0]);
+            assert_eq!(velocity[cell(o - 1 - layer)][n], -original[cell(o - 1 + layer)][n]);
         }
 
         // End of the axis: the face on the wall belongs to the last interior cell
-        assert_eq!(velocity[cell(last_interior)][0], 0.0);
+        assert_eq!(velocity[cell(last_interior)][n], 0.0);
         for layer in 0..o {
-            assert_eq!(velocity[cell(last_interior + 1 + layer)][0], -original[cell(last_interior - 1 - layer)][0]);
+            assert_eq!(velocity[cell(last_interior + 1 + layer)][n], -original[cell(last_interior - 1 - layer)][n]);
         }
 
-        // Tangential components, which are cell-centered along x
+        // Tangential components, which are cell-centered along y
         for layer in 0..o {
-            for component in 1..3 {
+            for component in tangential {
                 assert_eq!(velocity[cell(o - 1 - layer)][component], original[cell(o + layer)][component]);
                 assert_eq!(velocity[cell(last_interior + 1 + layer)][component], original[cell(last_interior - layer)][component]);
             }
         }
 
         // Only the normal component of the wall face in the interior is changed
-        for component in 1..3 {
+        for component in tangential {
             assert_eq!(velocity[cell(last_interior)][component], original[cell(last_interior)][component]);
         }
     }
@@ -434,7 +549,7 @@ mod tests {
     #[test]
     fn inlet_outlet_uses_one_decision_per_column() {
         let grid = test_grid();
-        let bcs = boundary_conditions(SpatialVector([0.0, 0.0, 1.0]), [[false; 2]; 3], &grid);
+        let bcs = boundary_conditions(SpatialVector([0.0, 0.0, 1.0]), BoundaryConditionType::WindInletOutlet, &grid);
 
         let cell = |i: usize| grid.flat_index_on_extended_grid([i, 5, 5]);
         let o = INTERIOR_OFFSET;

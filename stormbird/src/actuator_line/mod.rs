@@ -20,6 +20,9 @@ pub mod corrections;
 /// Damping of the flow along the span
 pub mod spanflow_damper;
 
+#[cfg(test)]
+mod tests;
+
 use stormath::smoothing::gaussian::gaussian_kernel;
 
 use stormath::spatial_vector::SpatialVector;
@@ -41,7 +44,7 @@ use spanflow_damper::SpanflowDamper;
 
 use corrections::{
     lifting_line::LiftingLineCorrection,
-    empirical_circulation::EmpiricalCirculationCorrection,
+    tip_loss::{TipLossCorrection, TipLossApplication},
 };
 
 #[derive(Debug, Clone)]
@@ -68,14 +71,18 @@ pub struct ActuatorLine {
     pub ctrl_points_velocity: Vec<SpatialVector>,
     /// Results from the model
     pub simulation_result: Option<SimulationResult>,
+    /// The circulation strength that the projected forces are computed from. Equal to the
+    /// circulation in the simulation result, unless the tip loss correction is only applied to the
+    /// projected forces.
+    pub projected_circulation_strength: Vec<Float>,
     /// Lift forces that are projected back to the CFD domain
     pub sectional_lift_forces_to_project: Vec<SpatialVector>,
     /// Drag forces that are projected back to the CFD domain
     pub sectional_drag_forces_to_project: Vec<SpatialVector>,
     /// Corrections based on the lifting line model
     pub lifting_line_correction: Option<LiftingLineCorrection>,
-    /// Empirical correction for the circulation strength, also known as a tip loss factor
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    /// Empirical tip loss correction of the circulation strength
+    pub tip_loss_correction: Option<TipLossCorrection>,
     /// Optional model to dampen spanwise flow at the control points
     pub spanflow_damper: Option<SpanflowDamper> 
 }
@@ -145,8 +152,15 @@ impl ActuatorLine {
     ///
     /// It solves for the circulation strength and computes the simulation result based on the
     /// current estimate of the control point velocities.
+    ///
+    /// The function can be called several times per time step, e.g., in each outer iteration of
+    /// the CFD solver. The time is used to detect when a new time step starts. The state of the
+    /// dynamic stall models, if any, is then updated with the last result from the previous time
+    /// step, so that it is only updated once per time step.
     pub fn do_step(&mut self, time: Float, time_step: Float){
         if time >= self.start_time {
+            self.update_dynamic_stall_state(time, time_step);
+
             let solver_result = self.solve(time, time_step);
 
             let ctrl_point_acceleration = vec![
@@ -168,6 +182,28 @@ impl ActuatorLine {
         }
 
         self.current_iteration += 1;
+    }
+
+    /// Updates the dynamic stall models, if any, at the start of a call to
+    /// [`do_step`](ActuatorLine::do_step).
+    ///
+    /// If the time is larger than the time of the last simulation result, a new time step has
+    /// started, and the state is updated with the force input from the last result. This must be
+    /// done before the time step is changed, so that the state is updated with the time step it was
+    /// computed with. Calls with the same time as the last result, e.g., from outer iterations in
+    /// the CFD solver, are evaluated from the same state.
+    fn update_dynamic_stall_state(&mut self, time: Float, time_step: Float) {
+        if !self.line_force_model.has_dynamic_stall() {
+            return;
+        }
+
+        if let Some(simulation_result) = &self.simulation_result {
+            if time > simulation_result.time {
+                self.line_force_model.update_dynamic_stall_state(&simulation_result.force_input);
+            }
+        }
+
+        self.line_force_model.set_dynamic_stall_time_step(time_step);
     }
 
     /// Function to update the controller in the model, if the controller is present.
@@ -224,16 +260,23 @@ impl ActuatorLine {
         };
 
         if let Some(lifting_line_correction) = &self.lifting_line_correction {
-            let last_circulation_strength = if let Some(result) = &self.simulation_result {
-                result.force_input.circulation_strength.clone()
-            } else {
-                vec![0.0; self.line_force_model.nr_span_lines()]
-            };
+            let (last_circulation_strength, last_projected_circulation_strength) =
+                if let Some(result) = &self.simulation_result {
+                    (
+                        result.force_input.circulation_strength.clone(),
+                        self.projected_circulation_strength.clone()
+                    )
+                } else {
+                    let zero_strength = vec![0.0; self.line_force_model.nr_span_lines()];
+
+                    (zero_strength.clone(), zero_strength)
+                };
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
                 &self.ctrl_points_velocity,
                 &last_circulation_strength,
+                &last_projected_circulation_strength,
                 time - self.start_time
             );
 
@@ -295,13 +338,9 @@ impl ActuatorLine {
             &corrected_ctrl_points_velocity
         );
 
-        if let Some(empirical_circulation_correction) = &self.empirical_circulation_correction {
-            let non_dim_span_positions = &self.line_force_model.ctrl_point_spanwise_distance_circulation_model;
-
-            for i in 0..new_estimated_circulation_strength.len() {
-                new_estimated_circulation_strength[i] *= empirical_circulation_correction.correction_factor(
-                    non_dim_span_positions[i]
-                );
+        if let Some(tip_loss_correction) = &self.tip_loss_correction {
+            if tip_loss_correction.application == TipLossApplication::Circulation {
+                tip_loss_correction.apply(&mut new_estimated_circulation_strength, &self.line_force_model);
             }
         }
 
@@ -318,6 +357,19 @@ impl ActuatorLine {
             circulation_strength.push(
                 previous_strength[i] + self.solver_settings.damping_factor * strength_difference
             );
+        }
+
+        // The tip loss correction of the projected forces is applied after the damping, so that
+        // the damping only acts on the uncorrected circulation
+        self.projected_circulation_strength = circulation_strength.clone();
+
+        if let Some(tip_loss_correction) = &self.tip_loss_correction {
+            if tip_loss_correction.application == TipLossApplication::ProjectedForces {
+                tip_loss_correction.apply(
+                    &mut self.projected_circulation_strength,
+                    &self.line_force_model
+                );
+            }
         }
 
         let residual = self.line_force_model.average_residual_absolute(
@@ -378,7 +430,12 @@ impl ActuatorLine {
         let ctrl_points_velocity = &self.ctrl_points_velocity; //self.corrected_ctrl_points_velocity(time);
         
         if let Some(simulation_result) = &self.simulation_result {
-            let circulatory_forces = &simulation_result.sectional_forces.circulatory;
+            // Same as the circulatory forces in the simulation result, but computed from the
+            // projected circulation
+            let circulatory_forces = self.line_force_model.sectional_circulatory_forces(
+                &self.projected_circulation_strength,
+                &simulation_result.force_input.velocity
+            );
 
             for (line_index, &circulatory_force) in circulatory_forces.iter().enumerate().take(nr_span_lines) {
                 let mut lift_force = circulatory_force;

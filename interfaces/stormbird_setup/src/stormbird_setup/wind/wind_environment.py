@@ -20,6 +20,11 @@ class WindEnvironment(StormbirdSetupBaseModel):
     wind_rotation_axis: SpatialVector = Field(
         default_factory=lambda: SpatialVector(x=0.0, y=0.0, z=-1.0)
     )
+    """
+    The axis that the wind direction is rotated around. The default is opposite of the default up
+    direction, so that the wind direction is measured clockwise seen from above. This is the same
+    default as in Stormbird.
+    """
     zero_direction_vector: SpatialVector = Field(
         default_factory=lambda: SpatialVector(x=1.0, y=0.0, z=0.0)
     )
@@ -63,3 +68,35 @@ class WindEnvironment(StormbirdSetupBaseModel):
         Returns the steady apparent wind vector at the given location
         '''
         return self.steady_true_wind_velocity_vector_at_location(condition, location) + linear_velocity
+
+    def linear_velocity_from_ship_velocity(self, ship_velocity: float) -> SpatialVector:
+        '''
+        Returns the linear velocity that is used for the apparent wind for a given ship velocity.
+        The ship is assumed to sail opposite of the zero direction vector, so that the linear
+        velocity is the ship velocity times the zero direction vector. This is the same definition
+        as in the complete sail model in Stormbird.
+        '''
+        return self.zero_direction_vector * ship_velocity
+
+    def apparent_wind_direction_from_condition_and_linear_velocity(
+        self,
+        condition: WindCondition,
+        linear_velocity: SpatialVector,
+        height: float = 10.0
+    ) -> float:
+        '''
+        Returns the apparent wind direction at the given height, measured from the zero direction
+        vector, around the wind rotation axis. This is the direction that is used to look up the
+        inflow corrections. The default height of 10 m is the same as in the complete sail model in
+        Stormbird.
+        '''
+        apparent_wind = self.steady_apparent_wind_velocity_vector_at_location(
+            condition,
+            self.up_direction * height,
+            linear_velocity
+        )
+
+        return self.zero_direction_vector.signed_angle_between(
+            apparent_wind,
+            self.wind_rotation_axis
+        )

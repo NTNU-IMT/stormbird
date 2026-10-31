@@ -20,7 +20,7 @@ use super::spanflow_damper::SpanflowDamper;
 
 use super::corrections::{
     lifting_line::LiftingLineCorrectionBuilder,
-    empirical_circulation::EmpiricalCirculationCorrection,
+    tip_loss::TipLossCorrection,
 };
 
 
@@ -51,9 +51,9 @@ pub struct ActuatorLineBuilder {
     /// Optional correction of the velocity, based on a lifting line model
     #[serde(default)]
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
-    /// Optional empirical correction of the circulation
+    /// Optional empirical tip loss correction of the circulation
     #[serde(default)]
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    pub tip_loss_correction: Option<TipLossCorrection>,
     /// Optional damping of the flow along the span
     #[serde(default)]
     pub spanflow_damper: Option<SpanflowDamper>
@@ -80,7 +80,7 @@ impl ActuatorLineBuilder {
             write_iterations_full_result: Self::default_write_iterations_full_result(),
             start_time: 0.0,
             lifting_line_correction: None,
-            empirical_circulation_correction: None,
+            tip_loss_correction: None,
             spanflow_damper: None,
         }
     }
@@ -90,6 +90,16 @@ impl ActuatorLineBuilder {
         let line_force_model = self.line_force_model.build();
 
         let nr_span_lines = line_force_model.nr_span_lines();
+
+        if line_force_model.has_dynamic_stall() && self.solver_settings.damping_factor < 1.0 {
+            eprintln!(
+                "Warning: the actuator line model has a dynamic stall model, but the damping \
+                factor of the circulation is {}. The damping acts as an additional time lag of \
+                about {:.1} time steps, which also affects the dynamic response of the forces.",
+                self.solver_settings.damping_factor,
+                1.0 / self.solver_settings.damping_factor
+            );
+        }
 
         let controller = self.controller.as_ref().map(|controller_builder| controller_builder
                     .build(&line_force_model)
@@ -119,10 +129,11 @@ impl ActuatorLineBuilder {
             write_iterations_full_result: self.write_iterations_full_result,
             ctrl_points_velocity: vec![SpatialVector::default(); nr_span_lines],
             simulation_result: None,
+            projected_circulation_strength: vec![0.0; nr_span_lines],
             sectional_lift_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             sectional_drag_forces_to_project: vec![SpatialVector::default(); nr_span_lines],
             lifting_line_correction,
-            empirical_circulation_correction: self.empirical_circulation_correction.clone(),
+            tip_loss_correction: self.tip_loss_correction.clone(),
             spanflow_damper: self.spanflow_damper.clone()
         }
     }

@@ -35,11 +35,12 @@ module-name = "pystormbird._native"
 python-source = "."
 features = ["pyo3/extension-module"]
 profile = "release"
-# The examples and the lock file of the development environment are not needed in the source
-# distribution
+# The examples, the lock file of the development environment and the notes for the maintainer are
+# not needed in the source distribution
 exclude = [
     { path = "examples/**/*", format = "sdist" },
     { path = "uv.lock", format = "sdist" },
+    { path = "maintainer_cheat_sheet.md", format = "sdist" },
 ]
 
 [tool.uv]

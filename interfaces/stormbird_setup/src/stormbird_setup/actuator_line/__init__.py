@@ -5,13 +5,13 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 """
 
 from .actuator_line_builder import ActuatorLineBuilder
-from .corrections import LiftingLineCorrectionBuilder, EmpiricalCirculationCorrection
+from .corrections import LiftingLineCorrectionBuilder, TipLossApplication, TipLossCorrection
 from .settings import Gaussian, ProjectionSettings, SamplingSettings, SolverSettings
 from ..lifting_line import SymmetryCondition
 
 __all__ = [
     "ActuatorLineBuilder",
-    "LiftingLineCorrectionBuilder", "EmpiricalCirculationCorrection",
+    "LiftingLineCorrectionBuilder", "TipLossApplication", "TipLossCorrection",
     "Gaussian", "ProjectionSettings", "SamplingSettings", "SolverSettings",
     "SymmetryCondition"
 ]

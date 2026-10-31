@@ -17,7 +17,7 @@ pub struct ActuatorLineBuilder {
     pub start_time: f64,
     pub controller: Option<ControllerBuilder>,
     pub lifting_line_correction: Option<LiftingLineCorrectionBuilder>,
-    pub empirical_circulation_correction: Option<EmpiricalCirculationCorrection>,
+    pub tip_loss_correction: Option<TipLossCorrection>,
     pub spanflow_damper: Option<SpanflowDamper>,
 }
 ```
@@ -33,6 +33,11 @@ The overall execution of an actuator line simulation is, necessarily, controlled
 
 1) The **velocity on the control point of each line segment** in the line force model is sampled from the CFD domain, using one of the available [velocity sampling methods](velocity_sampling.md).
 2) **The circulation strength on each line segment is calculated** based on the sampled velocity and the sectional models, in the same way as for the [non-linear solver](../lifting_line/solver.md) in the lifting line model, but with only one iteration. That is, the new circulation is estimated directly from the velocity, but the final values can be based on the previous time step as well, using the same general damping technique as for the lifting line model. The reason for using only one iteration is that there is no way to update the velocity fields in the CFD domain outside the general solver loop. As such, the number of iterations are inherently controlled by the CFD solver directly, and not by the actuator line model.
-3) **If any corrections are enabled**, these are applied to the estimated circulation strength. The corrections may be crucial for accurate results. See the [corrections chapter](corrections.md) for more details on what corrections are available and when they should be used.
-4) Based on the estimated circulation strength, the forces on each line segment are calculated, and the **circulatory forces are projected back to the CFD grid** using the methods and settings specified in the [force projection chapter](force_projection.md).
+3) **If any corrections are enabled**, these are applied to the estimated circulation strength. The corrections may be crucial for accurate results. See the [corrections chapter](corrections.md) for more details on what corrections are available and when they should be used. The tip loss correction can also be set to only apply to the circulation used for the projected forces, in which case it is applied after the damping.
+4) Based on the estimated circulation strength, the forces on each line segment are calculated, and the **circulatory forces are projected back to the CFD grid** using the methods and settings specified in the [force projection chapter](force_projection.md). The projected forces are computed from the same circulation as the forces on the wings, unless the tip loss correction is only applied to the projected forces.
 5) The **[result data](../line_model/force_calculations.md)** for each time step will finally be written to disk, and the actuator line model is ready for the next time step.
+
+## Dynamic stall
+The [dynamic stall model](../sectional_models/dynamic_stall.md) can be used in actuator line simulations in the same way as in dynamic lifting line simulations, by setting it on the wings in the line force model. The actuator line model can be called several times per time step, e.g., in each outer iteration of the CFD solver, and the state of the dynamic stall model is only updated when the time increases.
+
+Note that the damping of the circulation, set with the `damping_factor` in the `SolverSettings`, acts as an additional numerical time lag on the circulation of about `1 / damping_factor` time steps. For simulations of dynamic effects, the damping, as well as the rest of the setup, should be chosen so that this lag is small compared to the time scales of interest. A warning is given when the model has a dynamic stall model and the damping factor is below one.

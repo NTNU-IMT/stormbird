@@ -35,7 +35,8 @@ pub struct WindEnvironment {
     #[serde(default="WindEnvironment::default_wind_rotation_axis")]
     /// The axis that is used when rotating the wind vector based on the 
     /// wind direction. This is kept separate from the *up-direction* to allow for arbitrary 
-    /// definitions of wind direction
+    /// definitions of wind direction. The default is the negative z-axis, i.e., opposite of the
+    /// default up direction, so that the wind direction is measured clockwise seen from above.
     pub wind_rotation_axis: SpatialVector,
     #[serde(default="WindEnvironment::default_zero_direction_vector")]
     /// The zero direction vector is the direction at which the true wind will point when the wind
@@ -67,7 +68,7 @@ impl Default for WindEnvironment {
 impl WindEnvironment {
     fn default_zero_direction_vector() -> SpatialVector {SpatialVector::from([1.0, 0.0, 0.0])}
     fn default_up_direction() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
-    fn default_wind_rotation_axis() -> SpatialVector {SpatialVector::from([0.0, 0.0, 1.0])}
+    fn default_wind_rotation_axis() -> SpatialVector {SpatialVector::from([0.0, 0.0, -1.0])}
 
     /// Creates a wind environment from a JSON string
     pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
@@ -365,13 +366,15 @@ mod tests {
             0.0, 
             wind_velocity
         );
+        // The default wind rotation axis is opposite of the up direction, so that the wind
+        // direction is measured clockwise seen from above, and a wind from starboard is positive
         let starboard_wind_condition = WindCondition::new_constant(
-            Float::to_radians(-90.0), 
+            Float::to_radians(90.0), 
             wind_velocity
         );
 
         let port_wind_condition = WindCondition::new_constant(
-            Float::to_radians(90.0), 
+            Float::to_radians(-90.0), 
             wind_velocity
         );
 

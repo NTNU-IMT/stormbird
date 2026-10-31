@@ -13,6 +13,10 @@ pub mod varying_foil;
 pub mod rotating_cylinder;
 /// Section model of a foil that uses active air flow, e.g. suction.
 pub mod active_air_flow_foil;
+/// Dynamic stall model that can be combined with the section models that build on the foil model
+pub mod dynamic_stall;
+
+use std::borrow::Cow;
 
 use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
@@ -163,45 +167,56 @@ impl SectionModel {
         }
     }
 
-    /// Returns the pre-stall lift coefficient, reduced by the amount of stall
-    pub fn lift_coefficient_pre_stall_with_stall_drop_off(
-        &self, 
-        angle_of_attack: Float, 
-        internal_state: Float
-    ) -> Float {
+    /// Returns the foil model that the section model uses for the given internal state, or `None`
+    /// if the section model is not built on the foil model. The foil is borrowed for a single
+    /// element foil, and interpolated for the varying foils.
+    pub fn foil(&self, internal_state: Float) -> Option<Cow<'_, Foil>> {
         match self {
-            Self::SingleElementFoil(foil) => foil.lift_coefficient_pre_stall_with_stall_drop_off(
-                angle_of_attack
-            ),
-            Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient_pre_stall_with_stall_drop_off(
-                angle_of_attack, internal_state
-            ),
-            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient_pre_stall_with_stall_drop_off(
-                angle_of_attack, internal_state
-            ),
-            Self::RotatingCylinder(cylinder) => cylinder.lift_coefficient(internal_state),
-            Self::EffectiveWindSensor => 0.0,
+            Self::SingleElementFoil(foil) => Some(Cow::Borrowed(foil)),
+            Self::MultiElementFoil(varying_foil) => Some(Cow::Owned(
+                varying_foil.get_foil(internal_state)
+            )),
+            Self::ActiveAirFlowFoil(active_air_flow_foil) => Some(Cow::Owned(
+                active_air_flow_foil.varying_foil.get_foil(internal_state)
+            )),
+            Self::RotatingCylinder(_) | Self::EffectiveWindSensor => None,
         }
     }
 
-    /// Returns the post-stall lift coefficient, weighted by the amount of stall
-    pub fn lift_coefficient_post_stall_with_stall_weight(
-        &self, 
-        angle_of_attack: Float, 
-        internal_state: Float
-    ) -> Float {
+    /// Returns the pre-stall lift coefficient, reduced by the amount of stall, and the post-stall
+    /// lift coefficient, weighted by the amount of stall.
+    ///
+    /// For section models that are not built on the foil model, there is no stall, so the full
+    /// lift is returned as the pre-stall part, and the post-stall part is zero.
+    ///
+    /// # Arguments
+    /// - `angle_of_attack`: the angle of attack
+    /// - `internal_state`: the internal state of the section model
+    /// - `amount_of_stall`: optional amount of stall to use instead of the static value from the
+    ///   foil model, for instance from a dynamic stall model. Ignored for section models that are
+    ///   not built on the foil model.
+    ///
+    /// # Returns
+    /// A tuple with the pre-stall and the post-stall lift coefficients, in that order.
+    pub fn lift_coefficients_pre_and_post_stall(
+        &self,
+        angle_of_attack: Float,
+        internal_state: Float,
+        amount_of_stall: Option<Float>
+    ) -> (Float, Float) {
         match self {
-            Self::SingleElementFoil(foil) => foil.lift_coefficient_post_stall_with_stall_weight(
-                angle_of_attack
-            ),
-            Self::MultiElementFoil(varying_foil) => varying_foil.lift_coefficient_post_stall_with_stall_weight(
-                angle_of_attack, internal_state
-            ),
-            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.lift_coefficient_post_stall_with_stall_weight(
-                angle_of_attack, internal_state
-            ),
-            Self::RotatingCylinder(_) => 0.0,
-            Self::EffectiveWindSensor => 0.0,
+            Self::SingleElementFoil(_) | Self::MultiElementFoil(_) | Self::ActiveAirFlowFoil(_) => {
+                let foil = self.foil(internal_state)
+                    .expect("Section models built on the foil model always have a foil model");
+
+                let amount_of_stall = amount_of_stall.unwrap_or_else(
+                    || foil.amount_of_stall(angle_of_attack)
+                );
+
+                foil.lift_coefficients_pre_and_post_stall(angle_of_attack, amount_of_stall)
+            },
+            Self::RotatingCylinder(cylinder) => (cylinder.lift_coefficient(internal_state), 0.0),
+            Self::EffectiveWindSensor => (0.0, 0.0),
         }
     }
 
@@ -217,15 +232,30 @@ impl SectionModel {
     }
 
     /// Returns the drag coefficient
-    pub fn drag_coefficient(&self, angle_of_attack: Float, internal_state: Float) -> Float {
+    ///
+    /// # Arguments
+    /// - `angle_of_attack`: the angle of attack
+    /// - `internal_state`: the internal state of the section model
+    /// - `amount_of_stall`: optional amount of stall to use instead of the static value from the
+    ///   foil model, for instance from a dynamic stall model. Ignored for section models that are
+    ///   not built on the foil model.
+    pub fn drag_coefficient(
+        &self,
+        angle_of_attack: Float,
+        internal_state: Float,
+        amount_of_stall: Option<Float>
+    ) -> Float {
         match self {
-            Self::SingleElementFoil(foil) => foil.drag_coefficient(angle_of_attack),
-            Self::MultiElementFoil(varying_foil) => varying_foil.drag_coefficient(
-                angle_of_attack, internal_state
-            ),
-            Self::ActiveAirFlowFoil(active_air_flow_foil) => active_air_flow_foil.drag_coefficient(
-                angle_of_attack, internal_state
-            ),
+            Self::SingleElementFoil(_) | Self::MultiElementFoil(_) | Self::ActiveAirFlowFoil(_) => {
+                let foil = self.foil(internal_state)
+                    .expect("Section models built on the foil model always have a foil model");
+
+                let amount_of_stall = amount_of_stall.unwrap_or_else(
+                    || foil.amount_of_stall(angle_of_attack)
+                );
+
+                foil.drag_coefficient_with_amount_of_stall(angle_of_attack, amount_of_stall)
+            },
             Self::RotatingCylinder(cylinder) => cylinder.drag_coefficient(internal_state),
             Self::EffectiveWindSensor => 0.0,
         }

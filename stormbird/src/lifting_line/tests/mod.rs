@@ -15,3 +15,4 @@ mod quasi_steady_wake;
 mod coordinate_systems;
 mod wing_sails_speed_test;
 mod linearized_solver;
+mod dynamic_stall;

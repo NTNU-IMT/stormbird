@@ -244,4 +244,55 @@ impl LineForceModel {
 
         self.update_global_data_representations();
     }
+
+    /// Returns true if any of the wings have a dynamic stall model
+    pub fn has_dynamic_stall(&self) -> bool {
+        self.dynamic_stall.iter().any(|model| model.is_some())
+    }
+
+    /// Sets the time step to use in the dynamic stall models for the next evaluations. Should be
+    /// called before solving for the circulation strength in a new time step.
+    pub fn set_dynamic_stall_time_step(&mut self, time_step: Float) {
+        for model in self.dynamic_stall.iter_mut().flatten() {
+            model.set_time_step(time_step);
+        }
+    }
+
+    /// Resets the state of the dynamic stall models, so that they give static values until the
+    /// next completed time step.
+    pub fn reset_dynamic_stall(&mut self) {
+        for model in self.dynamic_stall.iter_mut().flatten() {
+            model.reset();
+        }
+    }
+
+    /// Updates the state of the dynamic stall models after a completed time step. Should be called
+    /// once per time step, with the force input from the final solution of the time step, and
+    /// before the time step of the dynamic stall models is changed.
+    ///
+    /// The angles of attack and the internal states are taken directly from the force input, so
+    /// that the state is based on the same values as the forces, even if the geometry or the
+    /// internal states of the model have been changed afterwards, e.g., by a controller. Only the
+    /// magnitude of the velocity is used, so the coordinate system of the force input does not
+    /// matter.
+    pub fn update_dynamic_stall_state(&mut self, force_input: &SectionalForcesInput) {
+        if !self.has_dynamic_stall() {
+            return;
+        }
+
+        for wing_index in 0..self.nr_wings() {
+            let Some(segment_states) = self.wing_dynamic_stall_states(
+                wing_index,
+                &force_input.angles_of_attack,
+                &force_input.section_models_internal_state,
+                &force_input.velocity
+            ) else {
+                continue;
+            };
+
+            if let Some(model) = &mut self.dynamic_stall[wing_index] {
+                model.commit(segment_states);
+            }
+        }
+    }
 }

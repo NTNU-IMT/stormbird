@@ -323,7 +323,7 @@
     // - `compute(parameters, xValues)`: returns the data for all series, as arrays
     // - `readout(x, data, index)`: returns the values shown when hovering, as [name, value] pairs
     // - `hint`: text shown when not hovering
-    // - `jsonSummary`: title of the JSON output
+    // - `jsonSummary`: title of the JSON output. The JSON output is not shown if this is not set
     class ModelExplorer {
         constructor(root, config) {
             this.root = root;
@@ -413,6 +413,14 @@
             controls.appendChild(tabList);
             tabPanels.forEach((p) => controls.appendChild(p));
 
+            if (this.config.jsonSummary !== undefined) {
+                this.buildJsonOutput(controls);
+            }
+
+            this.root.appendChild(controls);
+        }
+
+        buildJsonOutput(controls) {
             this.json = element('pre', { class: 'me-json' });
 
             const copyButton = element('button', { type: 'button', class: 'me-button', text: 'Copy' });
@@ -431,8 +439,6 @@
             ]);
 
             controls.appendChild(details);
-
-            this.root.appendChild(controls);
         }
 
         buildSlider(parameter) {
@@ -520,6 +526,10 @@
         }
 
         updateJson() {
+            if (this.json === undefined) {
+                return;
+            }
+
             const output = {};
 
             for (const group of this.config.controlGroups) {

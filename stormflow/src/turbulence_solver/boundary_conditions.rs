@@ -220,6 +220,8 @@ fn set_ghost_cells(
 mod tests {
     use super::*;
 
+    use crate::velocity_solver::boundary_condisitions::BoundaryConditionType;
+
     use stormbird::wind::{
         environment::WindEnvironment,
         wind_condition::WindCondition,
@@ -242,7 +244,7 @@ mod tests {
             &wind_environment,
             &WindCondition::new_constant(0.0, 10.0),
             SpatialVector::default(),
-            [[false; 2]; 3],
+            BoundaryConditionType::WindInletOutlet,
             grid
         );
 

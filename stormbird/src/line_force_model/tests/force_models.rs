@@ -15,6 +15,7 @@ use crate::line_force_model::corrections::force::ForceCorrection;
 use crate::line_force_model::added_mass::AddedMass;
 use crate::line_force_model::gyroscopic_moment::GyroscopicMoment;
 use crate::section_models::rotating_cylinder::RotatingCylinder;
+use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
 
 const CHORD_LENGTH: Float = 2.0;
 const DENSITY: Float = 1.2;
@@ -58,6 +59,7 @@ fn force_input(
         velocity: vec![velocity; nr_span_lines],
         angles_of_attack: vec![Float::to_radians(30.0); nr_span_lines],
         section_models_internal_state: vec![0.0; nr_span_lines],
+        amount_of_stall: vec![0.0; nr_span_lines],
         acceleration: vec![acceleration; nr_span_lines],
         rotation_velocity,
         coordinate_system: CoordinateSystem::Global,
@@ -191,5 +193,49 @@ fn gyroscopic_moment_requires_rotating_cylinder() {
     build(WingBuilder {
         gyroscopic_moment: GyroscopicMoment { moment_of_inertia: 100.0 },
         ..wing_builder(SectionModel::default())
+    });
+}
+
+#[test]
+fn dynamic_stall_from_json() {
+    let wing_builder: WingBuilder = serde_json::from_str(r#"{
+        "section_points": [{"x": 0.0, "y": 0.0, "z": 0.0}, {"x": 0.0, "y": 0.0, "z": 1.0}],
+        "chord_vectors": [{"x": 1.0, "y": 0.0, "z": 0.0}, {"x": 1.0, "y": 0.0, "z": 0.0}],
+        "section_model": {"SingleElementFoil": {}},
+        "dynamic_stall": {"separation_time_constant": 4.0}
+    }"#).unwrap();
+
+    let line_force_model = build(wing_builder);
+
+    let dynamic_stall = line_force_model.dynamic_stall[0].as_ref().unwrap();
+
+    assert_eq!(dynamic_stall.separation_time_constant, 4.0);
+    assert_eq!(dynamic_stall.segment_states.len(), line_force_model.nr_span_lines());
+}
+
+#[test]
+fn dynamic_stall_with_internal_state_lag_for_rotating_cylinder() {
+    let line_force_model = build(WingBuilder {
+        dynamic_stall: Some(DynamicStallModelBuilder {
+            internal_state_time_constant: 2.0,
+            ..Default::default()
+        }),
+        ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
+    });
+
+    let dynamic_stall = line_force_model.dynamic_stall[0].as_ref().unwrap();
+
+    assert_eq!(dynamic_stall.internal_state_time_constant, 2.0);
+}
+
+#[test]
+#[should_panic]
+fn dynamic_stall_parameters_require_foil_section_model() {
+    build(WingBuilder {
+        dynamic_stall: Some(DynamicStallModelBuilder {
+            separation_time_constant: Some(4.0),
+            ..Default::default()
+        }),
+        ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
     });
 }

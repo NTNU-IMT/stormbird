@@ -33,7 +33,7 @@ use crate::pressure_solver::{
 use crate::velocity_solver::{
     VelocitySolver,
     builder::VelocitySolverBuilder,
-    boundary_condisitions::VelocityBoundaryConditions,
+    boundary_condisitions::{VelocityBoundaryConditions, BoundaryConditionType},
 };
 use crate::turbulence_solver::{
     TurbulenceSolver,
@@ -69,9 +69,9 @@ pub struct SimulationBuilder {
     pub pressure_solver: PressureSolverBuilder,
     #[serde(default)]
     pub solver_settings: SolverSettings,
-    /// Optional "override" of the boundary conditions, to be able to set some to slip walls
+    /// How the boundary conditions are assigned to the faces of the domain
     #[serde(default)]
-    pub slip_wall_boundary_override: [[bool; 2]; 3],
+    pub boundary_condition_type: BoundaryConditionType,
     /// Optional RANS turbulence model. The turbulence solver always runs on the same platform as
     /// the velocity solver. `effective_viscosity` is used as the molecular viscosity when a
     /// turbulence model is used.
@@ -114,7 +114,7 @@ impl SimulationBuilder {
             &self.wind_environment,
             &self.wind_condition,
             self.linear_velocity,
-            self.slip_wall_boundary_override,
+            self.boundary_condition_type,
             &grid
         );
 

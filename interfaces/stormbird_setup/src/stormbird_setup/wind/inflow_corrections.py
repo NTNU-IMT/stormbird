@@ -8,76 +8,113 @@ from ..base_model import StormbirdSetupBaseModel
 from ..spatial_vector import SpatialVector
 from ..range import Range
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-import math
+if TYPE_CHECKING:
+    # Only imported for type checking, as the wind environment depends on this module
+    from .wind_environment import WindEnvironment
+    from .wind_condition import WindCondition
 
 class InflowCorrectionsSingleDirection(StormbirdSetupBaseModel):
     height_values: list[float]
     magnitude_corrections: list[float]
     angle_corrections: list[float]
     wing_indices: list[Range]
-    
+
     @classmethod
-    def from_simulation_results_aligned_with_freestream(
-        cls, 
+    def from_simulation_result(
+        cls,
         stormbird_result: dict[str, Any],
-        freestream_velocity: SpatialVector,
-        up_direction: SpatialVector = SpatialVector(z=1.0)
+        wind_environment: "WindEnvironment",
+        wind_condition: "WindCondition",
+        ship_velocity: float = 0.0
     ) -> "InflowCorrectionsSingleDirection":
-        """
-        Helper function used to extract inflow correction factors from a simulation results where
-        the wings are set to be aligned with the freestream flow, and where an effective wind sensor
-        are used to measure the flow
-        """
-        
-        ctrl_points      = stormbird_result["ctrl_points"]
-        angles_of_attack = stormbird_result["force_input"]["angles_of_attack"]
-        velocity_raw     = stormbird_result["solver_input_ctrl_points_velocity"]
-        wing_indices_raw = stormbird_result["wing_indices"]
-        
+        '''
+        Computes inflow corrections from velocity measurements at the control points, by comparing
+        the measured velocity with the undisturbed apparent wind at the same locations. The typical
+        use is a CFD simulation of a ship without sails, where an actuator line with the
+        EffectiveWindSensor section model samples the velocity at the sail positions.
+
+        The undisturbed apparent wind is computed from the wind environment, the wind condition and
+        the ship velocity, so it should match the inflow conditions in the CFD simulation, including
+        any variation with height. The ship velocity is along the zero direction vector, as in the
+        complete sail model, see `WindEnvironment.linear_velocity_from_ship_velocity`.
+
+        Only the part of the measured velocity that is normal to the up direction is used. The
+        magnitude correction is the ratio between the magnitude of this part and the magnitude of
+        the undisturbed apparent wind, and the angle correction is the angle from the undisturbed
+        apparent wind to the measured velocity, around the up direction. This is the same way as the
+        corrections are applied in Stormbird. The wings do not need to be aligned with the flow.
+
+        The corrections are given at the height of each control point. The apparent wind direction
+        that the corrections belong to can be computed with
+        `WindEnvironment.apparent_wind_direction_from_condition_and_linear_velocity`.
+
+        Args:
+            stormbird_result: a simulation result from Stormbird, as a dictionary, e.g., read from
+                one of the full result files from an actuator line simulation. The control points and
+                the sampled velocity in the result are always in the global coordinate system.
+            wind_environment: the wind environment
+            wind_condition: the wind condition in the simulation
+            ship_velocity: the ship velocity in the simulation
+        '''
+        ctrl_points = [
+            SpatialVector.from_dict(point) for point in stormbird_result["ctrl_points"]
+        ]
+
+        measured_velocity = [
+            SpatialVector.from_dict(velocity)
+            for velocity in stormbird_result["solver_input_ctrl_points_velocity"]
+        ]
+
+        wing_indices = [
+            Range(start = indices["start"], end = indices["end"])
+            for indices in stormbird_result["wing_indices"]
+        ]
+
+        up_direction = wind_environment.up_direction.normalize()
+
+        linear_velocity = wind_environment.linear_velocity_from_ship_velocity(ship_velocity)
+
         height_values = []
         magnitude_corrections = []
         angle_corrections = []
-        
-        wing_indices = []
-        
-        for indices in wing_indices_raw:
-            wing_indices.append(
-                Range(
-                    start = indices["start"],
-                    end = indices["end"]
+
+        for ctrl_point, velocity in zip(ctrl_points, measured_velocity):
+            # The same height as used when the corrections are applied in Stormbird
+            height_values.append(ctrl_point.dot(up_direction))
+
+            undisturbed_velocity = wind_environment.steady_apparent_wind_velocity_vector_at_location(
+                wind_condition,
+                ctrl_point,
+                linear_velocity
+            )
+
+            undisturbed_velocity = undisturbed_velocity - up_direction * undisturbed_velocity.dot(up_direction)
+
+            horizontal_velocity = velocity - up_direction * velocity.dot(up_direction)
+
+            if undisturbed_velocity.length() == 0.0:
+                raise ValueError(
+                    "The undisturbed apparent wind is zero at a control point, so the inflow "
+                    "corrections can not be computed"
                 )
+
+            magnitude_corrections.append(
+                horizontal_velocity.length() / undisturbed_velocity.length()
             )
-            
-        for i in range(len(ctrl_points)):
-            height = (
-                ctrl_points[i]["x"] * up_direction.x + 
-                ctrl_points[i]["y"] * up_direction.y + 
-                ctrl_points[i]["z"] * up_direction.z
+
+            angle_corrections.append(
+                undisturbed_velocity.signed_angle_between(horizontal_velocity, up_direction)
             )
-            
-            height_values.append(
-                height
-            )
-            
-            velocity_magnitude = math.sqrt(
-                velocity_raw[i]["x"]**2 + 
-                velocity_raw[i]["y"]**2 + 
-                velocity_raw[i]["z"]**2
-            )
-            
-            magnitude_corrections.append(velocity_magnitude / freestream_velocity.length())
-            
-            angle_corrections.append(angles_of_attack[i])
-        
-        return InflowCorrectionsSingleDirection(
+
+        return cls(
             height_values = height_values,
             magnitude_corrections = magnitude_corrections,
             angle_corrections = angle_corrections,
             wing_indices = wing_indices
         )
-    
+
 class InflowCorrections(StormbirdSetupBaseModel):
     apparent_wind_directions: list[float]
     corrections: list[InflowCorrectionsSingleDirection]

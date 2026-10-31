@@ -12,6 +12,8 @@ use stormath::{
 };
 
 use crate::section_models::SectionModel;
+use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
+use crate::error::Error;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
 use crate::line_force_model::wing_internal_state::InternalCompartments;
@@ -44,6 +46,8 @@ pub struct SingleWing {
     pub added_mass: AddedMass,
     /// Model for the gyroscopic moment from the wing
     pub gyroscopic_moment: GyroscopicMoment,
+    /// Optional dynamic stall model for the wing
+    pub dynamic_stall: Option<DynamicStallModelBuilder>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -89,6 +93,11 @@ pub struct WingBuilder {
     /// Optional model for the gyroscopic moment from the wing. Only allowed together with the
     /// rotating cylinder section model. Not used by default.
     pub gyroscopic_moment: GyroscopicMoment,
+    #[serde(default)]
+    /// Optional dynamic stall model for the wing. Only used in dynamic lifting line simulations.
+    /// The parameters for the stall are only allowed together with section models that build on
+    /// the foil model. Not used by default.
+    pub dynamic_stall: Option<DynamicStallModelBuilder>,
 }
 
 impl WingBuilder {
@@ -156,6 +165,28 @@ impl WingBuilder {
         }
 
         self.gyroscopic_moment.clone()
+    }
+
+    /// Checks that the dynamic stall model of the wing, if any, is valid for the section model of
+    /// the wing, see [`DynamicStallModelBuilder::check`].
+    pub fn check_dynamic_stall(&self) -> Result<(), Error> {
+        match &self.dynamic_stall {
+            Some(dynamic_stall) => dynamic_stall.check(&self.section_model),
+            None => Ok(())
+        }
+    }
+
+    /// Returns the builder for the dynamic stall model of the wing, if any.
+    ///
+    /// # Panics
+    /// If the dynamic stall model is not valid for the section model, see
+    /// [`check_dynamic_stall`](WingBuilder::check_dynamic_stall).
+    pub fn dynamic_stall(&self) -> Option<DynamicStallModelBuilder> {
+        if let Err(error) = self.check_dynamic_stall() {
+            panic!("Invalid dynamic stall model: {}", error);
+        }
+
+        self.dynamic_stall.clone()
     }
 
     /// Builds the data for a single wing
@@ -239,6 +270,7 @@ impl WingBuilder {
             force_correction: self.force_correction.clone(),
             added_mass: self.added_mass.clone(),
             gyroscopic_moment: self.gyroscopic_moment(),
+            dynamic_stall: self.dynamic_stall(),
         }
     }
 }

@@ -42,6 +42,8 @@ impl CompleteSailModelBuilder {
 
     /// Builds the complete sail model
     pub fn build(&self) -> Result<CompleteSailModel, Error> {
+        self.lifting_line_simulation.check_settings()?;
+
         let lifting_line_simulation = self.lifting_line_simulation.build();
 
         let controller = self.controller.build(&lifting_line_simulation.line_force_model)?;

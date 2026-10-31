@@ -104,8 +104,34 @@ impl SimulationBuilder {
         Self::new_from_string(&string)
     }
 
+    /// Checks that the settings are consistent. At the moment, this checks the settings of the line
+    /// force model, see [`LineForceModelBuilder::check_settings`], and that dynamic stall models
+    /// are only used together with a dynamic simulation.
+    pub fn check_settings(&self) -> Result<(), Error> {
+        self.line_force_model.check_settings()?;
+
+        let has_dynamic_stall = self.line_force_model.wing_builders.iter()
+            .any(|wing_builder| wing_builder.dynamic_stall.is_some());
+
+        if has_dynamic_stall && matches!(self.simulation_settings, SimulationSettings::QuasiSteady(_)) {
+            return Err(Error::CustomStringError(
+                "The dynamic stall model can only be used together with dynamic simulation \
+                settings, as it depends on the time history of the flow".to_string()
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Builds the [Simulation] struct based on the current state of the builder.
+    ///
+    /// # Panics
+    /// If the settings are not consistent, see [SimulationBuilder::check_settings].
     pub fn build(&self) -> Simulation {
+        if let Err(error) = self.check_settings() {
+            panic!("Invalid simulation settings: {}", error);
+        }
+
         let line_force_model = self.line_force_model.build();
 
         let nr_of_lines = line_force_model.nr_span_lines();

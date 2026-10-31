@@ -54,6 +54,12 @@ pub struct SectionalForcesInput {
     /// The internal state as it should be supplied to the sectional forces. I.e., with any 
     /// conversion from the wing internal state applied.
     pub section_models_internal_state: Vec<Float>,
+    /// The amount of stall used for the lift and drag at each control point, between 0 (no stall)
+    /// and 1 (full stall). This is the dynamic amount of stall for wings with a dynamic stall
+    /// model, the static value from the foil model otherwise, and zero for section models that are
+    /// not built on the foil model.
+    #[serde(default)]
+    pub amount_of_stall: Vec<Float>,
     /// The *felt* acceleration at each control point, meaning the acceleration of the fluid from 
     /// the perspective of the wings, **not** the acceleration of the wings themselves.
     pub acceleration: Vec<SpatialVector>,

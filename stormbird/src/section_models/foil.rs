@@ -138,11 +138,37 @@ impl Foil {
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn lift_coefficient(&self, angle_of_attack: Float) -> Float {
-        let cl_pre_stall  = self.lift_coefficient_pre_stall_with_stall_drop_off(angle_of_attack);
-
-        let cl_post_stall = self.lift_coefficient_post_stall_with_stall_weight(angle_of_attack);
+        let (cl_pre_stall, cl_post_stall) = self.lift_coefficients_pre_and_post_stall(
+            angle_of_attack,
+            self.amount_of_stall(angle_of_attack)
+        );
 
         cl_post_stall + cl_pre_stall
+    }
+
+    #[inline(always)]
+    /// Returns the pre-stall lift coefficient, reduced by the amount of stall, and the post-stall
+    /// lift coefficient, weighted by the amount of stall, for a given amount of stall. The lift
+    /// coefficient of the foil is the sum of the two.
+    ///
+    /// The amount of stall is given as an argument, so that it can come from other sources than
+    /// the static value, [`Foil::amount_of_stall`], such as a dynamic stall model.
+    ///
+    /// # Arguments
+    /// * `angle_of_attack` - Angle of attack in radians.
+    /// * `amount_of_stall` - The amount of stall, between 0 (no stall) and 1 (full stall)
+    ///
+    /// # Returns
+    /// A tuple with the pre-stall and the post-stall lift coefficients, in that order.
+    pub fn lift_coefficients_pre_and_post_stall(
+        &self,
+        angle_of_attack: Float,
+        amount_of_stall: Float
+    ) -> (Float, Float) {
+        (
+            self.lift_coefficient_pre_stall_raw(angle_of_attack) * (1.0 - amount_of_stall),
+            self.lift_coefficient_post_stall_raw(angle_of_attack) * amount_of_stall
+        )
     }
 
     #[inline(always)]
@@ -181,11 +207,10 @@ impl Foil {
     #[inline(always)]
     /// Returns the pre-stall lift coefficient, reduced by the amount of stall
     pub fn lift_coefficient_pre_stall_with_stall_drop_off(&self, angle_of_attack: Float) -> Float {
-        let amount_of_stall = self.amount_of_stall(angle_of_attack);
-
-        let cl_pre_stall_raw = self.lift_coefficient_pre_stall_raw(angle_of_attack);
-
-        cl_pre_stall_raw * (1.0 - amount_of_stall)
+        self.lift_coefficients_pre_and_post_stall(
+            angle_of_attack,
+            self.amount_of_stall(angle_of_attack)
+        ).0
     }
 
     #[inline(always)]
@@ -197,11 +222,10 @@ impl Foil {
     #[inline(always)]
     /// Returns the post-stall lift coefficient, weighted by the amount of stall
     pub fn lift_coefficient_post_stall_with_stall_weight(&self, angle_of_attack: Float) -> Float {
-        let cl_post_stall_raw = self.lift_coefficient_post_stall_raw(angle_of_attack);
-
-        let amount_of_stall = self.amount_of_stall(angle_of_attack);
-
-        cl_post_stall_raw * amount_of_stall
+        self.lift_coefficients_pre_and_post_stall(
+            angle_of_attack,
+            self.amount_of_stall(angle_of_attack)
+        ).1
     }
 
     /// Calculates the drag coefficient for a given angle of attack.
@@ -209,10 +233,28 @@ impl Foil {
     /// # Arguments
     /// * `angle_of_attack` - Angle of attack in radians.
     pub fn drag_coefficient(&self, angle_of_attack: Float) -> Float {
+        self.drag_coefficient_with_amount_of_stall(
+            angle_of_attack,
+            self.amount_of_stall(angle_of_attack)
+        )
+    }
+
+    /// Calculates the drag coefficient for a given angle of attack and amount of stall, as a blend
+    /// between the pre-stall and the post-stall drag.
+    ///
+    /// The amount of stall is given as an argument, so that it can come from other sources than
+    /// the static value, [`Foil::amount_of_stall`], such as a dynamic stall model.
+    ///
+    /// # Arguments
+    /// * `angle_of_attack` - Angle of attack in radians.
+    /// * `amount_of_stall` - The amount of stall, between 0 (no stall) and 1 (full stall)
+    pub fn drag_coefficient_with_amount_of_stall(
+        &self,
+        angle_of_attack: Float,
+        amount_of_stall: Float
+    ) -> Float {
         let cd_pre_stall  = self.drag_coefficient_pre_stall(angle_of_attack);
         let cd_post_stall = self.cd_max_after_stall * angle_of_attack.sin().abs().powf(self.cd_power_after_stall);
-
-        let amount_of_stall = self.amount_of_stall(angle_of_attack);
 
         cd_pre_stall * (1.0 - amount_of_stall) + amount_of_stall * cd_post_stall
     }

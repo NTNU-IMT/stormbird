@@ -16,7 +16,7 @@ To build the library run:
 cargo build --release
 ```
 
-This gives a static library, `target/release/libcpp_actuator_line.a` on Linux. The library uses the versions of Stormbird and Stormath that are published on [crates.io](https://crates.io/crates/stormbird), as given in `Cargo.toml`.
+This gives a static library, `target/release/libcpp_actuator_line.a` on Linux. The library uses the versions of Stormbird and Stormath that are published on [crates.io](https://crates.io/crates/stormbird), as given in `Cargo.toml`. To test changes to Stormbird that are not yet released, the dependency can temporarily be changed to the local version in this repository, with `stormbird = { path = "../../../stormbird" }`.
 
 The C++ header and source files for the interface are generated from the Rust code with cxxbridge:
 

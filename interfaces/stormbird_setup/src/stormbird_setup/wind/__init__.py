@@ -9,9 +9,21 @@ from .inflow_corrections import InflowCorrectionsSingleDirection, InflowCorrecti
 from .velocity_variation import PowerModel, LogarithmicModel
 from .wind_condition import WindCondition
 
+# Imported last, as it depends on the lifting line module, which depends on the wind environment.
+# The force tuning requires pystormbird, but it is only imported when the tuning is used.
+from .force_tuning import (
+    ForceTuningCase,
+    ForceTuningSettings,
+    ForceTuningCaseResult,
+    ForceTuningResult,
+    InflowCorrectionsForceTuner,
+)
+
 __all__ = [
     "WindEnvironment",
     "InflowCorrectionsSingleDirection", "InflowCorrections",
     "PowerModel", "LogarithmicModel",
-    "WindCondition"
+    "WindCondition",
+    "ForceTuningCase", "ForceTuningSettings", "ForceTuningCaseResult", "ForceTuningResult",
+    "InflowCorrectionsForceTuner",
 ]
