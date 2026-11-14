@@ -5,7 +5,7 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 """
 import warnings
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from ..base_model import StormbirdSetupBaseModel
 from ..line_force_model import LineForceModelBuilder
@@ -20,7 +20,7 @@ class ActuatorLineBuilder(StormbirdSetupBaseModel):
     projection_settings: ProjectionSettings = ProjectionSettings()
     solver_settings: SolverSettings = SolverSettings()
     sampling_settings: SamplingSettings = SamplingSettings()
-    write_iterations_full_result: int = 100
+    write_iterations_full_result: int = Field(default=100, ge=1)
     start_time: float = 0
     controller: ControllerBuilder | None = None
     lifting_line_correction: LiftingLineCorrectionBuilder | None = LiftingLineCorrectionBuilder()

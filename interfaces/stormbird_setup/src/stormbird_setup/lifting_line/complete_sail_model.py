@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 class CompleteSailModelSettings(StormbirdSetupBaseModel):
     max_controller_iterations: int = 10
     allowed_angle_error: float = 0.00175 # 0.1 degrees in radians
+    allowed_relative_internal_state_error: float = 1e-3
     nr_loadings_to_test_during_optimization: int = 10
     retractable: bool = False
     thrust_direction: SpatialVector = Field(default_factory=lambda: SpatialVector(x=-1.0))
