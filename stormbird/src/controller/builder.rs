@@ -108,7 +108,7 @@ mod tests {
             ..Default::default()
         });
 
-        builder.build()
+        builder.build().unwrap()
     }
 
     fn controller_builder(moving_average_window_size: Option<usize>) -> ControllerBuilder {

@@ -26,6 +26,7 @@ use varying_foil::VaryingFoil;
 use rotating_cylinder::RotatingCylinder;
 use active_air_flow_foil::ActiveAirFlowFoil;
 use crate::line_force_model::wing_internal_state::{WingInternalState, InternalCompartments};
+use crate::error::Error;
 
 #[derive(Debug, Clone)]
 /// The local flow conditions on a single segment of a wing. Used by section models where the
@@ -354,10 +355,9 @@ impl SectionModel {
     }
 
     /// Creates a section model from a JSON string
-    pub fn from_string(setup_string: &str) -> Result<Self, String> {
-        let section_model: SectionModel = serde_json::from_str(setup_string)
-            .map_err(|e| format!("Failed to parse section model from string: {}", e))?;
-        
+    pub fn from_string(setup_string: &str) -> Result<Self, Error> {
+        let section_model: SectionModel = serde_json::from_str(setup_string)?;
+
         Ok(section_model)
     }
 }

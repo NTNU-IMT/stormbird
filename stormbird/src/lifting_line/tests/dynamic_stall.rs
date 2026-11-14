@@ -44,7 +44,7 @@ fn dynamic_simulation(dynamic_stall: Option<DynamicStallModelBuilder>) -> Simula
     SimulationBuilder::new(
         line_force_model_builder(dynamic_stall),
         SimulationSettings::Dynamic(DynamicSettings::default()),
-    ).build()
+    ).build().unwrap()
 }
 
 /// Runs a simulation where the wing angle is ramped linearly from zero to the max angle, and returns
@@ -86,6 +86,7 @@ fn dynamic_stall_is_not_allowed_in_quasi_steady_simulations() {
     );
 
     assert!(builder.check_settings().is_err());
+    assert!(builder.build().is_err());
 }
 
 #[test]
@@ -202,7 +203,7 @@ fn rotor_simulation(dynamic_stall: Option<DynamicStallModelBuilder>) -> Simulati
     SimulationBuilder::new(
         builder,
         SimulationSettings::Dynamic(DynamicSettings::default()),
-    ).build()
+    ).build().unwrap()
 }
 
 /// Runs a rotor simulation where the revolutions per second change in a step after the first time

@@ -76,7 +76,7 @@ impl SpanwiseMeasurementBuilder {
     /// of sections, and therefore have their control points in different places.
     pub fn build(&self, line_force_model: &LineForceModel) -> Result<SpanwiseMeasurement, Error> {
         if self.non_dim_end_location < self.non_dim_start_location {
-            return Err(Error::CustomStringError(format!(
+            return Err(Error::InvalidInput(format!(
                 "The end of a spanwise measurement cannot be before its start. The start location \
                  is {} and the end location is {}. Both are non-dimensional, and run from -0.5 to \
                  0.5 along the span",
@@ -95,7 +95,7 @@ impl SpanwiseMeasurementBuilder {
             let wing_locations = &non_dim_locations[indices.clone()];
 
             if wing_locations.is_empty() {
-                return Err(Error::CustomStringError(format!(
+                return Err(Error::InvalidInput(format!(
                     "Wing {} has no control points, so there is nothing to measure on it",
                     wing_index
                 )));
@@ -245,7 +245,7 @@ mod tests {
             });
         }
 
-        builder.build()
+        builder.build().unwrap()
     }
 
     fn build(start: Float, end: Float, model: &LineForceModel) -> SpanwiseMeasurement {

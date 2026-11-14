@@ -31,14 +31,14 @@ fn initial_wake_length_follows_chord_length() {
         ..Default::default()
     });
 
-    let line_force_model = line_force_model_builder.build();
+    let line_force_model = line_force_model_builder.build().unwrap();
 
     let wake_builder = DynamicWakeBuilder {
         nr_panels_per_line_element: nr_panels,
         ..Default::default()
     };
 
-    let wake = wake_builder.build(&line_force_model);
+    let wake = wake_builder.build(&line_force_model).unwrap();
 
     let middle_panels_length = wake_builder.initial_relative_wake_length * chord_length *
         (nr_panels - 2) as Float / nr_panels as Float;

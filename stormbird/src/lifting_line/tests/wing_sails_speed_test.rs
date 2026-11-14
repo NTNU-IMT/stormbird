@@ -74,7 +74,7 @@ fn wing_sails_speed_test() {
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder.clone(),
         simulation_settings
-    }.build();
+    }.build().unwrap();
 
     let freestream_velocity = SpatialVector::from([1.2, 0.0, 0.0]);
 

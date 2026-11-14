@@ -1,4 +1,5 @@
 use stormath::type_aliases::Float;
+use crate::error::Error;
 use stormath::consts::MIN_POSITIVE;
 use stormath::solvers::{secant_solver, brent_solver, SolverSettings};
 
@@ -83,7 +84,7 @@ struct InternalFlowInput {
 }
 
 impl TryFrom<InternalFlowInput> for InternalFlow {
-    type Error = String;
+    type Error = Error;
 
     fn try_from(input: InternalFlowInput) -> Result<Self, Self::Error> {
         Self::new(
@@ -104,29 +105,29 @@ impl InternalFlow {
         loss_coefficient: Float,
         porous_fraction: Float,
         solver_settings: InternalFlowSolverSettings
-    ) -> Result<Self, String> {
+    ) -> Result<Self, Error> {
         if cp_suction_gradient > 0.0 {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "The cp_suction_gradient in the internal flow model must be zero or negative, as \
                 more suction can not increase the external pressure. Value: {}",
                 cp_suction_gradient
-            ));
+            )));
         }
 
         if loss_coefficient <= 0.0 {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "The loss_coefficient in the internal flow model must be larger than zero. \
                 Value: {}",
                 loss_coefficient
-            ));
+            )));
         }
 
         if porous_fraction <= 0.0 {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "The porous_fraction in the internal flow model must be larger than zero. \
                 Value: {}",
                 porous_fraction
-            ));
+            )));
         }
 
         Ok(Self {

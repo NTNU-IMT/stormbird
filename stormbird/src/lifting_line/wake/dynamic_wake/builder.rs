@@ -136,19 +136,22 @@ impl DynamicWakeBuilder {
         if error_messages.is_empty() {
             Ok(())
         } else {
-            Err(Error::CustomStringError(format!(
+            Err(Error::InvalidInput(format!(
                 "Invalid dynamic wake settings: {}",
                 error_messages.join(" ")
             )))
         }
     }
 
-    /// Builds the dynamic wake for the given line force model. Panics if the settings are not valid.
+    /// Builds the dynamic wake for the given line force model.
+    ///
+    /// # Errors
+    /// If the settings are not valid, see [`settings_is_valid`](Self::settings_is_valid).
     pub fn build(
         &self,
         line_force_model: &LineForceModel,
-    ) -> DynamicWake {
-        self.settings_is_valid().unwrap();
+    ) -> Result<DynamicWake, Error> {
+        self.settings_is_valid()?;
 
         let span_points = &line_force_model.span_points_global;
 
@@ -223,7 +226,7 @@ impl DynamicWakeBuilder {
             self.initial_relative_wake_length
         );
 
-        wake
+        Ok(wake)
     }
 
     /// The function that calculates the viscous core length for each panel in the wake.

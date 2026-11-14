@@ -31,7 +31,7 @@ fn moment_test() {
     let mut sim = SimulationBuilder {
         line_force_model: line_force_model_builder,
         simulation_settings: SimulationSettings::default()
-    }.build();
+    }.build().unwrap();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
 

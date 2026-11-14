@@ -2,6 +2,36 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## 0.13.0 - Unreleased
+### Breaking changes
+- Invalid user input is now returned as errors rather than causing panics. The following functions return a `Result<_, Error>` instead of the value directly:
+    - `LineForceModelBuilder::build` and `LineForceModelBuilder::build_with_nr_sections`
+    - `WingBuilder::build`, `WingBuilder::internal_compartments`, `WingBuilder::gyroscopic_moment` and `WingBuilder::dynamic_stall`
+    - `DynamicStallModelBuilder::build`
+    - `DynamicWakeBuilder::build`
+    - `SimulationBuilder::build`
+    - `ActuatorLineBuilder::build`, `ActuatorLine::new_from_file` and `ActuatorLine::new_from_string`
+    - `ActuatorLine::write_results`, which also returns errors from writing the CSV file with the forces, which were silently ignored before
+    - `DiscretizedSpectrum::from_json_string` and `DiscretizedSpectrum::from_json_file`
+    - `VelocityVariation::from_json_string` and `VelocityVariation::from_json_file`
+    - `WindCondition::set_parallel_gust_from_json_string`, `WindCondition::set_perpendicular_gust_from_json_string` and `WindCondition::set_vertical_gust_from_json_string`
+- Functions that returned errors as a `String` or a `serde_json::Error` now return the common `Error` type of the library, so that all errors can be propagated with `?`. This applies to `VaryingFoil::new`, `SpanVariation::new_linear`, `SpanVariation::new_piecewise_constant`, `InternalCompartments::new`, `FanCurveData::new`, `InternalFlow::new`, `SectionModel::from_string` and `ActiveAirFlowFoil::new_from_string`.
+- New `InvalidInput` variant in the `Error` enum, see below. Code that matches exhaustively on the error must handle the new variant.
+- Validation errors use the new `Error::InvalidInput` variant, rather than `Error::CustomStringError`. This includes the existing checks of the dynamic stall model, the dynamic wake, the spanwise measurements in the controller, and the use of dynamic stall in quasi-steady simulations.
+- The `dynamic_stall` field in `SingleWing` holds the built `DynamicStallModel` rather than the `DynamicStallModelBuilder`, so that the model is built, and checked, in `WingBuilder::build`.
+- `Simulation::new_from_string` and `CompleteSailModelBuilder::build` no longer call `SimulationBuilder::check_settings` separately, as the checks are done in `SimulationBuilder::build`.
+
+### Features
+- New `Error::InvalidInput` variant for invalid input or settings, with a helper constructor `Error::invalid_input`. The `Error` type also implements `std::error::Error::source` for the IO and JSON errors.
+- New `WingBuilder::check_geometry` function, which checks that a wing has at least two section points, one chord vector for each section point, one `line_segment_is_virtual` value for each segment if given, at least one section, and a span larger than zero. Before, these cases gave index panics or invalid values when building the model.
+- New `WingBuilder::check` function, which checks the geometry, the internal compartments, the gyroscopic moment model and the dynamic stall model of a wing.
+- `LineForceModelBuilder::check_settings` checks that there is at least one wing, all the settings of each wing, and that the number of `local_wing_angles` matches the number of wings. New `LineForceModelBuilder::check_settings_with_nr_sections` for the same checks with a given number of sections. Errors from a wing include the index of the wing.
+- `SimulationBuilder::check_settings` also checks the settings of the dynamic wake, if used.
+- New `ActuatorLineBuilder::check_settings` function, which checks the settings of the line force model, and that `write_iterations_full_result` is not zero, which gave a division by zero when writing results before.
+
+### Changes
+- The linearized solver and `ActuatorLine::update_controller` use `expect` with a descriptive message, rather than `unwrap`, for the cases that can still panic: a singular equation system in the linearized solver, and updating the controller before the first time step in the actuator line model.
+
 ## 0.12.0 - 2026-10-31
 ### Breaking changes
 - The default `wind_rotation_axis` in the `WindEnvironment` is changed from the positive to the negative z-axis, i.e., opposite of the default up direction, so that the wind direction is measured clockwise seen from above. This is the same default as in stormbird_setup, and the convention that is described in the book. Wind environments that are created from JSON without a `wind_rotation_axis` get the opposite sign of the wind direction. Set `wind_rotation_axis` to `{"x": 0.0, "y": 0.0, "z": 1.0}` to get the same behavior as before.

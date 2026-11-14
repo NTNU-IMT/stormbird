@@ -33,7 +33,7 @@ fn quasi_steady_simulation(symmetry_condition: SymmetryCondition) -> Simulation 
             },
             ..Default::default()
         })
-    }.build()
+    }.build().unwrap()
 }
 
 fn do_step(sim: &mut Simulation) {

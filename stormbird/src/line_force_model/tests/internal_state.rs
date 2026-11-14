@@ -68,6 +68,7 @@ mod compartments {
     use crate::line_force_model::builder::single_wing::WingBuilder;
     use crate::line_force_model::builder::LineForceModelBuilder;
     use crate::line_force_model::LineForceModel;
+    use crate::error::Error;
     use crate::section_models::SectionModel;
     use crate::section_models::foil::Foil;
     use crate::section_models::varying_foil::VaryingFoil;
@@ -92,7 +93,10 @@ mod compartments {
         })
     }
 
-    fn build_model(section_model: SectionModel, boundaries: Option<Vec<Float>>) -> LineForceModel {
+    fn try_build_model(
+        section_model: SectionModel,
+        boundaries: Option<Vec<Float>>
+    ) -> Result<LineForceModel, Error> {
         let mut builder = LineForceModelBuilder::new(8);
 
         builder.add_wing(WingBuilder {
@@ -107,6 +111,20 @@ mod compartments {
         });
 
         builder.build()
+    }
+
+    fn build_model(section_model: SectionModel, boundaries: Option<Vec<Float>>) -> LineForceModel {
+        try_build_model(section_model, boundaries).unwrap()
+    }
+
+    /// Asserts that building the model gives an invalid input error that contains the given text
+    fn assert_invalid_input(section_model: SectionModel, boundaries: Vec<Float>, expected: &str) {
+        match try_build_model(section_model, Some(boundaries)) {
+            Err(Error::InvalidInput(message)) => assert!(
+                message.contains(expected), "Unexpected error message: {}", message
+            ),
+            other => panic!("Expected an invalid input error, got {:?}", other.map(|_| ())),
+        }
     }
 
     #[test]
@@ -132,14 +150,16 @@ mod compartments {
     }
 
     #[test]
-    #[should_panic(expected = "only used by section models with an internal flow")]
     fn compartments_are_rejected_for_other_section_models() {
-        build_model(SectionModel::SingleElementFoil(Foil::default()), Some(vec![-0.5, 0.0, 0.5]));
+        assert_invalid_input(
+            SectionModel::SingleElementFoil(Foil::default()),
+            vec![-0.5, 0.0, 0.5],
+            "only used by section models with an internal flow"
+        );
     }
 
     #[test]
-    #[should_panic(expected = "must start at")]
     fn compartments_must_cover_the_whole_span() {
-        build_model(suction_sail_section_model(), Some(vec![-0.4, 0.0, 0.5]));
+        assert_invalid_input(suction_sail_section_model(), vec![-0.4, 0.0, 0.5], "must start at");
     }
 }

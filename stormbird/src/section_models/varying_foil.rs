@@ -37,7 +37,7 @@ struct VaryingFoilInput {
 }
 
 impl TryFrom<VaryingFoilInput> for VaryingFoil {
-    type Error = String;
+    type Error = Error;
 
     fn try_from(input: VaryingFoilInput) -> Result<Self, Self::Error> {
         Self::new(input.internal_state_data, input.foils_data)
@@ -55,25 +55,26 @@ impl std::fmt::Display for VaryingFoil {
 
 impl VaryingFoil {
     /// Creates a new varying foil, and checks that the data is valid
-    pub fn new(internal_state_data: Vec<Float>, foils_data: Vec<Foil>) -> Result<Self, String> {
+    pub fn new(internal_state_data: Vec<Float>, foils_data: Vec<Foil>) -> Result<Self, Error> {
         if internal_state_data.is_empty() {
-            return Err("The varying foil must have at least one foil in the data".to_string());
+            return Err(Error::invalid_input(
+                "The varying foil must have at least one foil in the data"
+            ));
         }
 
         if internal_state_data.len() != foils_data.len() {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "The internal state data and the foils data must have the same length. Internal \
                 state data: {}, foils data: {}",
                 internal_state_data.len(), foils_data.len()
-            ));
+            )));
         }
 
         for i in 1..internal_state_data.len() {
             if internal_state_data[i] <= internal_state_data[i - 1] {
-                return Err(
+                return Err(Error::invalid_input(
                     "The internal state data for the varying foil must be strictly increasing"
-                    .to_string()
-                );
+                ));
             }
         }
 

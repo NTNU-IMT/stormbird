@@ -12,7 +12,7 @@ use stormath::{
 };
 
 use crate::section_models::SectionModel;
-use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
+use crate::section_models::dynamic_stall::{DynamicStallModel, DynamicStallModelBuilder};
 use crate::error::Error;
 use crate::line_force_model::span_line::SpanLine;
 use crate::line_force_model::input_power::InputPowerModel;
@@ -47,7 +47,7 @@ pub struct SingleWing {
     /// Model for the gyroscopic moment from the wing
     pub gyroscopic_moment: GyroscopicMoment,
     /// Optional dynamic stall model for the wing
-    pub dynamic_stall: Option<DynamicStallModelBuilder>,
+    pub dynamic_stall: Option<DynamicStallModel>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -124,47 +124,99 @@ impl WingBuilder {
         span_distance
     }
 
+    /// Checks that the geometry of the wing is valid, i.e., that there are at least two section
+    /// points, that there is one chord vector for each section point, that the virtual line
+    /// segments, if given, have one value for each segment between the section points, that the
+    /// number of sections is not zero, and that the wing has a non-zero span.
+    ///
+    /// # Arguments
+    /// * `default_nr_sections` - The number of sections to use if the wing does not specify its
+    ///   own number of sections
+    pub fn check_geometry(&self, default_nr_sections: usize) -> Result<(), Error> {
+        let nr_section_points = self.section_points.len();
+
+        if nr_section_points < 2 {
+            return Err(Error::invalid_input(format!(
+                "A wing must have at least two section points, but {} were given",
+                nr_section_points
+            )));
+        }
+
+        if self.chord_vectors.len() != nr_section_points {
+            return Err(Error::invalid_input(format!(
+                "A wing must have one chord vector for each section point. Section points: {}, \
+                chord vectors: {}",
+                nr_section_points, self.chord_vectors.len()
+            )));
+        }
+
+        if let Some(line_segment_is_virtual) = &self.line_segment_is_virtual {
+            if line_segment_is_virtual.len() != nr_section_points - 1 {
+                return Err(Error::invalid_input(format!(
+                    "line_segment_is_virtual must have one value for each segment between the \
+                    section points, i.e., {} values, but {} were given",
+                    nr_section_points - 1, line_segment_is_virtual.len()
+                )));
+            }
+        }
+
+        if self.nr_sections.unwrap_or(default_nr_sections) == 0 {
+            return Err(Error::invalid_input(
+                "The number of sections for a wing must be at least one"
+            ));
+        }
+
+        let total_span_distance = self.specified_sections_span_distance()[nr_section_points - 1];
+
+        if total_span_distance.is_nan() || total_span_distance <= 0.0 {
+            return Err(Error::invalid_input(format!(
+                "The span of a wing must be larger than zero, but is {}",
+                total_span_distance
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Returns the internal compartments of the wing.
     ///
-    /// # Panics
+    /// # Errors
     /// If the boundaries are not valid, or if more than one compartment is specified for a section
     /// model that does not use internal compartments.
-    pub fn internal_compartments(&self) -> InternalCompartments {
+    pub fn internal_compartments(&self) -> Result<InternalCompartments, Error> {
         let Some(boundaries) = &self.internal_compartment_boundaries else {
-            return InternalCompartments::default();
+            return Ok(InternalCompartments::default());
         };
 
-        let compartments = InternalCompartments::new(boundaries.clone()).unwrap_or_else(|error| {
-            panic!("Invalid internal compartments for a wing: {}", error)
-        });
+        let compartments = InternalCompartments::new(boundaries.clone())?;
 
         if compartments.nr_compartments() > 1 && !self.section_model.uses_internal_compartments() {
-            panic!(
+            return Err(Error::invalid_input(
                 "Internal compartments are only used by section models with an internal flow \
                 model, i.e., an active air flow foil with the PowerToInternalFlow or \
                 FanSpeedToInternalFlow conversion"
-            );
+            ));
         }
 
-        compartments
+        Ok(compartments)
     }
 
     /// Returns the gyroscopic moment model of the wing.
     ///
-    /// # Panics
+    /// # Errors
     /// If the model is active for a section model that is not a rotating cylinder, as the internal
     /// state is then not the rotational speed of the wing.
-    pub fn gyroscopic_moment(&self) -> GyroscopicMoment {
+    pub fn gyroscopic_moment(&self) -> Result<GyroscopicMoment, Error> {
         if self.gyroscopic_moment.is_active() &&
             !matches!(self.section_model, SectionModel::RotatingCylinder(_))
         {
-            panic!(
+            return Err(Error::invalid_input(
                 "The gyroscopic moment model is only used together with the rotating cylinder \
                 section model"
-            );
+            ));
         }
 
-        self.gyroscopic_moment.clone()
+        Ok(self.gyroscopic_moment.clone())
     }
 
     /// Checks that the dynamic stall model of the wing, if any, is valid for the section model of
@@ -178,27 +230,46 @@ impl WingBuilder {
 
     /// Returns the builder for the dynamic stall model of the wing, if any.
     ///
-    /// # Panics
+    /// # Errors
     /// If the dynamic stall model is not valid for the section model, see
     /// [`check_dynamic_stall`](WingBuilder::check_dynamic_stall).
-    pub fn dynamic_stall(&self) -> Option<DynamicStallModelBuilder> {
-        if let Err(error) = self.check_dynamic_stall() {
-            panic!("Invalid dynamic stall model: {}", error);
-        }
+    pub fn dynamic_stall(&self) -> Result<Option<DynamicStallModelBuilder>, Error> {
+        self.check_dynamic_stall()?;
 
-        self.dynamic_stall.clone()
+        Ok(self.dynamic_stall.clone())
+    }
+
+    /// Checks all the settings of the wing, i.e., the geometry, see
+    /// [`check_geometry`](WingBuilder::check_geometry), the internal compartments, the gyroscopic
+    /// moment model and the dynamic stall model.
+    ///
+    /// # Arguments
+    /// * `default_nr_sections` - The number of sections to use if the wing does not specify its
+    ///   own number of sections
+    pub fn check(&self, default_nr_sections: usize) -> Result<(), Error> {
+        self.check_geometry(default_nr_sections)?;
+        self.internal_compartments()?;
+        self.gyroscopic_moment()?;
+        self.check_dynamic_stall()?;
+
+        Ok(())
     }
 
     /// Builds the data for a single wing
-    pub fn build(&self, default_nr_sections: usize) -> SingleWing {
+    ///
+    /// # Errors
+    /// If the settings of the wing are not valid, see [`check`](WingBuilder::check).
+    pub fn build(&self, default_nr_sections: usize) -> Result<SingleWing, Error> {
+        self.check_geometry(default_nr_sections)?;
+
         let nr_specified_sections = self.section_points.len();
         let nr_segments = nr_specified_sections - 1;
-        
+
         let nr_sections_average = self.nr_sections.unwrap_or(default_nr_sections);
 
         let specified_sections_span_distance = self.specified_sections_span_distance();
 
-        let total_span_distance = specified_sections_span_distance.last().unwrap();
+        let total_span_distance = specified_sections_span_distance[nr_segments];
 
         let ds_average = total_span_distance / (nr_sections_average as Float);
 
@@ -258,7 +329,12 @@ impl WingBuilder {
 
         let section_model = self.section_model.clone();
 
-        SingleWing {
+        let dynamic_stall = match self.dynamic_stall()? {
+            Some(builder) => Some(builder.build(span_lines_local.len())?),
+            None => None,
+        };
+
+        Ok(SingleWing {
             span_lines_local,
             chord_vectors_local,
             chord_lengths,
@@ -266,12 +342,12 @@ impl WingBuilder {
             section_model,
             non_zero_circulation_at_ends: self.non_zero_circulation_at_ends,
             input_power_model: self.input_power_model.clone(),
-            internal_compartments: self.internal_compartments(),
+            internal_compartments: self.internal_compartments()?,
             force_correction: self.force_correction.clone(),
             added_mass: self.added_mass.clone(),
-            gyroscopic_moment: self.gyroscopic_moment(),
-            dynamic_stall: self.dynamic_stall(),
-        }
+            gyroscopic_moment: self.gyroscopic_moment()?,
+            dynamic_stall,
+        })
     }
 }
 
@@ -308,7 +384,7 @@ mod tests {
             ..Default::default()
         };
 
-        let single_wing = wing_builder.build(12);
+        let single_wing = wing_builder.build(12).unwrap();
 
         dbg!(single_wing);
     }
@@ -327,5 +403,49 @@ mod tests {
         assert_eq!(wing_builder.force_correction.lift_induced_drag_correction, 0.01);
         assert_eq!(wing_builder.added_mass.chordwise_coefficient, 1.0);
         assert_eq!(wing_builder.gyroscopic_moment.moment_of_inertia, 100.0);
+    }
+
+    fn simple_wing_builder() -> WingBuilder {
+        WingBuilder {
+            section_points: vec![
+                SpatialVector::from([0.0, 0.0, 0.0]),
+                SpatialVector::from([0.0, 0.0, 10.0]),
+            ],
+            chord_vectors: vec![SpatialVector::from([1.0, 0.0, 0.0]); 2],
+            ..Default::default()
+        }
+    }
+
+    fn assert_invalid_input(result: Result<SingleWing, Error>) {
+        assert!(matches!(result, Err(Error::InvalidInput(_))), "Expected an invalid input error");
+    }
+
+    #[test]
+    fn valid_wing_builds() {
+        assert!(simple_wing_builder().build(10).is_ok());
+    }
+
+    #[test]
+    fn invalid_geometry_gives_errors() {
+        let mut too_few_points = simple_wing_builder();
+        too_few_points.section_points.truncate(1);
+        too_few_points.chord_vectors.truncate(1);
+        assert_invalid_input(too_few_points.build(10));
+
+        let mut missing_chord_vector = simple_wing_builder();
+        missing_chord_vector.chord_vectors.pop();
+        assert_invalid_input(missing_chord_vector.build(10));
+
+        let wrong_virtual_segments = WingBuilder {
+            line_segment_is_virtual: Some(vec![false, false]),
+            ..simple_wing_builder()
+        };
+        assert_invalid_input(wrong_virtual_segments.build(10));
+
+        assert_invalid_input(simple_wing_builder().build(0));
+
+        let mut zero_span = simple_wing_builder();
+        zero_span.section_points[1] = zero_span.section_points[0];
+        assert_invalid_input(zero_span.build(10));
     }
 }

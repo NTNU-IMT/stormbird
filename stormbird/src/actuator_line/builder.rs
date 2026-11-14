@@ -5,6 +5,7 @@
 
 use crate::line_force_model::builder::LineForceModelBuilder;
 use crate::controller::builder::ControllerBuilder;
+use crate::error::Error;
 
 use serde::{Serialize, Deserialize};
 
@@ -85,9 +86,30 @@ impl ActuatorLineBuilder {
         }
     }
 
+    /// Checks that the settings are consistent. At the moment, this checks the settings of the line
+    /// force model, see [`LineForceModelBuilder::check_settings`], and that the number of
+    /// iterations between each full result is written is not zero.
+    pub fn check_settings(&self) -> Result<(), Error> {
+        self.line_force_model.check_settings()?;
+
+        if self.write_iterations_full_result == 0 {
+            return Err(Error::invalid_input(
+                "write_iterations_full_result must be at least one"
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Constructs an actuator line model from the builder data.
-    pub fn build(&self) -> ActuatorLine {
-        let line_force_model = self.line_force_model.build();
+    ///
+    /// # Errors
+    /// If the settings are not consistent, see [`check_settings`](Self::check_settings), or if the
+    /// controller can not be built.
+    pub fn build(&self) -> Result<ActuatorLine, Error> {
+        self.check_settings()?;
+
+        let line_force_model = self.line_force_model.build()?;
 
         let nr_span_lines = line_force_model.nr_span_lines();
 
@@ -101,9 +123,10 @@ impl ActuatorLineBuilder {
             );
         }
 
-        let controller = self.controller.as_ref().map(|controller_builder| controller_builder
-                    .build(&line_force_model)
-                    .expect("Could not build the controller"));
+        let controller = match &self.controller {
+            Some(controller_builder) => Some(controller_builder.build(&line_force_model)?),
+            None => None,
+        };
 
         let lifting_line_correction = if let Some(lifting_line_correction_builder) = &self.lifting_line_correction {
             let viscous_core_length_factor = 0.5 * (
@@ -118,7 +141,7 @@ impl ActuatorLineBuilder {
             None
         };
 
-        ActuatorLine{
+        Ok(ActuatorLine{
             line_force_model,
             projection_settings: self.projection_settings.clone(),
             solver_settings: self.solver_settings.clone(),
@@ -135,6 +158,6 @@ impl ActuatorLineBuilder {
             lifting_line_correction,
             tip_loss_correction: self.tip_loss_correction.clone(),
             spanflow_damper: self.spanflow_damper.clone()
-        }
+        })
     }
 }

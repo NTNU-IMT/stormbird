@@ -16,6 +16,7 @@ use crate::line_force_model::added_mass::AddedMass;
 use crate::line_force_model::gyroscopic_moment::GyroscopicMoment;
 use crate::section_models::rotating_cylinder::RotatingCylinder;
 use crate::section_models::dynamic_stall::DynamicStallModelBuilder;
+use crate::error::Error;
 
 const CHORD_LENGTH: Float = 2.0;
 const DENSITY: Float = 1.2;
@@ -37,13 +38,17 @@ fn wing_builder(section_model: SectionModel) -> WingBuilder {
     }
 }
 
-fn build(wing_builder: WingBuilder) -> LineForceModel {
+fn try_build(wing_builder: WingBuilder) -> Result<LineForceModel, Error> {
     let mut builder = LineForceModelBuilder::new(12);
 
     builder.density = DENSITY;
     builder.add_wing(wing_builder);
 
     builder.build()
+}
+
+fn build(wing_builder: WingBuilder) -> LineForceModel {
+    try_build(wing_builder).unwrap()
 }
 
 fn force_input(
@@ -188,12 +193,11 @@ fn gyroscopic_moment() {
 }
 
 #[test]
-#[should_panic]
 fn gyroscopic_moment_requires_rotating_cylinder() {
-    build(WingBuilder {
+    assert!(try_build(WingBuilder {
         gyroscopic_moment: GyroscopicMoment { moment_of_inertia: 100.0 },
         ..wing_builder(SectionModel::default())
-    });
+    }).is_err());
 }
 
 #[test]
@@ -229,13 +233,12 @@ fn dynamic_stall_with_internal_state_lag_for_rotating_cylinder() {
 }
 
 #[test]
-#[should_panic]
 fn dynamic_stall_parameters_require_foil_section_model() {
-    build(WingBuilder {
+    assert!(try_build(WingBuilder {
         dynamic_stall: Some(DynamicStallModelBuilder {
             separation_time_constant: Some(4.0),
             ..Default::default()
         }),
         ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
-    });
+    }).is_err());
 }

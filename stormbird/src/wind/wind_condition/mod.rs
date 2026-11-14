@@ -8,6 +8,7 @@
 use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;
+use crate::error::Error;
 
 /// Models for the variation of the wind velocity with height
 pub mod velocity_variation;
@@ -88,23 +89,54 @@ impl WindCondition {
     }
 
     /// Set parallel gust spectrum from JSON input
-    pub fn set_parallel_gust_from_json_string(&mut self, gust_string: &str) {
-        let parallel_gust: DiscretizedSpectrum = serde_json::from_str(gust_string).unwrap();
+    pub fn set_parallel_gust_from_json_string(&mut self, gust_string: &str) -> Result<(), Error> {
+        let parallel_gust = DiscretizedSpectrum::from_json_string(gust_string)?;
         
         self.parallel_gust = Some(parallel_gust);
+
+        Ok(())
     }
 
     /// Set perpendicular gust spectrum from JSON input
-    pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: &str) {
-        let perpendicular_gust: DiscretizedSpectrum = serde_json::from_str(gust_string).unwrap();
+    pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: &str) -> Result<(), Error> {
+        let perpendicular_gust = DiscretizedSpectrum::from_json_string(gust_string)?;
         
         self.perpendicular_gust = Some(perpendicular_gust);
+
+        Ok(())
     }
 
     /// Set vertical gust spectrum from JSON input
-    pub fn set_vertical_gust_from_json_string(&mut self, gust_string: &str) {
-        let vertical_gust: DiscretizedSpectrum = serde_json::from_str(gust_string).unwrap();
+    pub fn set_vertical_gust_from_json_string(&mut self, gust_string: &str) -> Result<(), Error> {
+        let vertical_gust = DiscretizedSpectrum::from_json_string(gust_string)?;
         
         self.vertical_gust = Some(vertical_gust);
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_json_input_gives_errors() {
+        let mut wind_condition = WindCondition::new_constant(0.0, 10.0);
+
+        assert!(wind_condition.set_parallel_gust_from_json_string("not json").is_err());
+        assert!(wind_condition.parallel_gust.is_none());
+
+        assert!(DiscretizedSpectrum::from_json_file("this_file_does_not_exist.json").is_err());
+        assert!(VelocityVariation::from_json_string("{\"Unknown\": 1.0}").is_err());
+
+        let spectrum = DiscretizedSpectrum {
+            frequencies: vec![0.1],
+            amplitudes: vec![1.0],
+            phases: vec![0.0],
+        };
+
+        wind_condition.set_vertical_gust_from_json_string(&spectrum.to_json_string()).unwrap();
+        assert!(wind_condition.vertical_gust.is_some());
     }
 }

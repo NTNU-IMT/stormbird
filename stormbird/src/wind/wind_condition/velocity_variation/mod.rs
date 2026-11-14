@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use stormath::type_aliases::Float;
+use crate::error::Error;
 
 /// Power law model for the atmospheric boundary layer
 pub mod power_model;
@@ -42,14 +43,15 @@ impl VelocityVariation {
         }
     }
 
-    /// Creates a velocity variation from a JSON string. Panics if the string can not be parsed.
-    pub fn from_json_string(json_string: &str) -> Self {
-        serde_json::from_str(json_string).unwrap()
+    /// Creates a velocity variation from a JSON string
+    pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
+        Ok(serde_json::from_str(json_string)?)
     }
 
-    /// Creates a velocity variation from a JSON file. Panics if the file can not be read or parsed.
-    pub fn from_json_file(file_path: &str) -> Self {
-        let json_string = std::fs::read_to_string(file_path).unwrap();
+    /// Creates a velocity variation from a JSON file
+    pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
+        let json_string = std::fs::read_to_string(file_path)?;
+
         Self::from_json_string(&json_string)
     }
 }

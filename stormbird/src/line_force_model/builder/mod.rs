@@ -88,29 +88,61 @@ impl LineForceModelBuilder {
         self.wing_builders.push(wing_builder);
     }
 
-    /// Checks that the settings for each wing are consistent. At the moment, this checks that the
-    /// dynamic stall models, if any, are valid for the section models, see
-    /// [`WingBuilder::check_dynamic_stall`].
+    /// Checks that the settings are consistent, i.e., that there is at least one wing, that the
+    /// settings for each wing are valid, see [`WingBuilder::check`], and that the number of local
+    /// wing angles, if given, matches the number of wings.
     pub fn check_settings(&self) -> Result<(), Error> {
-        for wing_builder in &self.wing_builders {
-            wing_builder.check_dynamic_stall()?;
+        self.check_settings_with_nr_sections(self.nr_sections)
+    }
+
+    /// Same as [`check_settings`](LineForceModelBuilder::check_settings), but with the given
+    /// number of sections for each wing, rather than the number in the builder
+    pub fn check_settings_with_nr_sections(&self, nr_sections: usize) -> Result<(), Error> {
+        if self.wing_builders.is_empty() {
+            return Err(Error::invalid_input("A line force model must have at least one wing"));
+        }
+
+        for (wing_index, wing_builder) in self.wing_builders.iter().enumerate() {
+            wing_builder.check(nr_sections).map_err(|error| match error {
+                Error::InvalidInput(message) => Error::invalid_input(
+                    format!("Wing {}: {}", wing_index, message)
+                ),
+                other => other,
+            })?;
+        }
+
+        if !self.local_wing_angles.is_empty() && self.local_wing_angles.len() != self.wing_builders.len() {
+            return Err(Error::invalid_input(format!(
+                "The number of local wing angles ({}) does not match the number of wings ({})",
+                self.local_wing_angles.len(), self.wing_builders.len()
+            )));
         }
 
         Ok(())
     }
 
     /// Builds the line force model
-    pub fn build(&self) -> LineForceModel {
+    ///
+    /// # Errors
+    /// If the settings are not consistent, see
+    /// [`check_settings`](LineForceModelBuilder::check_settings).
+    pub fn build(&self) -> Result<LineForceModel, Error> {
         self.build_with_nr_sections(self.nr_sections)
     } 
 
     /// Builds the line force model with the given number of sections for each wing, rather than the
     /// number in the builder
-    pub fn build_with_nr_sections(&self, nr_sections: usize) -> LineForceModel {
+    ///
+    /// # Errors
+    /// If the settings are not consistent, see
+    /// [`check_settings_with_nr_sections`](LineForceModelBuilder::check_settings_with_nr_sections).
+    pub fn build_with_nr_sections(&self, nr_sections: usize) -> Result<LineForceModel, Error> {
+        self.check_settings_with_nr_sections(nr_sections)?;
+
         let mut line_force_model = LineForceModel::new(self.density);
 
         for wing_builder in &self.wing_builders {
-            let wing = wing_builder.build(nr_sections);
+            let wing = wing_builder.build(nr_sections)?;
 
             line_force_model.add_wing(&wing);
         }
@@ -125,10 +157,6 @@ impl LineForceModelBuilder {
         line_force_model.output_coordinate_system = self.output_coordinate_system;
 
         if !self.local_wing_angles.is_empty() {
-            if self.local_wing_angles.len() != line_force_model.nr_wings() {
-                panic!("The number of local wing angles does not match the number of wings.");
-            }
-
             line_force_model.local_wing_angles = self.local_wing_angles.clone();
         }
         
@@ -139,7 +167,7 @@ impl LineForceModelBuilder {
 
         line_force_model.update_calculated_values_after_create();
 
-        line_force_model
+        Ok(line_force_model)
     }    
 }
 

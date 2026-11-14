@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use stormath::type_aliases::Float;
 use stormath::consts::TAU;
+use crate::error::Error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// Structure used to represent a spectrum as discrete harmonic signals. The discrete variables must 
@@ -21,20 +22,21 @@ pub struct DiscretizedSpectrum {
 }
 
 impl DiscretizedSpectrum {
-    /// Creates a spectrum from a JSON string. Panics if the string can not be parsed.
-    pub fn from_json_string(json_string: &str) -> Self {
-        serde_json::from_str(json_string).unwrap()
+    /// Creates a spectrum from a JSON string
+    pub fn from_json_string(json_string: &str) -> Result<Self, Error> {
+        Ok(serde_json::from_str(json_string)?)
     }
     
-    /// Creates a spectrum from a JSON file. Panics if the file can not be read or parsed.
-    pub fn from_json_file(file_path: &str) -> Self {
-        let json_string = std::fs::read_to_string(file_path).unwrap();
-        serde_json::from_str(&json_string).unwrap()
+    /// Creates a spectrum from a JSON file
+    pub fn from_json_file(file_path: &str) -> Result<Self, Error> {
+        let json_string = std::fs::read_to_string(file_path)?;
+
+        Self::from_json_string(&json_string)
     }
     
     /// Returns the spectrum as a JSON string
     pub fn to_json_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        serde_json::to_string(self).expect("A discretized spectrum can always be serialized")
     }
 
     /// Computes the oscillating velocity as a function of time

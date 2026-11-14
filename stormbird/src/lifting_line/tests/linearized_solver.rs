@@ -62,7 +62,7 @@ fn lift_coefficients_with_settings(
                 solver: QuasiSteadySolverBuilder::Linearized(solver.clone()),
                 ..Default::default()
             })
-        }.build();
+        }.build().unwrap();
 
         let nr_points = simulation.get_freestream_velocity_points().len();
 

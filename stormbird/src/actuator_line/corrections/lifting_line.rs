@@ -527,7 +527,7 @@ use crate::test_utils::tolerance;
             ..Default::default()
         });
 
-        let line_force_model = builder.build();
+        let line_force_model = builder.build().unwrap();
         let nr_span_lines = line_force_model.nr_span_lines();
 
         let velocity = vec![SpatialVector::from([8.0, 0.0, 0.0]); nr_span_lines];

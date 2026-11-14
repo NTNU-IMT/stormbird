@@ -6,6 +6,7 @@ use stormath::consts::MIN_POSITIVE;
 use super::varying_foil::VaryingFoil;
 use super::integrate_power_coefficient;
 use crate::line_force_model::wing_internal_state::{WingInternalState, InternalCompartments};
+use crate::error::Error;
 
 pub use super::SegmentFlowConditions;
 
@@ -86,8 +87,8 @@ impl std::fmt::Display for ActiveAirFlowFoil {
 
 impl ActiveAirFlowFoil {
     /// Creates an active air flow foil from a JSON string
-    pub fn new_from_string(input_str: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(input_str)
+    pub fn new_from_string(input_str: &str) -> Result<Self, Error> {
+        Ok(serde_json::from_str(input_str)?)
     }
 
     /// Returns the lift coefficient for the given section internal state

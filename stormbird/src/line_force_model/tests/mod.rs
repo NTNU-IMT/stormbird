@@ -52,5 +52,13 @@ pub fn get_example_model() -> LineForceModel {
         builder.add_wing(wing);
     }
 
-    builder.build()
+    builder.build().unwrap()
+}
+
+#[test]
+fn a_model_without_wings_can_not_be_built() {
+    let builder = LineForceModelBuilder::new(10);
+
+    assert!(builder.check_settings().is_err());
+    assert!(builder.build().is_err());
 }

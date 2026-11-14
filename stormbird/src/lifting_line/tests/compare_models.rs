@@ -69,17 +69,17 @@ fn steady_lift() {
     let mut steady_sim = SimulationBuilder::new(
         wing_builder.clone(),
         SimulationSettings::QuasiSteady(steady_settings.clone())
-    ).build();
+    ).build().unwrap();
 
     let mut prescribed_sim = SimulationBuilder::new(
         prescribed_wing_builder.clone(),
         SimulationSettings::QuasiSteady(steady_settings)
-    ).build();
+    ).build().unwrap();
 
     let mut dynamic_sim = SimulationBuilder::new(
         wing_builder.clone(),
         SimulationSettings::Dynamic(dynamic_settings)
-    ).build();
+    ).build().unwrap();
 
     let force_factor = steady_sim.line_force_model.total_force_factor(velocity.length());
 

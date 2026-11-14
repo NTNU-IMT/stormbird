@@ -238,9 +238,7 @@ impl LineForceModel {
         self.force_corrections.push(wing.force_correction.clone());
         self.added_mass.push(wing.added_mass.clone());
         self.gyroscopic_moments.push(wing.gyroscopic_moment.clone());
-        self.dynamic_stall.push(
-            wing.dynamic_stall.as_ref().map(|builder| builder.build(wing.span_lines_local.len()))
-        );
+        self.dynamic_stall.push(wing.dynamic_stall.clone());
 
         self.update_global_data_representations();
     }
