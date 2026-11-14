@@ -2,11 +2,11 @@
 
 This file contains an overview of the changes made to the Stormbird lifting line FMU. See the [Stormbird change log](../../../stormbird/CHANGELOG.md) for changes to the underlying models. The version of the FMU follows the version of Stormbird.
 
-## 0.13.0 - Unreleased
+## 0.13.0 - 2026-11-14
 ### Breaking changes
 - With `motion_velocity_in_body_fixed_frame`, the angular motion velocity input is also given in the body fixed coordinate system, e.g., (p, q, r) from a ship simulator, and converted to the global coordinate system. Before, the setting only applied to the linear motion velocity, and the angular velocity input was always used as a global vector.
 - The FMU is built around the `CompleteSailModel` in Stormbird, rather than separate models for the lifting line simulation, the wind environment and the controller. The model is set up from a single parameters file, where the complete sail model is given inline under the key `sail_model`, as the JSON representation of a `CompleteSailModelBuilder`. The separate setup files, and the fields `lifting_line_setup_file_path`, `wind_environment_setup_file_path` and `controller_setup_file_path` in the parameters file, are removed. The unused fields `superstructure_force_setup_path` and `non_dim_spanwise_measurement_position` are also removed. The spanwise position of the flow measurements is set with the spanwise measurement in the controller.
-- Depends on Stormbird 0.13.0 and fmu_from_struct 0.3.0.
+- Depends on the published versions of Stormbird 0.13.0, Stormath 0.5.0 and fmu_from_struct 0.3.0.
 - The FMU is built and packaged with the `cargo fmu-from-struct` subcommand, which replaces the `package_fmu_after_build` tool. The FMU is written to `target/fmu/release/StormbirdLiftingLine.fmu`.
 
 ### Features
