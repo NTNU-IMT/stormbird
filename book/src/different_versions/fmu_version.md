@@ -85,7 +85,7 @@ The inputs to the FMU are, in short:
 - The translation and rotation of the sails, and, optionally, the velocity of the motion. The rotation inputs are the angles around the x, y and z axes, applied in the order given by the `rotation_type` of the line force model (see [moving line models](../line_model/move_line_models.md)). The velocities are computed from the change in translation and rotation with finite differences, where the angular velocity is computed from the change in the rotation matrix. It is therefore the angular velocity vector, which is correct also when several angles are different from zero, e.g., for a roll motion with a heading. In the first time step, there is no previous position, so the velocities are zero. The motion is tracked in every time step, also while waiting for `number_of_iterations_before_building_model`. The angular motion velocity inputs, if used, must also be the angular velocity vector, and not the time derivative of the rotation angles.
 - The local wing angles and the internal states of each sail. Without a controller, these are used in every time step. With a controller, they are only used as initial values, and the sails are controlled by the controller after the first time step. The `controller_loading` input sets the loading of the controller.
 
-The outputs are the total forces and moments, the forces and moments on each sail, the angle of attack, velocity and apparent wind direction measured on each sail, and an error code (see below). The FMU supports up to 10 sails, which is the number of inputs and outputs for each sail.
+The outputs are the total forces and moments, the forces and moments on each sail, the power consumed by the sails, in total, `input_power`, and for each sail, `input_power_sail_1` to `input_power_sail_10`, the angle of attack, velocity and apparent wind direction measured on each sail, and an error code (see below). The consumed power is computed with the [input power model](../line_model/input_power.md) of each wing, e.g., for the motors of rotor sails or the fans of suction sails, and is zero for sails that do not need power. The FMU supports up to 10 sails, which is the number of inputs and outputs for each sail.
 
 The sails are simulated in each time step where the velocity they feel, i.e., the wind minus the motion of the sails, is not zero. A moving ship in calm wind therefore gives forces.
 
@@ -103,7 +103,7 @@ After an error, the sails are not simulated anymore, and all the other outputs a
 | 4    | Other error from Stormbird                                                    |
 | 10   | Unexpected error (panic) while setting up the model                           |
 | 11   | Unexpected error (panic) while simulating a time step                         |
-| 12   | The simulation gave forces or moments that are not finite                     |
+| 12   | The simulation gave forces, moments or input power that are not finite        |
 | 13   | The sail model has more than 10 sails                                         |
 | 14   | A time step was simulated before the model was set up                         |
 | 15   | The input gave a freestream velocity that is not finite, e.g., a NaN input    |

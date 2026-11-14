@@ -87,6 +87,18 @@ only used as initial values.
 
 The FMU can model up to 10 sails, which is the number of inputs and outputs for each sail.
 
+## Output
+The outputs are:
+- the total forces and moments, and the forces and moments on each sail
+- the power consumed by the sails, in total, `input_power`, and for each sail, `input_power_sail_1`
+  to `input_power_sail_10`. The power is computed with the input power model of each wing, e.g.,
+  for the motors of rotor sails or the fans of suction sails, and is zero for sails that do not
+  need power.
+- the angle of attack, velocity and apparent wind direction measured on each sail, and the current
+  internal state of each sail
+- the velocities of the motion computed from the translation and rotation inputs
+- the error code, see below
+
 ## Motion
 The translation and rotation inputs set the position of the sails. The rotation inputs are the
 angles around the x, y and z axes, applied in the order given by the `rotation_type` in the line
@@ -151,7 +163,7 @@ looked into before running again.
 | 4    | Other error from Stormbird                                                    |
 | 10   | Unexpected error (panic) while setting up the model                           |
 | 11   | Unexpected error (panic) while simulating a time step                         |
-| 12   | The simulation gave forces or moments that are not finite                     |
+| 12   | The simulation gave forces, moments or input power that are not finite        |
 | 13   | The sail model has more than 10 sails                                         |
 | 14   | A time step was simulated before the model was set up                         |
 | 15   | The input gave a freestream velocity that is not finite, e.g., a NaN input    |

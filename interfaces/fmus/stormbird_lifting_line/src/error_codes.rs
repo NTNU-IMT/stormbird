@@ -18,7 +18,7 @@ pub const OK: i32 = 0;
 pub const PANIC_DURING_INITIALIZATION: i32 = 10;
 /// A panic was caught while simulating a time step
 pub const PANIC_DURING_TIME_STEP: i32 = 11;
-/// The simulation gave forces or moments that are not finite, e.g., NaN
+/// The simulation gave forces, moments or input power that are not finite, e.g., NaN
 pub const NON_FINITE_RESULT: i32 = 12;
 /// The sail model has more sails than the FMU has inputs and outputs for
 pub const TOO_MANY_SAILS: i32 = 13;

@@ -521,3 +521,33 @@ fn inconsistent_steady_state_settings_give_errors() {
 
     assert_eq!(initialized_fmu(&path).error_code, 3);
 }
+
+#[test]
+fn input_power_is_given_as_output() {
+    let mut with_power = parameters(2);
+
+    with_power["sail_model"]["lifting_line_simulation"]["line_force_model"]["wing_builders"][0]
+        ["input_power_model"] = json!("DirectFromInternalState");
+
+    let path = write_file("input_power", &with_power.to_string());
+
+    let mut fmu = initialized_fmu(&path);
+
+    fmu.section_models_internal_state_1 = 5000.0;
+
+    run_steps(&mut fmu, 2);
+
+    assert_eq!(fmu.error_code, error_codes::OK);
+    assert!((fmu.input_power_sail_1 - 5000.0).abs() < 1e-9);
+    assert_eq!(fmu.input_power_sail_2, 0.0);
+    assert!((fmu.input_power - 5000.0).abs() < 1e-9);
+
+    // The input power is zero after an error
+    fmu.wind_velocity = f64::NAN;
+
+    run_steps(&mut fmu, 1);
+
+    assert_ne!(fmu.error_code, error_codes::OK);
+    assert_eq!(fmu.input_power, 0.0);
+    assert_eq!(fmu.input_power_sail_1, 0.0);
+}

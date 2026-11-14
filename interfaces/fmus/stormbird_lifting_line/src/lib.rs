@@ -190,6 +190,22 @@ pub struct StormbirdLiftingLine {
     pub moment_sail_10_y: f64,
     pub moment_sail_10_z: f64,
 
+    /// Power consumed by the sails, in total and for each sail, e.g., by the motors of rotor sails
+    /// or the fans of suction sails. The power is computed with the input power model of each
+    /// wing, which by default uses the power coefficient of the section model. The power is zero for
+    /// sails that do not need power, such as regular foils.
+    pub input_power: f64,
+    pub input_power_sail_1: f64,
+    pub input_power_sail_2: f64,
+    pub input_power_sail_3: f64,
+    pub input_power_sail_4: f64,
+    pub input_power_sail_5: f64,
+    pub input_power_sail_6: f64,
+    pub input_power_sail_7: f64,
+    pub input_power_sail_8: f64,
+    pub input_power_sail_9: f64,
+    pub input_power_sail_10: f64,
+
     /// Measurements of the effective angle of attack at different wings. Max 10 as output in the
     /// FMU
     pub angle_of_attack_measurement_1: f64,
@@ -443,19 +459,20 @@ impl StormbirdLiftingLine {
         ))
     }
 
-    /// Checks that the forces and moments in the result are finite
+    /// Checks that the forces, moments and input power in the result are finite
     fn check_result(result: &SimulationResult) -> Result<(), FmuError> {
         let force = result.integrated_forces_sum();
         let moment = result.integrated_moments_sum();
 
-        let is_finite = (0..3).all(|i| force[i].is_finite() && moment[i].is_finite());
+        let is_finite = (0..3).all(|i| force[i].is_finite() && moment[i].is_finite()) &&
+            result.input_power_sum().is_finite();
 
         if is_finite {
             Ok(())
         } else {
             Err(FmuError::new(
                 error_codes::NON_FINITE_RESULT,
-                "The simulation gave forces or moments that are not finite"
+                "The simulation gave forces, moments or input power that are not finite"
             ))
         }
     }
@@ -746,6 +763,7 @@ impl StormbirdLiftingLine {
         raw_internal_state.iter().take(nr_sails).copied().collect()
     }
 
+    /// Sets the forces, moments and input power to zero
     fn set_zero_force_output(&mut self) {
         self.set_force_and_moment_output(
             SpatialVector::default(),
@@ -753,15 +771,20 @@ impl StormbirdLiftingLine {
             &[SpatialVector::default(); MAX_NR_SAILS],
             &[SpatialVector::default(); MAX_NR_SAILS],
         );
+
+        self.set_input_power_output(0.0, &[0.0; MAX_NR_SAILS]);
     }
 
+    /// Sets the forces, moments and input power from the result
     fn set_force_output(&mut self, result: &SimulationResult) {
         let mut sail_forces = [SpatialVector::default(); MAX_NR_SAILS];
         let mut sail_moments = [SpatialVector::default(); MAX_NR_SAILS];
+        let mut sail_input_power = [0.0; MAX_NR_SAILS];
 
         for i in 0..result.nr_of_wings().min(MAX_NR_SAILS) {
             sail_forces[i] = result.integrated_forces[i].total;
             sail_moments[i] = result.integrated_moments[i].total;
+            sail_input_power[i] = result.input_power[i];
         }
 
         self.set_force_and_moment_output(
@@ -770,6 +793,30 @@ impl StormbirdLiftingLine {
             &sail_forces,
             &sail_moments,
         );
+
+        self.set_input_power_output(result.input_power_sum(), &sail_input_power);
+    }
+
+    /// Sets the input power outputs, both the total and for each sail
+    fn set_input_power_output(&mut self, total: f64, sail_input_power: &[f64; MAX_NR_SAILS]) {
+        self.input_power = total;
+
+        let outputs: [&mut f64; MAX_NR_SAILS] = [
+            &mut self.input_power_sail_1,
+            &mut self.input_power_sail_2,
+            &mut self.input_power_sail_3,
+            &mut self.input_power_sail_4,
+            &mut self.input_power_sail_5,
+            &mut self.input_power_sail_6,
+            &mut self.input_power_sail_7,
+            &mut self.input_power_sail_8,
+            &mut self.input_power_sail_9,
+            &mut self.input_power_sail_10,
+        ];
+
+        for (output, value) in outputs.into_iter().zip(sail_input_power) {
+            *output = *value;
+        }
     }
 
     /// Sets the force and moment outputs, both the total and for each sail
