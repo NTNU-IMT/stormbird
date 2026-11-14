@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
-## 0.13.0 - Unreleased
+## 0.13.0 - 2026-11-14
 ### Breaking changes
 - Invalid user input is now returned as errors rather than causing panics. The following functions return a `Result<_, Error>` instead of the value directly:
     - `LineForceModelBuilder::build` and `LineForceModelBuilder::build_with_nr_sections`
@@ -22,6 +22,7 @@ This file contains an overview of the changes made to the Stormbird Rust library
 - `Simulation::new_from_string` and `CompleteSailModelBuilder::build` no longer call `SimulationBuilder::check_settings` separately, as the checks are done in `SimulationBuilder::build`.
 - Depends on Stormath 0.5.0, where the `YawPitchRoll` rotation type is removed, as it was the same rotation as `XYZ`. Line force models with `"rotation_type": "YawPitchRoll"` in the JSON input give an error, and should use `XYZ` instead.
 - `ControllerBuilder::build` returns an error if `time_steps_between_updates` is zero, which gave a division by zero when the controller was updated.
+- The `GaussianSmoothing` variant of the `AngleOfAttackCorrection` is removed. It was not implemented, and gave a panic when it was used. The only variant is now `None`, which is the default. JSON input with `"GaussianSmoothing"` gives an error.
 - New `allowed_relative_internal_state_error` field in the `CompleteSailModelSettings`, so code that creates the settings directly must set it, or use `..Default::default()`. The field has a default value when deserialized.
 - The controller in the complete sail model is optional. The `controller` field in `CompleteSailModelBuilder` is an `Option<ControllerBuilder>`, and the `controller` field in `CompleteSailModel` is an `Option<Controller>`. JSON input with a controller works as before. Code that accesses the controller of the model directly must handle the `None` case.
 

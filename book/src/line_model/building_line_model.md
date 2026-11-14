@@ -28,7 +28,7 @@ The only required input is the vector containing `WingBuilder` structures and th
 
 The `circulation_correction` is an enum, where the default variant is `None`, and therefore not used by default. There will be more on the circulation corrections option [later](./circulation_strength.md). This is only used in special circumstances, for instance when a pure lifting line simulation might fail due to numerical issues.
 
-The `angle_of_attack_correction` is an enum with the variants `None` and `GaussianSmoothing`. The default is `None`. The `GaussianSmoothing` variant is not yet implemented, so this field should be left at its default value for now.
+The `angle_of_attack_correction` is an enum that is reserved for corrections of the angles of attack. At the moment, the only variant is `None`, which is the default, so the field can be left out of the input.
 
 The `output_coordinate_system` is an enum that specifies how the forces and moments from the line force model should be calculated. The default is `Global`, which means all values are in a global coordinate system. That is, the coordinate system for the forces are not moved even if the wings are moved during a simulation. The other option is to set it to `Body`. In this case, the coordinate system of the forces will always follow the wings when they are moved.
 

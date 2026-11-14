@@ -6,12 +6,12 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[derive(Default)]
-/// Optional correction of the angles of attack on the line elements
+/// Optional correction of the angles of attack on the line elements. At the moment, the only
+/// option is no correction. The enum is kept so that corrections can be added later without
+/// changing the input format.
 pub enum AngleOfAttackCorrection {
     /// No correction
     #[default]
     None,
-    /// Gaussian smoothing of the angles of attack. **Note**: not implemented yet, and panics if used.
-    GaussianSmoothing
 }
 

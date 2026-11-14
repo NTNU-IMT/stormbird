@@ -62,3 +62,13 @@ fn a_model_without_wings_can_not_be_built() {
     assert!(builder.check_settings().is_err());
     assert!(builder.build().is_err());
 }
+
+#[test]
+fn angle_of_attack_correction_from_json() {
+    use crate::line_force_model::corrections::angle_of_attack::AngleOfAttackCorrection;
+
+    let correction: AngleOfAttackCorrection = serde_json::from_str("\"None\"").unwrap();
+
+    assert!(matches!(correction, AngleOfAttackCorrection::None));
+    assert!(serde_json::from_str::<AngleOfAttackCorrection>("\"GaussianSmoothing\"").is_err());
+}
