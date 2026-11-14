@@ -35,6 +35,8 @@ impl StormbirdLiftingLine {
             )
         })?;
 
+        parameters.check()?;
+
         let sail_model = parameters.sail_model.build()?;
 
         let nr_sails = sail_model.get_number_of_sails();

@@ -55,6 +55,38 @@ The FMU has two parameters:
   rotation inputs with finite differences use the scaled time step, so the translation must be
   given in full scale.
 
+The parameters file contains the complete sail model, under `sail_model`, and settings that are
+specific to the FMU. Only `sail_model` is required:
+
+```json
+{
+    "sail_model": {
+        "lifting_line_simulation": { ... },
+        "wind_environment": { ... },
+        "controller": { ... },
+        "settings": { ... }
+    },
+    "angles_in_degrees": false,
+    "use_motion_velocity": false,
+    "motion_velocity_in_body_fixed_frame": false,
+    "use_motion_velocity_linear_as_freestream": false,
+    "input_moving_average_window_size": 0,
+    "number_of_iterations_before_building_model": 0,
+    "steady_state": false,
+    "steady_state_optimize_loading": false
+}
+```
+
+The `sail_model` is the JSON representation of a `CompleteSailModelBuilder`, which can be generated
+with the `CompleteSailModelBuilder` class in the
+[stormbird_setup](https://pypi.org/project/stormbird_setup/) Python package. Only the
+`lifting_line_simulation` is required. The `wind_environment` is the default wind environment if
+not given. The `controller` is optional. Without a controller, the local wing angles and internal
+states are taken from the inputs of the FMU at every time step. With a controller, the inputs are
+only used as initial values.
+
+The FMU can model up to 10 sails, which is the number of inputs and outputs for each sail.
+
 ## Motion
 The translation and rotation inputs set the position of the sails. The rotation inputs are the
 angles around the x, y and z axes, applied in the order given by the `rotation_type` in the line
@@ -76,35 +108,28 @@ ship simulator. Otherwise, they are given in the global coordinate system.
 The sails are simulated as long as the velocity they feel, i.e., the wind minus the motion of the
 sails, is not zero. A moving ship in calm wind therefore gives forces.
 
-The parameters file contains the complete sail model, under `sail_model`, and settings that are
-specific to the FMU. Only `sail_model` is required:
+## Time-domain and steady state mode
+By default, the FMU runs a time-domain simulation, where each call to `do_step` is a time step in
+the lifting line simulation, with the time and time step from the importer. This works with both
+quasi-steady and dynamic settings for the lifting line simulation. A controller, if any, is updated
+once per time step, using all its settings, such as input filters and rate limits, so it may need
+several time steps to reach the set points.
 
-```json
-{
-    "sail_model": {
-        "lifting_line_simulation": { ... },
-        "wind_environment": { ... },
-        "controller": { ... },
-        "settings": { ... }
-    },
-    "angles_in_degrees": false,
-    "use_motion_velocity": false,
-    "motion_velocity_in_body_fixed_frame": false,
-    "use_motion_velocity_linear_as_freestream": false,
-    "input_moving_average_window_size": 0,
-    "number_of_iterations_before_building_model": 0
-}
-```
+With `"steady_state": true`, each call to `do_step` is instead an independent steady state
+simulation, using the steady state methods of the complete sail model:
 
-The `sail_model` is the JSON representation of a `CompleteSailModelBuilder`, which can be generated
-with the `CompleteSailModelBuilder` class in the
-[stormbird_setup](https://pypi.org/project/stormbird_setup/) Python package. Only the
-`lifting_line_simulation` is required. The `wind_environment` is the default wind environment if
-not given. The `controller` is optional. Without a controller, the local wing angles and internal
-states are taken from the inputs of the FMU at every time step. With a controller, the inputs are
-only used as initial values.
+- The lifting line simulation must use quasi-steady settings. Dynamic settings give error code 3.
+- The sails are placed at the input translation and rotation, without any motion velocity.
+- The ship velocity is the linear motion velocity input, in the global or body fixed coordinate
+  system, depending on `motion_velocity_in_body_fixed_frame`.
+- With a controller, the model iterates between simulations and controller updates until the
+  controller output has converged, with `controller_loading` as the loading. The time-domain
+  settings of the controller are not used. Without a controller, the local wing angles and
+  internal states from the input are used.
+- With `"steady_state_optimize_loading": true`, the loading that gives the highest effective power
+  is searched for, up to the `controller_loading` input.
 
-The FMU can model up to 10 sails, which is the number of inputs and outputs for each sail.
+The result does not depend on the time, the time step or earlier time steps.
 
 ## Error codes
 The FMU is designed to not crash, or return an error status to the importer, due to errors in the

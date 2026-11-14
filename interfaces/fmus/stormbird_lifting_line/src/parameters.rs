@@ -9,6 +9,7 @@ use std::path::Path;
 
 use stormbird::error::Error;
 use stormbird::lifting_line::complete_sail_model::builder::CompleteSailModelBuilder;
+use stormbird::lifting_line::simulation_builder::SimulationSettings;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -42,10 +43,45 @@ pub struct FmuParameters {
     /// If larger than zero, the model is not simulated until this number of time steps have been
     /// completed. This is useful in situations where the input velocity may not be properly set
     /// until a couple of time steps into the simulation.
-    pub number_of_iterations_before_building_model: usize
+    pub number_of_iterations_before_building_model: usize,
+    #[serde(default)]
+    /// If true, each time step is a steady state simulation with the steady state methods of the
+    /// complete sail model, rather than a step in a time-domain simulation. The sails are placed at
+    /// the input translation and rotation without any motion velocity, the ship velocity is the
+    /// linear motion velocity input, and the controller, if any, is iterated until it converges.
+    /// The lifting line simulation must use quasi-steady settings.
+    pub steady_state: bool,
+    #[serde(default)]
+    /// If true, the steady state simulations search for the controller loading that gives the
+    /// highest effective power, up to the `controller_loading` input. Only used together with
+    /// `steady_state`.
+    pub steady_state_optimize_loading: bool,
 }
 
 impl FmuParameters {
+    /// Checks that the settings are consistent
+    pub fn check(&self) -> Result<(), Error> {
+        if self.steady_state_optimize_loading && !self.steady_state {
+            return Err(Error::invalid_input(
+                "steady_state_optimize_loading can only be used together with steady_state"
+            ));
+        }
+
+        let is_quasi_steady = matches!(
+            self.sail_model.lifting_line_simulation.simulation_settings,
+            SimulationSettings::QuasiSteady(_)
+        );
+
+        if self.steady_state && !is_quasi_steady {
+            return Err(Error::invalid_input(
+                "The steady state mode of the FMU requires quasi-steady settings for the lifting \
+                line simulation"
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Construct a new Parameters object from a JSON file.
     pub fn from_json_file(file_path: &Path) -> Result<Self, Error> {
         let json_string = std::fs::read_to_string(file_path)?;

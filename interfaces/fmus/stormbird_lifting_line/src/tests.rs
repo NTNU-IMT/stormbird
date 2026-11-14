@@ -386,3 +386,138 @@ fn body_fixed_angular_velocity_input_is_converted_to_global() {
         "angular velocity: {:?}", angular_velocity(&fmu)
     );
 }
+
+fn steady_state_parameters(nr_sails: usize) -> Value {
+    let mut parameters = parameters(nr_sails);
+
+    parameters["steady_state"] = json!(true);
+
+    parameters
+}
+
+fn controller_json() -> Value {
+    json!({
+        "set_points": [{
+            "apparent_wind_directions_data": [-3.2, 3.2],
+            "angle_of_attack_data": [0.2, 0.2]
+        }, {
+            "apparent_wind_directions_data": [-3.2, 3.2],
+            "angle_of_attack_data": [0.2, 0.2]
+        }]
+    })
+}
+
+fn force(fmu: &StormbirdLiftingLine) -> SpatialVector {
+    SpatialVector::new(fmu.force_x, fmu.force_y, fmu.force_z)
+}
+
+#[test]
+/// The steady state mode should give the same result as the steady state method of the complete
+/// sail model, with the ship velocity from the linear motion velocity input
+fn steady_state_mode_matches_the_complete_sail_model() {
+    let parameters = steady_state_parameters(2);
+
+    let path = write_file("steady_state_mode", &parameters.to_string());
+
+    let mut fmu = initialized_fmu(&path);
+
+    let ship_speed = 6.0;
+
+    fmu.motion_velocity_linear_x = -ship_speed;
+    fmu.controller_loading = 1.0;
+
+    run_steps(&mut fmu, 1);
+
+    assert_eq!(fmu.error_code, error_codes::OK);
+
+    let mut model: CompleteSailModel = serde_json::from_value::<
+        stormbird::lifting_line::complete_sail_model::builder::CompleteSailModelBuilder
+    >(parameters["sail_model"].clone()).unwrap().build().unwrap();
+
+    model.set_local_wing_angles(&[10_f64.to_radians(), 10_f64.to_radians()]);
+
+    let wind_condition = WindCondition {
+        direction_coming_from: 90_f64.to_radians(),
+        velocity_variation: VelocityVariation::PowerModel(PowerModel {
+            reference_velocity: 8.0,
+            reference_height: PowerModel::default_reference_height(),
+            power_factor: PowerModel::default_power_factor(),
+        }),
+        parallel_gust: None,
+        perpendicular_gust: None,
+        vertical_gust: None,
+    };
+
+    let expected = model.simulate_steady_state_condition(&wind_condition, ship_speed, 1.0)
+        .integrated_forces_sum();
+
+    assert!(
+        (force(&fmu) - expected).length() < 1e-6 * expected.length(),
+        "FMU: {:?}, complete sail model: {:?}", force(&fmu), expected
+    );
+}
+
+#[test]
+/// In the steady state mode, the result should not depend on the time step or on earlier steps,
+/// and the motion of the sails should not give any velocity
+fn steady_state_mode_is_independent_of_time() {
+    let mut parameters = steady_state_parameters(2);
+    parameters["sail_model"]["controller"] = controller_json();
+
+    let path = write_file("steady_state_time", &parameters.to_string());
+
+    let mut fmu = initialized_fmu(&path);
+
+    fmu.motion_velocity_linear_x = -6.0;
+    fmu.controller_loading = 1.0;
+
+    fmu.do_step(0.0, TIME_STEP);
+
+    let first = force(&fmu);
+
+    fmu.rotation_x = 5.0;
+    fmu.do_step(TIME_STEP, 10.0 * TIME_STEP);
+
+    fmu.rotation_x = 0.0;
+    fmu.do_step(11.0 * TIME_STEP, 0.01);
+
+    assert_eq!(fmu.error_code, error_codes::OK);
+    assert_eq!(fmu.calculated_motion_velocity_angular_x, 0.0);
+    assert!((force(&fmu) - first).length() < 1e-6 * first.length());
+}
+
+#[test]
+fn steady_state_mode_with_optimized_loading() {
+    let mut parameters = steady_state_parameters(2);
+    parameters["sail_model"]["controller"] = controller_json();
+    parameters["steady_state_optimize_loading"] = json!(true);
+
+    let path = write_file("steady_state_optimize", &parameters.to_string());
+
+    let mut fmu = initialized_fmu(&path);
+
+    fmu.motion_velocity_linear_x = -6.0;
+    fmu.controller_loading = 1.0;
+
+    run_steps(&mut fmu, 1);
+
+    assert_eq!(fmu.error_code, error_codes::OK);
+    assert!(force_magnitude(&fmu) > 0.0);
+}
+
+#[test]
+fn inconsistent_steady_state_settings_give_errors() {
+    let mut dynamic = steady_state_parameters(2);
+    dynamic["sail_model"]["lifting_line_simulation"]["simulation_settings"] = json!({"Dynamic": {}});
+
+    let path = write_file("steady_state_dynamic", &dynamic.to_string());
+
+    assert_eq!(initialized_fmu(&path).error_code, 3);
+
+    let mut optimize_only = parameters(2);
+    optimize_only["steady_state_optimize_loading"] = json!(true);
+
+    let path = write_file("optimize_without_steady_state", &optimize_only.to_string());
+
+    assert_eq!(initialized_fmu(&path).error_code, 3);
+}

@@ -253,11 +253,13 @@ The model also has methods for more direct control of the simulation:
 - `local_wing_angles`, `internal_state`, `get_number_of_sails` and `get_wind_environment` (Python): query the current state of the model. `has_controller` (Rust) returns true if the model has a controller.
 
 ## Use in the FMU
-The [FMU](../different_versions/fmu_version.md) uses the complete sail model for time-domain simulations, typically with dynamic simulation settings. The model is set up from the JSON representation of the `CompleteSailModelBuilder`, given under the key `sail_model` in the parameters file of the FMU. In each time step, the FMU:
+The [FMU](../different_versions/fmu_version.md) uses the complete sail model, which is set up from the JSON representation of the `CompleteSailModelBuilder`, given under the key `sail_model` in the parameters file of the FMU. The FMU has two modes.
+
+By default, the FMU runs a time-domain simulation, with either quasi-steady or dynamic simulation settings. In each time step, the FMU:
 
 1. Sets the translation and rotation of the sails from the inputs, and computes the velocity of the motion with finite differences. Without a controller, the local wing angles and internal states are also set from the inputs. With a controller, the inputs are only used in the first time step.
 2. Creates a wind condition from the wind velocity and direction inputs, and computes the freestream velocity with `freestream_velocity_with_ship_velocity_vector`. The ship velocity vector is the linear motion velocity input if `use_motion_velocity_linear_as_freestream` is set in the FMU parameters, and zero otherwise, in which case the velocity of the ship is included through the motion of the sails.
 3. Runs a single time step of the lifting line simulation.
 4. Measures the flow on each sail with `flow_measurements_from_simulation_result`, which is given as output, and updates the controller, if any, with the same measurements. The updated sail settings are used in the next time step.
 
-The steady state methods are not used in the FMU.
+In the steady state mode of the FMU, each time step is instead an independent steady state simulation with `simulate_steady_state_condition_with_ship_velocity_vector`, or `simulate_optimal_steady_state_condition_with_ship_velocity_vector` if the loading should be optimized. The sails are placed at the input translation and rotation without any motion velocity, and the ship velocity vector is the linear motion velocity input. The lifting line simulation must then use quasi-steady settings.

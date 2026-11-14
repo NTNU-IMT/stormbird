@@ -46,7 +46,9 @@ The parameters file contains the complete sail model, under the key `sail_model`
     "motion_velocity_in_body_fixed_frame": false,
     "use_motion_velocity_linear_as_freestream": false,
     "input_moving_average_window_size": 0,
-    "number_of_iterations_before_building_model": 0
+    "number_of_iterations_before_building_model": 0,
+    "steady_state": false,
+    "steady_state_optimize_loading": false
 }
 ```
 
@@ -60,6 +62,21 @@ The settings that are specific to the FMU are:
 - `use_motion_velocity_linear_as_freestream`: whether the linear motion velocity should be included in the apparent wind, rather than as motion of the sails. This should only be used if the translation input is always zero.
 - `input_moving_average_window_size`: if larger than zero, the motion inputs are filtered with a moving average over this number of time steps.
 - `number_of_iterations_before_building_model`: if larger than zero, the sails are not simulated before this number of time steps are completed. This is useful if the inputs are not properly set in the first time steps.
+- `steady_state`: whether each time step should be an independent steady state simulation, rather than a step in a time-domain simulation. See below.
+- `steady_state_optimize_loading`: whether the steady state simulations should search for the controller loading that gives the highest effective power. Only allowed together with `steady_state`.
+
+### Time-domain and steady state mode
+By default, the FMU runs a time-domain simulation, where each call to `do_step` is a time step in the lifting line simulation, with the time and time step from the importer. This works with both quasi-steady and dynamic settings for the lifting line simulation. That is, the sails can be modeled with a quasi-steady wake in a time-domain simulation, e.g., to save computational time, while the time, gusts and the controller still behave as in the time domain. The controller, if any, is updated once per time step, using all its settings, such as input filters and rate limits, so it may need several time steps to reach the set points.
+
+With `steady_state` set to true, each call to `do_step` is instead an independent steady state simulation, using the [steady state methods](../lifting_line/complete_sail_model.md#steady-state-simulations) of the complete sail model. This is intended for cases where the ship is modeled in steady conditions, e.g., when a ship simulator searches for the steady speed of the ship. In this mode:
+
+- The lifting line simulation must use quasi-steady settings. Dynamic settings give error code 3.
+- The sails are placed at the input translation and rotation, without any motion velocity.
+- The ship velocity is the linear motion velocity input, in the global or body fixed coordinate system, depending on `motion_velocity_in_body_fixed_frame`.
+- With a controller, the model iterates between simulations and controller updates until the controller output has converged, with the `controller_loading` input as the loading. Settings that are only meaningful in the time domain, such as input filters and rate limits, are not used. Without a controller, the local wing angles and internal states from the inputs are used.
+- With `steady_state_optimize_loading`, the loading that gives the highest effective power is searched for, up to the `controller_loading` input.
+
+The result of each time step is then independent of the time, the time step and the earlier time steps.
 
 ## Inputs and outputs
 The inputs to the FMU are, in short:

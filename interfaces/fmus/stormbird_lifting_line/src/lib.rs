@@ -389,11 +389,25 @@ impl StormbirdLiftingLine {
 
         let model = self.sail_model_mut()?;
 
-        let result = model.lifting_line_simulation.do_step(
-            current_time,
-            time_step,
-            &freestream_velocity
-        );
+        let result = if parameters.steady_state_optimize_loading {
+            model.simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+                &wind_condition,
+                ship_velocity_vector,
+                controller_loading
+            )
+        } else if parameters.steady_state {
+            model.simulate_steady_state_condition_with_ship_velocity_vector(
+                &wind_condition,
+                ship_velocity_vector,
+                controller_loading
+            )
+        } else {
+            model.lifting_line_simulation.do_step(
+                current_time,
+                time_step,
+                &freestream_velocity
+            )
+        };
 
         Self::check_result(&result)?;
 
@@ -402,7 +416,10 @@ impl StormbirdLiftingLine {
             &result
         );
 
-        model.update_controller(current_time, time_step, &flow_measurements);
+        // In the steady state mode, the controller is applied by the steady state simulation
+        if !parameters.steady_state {
+            model.update_controller(current_time, time_step, &flow_measurements);
+        }
 
         self.model_steps_completed += 1;
 
@@ -471,6 +488,9 @@ impl StormbirdLiftingLine {
     /// motion. Otherwise, a non-zero initial position, e.g., a ship position far from the origin or
     /// a heading, would give a large velocity in the first time step. The velocities are replaced
     /// by the motion velocity input, if it is used.
+    ///
+    /// In the steady state mode, the translation and rotation are always set directly, with zero
+    /// velocity, as the ship velocity is given as a freestream velocity.
     fn update_motion(&mut self, parameters: &FmuParameters, time_step: f64) -> Result<(), FmuError> {
         let translation = self.translation_vector();
         let rotation    = self.rotation_vector(parameters);
@@ -478,13 +498,13 @@ impl StormbirdLiftingLine {
         let motion_velocity_linear  = self.motion_velocity_linear_vector(parameters);
         let motion_velocity_angular = self.motion_velocity_angular_vector(parameters);
 
-        let motion_is_initialized = self.motion_is_initialized;
+        let use_finite_difference = self.motion_is_initialized && !parameters.steady_state;
 
         let model = self.sail_model_mut()?;
 
         let line_force_model = &mut model.lifting_line_simulation.line_force_model;
 
-        if motion_is_initialized {
+        if use_finite_difference {
             // Apply translation and rotation, and compute the velocity using finite differences
             line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
                 time_step,
@@ -506,7 +526,7 @@ impl StormbirdLiftingLine {
         let calculated_velocity_angular = line_force_model.rigid_body_motion.velocity_angular;
 
         // Override the computed velocities if motion velocity is used
-        if parameters.use_motion_velocity {
+        if parameters.use_motion_velocity && !parameters.steady_state {
             line_force_model.rigid_body_motion.velocity_angular = motion_velocity_angular;
 
             // Only apply the linear velocity IF the linear motion velocity is NOT used as a
@@ -675,11 +695,11 @@ impl StormbirdLiftingLine {
     }
 
     /// Returns the velocity of the ship that is used when computing the apparent wind. This is the
-    /// linear motion velocity if `use_motion_velocity_linear_as_freestream` is true, and zero
-    /// otherwise. Without it, the velocity of the ship is taken into account through the motion of
-    /// the sails.
+    /// linear motion velocity if `use_motion_velocity_linear_as_freestream` is true, or in the
+    /// steady state mode, and zero otherwise. Without it, the velocity of the ship is taken into
+    /// account through the motion of the sails.
     fn ship_velocity_vector(&self, parameters: &FmuParameters) -> SpatialVector {
-        if parameters.use_motion_velocity_linear_as_freestream {
+        if parameters.use_motion_velocity_linear_as_freestream || parameters.steady_state {
             self.motion_velocity_linear_vector(parameters)
         } else {
             SpatialVector::default()
