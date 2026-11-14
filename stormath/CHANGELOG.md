@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to Stormath, the mathematical utilities used by Stormbird.
 
-## 0.5.0 - Unreleased
+## 0.5.0 - 2026-11-14
 ### Breaking changes
 - The `YawPitchRoll` variant of `RotationType` and the `SpatialVector::rotate_yaw_pitch_roll` function are removed. The rotation was by definition the same as `XYZ`, as yaw, pitch and roll around the rotated axes is the same as rotations around the fixed x, y and z axes, in that order. Use `XYZ` instead. JSON input with `"YawPitchRoll"` gives an error.
 
