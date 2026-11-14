@@ -8,14 +8,49 @@ use super::*;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
-/// Defines how the rotation angles in a rotation vector, [x, y, z], are applied
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Defines how the rotation angles in a rotation vector, [x, y, z], are applied.
+///
+/// The rotation vector always contains the angle around the x-axis, the angle around the y-axis
+/// and the angle around the z-axis, in that order. The rotation type defines the order in which
+/// the three rotations are applied. All rotations are around the *fixed* axes of the original
+/// coordinate system (extrinsic rotations). For instance, `XYZ` first rotates around the x-axis,
+/// then around the fixed y-axis, and finally around the fixed z-axis, which gives the rotation
+/// matrix R = Rz Ry Rx.
+///
+/// A sequence of rotations around fixed axes is the same as the reversed sequence of rotations
+/// around the rotated axes (intrinsic rotations). `XYZ` is therefore the same as a rotation around
+/// the z-axis, then around the new y-axis, and then around the new x-axis, which is the yaw, pitch
+/// and roll convention that is common for ships, when x points forward and z up or down.
 pub enum RotationType {
     #[default]
     /// Rotation around the fixed x-axis, then the fixed y-axis, and then the fixed z-axis
     XYZ,
-    /// Yaw around the z-axis, then pitch around the new y-axis, and then roll around the new x-axis
-    YawPitchRoll,
+    /// Rotation around the fixed x-axis, then the fixed z-axis, and then the fixed y-axis
+    XZY,
+    /// Rotation around the fixed y-axis, then the fixed x-axis, and then the fixed z-axis
+    YXZ,
+    /// Rotation around the fixed y-axis, then the fixed z-axis, and then the fixed x-axis
+    YZX,
+    /// Rotation around the fixed z-axis, then the fixed x-axis, and then the fixed y-axis
+    ZXY,
+    /// Rotation around the fixed z-axis, then the fixed y-axis, and then the fixed x-axis
+    ZYX,
+}
+
+impl RotationType {
+    /// Returns the indices of the axes, where 0 is x, 1 is y and 2 is z, in the order the
+    /// rotations are applied
+    pub fn axis_order(self) -> [usize; 3] {
+        match self {
+            RotationType::XYZ => [0, 1, 2],
+            RotationType::XZY => [0, 2, 1],
+            RotationType::YXZ => [1, 0, 2],
+            RotationType::YZX => [1, 2, 0],
+            RotationType::ZXY => [2, 0, 1],
+            RotationType::ZYX => [2, 1, 0],
+        }
+    }
 }
 
 impl SpatialVector {
@@ -44,10 +79,40 @@ impl SpatialVector {
 
     /// Rotates the vector with the given rotation angles and rotation type
     pub fn rotate(self, rotation: Self, rotation_type: RotationType) -> Self {
-        match rotation_type {
-            RotationType::XYZ => self.rotate_xyz(rotation),
-            RotationType::YawPitchRoll => self.rotate_yaw_pitch_roll(rotation),
+        let mut new_vector = self;
+
+        for axis_index in rotation_type.axis_order() {
+            new_vector = new_vector.rotate_around_coordinate_axis(axis_index, rotation[axis_index]);
         }
+
+        new_vector
+    }
+
+    #[inline(always)]
+    /// Rotates the vector around one of the axes in the coordinate system, where 0 is the x-axis,
+    /// 1 is the y-axis and 2 is the z-axis. The rotation follows the right-hand rule.
+    pub fn rotate_around_coordinate_axis(self, axis_index: usize, angle: Float) -> Self {
+        if angle == 0.0 {
+            return self;
+        }
+
+        // The two other axes, in the order that gives a right-handed rotation
+        let (first, second) = match axis_index {
+            0 => (1, 2),
+            1 => (2, 0),
+            2 => (0, 1),
+            _ => panic!("The axis index must be 0, 1 or 2, but is {}", axis_index),
+        };
+
+        let cos_angle = angle.cos();
+        let sin_angle = angle.sin();
+
+        let mut new_vector = self;
+
+        new_vector[first] = self[first] * cos_angle - self[second] * sin_angle;
+        new_vector[second] = self[first] * sin_angle + self[second] * cos_angle;
+
+        new_vector
     }
 
     #[inline(always)]
@@ -74,47 +139,7 @@ impl SpatialVector {
     /// | sin  cos 0 |
     /// | 0    0   1 |
     pub fn rotate_xyz(self, rotation: Self) -> Self {
-        let mut new_vector = self;
-
-        if rotation[0] != 0.0 {
-            let temp_y = new_vector[1];
-            let temp_z = new_vector[2];
-            new_vector[1] = temp_y * rotation[0].cos() - temp_z * rotation[0].sin();
-            new_vector[2] = temp_y * rotation[0].sin() + temp_z * rotation[0].cos();
-        }
-
-        if rotation[1] != 0.0 {
-            let temp_x = new_vector[0];
-            let temp_z = new_vector[2];
-            new_vector[0] = temp_x * rotation[1].cos() + temp_z * rotation[1].sin();
-            new_vector[2] = -temp_x * rotation[1].sin() + temp_z * rotation[1].cos();
-        }
-
-        if rotation[2] != 0.0 {
-            let temp_x = new_vector[0];
-            let temp_y = new_vector[1];
-            new_vector[0] = temp_x * rotation[2].cos() - temp_y * rotation[2].sin();
-            new_vector[1] = temp_x * rotation[2].sin() + temp_y * rotation[2].cos();
-        }
-
-        new_vector
-    }
-
-    #[inline(always)]
-    /// Rotates the vector around the yaw, pitch, and roll angles specified in the rotation vector
-    pub fn rotate_yaw_pitch_roll(self, rotation: Self) -> Self {
-        let yaw_axis = SpatialVector::unit_z();
-
-        let pitch_axis = SpatialVector::unit_y()
-            .rotate_around_axis(rotation[2], yaw_axis);
-
-        let roll_axis = SpatialVector::unit_x()
-            .rotate_around_axis(rotation[2], yaw_axis)
-            .rotate_around_axis(rotation[1], pitch_axis);
-
-        self.rotate_around_axis(rotation[2], yaw_axis)
-            .rotate_around_axis(rotation[1], pitch_axis)
-            .rotate_around_axis(rotation[0], roll_axis)
+        self.rotate(rotation, RotationType::XYZ)
     }
 
     #[inline(always)]
@@ -283,40 +308,85 @@ mod tests {
     }
 
     #[test]
-    fn yaw_pitch_roll_rotation() {
-        let vector = SpatialVector::from([1.2, 0.0, 0.0]);
+    /// Compares all rotation types against rotations around each fixed axis with Rodrigues'
+    /// formula, applied in the order given by the rotation type
+    fn all_rotation_types_follow_the_axis_order() {
+        let rotation = SpatialVector::new(
+            Float::to_radians(30.0),
+            Float::to_radians(21.2),
+            Float::to_radians(-16.1),
+        );
 
-        let pure_yaw_rotation = SpatialVector::from([0.0, 0.0, Float::to_radians(90.0)]);
-        let pure_pitch_rotation = SpatialVector::from([0.0, Float::to_radians(90.0), 0.0]);
-        let combined_rotation = SpatialVector::from([0.0, Float::to_radians(-90.0), Float::to_radians(90.0)]);
+        let axes = [SpatialVector::unit_x(), SpatialVector::unit_y(), SpatialVector::unit_z()];
 
-        let yaw_rotated_vector = vector.rotate_yaw_pitch_roll(pure_yaw_rotation);
-        let pitch_rotated_vector = vector.rotate_yaw_pitch_roll(pure_pitch_rotation);
-        let combined_rotated_vector = vector.rotate_yaw_pitch_roll(combined_rotation);
-        
-        assert!((yaw_rotated_vector[1] - vector[0]).abs() < 1e-6);
-        assert!((pitch_rotated_vector[2] + vector[0]).abs() < 1e-6);
-        assert!((combined_rotated_vector[2] - vector[0]).abs() < 1e-6);
+        let original_vector = SpatialVector::new(1.3, 1.2, 1.5);
 
-        dbg!(yaw_rotated_vector, pitch_rotated_vector, combined_rotated_vector);
+        let rotation_types = [
+            RotationType::XYZ, RotationType::XZY, RotationType::YXZ,
+            RotationType::YZX, RotationType::ZXY, RotationType::ZYX,
+        ];
 
-        // Extrinsic xyz rotation should be the same as intrinsic yaw-pitch-roll rotation
+        let mut results: Vec<SpatialVector> = Vec::new();
+
+        for rotation_type in rotation_types {
+            let mut expected = original_vector;
+
+            for axis_index in rotation_type.axis_order() {
+                expected = expected.rotate_around_axis(rotation[axis_index], axes[axis_index]);
+            }
+
+            let calculated = original_vector.rotate(rotation, rotation_type);
+
+            assert!(
+                (calculated - expected).length() < 1e-6,
+                "{:?}: calculated {:?}, expected {:?}", rotation_type, calculated, expected
+            );
+
+            results.push(calculated);
+        }
+
+        // The rotation types should give different results for a general rotation
+        for i in 0..results.len() {
+            for j in (i + 1)..results.len() {
+                assert!((results[i] - results[j]).length() > 1e-3);
+            }
+        }
+    }
+
+    #[test]
+    /// The XYZ rotation around fixed axes should be the same as yaw, pitch and roll around the
+    /// rotated axes
+    fn xyz_rotation_equals_intrinsic_yaw_pitch_roll() {
         let vector = SpatialVector::from([1.2, 4.0, 2.0]);
 
-        let yaw_angle = Float::to_radians(30.0);
-        let pitch_angle = Float::to_radians(21.2);
         let roll_angle = Float::to_radians(-16.1);
+        let pitch_angle = Float::to_radians(21.2);
+        let yaw_angle = Float::to_radians(30.0);
 
-        let rotation = SpatialVector::from([roll_angle, pitch_angle, yaw_angle]);
+        let yaw_axis = SpatialVector::unit_z();
+        let pitch_axis = SpatialVector::unit_y().rotate_around_axis(yaw_angle, yaw_axis);
+        let roll_axis = SpatialVector::unit_x()
+            .rotate_around_axis(yaw_angle, yaw_axis)
+            .rotate_around_axis(pitch_angle, pitch_axis);
 
-        let test_1 = vector.rotate_xyz(rotation);
-        let test_2 = vector.rotate_yaw_pitch_roll(rotation);
+        let intrinsic = vector
+            .rotate_around_axis(yaw_angle, yaw_axis)
+            .rotate_around_axis(pitch_angle, pitch_axis)
+            .rotate_around_axis(roll_angle, roll_axis);
 
-        dbg!(test_1, test_2);
+        let extrinsic = vector.rotate(
+            SpatialVector::from([roll_angle, pitch_angle, yaw_angle]),
+            RotationType::XYZ
+        );
 
-        assert!((test_1[0] - test_2[0]).abs() < 1e-6);
-        assert!((test_1[1] - test_2[1]).abs() < 1e-6);
-        assert!((test_1[2] - test_2[2]).abs() < 1e-6);
+        assert!((intrinsic - extrinsic).length() < 1e-6);
+    }
 
+    #[test]
+    fn rotation_types_from_json() {
+        let rotation_type: RotationType = serde_json::from_str("\"ZYX\"").unwrap();
+
+        assert_eq!(rotation_type, RotationType::ZYX);
+        assert!(serde_json::from_str::<RotationType>("\"YawPitchRoll\"").is_err());
     }
 }

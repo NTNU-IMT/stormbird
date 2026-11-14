@@ -11,7 +11,6 @@ use crate::spatial_vector::{
 };
 
 use crate::type_aliases::{Float};
-use crate::consts::{PI, TAU};
 
 use serde::{Serialize, Deserialize};
 
@@ -49,6 +48,18 @@ impl RigidBodyMotion {
         vector.in_rotated_coordinate_system(self.rotation, self.rotation_type)
     }
 
+    /// Returns the input vector, given in the body fixed coordinate system defined by the rigid
+    /// body motion, in the global coordinate system. This is the inverse of
+    /// [`vector_in_body_fixed_coordinate_system`](Self::vector_in_body_fixed_coordinate_system).
+    /// It can, for instance, be used to convert an angular velocity in body fixed axes, often
+    /// called (p, q, r) for ships, to the global angular velocity vector.
+    pub fn vector_from_body_fixed_to_global_coordinate_system(
+        &self,
+        vector: SpatialVector
+    ) -> SpatialVector {
+        vector.from_rotated_to_global_system(self.rotation, self.rotation_type)
+    }
+
     /// Returns the relative position of the point to the center of the body.
     pub fn point_relative_to_body_center(&self, point: SpatialVector) -> SpatialVector {
         point - self.translation
@@ -84,7 +95,8 @@ impl RigidBodyMotion {
         self.velocity_linear = (self.translation - old_translation) / time_step;
     }
 
-    /// Sets a new rotation, and updates the angular velocity with a first order finite difference
+    /// Sets a new rotation, and updates the angular velocity with a first order finite difference,
+    /// see [`angular_velocity_from_rotation_change`].
     pub fn update_rotation_with_velocity_using_finite_difference(
         &mut self,
         rotation: SpatialVector,
@@ -94,21 +106,97 @@ impl RigidBodyMotion {
 
         self.rotation = rotation;
 
-        let mut rotation_difference = self.rotation - old_rotation;
+        self.velocity_angular = angular_velocity_from_rotation_change(
+            old_rotation,
+            self.rotation,
+            time_step,
+            self.rotation_type
+        );
+    }
+}
 
-        // Logic to handle situations where the input rotation might have switched quadrants.
-        // WARNING: this implicitly assumes that the rotation will never be larger than PI during
-        // one time step. This seems like a reasonable assumption, but it is not guaranteed.
+/// Returns the angular velocity vector, in the global coordinate system, of a body that rotates
+/// from the old to the new rotation during the given time step.
+///
+/// The rotations are given as angles around the x, y and z axes, applied as defined by the rotation
+/// type. Note that the angular velocity is *not* the time derivative of these angles, except when
+/// the body only rotates around a single axis. For instance, for the `XYZ` rotation type, where
+/// R = Rz Ry Rx, the angular velocity is
+///
+/// ω = φ̇ (Rz Ry ex) + θ̇ (Rz ey) + ψ̇ ez
+///
+/// where φ, θ and ψ are the angles around the x, y and z axes. That is, the rate of the first
+/// rotation acts around an axis that is rotated by the following rotations.
+///
+/// The angular velocity is computed from the rotation matrices rather than from the angles. The
+/// change in rotation during the time step, ΔR = R_new R_oldᵀ, is converted to a rotation angle
+/// around a single axis, and the angular velocity is the axis times the angle divided by the time
+/// step. This is exact for a constant angular velocity during the time step, works for all rotation
+/// types, and handles angles that jump between -π and π. It assumes that the body rotates less than
+/// π during one time step.
+pub fn angular_velocity_from_rotation_change(
+    old_rotation: SpatialVector,
+    new_rotation: SpatialVector,
+    time_step: Float,
+    rotation_type: RotationType
+) -> SpatialVector {
+    let unit_vectors = [SpatialVector::unit_x(), SpatialVector::unit_y(), SpatialVector::unit_z()];
+
+    // Columns of the old rotation matrix, i.e., the rotated unit vectors
+    let old_columns = unit_vectors.map(|unit| unit.rotate(old_rotation, rotation_type));
+
+    // ΔR = R_new R_oldᵀ. Column j of ΔR is R_new applied to row j of R_old, as R_oldᵀ e_j is row j
+    // of R_old.
+    let delta_columns: [SpatialVector; 3] = std::array::from_fn(|j| {
+        let old_row = SpatialVector::new(old_columns[0][j], old_columns[1][j], old_columns[2][j]);
+
+        old_row.rotate(new_rotation, rotation_type)
+    });
+
+    // Element (row, col) of ΔR
+    let m = |row: usize, col: usize| delta_columns[col][row];
+
+    let trace = m(0, 0) + m(1, 1) + m(2, 2);
+    let cos_angle = (0.5 * (trace - 1.0)).clamp(-1.0, 1.0);
+    let angle = cos_angle.acos();
+
+    // The skew-symmetric part of ΔR is sin(angle) times the cross product matrix of the axis
+    let sin_angle_times_axis = 0.5 * SpatialVector::new(
+        m(2, 1) - m(1, 2),
+        m(0, 2) - m(2, 0),
+        m(1, 0) - m(0, 1),
+    );
+
+    let sin_angle = angle.sin();
+
+    let rotation_vector = if angle < 1e-6 {
+        // Small angles: sin(angle) ≈ angle
+        sin_angle_times_axis
+    } else if sin_angle > 1e-6 {
+        sin_angle_times_axis * (angle / sin_angle)
+    } else {
+        // The angle is close to π, where the skew-symmetric part vanishes. The axis is then found
+        // from the symmetric part, ΔR = 2 a aᵀ - I. The sign of the axis does not matter for a
+        // rotation of π.
+        let b = |i: usize| (0.5 * (m(i, i) + 1.0)).max(0.0);
+
+        let largest = (0..3).max_by(|&i, &j| b(i).total_cmp(&b(j))).unwrap_or(0);
+        let a_largest = b(largest).sqrt();
+
+        let mut axis = SpatialVector::default();
+
         for i in 0..3 {
-            if rotation_difference[i] > PI {
-                rotation_difference[i] -= TAU;
-            } else if rotation_difference[i] < -PI {
-                rotation_difference[i] += TAU;
-            }
+            axis[i] = if i == largest {
+                a_largest
+            } else {
+                0.5 * (m(i, largest) + m(largest, i)) / (2.0 * a_largest)
+            };
         }
 
-        self.velocity_angular = rotation_difference / time_step;
-    }
+        axis.normalize() * angle
+    };
+
+    rotation_vector / time_step
 }
 
 #[cfg(test)]
@@ -183,6 +271,156 @@ mod tests {
 
         }
      }
+
+    /// All rotation types, for tests that should hold for any of them
+    const ROTATION_TYPES: [RotationType; 6] = [
+        RotationType::XYZ, RotationType::XZY, RotationType::YXZ,
+        RotationType::YZX, RotationType::ZXY, RotationType::ZYX,
+    ];
+
+    #[test]
+    /// Example from the documentation: a ship with a heading of 90 degrees that rolls. The roll
+    /// axis is the x-axis of the ship, which points along the global y-axis.
+    fn roll_with_heading_rotates_around_the_ship_axis() {
+        let heading = Float::to_radians(90.0);
+        let roll_rate = 0.1;
+        let time_step = 0.01;
+
+        let mut motion = RigidBodyMotion {
+            rotation: SpatialVector::new(0.0, 0.0, heading),
+            rotation_type: RotationType::XYZ,
+            ..Default::default()
+        };
+
+        motion.update_rotation_with_velocity_using_finite_difference(
+            SpatialVector::new(roll_rate * time_step, 0.0, heading),
+            time_step
+        );
+
+        let expected = SpatialVector::new(0.0, roll_rate, 0.0);
+
+        assert!(
+            (motion.velocity_angular - expected).length() < 1e-9,
+            "angular velocity: {:?}", motion.velocity_angular
+        );
+    }
+
+    #[test]
+    /// Compares the velocity at a point, from the angular velocity, with a central finite
+    /// difference of the position of the point, for a motion where all three angles vary, a large
+    /// constant heading, and all rotation types
+    fn velocity_at_point_with_combined_rotations() {
+        let time_step = 1e-4;
+        let point_local = SpatialVector::new(3.0, -2.0, 30.0);
+
+        let angles = |t: Float| SpatialVector::new(
+            Float::to_radians(10.0) * (1.3 * t).sin(),
+            Float::to_radians(5.0) * (0.7 * t).cos(),
+            Float::to_radians(135.0) + Float::to_radians(8.0) * (0.4 * t).sin(),
+        );
+
+        for rotation_type in ROTATION_TYPES {
+            for t in [0.0, 0.8, 2.1, 3.7] {
+                let mut motion = RigidBodyMotion {
+                    rotation: angles(t - time_step),
+                    rotation_type,
+                    ..Default::default()
+                };
+
+                motion.update_rotation_with_velocity_using_finite_difference(
+                    angles(t + time_step),
+                    2.0 * time_step
+                );
+
+                let position = |t: Float| point_local.rotate(angles(t), rotation_type);
+
+                let fd_velocity = (position(t + time_step) - position(t - time_step)) /
+                    (2.0 * time_step);
+
+                let point_at_t = position(t);
+
+                let velocity = motion.velocity_angular.cross(point_at_t);
+
+                assert!(
+                    (velocity - fd_velocity).length() < 1e-6 * (1.0 + fd_velocity.length()),
+                    "{:?} at t = {}: velocity {:?}, finite difference {:?}",
+                    rotation_type, t, velocity, fd_velocity
+                );
+            }
+        }
+    }
+
+    #[test]
+    /// The angular velocity should be exact for a constant angular velocity, also when the body
+    /// rotates a large angle during one time step. The new rotation angles are found by rotating the
+    /// body around a fixed axis, and extracting the XYZ angles from the rotation matrix.
+    fn constant_angular_velocity_is_exact() {
+        let angular_velocity = SpatialVector::new(0.3, -0.8, 1.1);
+        let time_step = 0.5;
+        let old_rotation = SpatialVector::new(0.2, -0.4, 2.0);
+
+        let rotation_angle = angular_velocity.length() * time_step;
+        let axis = angular_velocity.normalize();
+
+        // Columns of the new rotation matrix
+        let columns = [SpatialVector::unit_x(), SpatialVector::unit_y(), SpatialVector::unit_z()]
+            .map(|unit| unit.rotate(old_rotation, RotationType::XYZ).rotate_around_axis(rotation_angle, axis));
+
+        let r = |row: usize, col: usize| columns[col][row];
+
+        // For R = Rz Ry Rx: R20 = -sin(θ), R21 = cos(θ) sin(φ), R22 = cos(θ) cos(φ),
+        // R10 = sin(ψ) cos(θ), R00 = cos(ψ) cos(θ)
+        let new_rotation = SpatialVector::new(
+            r(2, 1).atan2(r(2, 2)),
+            (-r(2, 0)).asin(),
+            r(1, 0).atan2(r(0, 0)),
+        );
+
+        let calculated = angular_velocity_from_rotation_change(
+            old_rotation,
+            new_rotation,
+            time_step,
+            RotationType::XYZ
+        );
+
+        assert!(
+            (calculated - angular_velocity).length() < 1e-9,
+            "calculated: {:?}, expected: {:?}", calculated, angular_velocity
+        );
+    }
+
+    #[test]
+    /// A rotation of close to π during one time step uses a separate branch, where the axis is
+    /// found from the symmetric part of the rotation matrix
+    fn rotation_of_half_a_turn() {
+        let time_step = 1.0;
+        let axis = SpatialVector::new(1.0, 2.0, -0.5).normalize();
+        let old_rotation = SpatialVector::new(0.1, 0.2, 0.3);
+
+        for angle in [PI - 1e-7, PI] {
+            let columns = [SpatialVector::unit_x(), SpatialVector::unit_y(), SpatialVector::unit_z()]
+                .map(|unit| unit.rotate(old_rotation, RotationType::XYZ).rotate_around_axis(angle, axis));
+
+            let r = |row: usize, col: usize| columns[col][row];
+
+            let new_rotation = SpatialVector::new(
+                r(2, 1).atan2(r(2, 2)),
+                (-r(2, 0)).asin(),
+                r(1, 0).atan2(r(0, 0)),
+            );
+
+            let calculated = angular_velocity_from_rotation_change(
+                old_rotation,
+                new_rotation,
+                time_step,
+                RotationType::XYZ
+            );
+
+            // The sign of the axis is ambiguous for a rotation of exactly π
+            assert!((calculated.length() - angle).abs() < 1e-5, "length: {}", calculated.length());
+            assert!(calculated.normalize().cross(axis).length() < 1e-5);
+        }
+    }
 
     #[test]
     /// Test that the angular velocity is correct when the rotation angle passes +/- PI, in both

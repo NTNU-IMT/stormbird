@@ -2,6 +2,18 @@
 
 This file contains an overview of the changes made to Stormath, the mathematical utilities used by Stormbird.
 
+## 0.4.1 - Unreleased
+### Breaking changes
+- The `YawPitchRoll` variant of `RotationType` and the `SpatialVector::rotate_yaw_pitch_roll` function are removed. The rotation was by definition the same as `XYZ`, as yaw, pitch and roll around the rotated axes is the same as rotations around the fixed x, y and z axes, in that order. Use `XYZ` instead. JSON input with `"YawPitchRoll"` gives an error.
+
+### Features
+- New rotation types: `XZY`, `YXZ`, `YZX`, `ZXY` and `ZYX`, in addition to `XYZ`. The rotation vector always contains the angles around the x, y and z axes, while the rotation type defines the order in which the rotations around the fixed axes are applied. New `RotationType::axis_order` function, which returns this order, and new `SpatialVector::rotate_around_coordinate_axis` function, which rotates a vector around a single coordinate axis.
+- New `angular_velocity_from_rotation_change` function in the `rigid_body_motion` module, which computes the angular velocity vector from the change in rotation during a time step, see the bug fix below.
+- New `RigidBodyMotion::vector_from_body_fixed_to_global_coordinate_system` function, which is the inverse of `vector_in_body_fixed_coordinate_system`. It can, for instance, be used to convert an angular velocity in body fixed axes to the global angular velocity vector.
+
+### Bug fixes
+- `RigidBodyMotion::update_rotation_with_velocity_using_finite_difference` gave a wrong angular velocity when more than one rotation angle was different from zero. The angular velocity was computed as the time derivative of the rotation angles, which is only the angular velocity vector when the body rotates around a single axis. For instance, with a heading of 90 degrees, a roll rate was applied around the global x-axis rather than around the x-axis of the body, which then points along the global y-axis. The angular velocity is now computed from the rotation matrices, as the rotation around a single axis that takes the body from the old to the new rotation, divided by the time step. This is exact for a constant angular velocity during the time step, works for all rotation types, and handles angles that jump between -π and π, which was handled separately before. The results are unchanged for rotations around a single axis.
+
 ## 0.4.0 - 2026-10-23
 ### Highlights
 - New bracketed root-finding method (Brent's method), through the `brent_solver` function. Used by Stormbird to find the operating point of fans. The solver returns an error if the function returns NaN, rather than continuing with an invalid value.
