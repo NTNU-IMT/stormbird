@@ -52,7 +52,23 @@ The parameters file contains the complete sail model, under the key `sail_model`
 }
 ```
 
-Only the `sail_model`, and the `lifting_line_simulation` within it, are required. The `sail_model` can be generated with the `CompleteSailModelBuilder` in [stormbird_setup](./io_overview.md), for instance with `to_dict()`. The lifting line simulation should normally use dynamic simulation settings, as the FMU is used for time-domain simulations.
+Only the `sail_model`, and the `lifting_line_simulation` within it, are required. The lifting line simulation can use either quasi-steady or dynamic simulation settings in the default time-domain mode, while the steady state mode requires quasi-steady settings (see [below](#time-domain-and-steady-state-mode)).
+
+The parameters file can be generated in Python with the `LiftingLineFmuParameters` class in [stormbird_setup](./io_overview.md), which has all the settings in the file as fields, with the same default values as the FMU. The sail model is a `CompleteSailModelBuilder`. The class checks the same consistency of the settings as the FMU, so inconsistent settings give an error already in Python:
+
+```python
+from stormbird_setup.fmu import LiftingLineFmuParameters
+from stormbird_setup.lifting_line import CompleteSailModelBuilder
+
+parameters = LiftingLineFmuParameters(
+    sail_model = CompleteSailModelBuilder(
+        lifting_line_simulation = simulation_builder, # A lifting line SimulationBuilder
+    ),
+    angles_in_degrees = True,
+)
+
+parameters.to_json_file("parameters.json")
+```
 
 The settings that are specific to the FMU are:
 

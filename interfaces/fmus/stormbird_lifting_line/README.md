@@ -85,6 +85,26 @@ not given. The `controller` is optional. Without a controller, the local wing an
 states are taken from the inputs of the FMU at every time step. With a controller, the inputs are
 only used as initial values.
 
+The whole parameters file can be set up in Python with the `LiftingLineFmuParameters` class in
+[stormbird_setup](https://pypi.org/project/stormbird_setup/), which has all the settings in the file
+as fields, with the same default values as the FMU, and checks that the settings are consistent:
+
+```python
+from stormbird_setup.fmu import LiftingLineFmuParameters
+from stormbird_setup.lifting_line import CompleteSailModelBuilder
+
+parameters = LiftingLineFmuParameters(
+    sail_model = CompleteSailModelBuilder(
+        lifting_line_simulation = simulation_builder, # A lifting line SimulationBuilder
+    ),
+    angles_in_degrees = True,
+)
+
+parameters.to_json_file("parameters.json")
+```
+
+See the `two_moving_wings` example in the `examples` folder for a complete setup.
+
 The FMU can model up to 10 sails, which is the number of inputs and outputs for each sail.
 
 ## Output

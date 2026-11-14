@@ -8,7 +8,6 @@ the setup can be added.
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import json
 import math
 
 from stormbird_setup.spatial_vector import SpatialVector
@@ -17,6 +16,7 @@ from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 from stormbird_setup.section_models import SectionModel, Foil
 from stormbird_setup.lifting_line import SimulationBuilder, DynamicSettings, CompleteSailModelBuilder
 from stormbird_setup.wind import WindEnvironment
+from stormbird_setup.fmu import LiftingLineFmuParameters
 
 
 @dataclass(kw_only=True)
@@ -92,16 +92,19 @@ class LiftingLineSimulation:
             wind_environment = WindEnvironment()
         )
 
+    def fmu_parameters(self) -> LiftingLineFmuParameters:
+        '''
+        The parameters for the FMU, which contains the complete sail model as well as settings that
+        are specific to the FMU.
+        '''
+        return LiftingLineFmuParameters(
+            sail_model = self.sail_model_builder(),
+            use_motion_velocity_linear_as_freestream = True,
+            angles_in_degrees = True
+        )
+
     def write_fmu_parameters(self, file_path: Path) -> None:
         '''
-        Writes the parameters file for the FMU, which contains the complete sail model as well as
-        settings that are specific to the FMU.
+        Writes the parameters file for the FMU
         '''
-        parameters = {
-            "sail_model": self.sail_model_builder().to_dict(),
-            "use_motion_velocity_linear_as_freestream": True,
-            "angles_in_degrees": True
-        }
-
-        with open(file_path, "w") as f:
-            json.dump(parameters, f, indent=4)
+        self.fmu_parameters().to_json_file(file_path)
