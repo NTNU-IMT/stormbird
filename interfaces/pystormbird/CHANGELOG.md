@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
-## 0.13.0 - Unreleased
+## 0.13.0 - 2026-11-14
 ### Breaking changes
 - Depends on the published version of Stormbird 0.13.0. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for all the changes to the underlying models. The most important ones for Python users are:
   - Invalid settings, e.g., a wing with fewer than two section points, a line force model without wings, or an invalid controller, raise a `ValueError` when the model is created, rather than a panic or invalid results later.
