@@ -22,6 +22,9 @@ use stormbird::lifting_line::wake::WakeData;
 
 use stormath::spatial_vector::SpatialVector;
 
+use crate::ffi_utils::write_floats;
+use crate::span_varying_internal_state;
+
 /// Opaque pointer structure to a lifting line Simulation
 #[repr(C)]
 pub struct LiftingLineSimulation {
@@ -772,15 +775,81 @@ fn write_vectors(vectors: &[SpatialVector], vectors_out: *mut f64, nr_vectors: u
     actual_count as i32
 }
 
-/// Helper that copies a list of floats into a caller owned array.
-fn write_floats(values: &[f64], values_out: *mut f64, values_out_length: usize) -> i32 {
-    let actual_count = values.len().min(values_out_length);
 
-    let output_slice = unsafe {
-        std::slice::from_raw_parts_mut(values_out, actual_count)
-    };
+/// Sets an internal state on a single sail that is linearly interpolated between non-dimensional
+/// span locations, from -0.5 at the start to 0.5 at the end of the sail. The locations must be
+/// strictly increasing, and there must be one value for each location.
+///
+/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if `length` is
+/// zero, -6 if the wing index is out of range or the locations are not valid.
+///
+/// # Safety
+/// - `locations` and `values` must point to arrays with at least `length` doubles.
+#[unsafe(no_mangle)]
+pub extern "C" fn lifting_line_simulation_set_internal_state_linear(
+    simulation: *mut LiftingLineSimulation,
+    wing_index: usize,
+    locations: *const f64,
+    values: *const f64,
+    length: usize,
+) -> i32 {
+    let function_name = "lifting_line_simulation_set_internal_state_linear";
 
-    output_slice.copy_from_slice(&values[0..actual_count]);
+    if simulation.is_null() {
+        set_last_error(format!("{}: the simulation pointer is null", function_name));
 
-    actual_count as i32
+        return -1;
+    }
+
+    let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };
+
+    span_varying_internal_state::set_internal_state_linear(
+        function_name,
+        &mut rust_simulation.line_force_model,
+        wing_index,
+        locations,
+        values,
+        length
+    )
+}
+
+/// Sets an internal state on a single sail that is constant within zones along the span. The
+/// zones are given by their non-dimensional boundaries, from -0.5 at the start to 0.5 at the end
+/// of the sail, and there must be one more boundary than values. The boundaries must be strictly
+/// increasing.
+///
+/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if an array has
+/// zero length, -6 if the wing index is out of range or the boundaries and values are not valid.
+///
+/// # Safety
+/// - `boundaries` must point to an array with at least `nr_boundaries` doubles, and `values` to an
+///   array with at least `nr_values` doubles.
+#[unsafe(no_mangle)]
+pub extern "C" fn lifting_line_simulation_set_internal_state_piecewise_constant(
+    simulation: *mut LiftingLineSimulation,
+    wing_index: usize,
+    boundaries: *const f64,
+    nr_boundaries: usize,
+    values: *const f64,
+    nr_values: usize,
+) -> i32 {
+    let function_name = "lifting_line_simulation_set_internal_state_piecewise_constant";
+
+    if simulation.is_null() {
+        set_last_error(format!("{}: the simulation pointer is null", function_name));
+
+        return -1;
+    }
+
+    let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };
+
+    span_varying_internal_state::set_internal_state_piecewise_constant(
+        function_name,
+        &mut rust_simulation.line_force_model,
+        wing_index,
+        boundaries,
+        nr_boundaries,
+        values,
+        nr_values
+    )
 }

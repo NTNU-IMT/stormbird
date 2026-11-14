@@ -1,4 +1,6 @@
 pub mod error;
+pub(crate) mod ffi_utils;
+pub(crate) mod span_varying_internal_state;
 pub mod lifting_line;
 pub mod results;
 pub mod wind;
@@ -30,6 +32,14 @@ pub use lifting_line::complete_sail_model::{
     complete_sail_model_set_local_wing_angles,
     complete_sail_model_internal_state,
     complete_sail_model_set_internal_state,
+    complete_sail_model_set_internal_state_linear,
+    complete_sail_model_set_internal_state_piecewise_constant,
+    complete_sail_model_has_controller,
+    complete_sail_model_ship_velocity_vector,
+    complete_sail_model_simulate_steady_state_condition_with_ship_velocity_vector,
+    complete_sail_model_simulate_optimal_steady_state_condition_with_ship_velocity_vector,
+    complete_sail_model_freestream_velocity_with_ship_velocity_vector,
+    complete_sail_model_do_step_with_ship_velocity_vector,
 };
 
 pub use lifting_line::simulation::{
@@ -52,6 +62,8 @@ pub use lifting_line::simulation::{
     lifting_line_simulation_set_local_wing_angles,
     lifting_line_simulation_internal_state,
     lifting_line_simulation_set_internal_state,
+    lifting_line_simulation_set_internal_state_linear,
+    lifting_line_simulation_set_internal_state_piecewise_constant,
     lifting_line_simulation_reset_previous_circulation_strength,
     lifting_line_simulation_do_step,
     lifting_line_simulation_induced_velocities,
@@ -67,6 +79,25 @@ pub use results::{
     simulation_result_integrated_forces_sum,
     simulation_result_integrated_moments_sum,
     simulation_result_input_power_sum,
+    IntegratedValues,
+    SectionalForces,
+    simulation_result_new_from_json_file,
+    simulation_result_nr_of_span_lines,
+    simulation_result_iterations,
+    simulation_result_residual,
+    simulation_result_wing_indices,
+    simulation_result_ctrl_points,
+    simulation_result_integrated_forces,
+    simulation_result_integrated_moments,
+    simulation_result_input_power,
+    simulation_result_sectional_forces,
+    simulation_result_force_input_circulation_strength,
+    simulation_result_force_input_velocity,
+    simulation_result_force_input_angles_of_attack,
+    simulation_result_force_input_section_models_internal_state,
+    simulation_result_force_input_amount_of_stall,
+    simulation_result_force_input_acceleration,
+    simulation_result_force_input_rotation_velocity,
 };
 
 pub use wind::{

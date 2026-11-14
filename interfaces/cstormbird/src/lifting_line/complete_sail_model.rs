@@ -23,6 +23,9 @@ use stormbird::{
 
 use stormath::spatial_vector::SpatialVector;
 
+use crate::ffi_utils::{read_vector, write_floats, write_vectors};
+use crate::span_varying_internal_state;
+
 /// Opaque pointer structure to the CompleteSailModel
 #[repr(C)]
 pub struct CompleteSailModel {
@@ -823,15 +826,302 @@ fn write_single_sail_results(
     actual_count as i32
 }
 
-/// Helper that copies a vector of floats into a caller owned array.
-fn write_floats(values: &[f64], values_out: *mut f64, values_out_length: usize) -> i32 {
-    let actual_count = values.len().min(values_out_length);
 
-    let output_slice = unsafe {
-        std::slice::from_raw_parts_mut(values_out, actual_count)
-    };
+/// Returns 1 if the model has a controller, 0 if it does not, or -1 if the pointer is null.
+///
+/// Without a controller, the `complete_sail_model_apply_controller_*` functions do nothing, and
+/// the sails are operated with the local wing angles and internal states that are set directly on
+/// the model.
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_has_controller(sail_model: *const CompleteSailModel) -> i32 {
+    if sail_model.is_null() {
+        set_last_error("complete_sail_model_has_controller: the model pointer is null");
 
-    output_slice.copy_from_slice(&values[0..actual_count]);
+        return -1;
+    }
 
-    actual_count as i32
+    let rust_model = unsafe { &*(sail_model as *const CompleteSailModelImpl) };
+
+    rust_model.has_controller() as i32
+}
+
+/// The velocity vector of the ship for the given ship velocity, written as 3 doubles to
+/// `vector_out`. The ship is assumed to move in the opposite direction of the
+/// `zero_direction_vector` in the wind environment.
+///
+/// Returns 0 on success, or -1 if a pointer is null.
+///
+/// # Safety
+/// - `vector_out` must point to an array with room for at least 3 doubles.
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_ship_velocity_vector(
+    sail_model: *const CompleteSailModel,
+    ship_velocity: f64,
+    vector_out: *mut f64,
+) -> i32 {
+    if sail_model.is_null() || vector_out.is_null() {
+        set_last_error(
+            "complete_sail_model_ship_velocity_vector: one of the input pointers is null"
+        );
+
+        return -1;
+    }
+
+    let rust_model = unsafe { &*(sail_model as *const CompleteSailModelImpl) };
+
+    let vector = rust_model.ship_velocity_vector(ship_velocity);
+
+    write_vectors(&[vector], vector_out, 1);
+
+    0
+}
+
+/// Same as `complete_sail_model_simulate_steady_state_condition`, but with the velocity of the
+/// ship given as a vector of 3 doubles, rather than as a scalar along the negative
+/// `zero_direction_vector` in the wind environment.
+///
+/// Returns NULL if a pointer is null.
+///
+/// # Safety
+/// - `ship_velocity_vector` must point to an array with at least 3 doubles.
+/// - The returned pointer must be freed with `simulation_result_drop`
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_simulate_steady_state_condition_with_ship_velocity_vector(
+    sail_model: *mut CompleteSailModel,
+    wind_condition: *const WindCondition,
+    ship_velocity_vector: *const f64,
+    controller_loading: f64,
+) -> *mut SimulationResult {
+    if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() {
+        set_last_error(
+            "complete_sail_model_simulate_steady_state_condition_with_ship_velocity_vector: \
+             one of the input pointers is null"
+        );
+
+        return std::ptr::null_mut();
+    }
+
+    let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };
+
+    let wind_condition_rust = unsafe { wind_condition_ref(wind_condition) };
+
+    let result = rust_model.simulate_steady_state_condition_with_ship_velocity_vector(
+        wind_condition_rust,
+        read_vector(ship_velocity_vector),
+        controller_loading
+    );
+
+    box_simulation_result(result)
+}
+
+/// Same as `complete_sail_model_simulate_optimal_steady_state_condition`, but with the velocity of
+/// the ship given as a vector of 3 doubles. The delivered power is the thrust times the component
+/// of the ship velocity along the thrust direction in the settings.
+///
+/// Returns NULL if a pointer is null.
+///
+/// # Safety
+/// - `ship_velocity_vector` must point to an array with at least 3 doubles.
+/// - The returned pointer must be freed with `simulation_result_drop`
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+    sail_model: *mut CompleteSailModel,
+    wind_condition: *const WindCondition,
+    ship_velocity_vector: *const f64,
+    max_loading: f64,
+) -> *mut SimulationResult {
+    if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() {
+        set_last_error(
+            "complete_sail_model_simulate_optimal_steady_state_condition_with_ship_velocity_vector: \
+             one of the input pointers is null"
+        );
+
+        return std::ptr::null_mut();
+    }
+
+    let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };
+
+    let wind_condition_rust = unsafe { wind_condition_ref(wind_condition) };
+
+    let result = rust_model.simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+        wind_condition_rust,
+        read_vector(ship_velocity_vector),
+        max_loading
+    );
+
+    box_simulation_result(result)
+}
+
+/// Same as `complete_sail_model_freestream_velocity`, but with the velocity of the ship given as a
+/// vector of 3 doubles.
+///
+/// Returns the number of points written to `velocity_out`, or a negative error code:
+/// -1 if a pointer is null, -2 if `nr_points` is zero.
+///
+/// # Safety
+/// - `ship_velocity_vector` must point to an array with at least 3 doubles.
+/// - `velocity_out` must point to an array with room for at least `3 * nr_points` doubles.
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_freestream_velocity_with_ship_velocity_vector(
+    sail_model: *const CompleteSailModel,
+    wind_condition: *const WindCondition,
+    ship_velocity_vector: *const f64,
+    time: f64,
+    velocity_out: *mut f64,
+    nr_points: usize,
+) -> i32 {
+    if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() ||
+        velocity_out.is_null()
+    {
+        set_last_error(
+            "complete_sail_model_freestream_velocity_with_ship_velocity_vector: \
+             one of the input pointers is null"
+        );
+
+        return -1;
+    }
+
+    if nr_points == 0 {
+        set_last_error(
+            "complete_sail_model_freestream_velocity_with_ship_velocity_vector: \
+             the output array has zero length"
+        );
+
+        return -2;
+    }
+
+    let rust_model = unsafe { &*(sail_model as *const CompleteSailModelImpl) };
+
+    let wind_condition_rust = unsafe { wind_condition_ref(wind_condition) };
+
+    let freestream_velocity = rust_model.freestream_velocity_with_ship_velocity_vector(
+        wind_condition_rust,
+        read_vector(ship_velocity_vector),
+        time
+    );
+
+    write_vectors(&freestream_velocity, velocity_out, nr_points)
+}
+
+/// Same as `complete_sail_model_do_step`, but with the velocity of the ship given as a vector of 3
+/// doubles.
+///
+/// Returns NULL if a pointer is null.
+///
+/// # Safety
+/// - `ship_velocity_vector` must point to an array with at least 3 doubles.
+/// - The returned pointer must be freed with `simulation_result_drop`
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_do_step_with_ship_velocity_vector(
+    sail_model: *mut CompleteSailModel,
+    current_time: f64,
+    time_step: f64,
+    wind_condition: *const WindCondition,
+    ship_velocity_vector: *const f64,
+) -> *mut SimulationResult {
+    if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() {
+        set_last_error(
+            "complete_sail_model_do_step_with_ship_velocity_vector: \
+             one of the input pointers is null"
+        );
+
+        return std::ptr::null_mut();
+    }
+
+    let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };
+
+    let wind_condition_rust = unsafe { wind_condition_ref(wind_condition) };
+
+    let result = rust_model.do_step_with_ship_velocity_vector(
+        current_time,
+        time_step,
+        wind_condition_rust,
+        read_vector(ship_velocity_vector)
+    );
+
+    box_simulation_result(result)
+}
+
+/// Sets an internal state on a single sail that is linearly interpolated between non-dimensional
+/// span locations, from -0.5 at the start to 0.5 at the end of the sail. The locations must be
+/// strictly increasing, and there must be one value for each location.
+///
+/// **Note**: if the model has a controller, it sets a constant internal state for all sails when it
+/// updates, which overwrites the internal state set here.
+///
+/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if `length` is
+/// zero, -6 if the wing index is out of range or the locations are not valid.
+///
+/// # Safety
+/// - `locations` and `values` must point to arrays with at least `length` doubles.
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_set_internal_state_linear(
+    sail_model: *mut CompleteSailModel,
+    wing_index: usize,
+    locations: *const f64,
+    values: *const f64,
+    length: usize,
+) -> i32 {
+    let function_name = "complete_sail_model_set_internal_state_linear";
+
+    if sail_model.is_null() {
+        set_last_error(format!("{}: the model pointer is null", function_name));
+
+        return -1;
+    }
+
+    let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };
+
+    span_varying_internal_state::set_internal_state_linear(
+        function_name,
+        &mut rust_model.lifting_line_simulation.line_force_model,
+        wing_index,
+        locations,
+        values,
+        length
+    )
+}
+
+/// Sets an internal state on a single sail that is constant within zones along the span. The
+/// zones are given by their non-dimensional boundaries, from -0.5 at the start to 0.5 at the end
+/// of the sail, and there must be one more boundary than values. The boundaries must be strictly
+/// increasing.
+///
+/// **Note**: if the model has a controller, it sets a constant internal state for all sails when it
+/// updates, which overwrites the internal state set here.
+///
+/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if an array has
+/// zero length, -6 if the wing index is out of range or the boundaries and values are not valid.
+///
+/// # Safety
+/// - `boundaries` must point to an array with at least `nr_boundaries` doubles, and `values` to an
+///   array with at least `nr_values` doubles.
+#[unsafe(no_mangle)]
+pub extern "C" fn complete_sail_model_set_internal_state_piecewise_constant(
+    sail_model: *mut CompleteSailModel,
+    wing_index: usize,
+    boundaries: *const f64,
+    nr_boundaries: usize,
+    values: *const f64,
+    nr_values: usize,
+) -> i32 {
+    let function_name = "complete_sail_model_set_internal_state_piecewise_constant";
+
+    if sail_model.is_null() {
+        set_last_error(format!("{}: the model pointer is null", function_name));
+
+        return -1;
+    }
+
+    let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };
+
+    span_varying_internal_state::set_internal_state_piecewise_constant(
+        function_name,
+        &mut rust_model.lifting_line_simulation.line_force_model,
+        wing_index,
+        boundaries,
+        nr_boundaries,
+        values,
+        nr_values
+    )
 }
