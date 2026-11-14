@@ -15,6 +15,11 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 
 [features]
+default = ["fmi2"]
+# The version of the FMI standard. Exactly one of these must be active. Use, e.g.,
+# `--no-default-features --features fmi3` to build an FMU for version 3.
+fmi2 = []
+fmi3 = []
 parallel = ["stormbird/parallel"]
 
 # Panics must unwind, so that they can be caught and reported as an error code, rather than crashing

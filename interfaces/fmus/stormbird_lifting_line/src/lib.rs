@@ -39,8 +39,16 @@ use model_scaling::ModelScaling;
 /// The maximum number of sails, given by the number of inputs and outputs for each sail
 pub const MAX_NR_SAILS: usize = 10;
 
+// Exactly one version of the FMI standard must be selected with the cargo features
+#[cfg(all(feature = "fmi2", feature = "fmi3"))]
+compile_error!("The features 'fmi2' and 'fmi3' are mutually exclusive. Select only one of them.");
+
+#[cfg(not(any(feature = "fmi2", feature = "fmi3")))]
+compile_error!("Select the version of the FMI standard with either the 'fmi2' or the 'fmi3' feature.");
+
 #[derive(Debug, Default, Clone, Fmu)]
-#[fmu_from_struct(fmi_version = 2)]
+#[cfg_attr(feature = "fmi2", fmu_from_struct(fmi_version = 2))]
+#[cfg_attr(feature = "fmi3", fmu_from_struct(fmi_version = 3))]
 /// FMU for a lifting line model using the Stormbird library.
 pub struct StormbirdLiftingLine {
     #[fmu_from_struct(parameter)]

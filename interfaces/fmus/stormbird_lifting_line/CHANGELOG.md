@@ -9,6 +9,7 @@ This file contains an overview of the changes made to the Stormbird lifting line
 - The FMU is built and packaged with the `cargo fmu-from-struct` subcommand, which replaces the `package_fmu_after_build` tool. The FMU is written to `target/fmu/release/StormbirdLiftingLine.fmu`.
 
 ### Features
+- The FMU can be built for version 3 of the FMI standard, in addition to version 2, by selecting the new cargo feature `fmi3` instead of the default `fmi2`, e.g., `cargo fmu-from-struct --release --no-default-features --features fmi3`. The variables and the behavior are the same for both versions.
 - New `error_code` output. The FMU no longer crashes, or returns an error status to the importer, due to errors in the input or in the simulation, including panics. Instead, the error is reported as a non-zero error code, and the error message is printed to the standard error output. After an error, the model is not simulated anymore, and all other outputs are zero, until the FMU is restarted. See the README for the meaning of each code.
 - The number of sails is checked when the model is set up. More than 10 sails gives an error code, rather than a panic in the first time step.
 - A freestream velocity that is not finite, e.g., due to a NaN input, gives an error code. Before, it was treated as a zero input, which gave zero forces without a warning.

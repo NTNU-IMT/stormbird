@@ -3,7 +3,7 @@
 The lifting line functionality in Stormbird is available as a *Functional Mockup Unit*, which means that the functionality can be executed through the [Functional Mockup Interface standard](https://fmi-standard.org/). The actual interface is generated using the [fmu_from_struct](https://github.com/jarlekramer/fmu_from_struct) library, which is made by the same developer as Stormbird.
 
 ## How to execute simulations using the FMU-version
-The FMU-version is currently made to support version 2 of the FMI-standard. This choice is made because the developers of Stormbird primarily use the [Open Simulation Platform](https://opensimulationplatform.com/) for executing simulations, which currently only supports version 2. An FMU that supports version 3 of the FMI-standard is relatively straightforward to make, but will probably not be prioritized before the Open Simulation Platform is updated to the latest version.
+The FMU can be built for either version 2 or version 3 of the FMI-standard, which is chosen when the FMU is built (see [below](#building-the-fmu)). Version 2 is the default. This choice is made because the developers of Stormbird primarily use the [Open Simulation Platform](https://opensimulationplatform.com/) for executing simulations, which currently only supports version 2. Version 2 is therefore also the most tested version. The variables and the behavior of the FMU are the same for both versions.
 
 A simulation can be executed with any simulation platform that supports the FMI-standard. One example is the [command line interface](https://open-simulation-platform.github.io/cosim) from the Open Simulation Platform, or some Python interface to FMUs such as [FMPy](https://github.com/CATIA-Systems/FMPy) or [PyFMI](https://jmodelica.org/pyfmi/).
 
@@ -18,7 +18,13 @@ cd interfaces/fmus/stormbird_lifting_line
 cargo fmu-from-struct --release
 ```
 
-This gives the file `target/fmu/release/StormbirdLiftingLine.fmu`. See the [README of the FMU](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/fmus/stormbird_lifting_line) for more options.
+This gives the file `target/fmu/release/StormbirdLiftingLine.fmu`, which supports version 2 of the FMI-standard. To build an FMU for version 3 instead, select the `fmi3` feature, and turn off the default `fmi2` feature:
+
+```
+cargo fmu-from-struct --release --no-default-features --features fmi3
+```
+
+See the [README of the FMU](https://github.com/NTNU-IMT/stormbird/tree/main/interfaces/fmus/stormbird_lifting_line) for more options.
 
 ## Setting up the model
 The sails are modeled with a [complete sail model](../lifting_line/complete_sail_model.md), which combines a dynamic lifting line simulation with a wind environment and an optional controller. The FMU has two parameters:

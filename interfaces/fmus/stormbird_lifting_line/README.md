@@ -2,7 +2,8 @@
 
 This crate generates a Functional Mockup Unit (FMU) that can execute lifting line simulations in a
 dynamic situation, possibly together with other models that support the
-[FMI-standard](https://fmi-standard.org/). The FMU supports version 2 of the standard.
+[FMI-standard](https://fmi-standard.org/). The FMU can be built for either version 2 or version 3 of
+the standard, with version 2 as the default.
 
 The FMU is built around the `CompleteSailModel` in Stormbird, which combines a lifting line
 simulation with a wind environment and an optional controller. See the
@@ -19,6 +20,11 @@ The interface is automatically generated using the `Fmu` derive macro from
   as `target/fmu/release/StormbirdLiftingLine.fmu`. All arguments except `--resources` and
   `-o/--output` are passed on to `cargo build`, so features can be activated as usual, e.g.,
   `cargo fmu-from-struct --release --features parallel`
+- The version of the FMI standard is selected with the cargo features `fmi2` (default) and `fmi3`.
+  Exactly one of them must be active. To build an FMU for version 3, turn off the default feature:
+  `cargo fmu-from-struct --release --no-default-features --features fmi3`. Both versions are
+  written to the same path by default, so use `-o/--output` to keep both, e.g.,
+  `-o target/fmu/release/StormbirdLiftingLine_fmi3.fmu`. Version 2 is the most tested version.
 - Optional: to optimize specifically for the local CPU, first set the environment variable
   `RUSTFLAGS="-C target-cpu=native"`. The FMU will then not necessarily run on other computers.
 - Optional: use `--resources <PATH>` to include a folder as the `resources` folder in the FMU, for
