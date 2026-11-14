@@ -18,6 +18,7 @@ pub struct CompleteSailModelBuilder {
 pub struct CompleteSailModelSettings {
     pub max_controller_iterations: usize,               // Default: 10
     pub allowed_angle_error: Float,                     // Default: 0.1 degrees, in radians
+    pub allowed_relative_internal_state_error: Float,   // Default: 0.001
     pub nr_loadings_to_test_during_optimization: usize, // Default: 10
     pub retractable: bool,                              // Default: false
     pub thrust_direction: SpatialVector,                // Default: (-1, 0, 0)
@@ -57,7 +58,13 @@ def simulate_optimal_steady_state_condition(
 `simulate_steady_state_condition` simulates the sails with a given controller *loading*. The loading scales all set points in the controller. A loading of 1.0 gives the set points as specified, while 0.0 gives sails in a neutral position. Values outside this range are clamped. The simulation runs in two steps:
 
 1. The controller is first applied based on the wind condition alone, which neglects the velocities induced by the sails.
-2. The model then alternates between running the lifting line simulation and updating the controller based on the result, until the change in the local wing angles is smaller than `allowed_angle_error` or until `max_controller_iterations` is reached. This makes it possible to reach the set points also when they depend on the induced velocities, e.g., when the controller uses the effective angle of attack.
+2. The model then alternates between running the lifting line simulation and updating the controller based on the result, until the controller output is close to the settings used in the last simulation, or until `max_controller_iterations` is reached. The local wing angles must change less than `allowed_angle_error`, and the internal states less than `allowed_relative_internal_state_error` relative to their magnitude. The returned result is from the last simulation, so it is consistent with the final sail settings. This makes it possible to reach the set points also when they depend on the induced velocities, e.g., when the controller uses the effective angle of attack, or when the internal state of a rotor sail is given as a spin ratio, which depends on the local velocity.
+
+The steady state simulations are independent of earlier calls, and of settings that are only meaningful in the time domain:
+
+- The controller output is computed directly from the set points. The input filters, the rate limits, the number of time steps between updates and the start time of the controller are not used, and the internal state of the controller, i.e., the time step counter and the input filters, is not changed. These settings only affect the [time-domain methods](#other-methods).
+- Only the steady part of the wind condition is used, so any gusts are neglected.
+- The dynamic stall models, if any, are reset before each iteration, so that they give the static values.
 
 Without a controller, the sail settings are not changed, so `simulate_steady_state_condition` runs a single simulation with the current local wing angles and internal states.
 
@@ -240,7 +247,8 @@ The model also has methods for more direct control of the simulation:
 - `apply_controller_based_on_wind_condition`, `apply_controller_based_on_freestream` and `apply_controller_based_on_simulation_result`: update the sail settings with the controller, based on different types of input. They do nothing if there is no controller.
 - `set_local_wing_angles` and `set_internal_state`: set the sail settings manually. Any later controller update overwrites them. In Python, there are also `set_internal_state_linear` and `set_internal_state_piecewise_constant` for internal states that vary along the span.
 - `freestream_velocity`: the apparent wind at all the points where the simulation needs it, including the ship velocity and any inflow corrections.
-- `do_step_with_ship_velocity_vector` and `freestream_velocity_with_ship_velocity_vector` (Rust): the same as `do_step` and `freestream_velocity`, but with the velocity of the ship given as a vector, rather than as a scalar along the negative `zero_direction_vector`. This is useful when the ship velocity comes from an external motion simulation, for instance in the FMU. `ship_velocity_vector` returns the vector that corresponds to a scalar ship velocity.
+- `do_step_with_ship_velocity_vector`, `freestream_velocity_with_ship_velocity_vector`, `simulate_steady_state_condition_with_ship_velocity_vector` and `simulate_optimal_steady_state_condition_with_ship_velocity_vector` (Rust): the same as the methods without `_with_ship_velocity_vector`, but with the velocity of the ship given as a vector, rather than as a scalar along the negative `zero_direction_vector`. This is useful when the ship velocity comes from an external motion simulation, for instance in the FMU. `ship_velocity_vector` returns the vector that corresponds to a scalar ship velocity. In the optimal version, the delivered power is the thrust times the component of the ship velocity along the `thrust_direction`.
+- The inflow corrections, if any, are looked up with an apparent wind direction that includes both the ship velocity and the linear velocity of the rigid body motion of the sails. This makes the corrections the same whether the velocity of the ship is given as a ship velocity, or as motion of the sails, e.g., with a translation that changes in time.
 - `flow_measurements_from_simulation_result` (Rust): the angle of attack, velocity and apparent wind direction measured on each sail, as used by the controller. The measurements use the spanwise measurement of the controller if there is one, and the default spanwise measurement otherwise, so they are also available without a controller. `update_controller` updates the controller with given measurements.
 - `local_wing_angles`, `internal_state`, `get_number_of_sails` and `get_wind_environment` (Python): query the current state of the model. `has_controller` (Rust) returns true if the model has a controller.
 

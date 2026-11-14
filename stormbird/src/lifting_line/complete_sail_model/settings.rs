@@ -18,6 +18,11 @@ pub struct CompleteSailModelSettings {
     /// When searching for an angle of attack, it is typically OK with some error relative to the 
     /// perfectly converged case. This limits controls when to stop iterating
     pub allowed_angle_error: Float,
+    #[serde(default="CompleteSailModelSettings::default_allowed_relative_internal_state_error")]
+    /// The allowed relative change in the internal state of each wing, from the controller, when
+    /// searching for a converged steady state. The model stops iterating when both the local wing
+    /// angles and the internal states have converged.
+    pub allowed_relative_internal_state_error: Float,
     #[serde(default="CompleteSailModelSettings::default_nr_loadings_to_test_during_optimization")]
     /// The number of loadings to test when the goal is to find the one with the highest delivered power
     pub nr_loadings_to_test_during_optimization: usize,
@@ -34,6 +39,7 @@ impl Default for CompleteSailModelSettings {
         CompleteSailModelSettings{
             max_controller_iterations: Self::default_max_controller_iterations(),
             allowed_angle_error: Self::default_allowed_angle_error(),
+            allowed_relative_internal_state_error: Self::default_allowed_relative_internal_state_error(),
             nr_loadings_to_test_during_optimization: Self::default_nr_loadings_to_test_during_optimization(),
             retractable: false,
             thrust_direction: Self::default_thrust_direction()
@@ -44,6 +50,7 @@ impl Default for CompleteSailModelSettings {
 impl CompleteSailModelSettings {
     fn default_max_controller_iterations() -> usize {10}
     fn default_allowed_angle_error() -> Float {0.1_f64.to_radians() as Float}
+    fn default_allowed_relative_internal_state_error() -> Float {1e-3}
     fn default_nr_loadings_to_test_during_optimization() -> usize {10}
     fn default_thrust_direction() -> SpatialVector {SpatialVector::new(-1.0, 0.0, 0.0)}
 }

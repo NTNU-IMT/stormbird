@@ -21,8 +21,10 @@ use crate::wind::{
 use crate::controller::{
     Controller,
     input::ControllerInput,
+    output::ControllerOutput,
     measurements::SpanwiseMeasurement,
 };
+use crate::line_force_model::LineForceModel;
 
 use crate::common_utils::results::{
     simulation::SimulationResult,
@@ -97,6 +99,46 @@ impl CompleteSailModel {
         ship_velocity: Float,
         max_loading: Float
     ) -> SimulationResult {
+        let ship_velocity_vector = self.ship_velocity_vector(ship_velocity);
+
+        self.optimal_steady_state_condition(
+            wind_condition,
+            ship_velocity_vector,
+            ship_velocity,
+            max_loading
+        )
+    }
+
+    /// Same as [`simulate_optimal_steady_state_condition`](Self::simulate_optimal_steady_state_condition),
+    /// but with the velocity of the ship given as a vector. The delivered power is the thrust times
+    /// the component of the ship velocity along the `thrust_direction` in the settings.
+    pub fn simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+        &mut self,
+        wind_condition: &WindCondition,
+        ship_velocity_vector: SpatialVector,
+        max_loading: Float
+    ) -> SimulationResult {
+        let ship_speed_along_thrust = ship_velocity_vector.dot(
+            self.settings.thrust_direction.normalize()
+        );
+
+        self.optimal_steady_state_condition(
+            wind_condition,
+            ship_velocity_vector,
+            ship_speed_along_thrust,
+            max_loading
+        )
+    }
+
+    /// Implementation of the optimal steady state simulation, where the ship speed is the speed
+    /// used to compute the delivered power
+    fn optimal_steady_state_condition(
+        &mut self,
+        wind_condition: &WindCondition,
+        ship_velocity_vector: SpatialVector,
+        ship_speed: Float,
+        max_loading: Float
+    ) -> SimulationResult {
         let loadings_to_test = if self.has_controller() {
             array_generation::linspace(
                 0.0,
@@ -108,43 +150,43 @@ impl CompleteSailModel {
         };
 
         let nr_loadings_to_test = loadings_to_test.len();
-        
+
         let mut results: Vec<SimulationResult> = Vec::with_capacity(nr_loadings_to_test);
         let mut effective_power: Vec<Float> = Vec::with_capacity(nr_loadings_to_test);
-        
+
         let mut max_effective_power = Float::NEG_INFINITY;
         let mut best_index = 0;
-        
+
         for i in 0..nr_loadings_to_test {
-            let result = self.simulate_steady_state_condition(
-                wind_condition, 
-                ship_velocity, 
+            let result = self.simulate_steady_state_condition_with_ship_velocity_vector(
+                wind_condition,
+                ship_velocity_vector,
                 loadings_to_test[i]
             );
-            
+
             let thrust = result.integrated_forces_sum().dot(self.settings.thrust_direction);
-            let delivered_power = thrust * ship_velocity;
+            let delivered_power = thrust * ship_speed;
             let input_power = result.input_power_sum();
-            
+
             effective_power.push(delivered_power - input_power);
-            
+
             if effective_power[i] > max_effective_power {
                 max_effective_power = effective_power[i];
                 best_index = i;
             }
-            
+
             results.push(
-              result  
+              result
             );
         }
-        
+
         let mut best_result = results[best_index].clone();
 
         // Set all integrated values to zero if the sails are not providing any useful work AND they
         // are set to be retractable
         if max_effective_power < 0.0 && self.settings.retractable {
             let nr_wings = best_result.nr_of_wings();
-            
+
             best_result.input_power = vec![0.0; nr_wings];
             best_result.integrated_forces = vec![IntegratedValues::default(); nr_wings];
             best_result.integrated_moments = vec![IntegratedValues::default(); nr_wings];
@@ -152,89 +194,160 @@ impl CompleteSailModel {
 
         best_result
     }
-    
+
     /// The main interface to use the sail model in steady state conditions.
     ///
     /// With a controller, the model alternates between running the simulation and updating the
-    /// controller until the local wing angles converge. Without a controller, a single simulation
-    /// is run with the current local wing angles and internal states.
+    /// controller until the local wing angles and internal states converge. Without a controller,
+    /// a single simulation is run with the current local wing angles and internal states.
+    ///
+    /// The simulation is a true steady state, which is independent of earlier calls:
+    /// - The controller is applied with [`Controller::steady_state_output`], which gives the set
+    ///   points directly. Settings that are only meaningful in the time domain, i.e., input
+    ///   filters, rate limits, the number of time steps between updates and the start time, are not
+    ///   used, and the internal state of the controller is not changed.
+    /// - The steady part of the wind condition is used, so any gusts are neglected.
+    /// - The dynamic stall models, if any, are reset before each iteration, so that they give the
+    ///   static values.
     ///
     /// # Arguments
     /// - `wind_condition`: structure containing variables defining the wind condition.
     /// - `ship_velocity`: The velocity of the ship in m/s
-    /// - `controller_loading`: the loading of the controller, meaning how close to the max angle of 
-    ///   attack/max spin ratio/max flap angle/max suction rate the sail should be operated at. 1.0 
-    ///   means max values, while 0.0 means sails in neutral position 
+    /// - `controller_loading`: the loading of the controller, meaning how close to the max angle of
+    ///   attack/max spin ratio/max flap angle/max suction rate the sail should be operated at. 1.0
+    ///   means max values, while 0.0 means sails in neutral position
     pub fn simulate_steady_state_condition(
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
         controller_loading: Float
     ) -> SimulationResult {
+        let ship_velocity_vector = self.ship_velocity_vector(ship_velocity);
+
+        self.simulate_steady_state_condition_with_ship_velocity_vector(
+            wind_condition,
+            ship_velocity_vector,
+            controller_loading
+        )
+    }
+
+    /// Same as [`simulate_steady_state_condition`](Self::simulate_steady_state_condition), but with
+    /// the velocity of the ship given as a vector, see
+    /// [`freestream_velocity_with_ship_velocity_vector`](Self::freestream_velocity_with_ship_velocity_vector).
+    pub fn simulate_steady_state_condition_with_ship_velocity_vector(
+        &mut self,
+        wind_condition: &WindCondition,
+        ship_velocity_vector: SpatialVector,
+        controller_loading: Float
+    ) -> SimulationResult {
         let loading_used = controller_loading.clamp(0.0, 1.0);
 
-        // Apply initial controller settings based on the wind conditions alone, but which then 
-        // neglects the lift-induced velocity.
-        self.apply_controller_based_on_wind_condition(
-            0.0, 
-            1.0, 
-            wind_condition, 
-            ship_velocity, 
-            loading_used
+        let freestream_velocity = self.freestream_velocity_internal(
+            wind_condition,
+            ship_velocity_vector,
+            None
         );
 
-        // Extract variables to assess convergence of the local wing angles
-        let mut current_wing_angles = self.lifting_line_simulation
-            .line_force_model.local_wing_angles.clone();
+        // Apply initial controller settings based on the wind conditions alone, which neglects the
+        // lift-induced velocities.
+        if let Some(controller) = &self.controller {
+            let nr_ctrl_points = self.lifting_line_simulation.line_force_model.nr_span_lines();
 
-        let mut max_change_in_wing_angles = 999.0;
+            let controller_inputs = ControllerInput::new_from_velocity(
+                loading_used,
+                &self.lifting_line_simulation.line_force_model,
+                &freestream_velocity[0..nr_ctrl_points],
+                &controller.spanwise_measurement,
+                &self.wind_environment,
+            );
+
+            let output = controller.steady_state_output(
+                &controller_inputs,
+                &self.lifting_line_simulation.line_force_model
+            );
+
+            self.lifting_line_simulation.line_force_model.set_controller_output(&output);
+        }
+
         let mut iteration = 0;
-        let mut result: SimulationResult = SimulationResult::default();
 
-        // Iterate until the local wing angles converge
-        while iteration < self.settings.max_controller_iterations && max_change_in_wing_angles > self.settings.allowed_angle_error {
+        loop {
+            let line_force_model = &self.lifting_line_simulation.line_force_model;
+
+            let wing_angles_before = line_force_model.local_wing_angles.clone();
+            let internal_states_before = Self::representative_internal_states(line_force_model);
+
             // The iterations are not a time history, so the dynamic stall models, if any, should
             // give static values
             self.lifting_line_simulation.line_force_model.reset_dynamic_stall();
 
-            result = self.do_step(
+            let result = self.lifting_line_simulation.do_step(
                 iteration as Float,
                 1.0,
-                wind_condition, 
-                ship_velocity
+                &freestream_velocity
             );
 
-            self.apply_controller_based_on_simulation_result(
-                iteration as Float,
-                1.0,
+            iteration += 1;
+
+            let Some(controller) = &self.controller else {
+                return result;
+            };
+
+            let controller_inputs = self.flow_measurements_from_simulation_result(
                 loading_used,
                 &result
             );
 
-            let new_wing_angles = self.lifting_line_simulation
-                .line_force_model.local_wing_angles.clone();
+            let output = controller.steady_state_output(
+                &controller_inputs,
+                &self.lifting_line_simulation.line_force_model
+            );
 
-            let mut wing_angles_change = Vec::new();
+            let converged = self.controller_output_is_converged(
+                &output,
+                &wing_angles_before,
+                &internal_states_before
+            );
 
-            for (angle_new, angle_old) in new_wing_angles.iter().zip(current_wing_angles.iter()) {
-                wing_angles_change.push((angle_new - angle_old).abs());
+            if converged || iteration >= self.settings.max_controller_iterations {
+                return result;
             }
 
-            max_change_in_wing_angles = 0.0;
-
-            for c in wing_angles_change.iter() {
-                if *c > max_change_in_wing_angles {
-                    max_change_in_wing_angles = *c;
-                }
-            }
-
-            current_wing_angles = new_wing_angles;
-            iteration += 1;
+            self.lifting_line_simulation.line_force_model.set_controller_output(&output);
         }
-
-        result    
     }
-    
+
+    /// Returns the representative value of the internal state of each wing
+    fn representative_internal_states(line_force_model: &LineForceModel) -> Vec<Float> {
+        line_force_model.internal_state.iter()
+            .map(|internal_state| internal_state.representative_value())
+            .collect()
+    }
+
+    /// Checks if the controller output is close enough to the wing angles and internal states that
+    /// were used in the last simulation, so that the result of that simulation can be used as the
+    /// converged result.
+    fn controller_output_is_converged(
+        &self,
+        output: &ControllerOutput,
+        wing_angles_used: &[Float],
+        internal_states_used: &[Float],
+    ) -> bool {
+        let wing_angles_converged = output.local_wing_angles.iter()
+            .zip(wing_angles_used)
+            .all(|(new, old)| (new - old).abs() <= self.settings.allowed_angle_error);
+
+        let internal_states_converged = output.internal_states.iter()
+            .zip(internal_states_used)
+            .all(|(new, old)| {
+                let scale = new.abs().max(old.abs());
+
+                (new - old).abs() <= self.settings.allowed_relative_internal_state_error * scale
+            });
+
+        wing_angles_converged && internal_states_converged
+    }
+
     /// Same as `simulate_steady_state_condition`, but returns the simplified results for each sail
     pub fn simulate_steady_state_condition_simple_output(
         &mut self,
@@ -390,32 +503,65 @@ impl CompleteSailModel {
     /// [`freestream_velocity`](Self::freestream_velocity), which can be used when the ship does not
     /// move in the opposite direction of the `zero_direction_vector` in the wind environment, for
     /// instance when the ship velocity comes from an external motion simulation.
+    ///
+    /// The apparent wind direction that is used to look up the inflow corrections, if any, includes
+    /// both the ship velocity and the linear velocity of the rigid body motion of the sails. The
+    /// latter is not part of the returned freestream velocity, as it is included as motion of the
+    /// sails in the lifting line simulation, but it is part of the apparent wind that the sails
+    /// experience. This matters when the velocity of the ship is given as motion of the sails, e.g.,
+    /// through a translation that varies in time, rather than as a ship velocity.
     pub fn freestream_velocity_with_ship_velocity_vector(
         &self,
         wind_condition: &WindCondition,
         ship_velocity_vector: SpatialVector,
         time: Float
     ) -> Vec<SpatialVector> {
+        self.freestream_velocity_internal(wind_condition, ship_velocity_vector, Some(time))
+    }
+
+    /// Returns the freestream velocity, see
+    /// [`freestream_velocity_with_ship_velocity_vector`](Self::freestream_velocity_with_ship_velocity_vector).
+    /// If the time is `None`, only the steady part of the wind condition is used, i.e., without
+    /// gusts.
+    fn freestream_velocity_internal(
+        &self,
+        wind_condition: &WindCondition,
+        ship_velocity_vector: SpatialVector,
+        time: Option<Float>
+    ) -> Vec<SpatialVector> {
         let freestream_velocity_points = self.lifting_line_simulation
             .get_freestream_velocity_points();
 
         let linear_velocity = -ship_velocity_vector;
-        
+
         let nr_points = freestream_velocity_points.len();
-        
+
         let mut freestream_velocity = Vec::with_capacity(nr_points);
-        
+
         for &point in freestream_velocity_points.iter().take(nr_points) {
-            freestream_velocity.push(
-                self.wind_environment.unsteady_apparent_wind_velocity_vector_at_location(
+            let velocity = match time {
+                Some(time) => self.wind_environment.unsteady_apparent_wind_velocity_vector_at_location(
                     wind_condition,
                     point,
-                    linear_velocity, 
+                    linear_velocity,
                     time
-                )
-            );
+                ),
+                None => self.wind_environment.steady_apparent_wind_velocity_vector_at_location(
+                    wind_condition,
+                    point,
+                    linear_velocity
+                ),
+            };
+
+            freestream_velocity.push(velocity);
         }
-        
+
+        // The apparent wind experienced by the sails also includes the linear motion of the sails
+        let sail_motion_velocity = self.lifting_line_simulation.line_force_model
+            .rigid_body_motion.velocity_linear;
+
+        let linear_velocity_for_direction = linear_velocity - sail_motion_velocity;
+
         // NOTE: potential issue. The reference height is meant as 10 meters above the water plane.
         // However, `apparent_wind_direction_from_condition_and_linear_velocity` treats the height
         // as a coordinate along the up direction, and subtracts the `water_plane_height` in the wind
@@ -429,7 +575,7 @@ impl CompleteSailModel {
         let apparent_wind_direction = self.wind_environment
             .apparent_wind_direction_from_condition_and_linear_velocity(
                 wind_condition,
-                linear_velocity,
+                linear_velocity_for_direction,
                 reference_height
             );
         

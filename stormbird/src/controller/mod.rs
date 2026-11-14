@@ -82,6 +82,36 @@ impl Controller {
         ).collect()
     }
     
+    /// Returns the output given directly by the set points, for steady state simulations.
+    ///
+    /// Settings that are only meaningful in a time-domain simulation are not used: the inputs are
+    /// not filtered, the change rates are not limited, and the number of time steps between updates
+    /// and the start time are ignored. The internal state of the controller, i.e., the time step
+    /// counter and the input filters, is not changed, so the output only depends on the inputs.
+    pub fn steady_state_output(
+        &self,
+        inputs: &[ControllerInput],
+        line_force_model: &LineForceModel,
+    ) -> ControllerOutput {
+        let nr_wings = line_force_model.nr_wings();
+
+        let local_wing_angles = (0..nr_wings).map(
+            |wing_index| self.set_points[wing_index]
+                .get_local_wing_angle_without_rate_limit(&inputs[wing_index])
+        ).collect();
+
+        let internal_states = (0..nr_wings).map(
+            |wing_index| self.set_points[wing_index].get_internal_state_without_rate_limit(
+                wing_index, line_force_model, &inputs[wing_index]
+            )
+        ).collect();
+
+        ControllerOutput {
+            local_wing_angles,
+            internal_states
+        }
+    }
+
     /// Updates the controller. Returns the new output if it is time to update, and `None` otherwise.
     ///
     /// If the controller has input filters, the inputs are added to the filters at every call, and
