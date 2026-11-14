@@ -272,6 +272,16 @@ mod tests {
         }
      }
 
+    /// Returns the tolerance to use in a test, depending on whether the library is compiled with
+    /// double or single precision
+    fn tolerance(double_precision: Float, single_precision: Float) -> Float {
+        if cfg!(feature = "single_precision") {
+            single_precision
+        } else {
+            double_precision
+        }
+    }
+
     /// All rotation types, for tests that should hold for any of them
     const ROTATION_TYPES: [RotationType; 6] = [
         RotationType::XYZ, RotationType::XZY, RotationType::YXZ,
@@ -300,7 +310,7 @@ mod tests {
         let expected = SpatialVector::new(0.0, roll_rate, 0.0);
 
         assert!(
-            (motion.velocity_angular - expected).length() < 1e-9,
+            (motion.velocity_angular - expected).length() < tolerance(1e-9, 1e-6),
             "angular velocity: {:?}", motion.velocity_angular
         );
     }
@@ -310,7 +320,9 @@ mod tests {
     /// difference of the position of the point, for a motion where all three angles vary, a large
     /// constant heading, and all rotation types
     fn velocity_at_point_with_combined_rotations() {
-        let time_step = 1e-4;
+        // The finite difference of the positions is the reference. A larger step is used in single
+        // precision, where round-off errors would otherwise dominate the reference.
+        let time_step = tolerance(1e-4, 1e-2);
         let point_local = SpatialVector::new(3.0, -2.0, 30.0);
 
         let angles = |t: Float| SpatialVector::new(
@@ -342,7 +354,8 @@ mod tests {
                 let velocity = motion.velocity_angular.cross(point_at_t);
 
                 assert!(
-                    (velocity - fd_velocity).length() < 1e-6 * (1.0 + fd_velocity.length()),
+                    (velocity - fd_velocity).length() <
+                        tolerance(1e-6, 1e-3) * (1.0 + fd_velocity.length()),
                     "{:?} at t = {}: velocity {:?}, finite difference {:?}",
                     rotation_type, t, velocity, fd_velocity
                 );
@@ -384,7 +397,7 @@ mod tests {
         );
 
         assert!(
-            (calculated - angular_velocity).length() < 1e-9,
+            (calculated - angular_velocity).length() < tolerance(1e-9, 1e-5),
             "calculated: {:?}, expected: {:?}", calculated, angular_velocity
         );
     }
