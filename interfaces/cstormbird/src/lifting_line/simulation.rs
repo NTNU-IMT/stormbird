@@ -11,6 +11,8 @@ use std::os::raw::c_char;
 use crate::error::{
     catch_panic,
     set_last_error,
+    STORMBIRD_ERROR_INVALID_INPUT,
+    STORMBIRD_ERROR_NULL_POINTER,
 };
 use crate::results::{
     SimulationResult,
@@ -43,7 +45,7 @@ pub extern "C" fn lifting_line_simulation_new(
     setup_string: *const c_char
 ) -> *mut LiftingLineSimulation {
     if setup_string.is_null() {
-        set_last_error("lifting_line_simulation_new: the setup string pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "lifting_line_simulation_new: the setup string pointer is null");
 
         return std::ptr::null_mut();
     }
@@ -51,8 +53,7 @@ pub extern "C" fn lifting_line_simulation_new(
     let setup_str = match unsafe { CStr::from_ptr(setup_string) }.to_str() {
         Ok(s) => s.to_string(),
         Err(error) => {
-            set_last_error(
-                format!(
+            set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                     "lifting_line_simulation_new: the setup string is not valid UTF-8: {}",
                     error
                 )
@@ -71,7 +72,7 @@ pub extern "C" fn lifting_line_simulation_new(
             Box::into_raw(Box::new(simulation)) as *mut LiftingLineSimulation
         },
         Some(Err(error)) => {
-            set_last_error(format!("lifting_line_simulation_new: {}", error));
+            set_last_error(error.code(), format!("lifting_line_simulation_new: {}", error));
 
             std::ptr::null_mut()
         },
@@ -138,7 +139,7 @@ pub extern "C" fn lifting_line_simulation_get_number_of_freestream_velocity_poin
 }
 
 /// Whether the simulation uses a dynamic wake. Returns 1 for a dynamic wake, 0 for a quasi-steady
-/// wake, and -1 if the input pointer is null.
+/// wake, and -20 if the input pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn lifting_line_simulation_has_dynamic_wake(
     simulation: *mut LiftingLineSimulation
@@ -160,7 +161,7 @@ pub extern "C" fn lifting_line_simulation_has_dynamic_wake(
 /// by `lifting_line_simulation_get_number_of_freestream_velocity_points`.
 ///
 /// Returns the number of points written to `points_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `nr_points` is zero.
+/// -20 if a pointer is null, -3 if `nr_points` is zero.
 ///
 /// # Safety
 /// - `points_out` must point to an array with room for at least `3 * nr_points` doubles.
@@ -173,15 +174,15 @@ pub extern "C" fn lifting_line_simulation_get_freestream_velocity_points(
     let function_name = "lifting_line_simulation_get_freestream_velocity_points";
 
     if simulation.is_null() || points_out.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_points == 0 {
-        set_last_error(format!("{}: the output array has zero length", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: the output array has zero length", function_name));
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
@@ -193,7 +194,7 @@ pub extern "C" fn lifting_line_simulation_get_freestream_velocity_points(
 
 /// Sets the position of the sails, without changing the velocity.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `translation` must point to an array with at least 3 doubles.
@@ -220,7 +221,7 @@ pub extern "C" fn lifting_line_simulation_set_translation_only(
 
 /// Sets the orientation of the sails, without changing the velocity.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `rotation` must point to an array with at least 3 doubles.
@@ -248,7 +249,7 @@ pub extern "C" fn lifting_line_simulation_set_rotation_only(
 /// Sets both the position and the orientation of the sails, and computes the linear and angular
 /// velocity from the change since the previous call, using a finite difference.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `translation` and `rotation` must both point to arrays with at least 3 doubles.
@@ -263,9 +264,9 @@ pub extern "C" fn lifting_line_simulation_set_translation_and_rotation_with_fini
         "lifting_line_simulation_set_translation_and_rotation_with_finite_difference_for_the_velocity";
 
     if simulation.is_null() || translation.is_null() || rotation.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };
@@ -283,7 +284,7 @@ pub extern "C" fn lifting_line_simulation_set_translation_and_rotation_with_fini
 /// Sets the position of the sails, and computes the linear velocity from the change since the
 /// previous call, using a finite difference.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `translation` must point to an array with at least 3 doubles.
@@ -319,7 +320,7 @@ pub extern "C" fn lifting_line_simulation_set_translation_with_velocity_using_fi
 /// Sets the orientation of the sails, and computes the angular velocity from the change since the
 /// previous call, using a finite difference.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `rotation` must point to an array with at least 3 doubles.
@@ -354,7 +355,7 @@ pub extern "C" fn lifting_line_simulation_set_rotation_with_velocity_using_finit
 
 /// Sets the linear velocity of the sails directly, without changing the position.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `linear_velocity` must point to an array with at least 3 doubles.
@@ -381,7 +382,7 @@ pub extern "C" fn lifting_line_simulation_set_velocity_linear(
 
 /// Sets the angular velocity of the sails directly, without changing the orientation.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `angular_velocity` must point to an array with at least 3 doubles.
@@ -410,7 +411,7 @@ pub extern "C" fn lifting_line_simulation_set_velocity_angular(
 /// per sail, and the number of sails is given by `lifting_line_simulation_get_number_of_sails`.
 ///
 /// Returns the number of angles written to `angles_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `angles_out_length` is zero.
+/// -20 if a pointer is null, -3 if `angles_out_length` is zero.
 ///
 /// # Safety
 /// - `angles_out` must point to an array with room for at least `angles_out_length` doubles.
@@ -423,15 +424,15 @@ pub extern "C" fn lifting_line_simulation_local_wing_angles(
     let function_name = "lifting_line_simulation_local_wing_angles";
 
     if simulation.is_null() || angles_out.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if angles_out_length == 0 {
-        set_last_error(format!("{}: the output array has zero length", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: the output array has zero length", function_name));
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
@@ -446,7 +447,7 @@ pub extern "C" fn lifting_line_simulation_local_wing_angles(
 /// Sets the rotation angle of each sail around its span axis, in radians. The number of values
 /// must match the number of sails, given by `lifting_line_simulation_get_number_of_sails`.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if the number of
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the number of
 /// values does not match the number of sails.
 ///
 /// # Safety
@@ -483,7 +484,7 @@ pub extern "C" fn lifting_line_simulation_set_local_wing_angles(
 /// span.
 ///
 /// Returns the number of values written to `internal_state_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `internal_state_out_length` is zero.
+/// -20 if a pointer is null, -3 if `internal_state_out_length` is zero.
 ///
 /// # Safety
 /// - `internal_state_out` must point to an array with room for at least
@@ -497,15 +498,15 @@ pub extern "C" fn lifting_line_simulation_internal_state(
     let function_name = "lifting_line_simulation_internal_state";
 
     if simulation.is_null() || internal_state_out.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if internal_state_out_length == 0 {
-        set_last_error(format!("{}: the output array has zero length", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: the output array has zero length", function_name));
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
@@ -518,7 +519,7 @@ pub extern "C" fn lifting_line_simulation_internal_state(
 /// Sets a constant internal state for each sail. The number of values must match the
 /// number of sails, given by `lifting_line_simulation_get_number_of_sails`.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if the number of
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the number of
 /// values does not match the number of sails.
 ///
 /// # Safety
@@ -551,7 +552,7 @@ pub extern "C" fn lifting_line_simulation_set_internal_state(
 
 /// Resets the circulation strength stored from the previous time step to zero.
 ///
-/// Returns 0 on success, or -1 if the input pointer is null.
+/// Returns 0 on success, or -20 if the input pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn lifting_line_simulation_reset_previous_circulation_strength(
     simulation: *mut LiftingLineSimulation
@@ -559,9 +560,9 @@ pub extern "C" fn lifting_line_simulation_reset_previous_circulation_strength(
     let function_name = "lifting_line_simulation_reset_previous_circulation_strength";
 
     if simulation.is_null() {
-        set_last_error(format!("{}: the simulation pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the simulation pointer is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };
@@ -595,7 +596,7 @@ pub extern "C" fn lifting_line_simulation_do_step(
     let function_name = "lifting_line_simulation_do_step";
 
     if simulation.is_null() || freestream_velocity.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
         return std::ptr::null_mut();
     }
@@ -605,8 +606,7 @@ pub extern "C" fn lifting_line_simulation_do_step(
     let expected_nr_points = rust_simulation.get_freestream_velocity_points().len();
 
     if nr_points != expected_nr_points {
-        set_last_error(
-            format!(
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                 "{}: got the freestream velocity at {} points, but the simulation needs it at {} \
                  points",
                 function_name,
@@ -632,7 +632,7 @@ pub extern "C" fn lifting_line_simulation_do_step(
 /// time step.
 ///
 /// Returns the number of points written to `velocity_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `nr_points` is zero.
+/// -20 if a pointer is null, -3 if `nr_points` is zero.
 ///
 /// # Safety
 /// - `points` and `velocity_out` must both point to arrays with at least `3 * nr_points` doubles.
@@ -646,15 +646,15 @@ pub extern "C" fn lifting_line_simulation_induced_velocities(
     let function_name = "lifting_line_simulation_induced_velocities";
 
     if simulation.is_null() || points.is_null() || velocity_out.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_points == 0 {
-        set_last_error(format!("{}: no points were given", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: no points were given", function_name));
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
@@ -673,7 +673,7 @@ fn simulation_ref<'a>(
     function_name: &str,
 ) -> Option<&'a SimulationImpl> {
     if simulation.is_null() {
-        set_last_error(format!("{}: the simulation pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the simulation pointer is null", function_name));
 
         return None;
     }
@@ -689,7 +689,7 @@ fn mutable_simulation_and_vector<'a>(
     function_name: &str,
 ) -> Option<(&'a mut SimulationImpl, SpatialVector)> {
     if simulation.is_null() || vector.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
         return None;
     }
@@ -712,9 +712,9 @@ fn input_values_for_each_sail<'a>(
     function_name: &str,
 ) -> Result<&'a [f64], i32> {
     if simulation.is_null() || values.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return Err(-1);
+        return Err(-STORMBIRD_ERROR_NULL_POINTER);
     }
 
     let rust_simulation = unsafe { &*(simulation as *const SimulationImpl) };
@@ -722,8 +722,7 @@ fn input_values_for_each_sail<'a>(
     let nr_sails = rust_simulation.line_force_model.nr_wings();
 
     if length != nr_sails {
-        set_last_error(
-            format!(
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                 "{}: got {} {}, but the simulation has {} sails",
                 function_name,
                 length,
@@ -732,7 +731,7 @@ fn input_values_for_each_sail<'a>(
             )
         );
 
-        return Err(-2);
+        return Err(-STORMBIRD_ERROR_INVALID_INPUT);
     }
 
     Ok(unsafe { std::slice::from_raw_parts(values, length) })
@@ -780,8 +779,8 @@ fn write_vectors(vectors: &[SpatialVector], vectors_out: *mut f64, nr_vectors: u
 /// span locations, from -0.5 at the start to 0.5 at the end of the sail. The locations must be
 /// strictly increasing, and there must be one value for each location.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if `length` is
-/// zero, -6 if the wing index is out of range or the locations are not valid.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if `length` is
+/// zero, -3 if the wing index is out of range or the locations are not valid.
 ///
 /// # Safety
 /// - `locations` and `values` must point to arrays with at least `length` doubles.
@@ -796,9 +795,9 @@ pub extern "C" fn lifting_line_simulation_set_internal_state_linear(
     let function_name = "lifting_line_simulation_set_internal_state_linear";
 
     if simulation.is_null() {
-        set_last_error(format!("{}: the simulation pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the simulation pointer is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };
@@ -818,8 +817,8 @@ pub extern "C" fn lifting_line_simulation_set_internal_state_linear(
 /// of the sail, and there must be one more boundary than values. The boundaries must be strictly
 /// increasing.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if an array has
-/// zero length, -6 if the wing index is out of range or the boundaries and values are not valid.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if an array has
+/// zero length, -3 if the wing index is out of range or the boundaries and values are not valid.
 ///
 /// # Safety
 /// - `boundaries` must point to an array with at least `nr_boundaries` doubles, and `values` to an
@@ -836,9 +835,9 @@ pub extern "C" fn lifting_line_simulation_set_internal_state_piecewise_constant(
     let function_name = "lifting_line_simulation_set_internal_state_piecewise_constant";
 
     if simulation.is_null() {
-        set_last_error(format!("{}: the simulation pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the simulation pointer is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_simulation = unsafe { &mut *(simulation as *mut SimulationImpl) };

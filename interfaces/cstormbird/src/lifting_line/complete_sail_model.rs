@@ -5,6 +5,8 @@ use std::os::raw::c_char;
 use crate::error::{
     catch_panic,
     set_last_error,
+    STORMBIRD_ERROR_INVALID_INPUT,
+    STORMBIRD_ERROR_NULL_POINTER,
 };
 use crate::wind::{
     WindCondition,
@@ -42,7 +44,7 @@ pub struct CompleteSailModel {
 #[unsafe(no_mangle)]
 pub extern "C" fn complete_sail_model_new(setup_string: *const c_char) -> *mut CompleteSailModel {
     if setup_string.is_null() {
-        set_last_error("complete_sail_model_new: the setup string pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_new: the setup string pointer is null");
 
         return std::ptr::null_mut();
     }
@@ -50,8 +52,7 @@ pub extern "C" fn complete_sail_model_new(setup_string: *const c_char) -> *mut C
     let setup_str = match unsafe { CStr::from_ptr(setup_string) }.to_str() {
         Ok(s) => s.to_string(),
         Err(error) => {
-            set_last_error(
-                format!("complete_sail_model_new: the setup string is not valid UTF-8: {}", error)
+            set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("complete_sail_model_new: the setup string is not valid UTF-8: {}", error)
             );
 
             return std::ptr::null_mut();
@@ -68,7 +69,7 @@ pub extern "C" fn complete_sail_model_new(setup_string: *const c_char) -> *mut C
     match build_result {
         Some(Ok(model)) => Box::into_raw(Box::new(model)) as *mut CompleteSailModel,
         Some(Err(error)) => {
-            set_last_error(format!("complete_sail_model_new: {}", error));
+            set_last_error(error.code(), format!("complete_sail_model_new: {}", error));
 
             std::ptr::null_mut()
         },
@@ -90,9 +91,9 @@ pub extern "C" fn complete_sail_model_drop(sail_model: *mut CompleteSailModel) {
 #[unsafe(no_mangle)]
 pub extern "C" fn complete_sail_model_get_number_of_sails(sail_model: *mut CompleteSailModel) -> i32 {
     if sail_model.is_null() {
-        set_last_error("complete_sail_model_get_number_of_sails: the model pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_get_number_of_sails: the model pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -111,9 +112,9 @@ pub extern "C" fn complete_sail_model_get_number_of_span_lines(
     sail_model: *mut CompleteSailModel
 ) -> i32 {
     if sail_model.is_null() {
-        set_last_error("complete_sail_model_get_number_of_span_lines: the model pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_get_number_of_span_lines: the model pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -131,12 +132,11 @@ pub extern "C" fn complete_sail_model_get_number_of_freestream_velocity_points(
     sail_model: *mut CompleteSailModel
 ) -> i32 {
     if sail_model.is_null() {
-        set_last_error(
-            "complete_sail_model_get_number_of_freestream_velocity_points: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_get_number_of_freestream_velocity_points: \
              the model pointer is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -164,8 +164,7 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition(
     max_loading: f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() {
-        set_last_error(
-            "complete_sail_model_simulate_optimal_steady_state_condition: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_simulate_optimal_steady_state_condition: \
              one of the input pointers is null"
         );
 
@@ -206,8 +205,7 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition(
     controller_loading: f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() {
-        set_last_error(
-            "complete_sail_model_simulate_steady_state_condition: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_simulate_steady_state_condition: \
              one of the input pointers is null"
         );
 
@@ -233,7 +231,7 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition(
 /// the total force and moment and the input power for each sail.
 ///
 /// Returns the number of sails written to `results_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `results_out_length` is zero.
+/// -20 if a pointer is null, -3 if `results_out_length` is zero.
 ///
 /// # Safety
 /// - `results_out` must point to an array with room for at least `results_out_length` elements.
@@ -248,21 +246,19 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition_simple_out
 ) -> i32 {
     // Check for null pointer
     if sail_model.is_null() || wind_condition.is_null() || results_out.is_null() {
-        set_last_error(
-            "complete_sail_model_simulate_steady_state_condition_simple_output: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_simulate_steady_state_condition_simple_output: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if results_out_length == 0 {
-        set_last_error(
-            "complete_sail_model_simulate_steady_state_condition_simple_output: \
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_simulate_steady_state_condition_simple_output: \
              the output array has zero length"
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe {
@@ -284,7 +280,7 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition_simple_out
 /// simplified to the total force and moment and the input power for each sail.
 ///
 /// Returns the number of sails written to `results_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `results_out_length` is zero.
+/// -20 if a pointer is null, -3 if `results_out_length` is zero.
 ///
 /// # Safety
 /// - `results_out` must point to an array with room for at least `results_out_length` elements.
@@ -298,21 +294,19 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_si
     results_out_length: usize,
 ) -> i32 {
     if sail_model.is_null() || wind_condition.is_null() || results_out.is_null() {
-        set_last_error(
-            "complete_sail_model_simulate_optimal_steady_state_condition_simple_output: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_simulate_optimal_steady_state_condition_simple_output: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if results_out_length == 0 {
-        set_last_error(
-            "complete_sail_model_simulate_optimal_steady_state_condition_simple_output: \
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_simulate_optimal_steady_state_condition_simple_output: \
              the output array has zero length"
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe {
@@ -334,7 +328,7 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_si
 /// stores a result for each time step in `results_out`.
 ///
 /// Returns the number of results written to `results_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `results_out_length` is zero. Results that do not fit in
+/// -20 if a pointer is null, -3 if `results_out_length` is zero. Results that do not fit in
 /// `results_out` are discarded, and entries beyond the returned count are left untouched.
 ///
 /// # Safety
@@ -351,15 +345,15 @@ pub extern "C" fn complete_sail_model_do_multiple_steps(
     results_out_length: usize,
 ) -> i32 {
     if sail_model.is_null() || wind_condition.is_null() || results_out.is_null() {
-        set_last_error("complete_sail_model_do_multiple_steps: one of the input pointers is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_do_multiple_steps: one of the input pointers is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if results_out_length == 0 {
-        set_last_error("complete_sail_model_do_multiple_steps: the output array has zero length");
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_do_multiple_steps: the output array has zero length");
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe {
@@ -404,7 +398,7 @@ pub extern "C" fn complete_sail_model_do_step(
     ship_velocity: f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() {
-        set_last_error("complete_sail_model_do_step: one of the input pointers is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_do_step: one of the input pointers is null");
 
         return std::ptr::null_mut();
     }
@@ -428,7 +422,7 @@ pub extern "C" fn complete_sail_model_do_step(
 /// Updates the control parameters of the sails based on the wind condition alone, meaning that
 /// the lift induced velocity is neglected.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn complete_sail_model_apply_controller_based_on_wind_condition(
     sail_model: *mut CompleteSailModel,
@@ -439,12 +433,11 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_wind_condition(
     controller_loading: f64,
 ) -> i32 {
     if sail_model.is_null() || wind_condition.is_null() {
-        set_last_error(
-            "complete_sail_model_apply_controller_based_on_wind_condition: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_apply_controller_based_on_wind_condition: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -471,7 +464,7 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_wind_condition(
 /// given by `complete_sail_model_get_number_of_freestream_velocity_points`.
 ///
 /// Returns the number of points written to `velocity_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `nr_points` is zero.
+/// -20 if a pointer is null, -3 if `nr_points` is zero.
 ///
 /// # Safety
 /// - `velocity_out` must point to an array with room for at least `3 * nr_points` doubles.
@@ -485,15 +478,15 @@ pub extern "C" fn complete_sail_model_freestream_velocity(
     nr_points: usize,
 ) -> i32 {
     if sail_model.is_null() || wind_condition.is_null() || velocity_out.is_null() {
-        set_last_error("complete_sail_model_freestream_velocity: one of the input pointers is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_freestream_velocity: one of the input pointers is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_points == 0 {
-        set_last_error("complete_sail_model_freestream_velocity: the output array has zero length");
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_freestream_velocity: the output array has zero length");
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe {
@@ -527,7 +520,7 @@ pub extern "C" fn complete_sail_model_freestream_velocity(
 /// `nr_points` must be at least the number of span lines in the model, which is given by
 /// `complete_sail_model_get_number_of_span_lines`.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if `nr_points` is
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if `nr_points` is
 /// smaller than the number of span lines.
 ///
 /// # Safety
@@ -542,12 +535,11 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_freestream(
     nr_points: usize,
 ) -> i32 {
     if sail_model.is_null() || freestream_velocity.is_null() {
-        set_last_error(
-            "complete_sail_model_apply_controller_based_on_freestream: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_apply_controller_based_on_freestream: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -557,8 +549,7 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_freestream(
     let nr_span_lines = rust_model.lifting_line_simulation.line_force_model.nr_span_lines();
 
     if nr_points < nr_span_lines {
-        set_last_error(
-            format!(
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                 "complete_sail_model_apply_controller_based_on_freestream: got {} velocity \
                  points, but the model has {} span lines",
                 nr_points,
@@ -566,7 +557,7 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_freestream(
             )
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let input_slice = unsafe {
@@ -589,7 +580,7 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_freestream(
 
 /// Updates the control parameters of the sails based on the result of a previous simulation step.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `simulation_result` must be a pointer returned by one of the simulation functions.
@@ -602,12 +593,11 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_simulation_resul
     simulation_result: *const SimulationResult,
 ) -> i32 {
     if sail_model.is_null() || simulation_result.is_null() {
-        set_last_error(
-            "complete_sail_model_apply_controller_based_on_simulation_result: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_apply_controller_based_on_simulation_result: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -632,7 +622,7 @@ pub extern "C" fn complete_sail_model_apply_controller_based_on_simulation_resul
 /// per sail, and the number of sails is given by `complete_sail_model_get_number_of_sails`.
 ///
 /// Returns the number of angles written to `angles_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `angles_out_length` is zero.
+/// -20 if a pointer is null, -3 if `angles_out_length` is zero.
 ///
 /// # Safety
 /// - `angles_out` must point to an array with room for at least `angles_out_length` doubles.
@@ -643,15 +633,15 @@ pub extern "C" fn complete_sail_model_local_wing_angles(
     angles_out_length: usize,
 ) -> i32 {
     if sail_model.is_null() || angles_out.is_null() {
-        set_last_error("complete_sail_model_local_wing_angles: one of the input pointers is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_local_wing_angles: one of the input pointers is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if angles_out_length == 0 {
-        set_last_error("complete_sail_model_local_wing_angles: the output array has zero length");
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_local_wing_angles: the output array has zero length");
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe {
@@ -666,7 +656,7 @@ pub extern "C" fn complete_sail_model_local_wing_angles(
 /// Sets the rotation angle of each sail around its span axis, in radians. The number of values
 /// must match the number of sails, given by `complete_sail_model_get_number_of_sails`.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if the number of
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the number of
 /// values does not match the number of sails.
 ///
 /// # Safety
@@ -678,11 +668,10 @@ pub extern "C" fn complete_sail_model_set_local_wing_angles(
     length: usize,
 ) -> i32 {
     if sail_model.is_null() || local_wing_angles.is_null() {
-        set_last_error(
-            "complete_sail_model_set_local_wing_angles: one of the input pointers is null"
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_set_local_wing_angles: one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -690,8 +679,7 @@ pub extern "C" fn complete_sail_model_set_local_wing_angles(
     };
 
     if length != rust_model.get_number_of_sails() {
-        set_last_error(
-            format!(
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                 "complete_sail_model_set_local_wing_angles: got {} angles, but the model has {} \
                  sails",
                 length,
@@ -699,7 +687,7 @@ pub extern "C" fn complete_sail_model_set_local_wing_angles(
             )
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let input_slice = unsafe {
@@ -717,7 +705,7 @@ pub extern "C" fn complete_sail_model_set_local_wing_angles(
 /// span.
 ///
 /// Returns the number of values written to `internal_state_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `internal_state_out_length` is zero.
+/// -20 if a pointer is null, -3 if `internal_state_out_length` is zero.
 ///
 /// # Safety
 /// - `internal_state_out` must point to an array with room for at least
@@ -729,21 +717,19 @@ pub extern "C" fn complete_sail_model_internal_state(
     internal_state_out_length: usize,
 ) -> i32 {
     if sail_model.is_null() || internal_state_out.is_null() {
-        set_last_error(
-            "complete_sail_model_internal_state: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_internal_state: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if internal_state_out_length == 0 {
-        set_last_error(
-            "complete_sail_model_internal_state: \
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_internal_state: \
              the output array has zero length"
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe {
@@ -761,7 +747,7 @@ pub extern "C" fn complete_sail_model_internal_state(
 /// Sets a constant internal state for each sail. The number of values must match the
 /// number of sails, given by `complete_sail_model_get_number_of_sails`.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if the number of
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the number of
 /// values does not match the number of sails.
 ///
 /// # Safety
@@ -773,12 +759,11 @@ pub extern "C" fn complete_sail_model_set_internal_state(
     length: usize,
 ) -> i32 {
     if sail_model.is_null() || internal_state.is_null() {
-        set_last_error(
-            "complete_sail_model_set_internal_state: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_set_internal_state: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe {
@@ -786,8 +771,7 @@ pub extern "C" fn complete_sail_model_set_internal_state(
     };
 
     if length != rust_model.get_number_of_sails() {
-        set_last_error(
-            format!(
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                 "complete_sail_model_set_internal_state: got {} values, but the \
                  model has {} sails",
                 length,
@@ -795,7 +779,7 @@ pub extern "C" fn complete_sail_model_set_internal_state(
             )
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let input_slice = unsafe {
@@ -827,7 +811,7 @@ fn write_single_sail_results(
 }
 
 
-/// Returns 1 if the model has a controller, 0 if it does not, or -1 if the pointer is null.
+/// Returns 1 if the model has a controller, 0 if it does not, or -20 if the pointer is null.
 ///
 /// Without a controller, the `complete_sail_model_apply_controller_*` functions do nothing, and
 /// the sails are operated with the local wing angles and internal states that are set directly on
@@ -835,9 +819,9 @@ fn write_single_sail_results(
 #[unsafe(no_mangle)]
 pub extern "C" fn complete_sail_model_has_controller(sail_model: *const CompleteSailModel) -> i32 {
     if sail_model.is_null() {
-        set_last_error("complete_sail_model_has_controller: the model pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_has_controller: the model pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe { &*(sail_model as *const CompleteSailModelImpl) };
@@ -849,7 +833,7 @@ pub extern "C" fn complete_sail_model_has_controller(sail_model: *const Complete
 /// `vector_out`. The ship is assumed to move in the opposite direction of the
 /// `zero_direction_vector` in the wind environment.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `vector_out` must point to an array with room for at least 3 doubles.
@@ -860,11 +844,10 @@ pub extern "C" fn complete_sail_model_ship_velocity_vector(
     vector_out: *mut f64,
 ) -> i32 {
     if sail_model.is_null() || vector_out.is_null() {
-        set_last_error(
-            "complete_sail_model_ship_velocity_vector: one of the input pointers is null"
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_ship_velocity_vector: one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe { &*(sail_model as *const CompleteSailModelImpl) };
@@ -893,8 +876,7 @@ pub extern "C" fn complete_sail_model_simulate_steady_state_condition_with_ship_
     controller_loading: f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() {
-        set_last_error(
-            "complete_sail_model_simulate_steady_state_condition_with_ship_velocity_vector: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_simulate_steady_state_condition_with_ship_velocity_vector: \
              one of the input pointers is null"
         );
 
@@ -931,8 +913,7 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_wi
     max_loading: f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() {
-        set_last_error(
-            "complete_sail_model_simulate_optimal_steady_state_condition_with_ship_velocity_vector: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_simulate_optimal_steady_state_condition_with_ship_velocity_vector: \
              one of the input pointers is null"
         );
 
@@ -956,7 +937,7 @@ pub extern "C" fn complete_sail_model_simulate_optimal_steady_state_condition_wi
 /// vector of 3 doubles.
 ///
 /// Returns the number of points written to `velocity_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `nr_points` is zero.
+/// -20 if a pointer is null, -3 if `nr_points` is zero.
 ///
 /// # Safety
 /// - `ship_velocity_vector` must point to an array with at least 3 doubles.
@@ -973,21 +954,19 @@ pub extern "C" fn complete_sail_model_freestream_velocity_with_ship_velocity_vec
     if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() ||
         velocity_out.is_null()
     {
-        set_last_error(
-            "complete_sail_model_freestream_velocity_with_ship_velocity_vector: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_freestream_velocity_with_ship_velocity_vector: \
              one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_points == 0 {
-        set_last_error(
-            "complete_sail_model_freestream_velocity_with_ship_velocity_vector: \
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "complete_sail_model_freestream_velocity_with_ship_velocity_vector: \
              the output array has zero length"
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_model = unsafe { &*(sail_model as *const CompleteSailModelImpl) };
@@ -1020,8 +999,7 @@ pub extern "C" fn complete_sail_model_do_step_with_ship_velocity_vector(
     ship_velocity_vector: *const f64,
 ) -> *mut SimulationResult {
     if sail_model.is_null() || wind_condition.is_null() || ship_velocity_vector.is_null() {
-        set_last_error(
-            "complete_sail_model_do_step_with_ship_velocity_vector: \
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "complete_sail_model_do_step_with_ship_velocity_vector: \
              one of the input pointers is null"
         );
 
@@ -1049,8 +1027,8 @@ pub extern "C" fn complete_sail_model_do_step_with_ship_velocity_vector(
 /// **Note**: if the model has a controller, it sets a constant internal state for all sails when it
 /// updates, which overwrites the internal state set here.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if `length` is
-/// zero, -6 if the wing index is out of range or the locations are not valid.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if `length` is
+/// zero, -3 if the wing index is out of range or the locations are not valid.
 ///
 /// # Safety
 /// - `locations` and `values` must point to arrays with at least `length` doubles.
@@ -1065,9 +1043,9 @@ pub extern "C" fn complete_sail_model_set_internal_state_linear(
     let function_name = "complete_sail_model_set_internal_state_linear";
 
     if sail_model.is_null() {
-        set_last_error(format!("{}: the model pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the model pointer is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };
@@ -1090,8 +1068,8 @@ pub extern "C" fn complete_sail_model_set_internal_state_linear(
 /// **Note**: if the model has a controller, it sets a constant internal state for all sails when it
 /// updates, which overwrites the internal state set here.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if an array has
-/// zero length, -6 if the wing index is out of range or the boundaries and values are not valid.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if an array has
+/// zero length, -3 if the wing index is out of range or the boundaries and values are not valid.
 ///
 /// # Safety
 /// - `boundaries` must point to an array with at least `nr_boundaries` doubles, and `values` to an
@@ -1108,9 +1086,9 @@ pub extern "C" fn complete_sail_model_set_internal_state_piecewise_constant(
     let function_name = "complete_sail_model_set_internal_state_piecewise_constant";
 
     if sail_model.is_null() {
-        set_last_error(format!("{}: the model pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the model pointer is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_model = unsafe { &mut *(sail_model as *mut CompleteSailModelImpl) };

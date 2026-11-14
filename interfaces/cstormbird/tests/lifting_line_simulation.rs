@@ -3,7 +3,7 @@
 
 use std::ffi::{CStr, CString};
 
-use cstormbird::error::{stormbird_clear_last_error, stormbird_last_error_message};
+use cstormbird::error::*;
 use cstormbird::lifting_line::simulation::*;
 use cstormbird::results::*;
 
@@ -317,7 +317,7 @@ fn a_wrong_number_of_wing_angles_is_reported() {
             too_many.as_ptr(),
             too_many.len()
         ),
-        -2
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     let message = last_error_message().expect("a failed call should store a message");
@@ -459,7 +459,7 @@ fn the_internal_state_can_be_set_and_read() {
 
     assert_eq!(
         lifting_line_simulation_set_internal_state(simulation, too_many.as_ptr(), too_many.len()),
-        -2
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     lifting_line_simulation_drop(simulation);
@@ -508,7 +508,7 @@ fn span_varying_internal_states_can_be_set() {
         lifting_line_simulation_set_internal_state_piecewise_constant(
             simulation, 1, boundaries.as_ptr(), 3, zone_values.as_ptr(), 2
         ),
-        -6
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     assert!(last_error_message().unwrap().contains("out of range"));

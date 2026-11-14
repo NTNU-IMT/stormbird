@@ -188,5 +188,5 @@ looked into before running again.
 | 14   | A time step was simulated before the model was set up                         |
 | 15   | The input gave a freestream velocity that is not finite, e.g., a NaN input    |
 
-The codes from 1 to 4 are the same as the codes from `stormbird::error::Error::code`. Codes 10 and
+The codes from 1 to 4 are the same as the codes from `stormbird::error::Error::code`, and the same codes are used by the C interface, cstormbird, which uses the codes from 20 and up for its own errors. Codes 10 and
 11 indicate a bug in Stormbird or in the FMU, and should be reported.

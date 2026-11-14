@@ -3,7 +3,7 @@
 
 use std::ffi::{CStr, CString};
 
-use cstormbird::error::{stormbird_clear_last_error, stormbird_last_error_message};
+use cstormbird::error::*;
 use cstormbird::lifting_line::complete_sail_model::*;
 use cstormbird::results::*;
 use cstormbird::wind::*;
@@ -92,7 +92,7 @@ fn the_controller_is_optional() {
 
     assert_eq!(complete_sail_model_has_controller(with_controller), 1);
     assert_eq!(complete_sail_model_has_controller(without_controller), 0);
-    assert_eq!(complete_sail_model_has_controller(std::ptr::null()), -1);
+    assert_eq!(complete_sail_model_has_controller(std::ptr::null()), -STORMBIRD_ERROR_NULL_POINTER);
 
     complete_sail_model_drop(with_controller);
     complete_sail_model_drop(without_controller);
@@ -218,7 +218,7 @@ fn span_varying_internal_states_can_be_set() {
 
     assert_eq!(
         complete_sail_model_set_internal_state_linear(model, 2, locations.as_ptr(), values.as_ptr(), 2),
-        -6
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     assert!(last_error_message().unwrap().contains("out of range"));
@@ -227,7 +227,7 @@ fn span_varying_internal_states_can_be_set() {
 
     assert_eq!(
         complete_sail_model_set_internal_state_linear(model, 0, decreasing.as_ptr(), values.as_ptr(), 2),
-        -6
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     assert!(last_error_message().unwrap().contains("increasing"));
@@ -236,17 +236,17 @@ fn span_varying_internal_states_can_be_set() {
         complete_sail_model_set_internal_state_piecewise_constant(
             model, 0, boundaries.as_ptr(), 3, zone_values.as_ptr(), 1
         ),
-        -6
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     assert_eq!(
         complete_sail_model_set_internal_state_linear(model, 0, std::ptr::null(), values.as_ptr(), 2),
-        -1
+        -STORMBIRD_ERROR_NULL_POINTER
     );
 
     assert_eq!(
         complete_sail_model_set_internal_state_linear(model, 0, locations.as_ptr(), values.as_ptr(), 0),
-        -2
+        -STORMBIRD_ERROR_INVALID_INPUT
     );
 
     complete_sail_model_drop(model);
@@ -343,9 +343,9 @@ fn the_simulation_result_can_be_queried() {
     assert_eq!(rotation_velocity, [0.0; 3]);
 
     // Errors
-    assert_eq!(simulation_result_ctrl_points(std::ptr::null(), ctrl_points.as_mut_ptr(), 1), -1);
-    assert_eq!(simulation_result_ctrl_points(result, ctrl_points.as_mut_ptr(), 0), -2);
-    assert_eq!(simulation_result_iterations(std::ptr::null()), -1);
+    assert_eq!(simulation_result_ctrl_points(std::ptr::null(), ctrl_points.as_mut_ptr(), 1), -STORMBIRD_ERROR_NULL_POINTER);
+    assert_eq!(simulation_result_ctrl_points(result, ctrl_points.as_mut_ptr(), 0), -STORMBIRD_ERROR_INVALID_INPUT);
+    assert_eq!(simulation_result_iterations(std::ptr::null()), -STORMBIRD_ERROR_NULL_POINTER);
     assert!(simulation_result_residual(std::ptr::null()).is_nan());
 
     simulation_result_drop(result);

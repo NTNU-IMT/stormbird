@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-use crate::error::set_last_error;
+use crate::error::{set_last_error, STORMBIRD_ERROR_INVALID_INPUT, STORMBIRD_ERROR_NULL_POINTER};
 use crate::ffi_utils::{write_floats, write_vectors};
 
 use stormbird::common_utils::results::simplfied::SingleSailResult as SingleSailResultImpl;
@@ -60,7 +60,7 @@ pub extern "C" fn simulation_result_drop(result: *mut SimulationResult) {
 #[unsafe(no_mangle)]
 pub extern "C" fn simulation_result_time(result: *const SimulationResult) -> f64 {
     if result.is_null() {
-        set_last_error("simulation_result_time: the result pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_time: the result pointer is null");
 
         return f64::NAN;
     }
@@ -70,14 +70,14 @@ pub extern "C" fn simulation_result_time(result: *const SimulationResult) -> f64
     rust_result.time
 }
 
-/// The number of sails (wings) the result contains data for. Returns -1 if the input pointer is
+/// The number of sails (wings) the result contains data for. Returns -20 if the input pointer is
 /// null.
 #[unsafe(no_mangle)]
 pub extern "C" fn simulation_result_nr_of_wings(result: *const SimulationResult) -> i32 {
     if result.is_null() {
-        set_last_error("simulation_result_nr_of_wings: the result pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_nr_of_wings: the result pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_result = unsafe { &*(result as *const SimulationResultImpl) };
@@ -88,7 +88,7 @@ pub extern "C" fn simulation_result_nr_of_wings(result: *const SimulationResult)
 /// Simplifies the result to the total force, total moment and input power for each sail.
 ///
 /// Returns the number of sails written to `results_out`, or a negative error code:
-/// -1 if a pointer is null, -2 if `results_out_length` is zero.
+/// -20 if a pointer is null, -3 if `results_out_length` is zero.
 ///
 /// # Safety
 /// - `results_out` must point to an array with room for at least `results_out_length` elements.
@@ -99,15 +99,15 @@ pub extern "C" fn simulation_result_as_simplified(
     results_out_length: usize,
 ) -> i32 {
     if result.is_null() || results_out.is_null() {
-        set_last_error("simulation_result_as_simplified: one of the input pointers is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_as_simplified: one of the input pointers is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if results_out_length == 0 {
-        set_last_error("simulation_result_as_simplified: the output array has zero length");
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "simulation_result_as_simplified: the output array has zero length");
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let rust_result = unsafe { &*(result as *const SimulationResultImpl) };
@@ -129,7 +129,7 @@ pub extern "C" fn simulation_result_as_simplified(
 
 /// The sum of the integrated forces on all the sails, written as 3 doubles to `force_out`.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `force_out` must point to an array with room for at least 3 doubles.
@@ -139,11 +139,10 @@ pub extern "C" fn simulation_result_integrated_forces_sum(
     force_out: *mut f64,
 ) -> i32 {
     if result.is_null() || force_out.is_null() {
-        set_last_error(
-            "simulation_result_integrated_forces_sum: one of the input pointers is null"
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_integrated_forces_sum: one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_result = unsafe { &*(result as *const SimulationResultImpl) };
@@ -159,7 +158,7 @@ pub extern "C" fn simulation_result_integrated_forces_sum(
 
 /// The sum of the integrated moments on all the sails, written as 3 doubles to `moment_out`.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `moment_out` must point to an array with room for at least 3 doubles.
@@ -169,11 +168,10 @@ pub extern "C" fn simulation_result_integrated_moments_sum(
     moment_out: *mut f64,
 ) -> i32 {
     if result.is_null() || moment_out.is_null() {
-        set_last_error(
-            "simulation_result_integrated_moments_sum: one of the input pointers is null"
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_integrated_moments_sum: one of the input pointers is null"
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_result = unsafe { &*(result as *const SimulationResultImpl) };
@@ -191,7 +189,7 @@ pub extern "C" fn simulation_result_integrated_moments_sum(
 #[unsafe(no_mangle)]
 pub extern "C" fn simulation_result_input_power_sum(result: *const SimulationResult) -> f64 {
     if result.is_null() {
-        set_last_error("simulation_result_input_power_sum: the result pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_input_power_sum: the result pointer is null");
 
         return f64::NAN;
     }
@@ -258,7 +256,7 @@ pub extern "C" fn simulation_result_new_from_json_file(
     file_path: *const c_char
 ) -> *mut SimulationResult {
     if file_path.is_null() {
-        set_last_error("simulation_result_new_from_json_file: the file path pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_new_from_json_file: the file path pointer is null");
 
         return std::ptr::null_mut();
     }
@@ -266,7 +264,7 @@ pub extern "C" fn simulation_result_new_from_json_file(
     let file_path = match unsafe { CStr::from_ptr(file_path) }.to_str() {
         Ok(file_path) => file_path,
         Err(error) => {
-            set_last_error(format!(
+            set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                 "simulation_result_new_from_json_file: the file path is not valid UTF-8: {}",
                 error
             ));
@@ -278,7 +276,7 @@ pub extern "C" fn simulation_result_new_from_json_file(
     match SimulationResultImpl::from_json(file_path) {
         Ok(result) => box_simulation_result(result),
         Err(error) => {
-            set_last_error(format!(
+            set_last_error(error.code(), format!(
                 "simulation_result_new_from_json_file: failed to read the result from {}: {}",
                 file_path, error
             ));
@@ -288,25 +286,25 @@ pub extern "C" fn simulation_result_new_from_json_file(
     }
 }
 
-/// The number of line elements (span lines) in the result. Returns -1 if the pointer is null.
+/// The number of line elements (span lines) in the result. Returns -error.code() if the pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn simulation_result_nr_of_span_lines(result: *const SimulationResult) -> i32 {
     if result.is_null() {
-        set_last_error("simulation_result_nr_of_span_lines: the result pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_nr_of_span_lines: the result pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     unsafe { result_ref(result) }.nr_span_lines() as i32
 }
 
-/// The number of iterations used by the solver. Returns -1 if the pointer is null.
+/// The number of iterations used by the solver. Returns -20 if the pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn simulation_result_iterations(result: *const SimulationResult) -> i32 {
     if result.is_null() {
-        set_last_error("simulation_result_iterations: the result pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_iterations: the result pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     unsafe { result_ref(result) }.iterations as i32
@@ -316,7 +314,7 @@ pub extern "C" fn simulation_result_iterations(result: *const SimulationResult) 
 #[unsafe(no_mangle)]
 pub extern "C" fn simulation_result_residual(result: *const SimulationResult) -> f64 {
     if result.is_null() {
-        set_last_error("simulation_result_residual: the result pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_residual: the result pointer is null");
 
         return f64::NAN;
     }
@@ -327,7 +325,7 @@ pub extern "C" fn simulation_result_residual(result: *const SimulationResult) ->
 /// The indices of the line elements that belong to each sail, written as 2 values per sail to
 /// `indices_out`: the index of the first line element, and one past the index of the last.
 ///
-/// Returns the number of sails written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of sails written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_wings` is zero.
 ///
 /// # Safety
@@ -339,15 +337,15 @@ pub extern "C" fn simulation_result_wing_indices(
     nr_wings: usize,
 ) -> i32 {
     if result.is_null() || indices_out.is_null() {
-        set_last_error("simulation_result_wing_indices: one of the input pointers is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "simulation_result_wing_indices: one of the input pointers is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_wings == 0 {
-        set_last_error("simulation_result_wing_indices: the output array has zero length");
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, "simulation_result_wing_indices: the output array has zero length");
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let wing_indices = &unsafe { result_ref(result) }.wing_indices;
@@ -368,15 +366,15 @@ pub extern "C" fn simulation_result_wing_indices(
 /// error code to return, if any.
 fn check_output(function_name: &str, result: *const SimulationResult, out_is_null: bool, length: usize) -> Option<i32> {
     if result.is_null() || out_is_null {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return Some(-1);
+        return Some(-STORMBIRD_ERROR_NULL_POINTER);
     }
 
     if length == 0 {
-        set_last_error(format!("{}: the output array has zero length", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: the output array has zero length", function_name));
 
-        return Some(-2);
+        return Some(-STORMBIRD_ERROR_INVALID_INPUT);
     }
 
     None
@@ -384,7 +382,7 @@ fn check_output(function_name: &str, result: *const SimulationResult, out_is_nul
 
 /// The control points of the line elements, written as 3 doubles per point to `points_out`.
 ///
-/// Returns the number of points written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of points written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_points` is zero.
 ///
 /// # Safety
@@ -406,7 +404,7 @@ pub extern "C" fn simulation_result_ctrl_points(
 
 /// The forces integrated over each sail, written as one `IntegratedValues` per sail.
 ///
-/// Returns the number of sails written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of sails written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_wings` is zero.
 ///
 /// # Safety
@@ -428,7 +426,7 @@ pub extern "C" fn simulation_result_integrated_forces(
 
 /// The moments integrated over each sail, written as one `IntegratedValues` per sail.
 ///
-/// Returns the number of sails written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of sails written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_wings` is zero.
 ///
 /// # Safety
@@ -466,7 +464,7 @@ fn write_integrated_values(
 
 /// The input power used by each sail.
 ///
-/// Returns the number of values written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of values written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_wings` is zero.
 ///
 /// # Safety
@@ -488,8 +486,8 @@ pub extern "C" fn simulation_result_input_power(
 
 /// The forces on each line element, written as one `SectionalForces` per line element.
 ///
-/// Returns the number of line elements written, or a negative error code: -1 if a pointer is null,
-/// -2 if `nr_span_lines` is zero.
+/// Returns the number of line elements written, or a negative error code: -20 if a pointer is null,
+/// -3 if `nr_span_lines` is zero.
 ///
 /// # Safety
 /// - `forces_out` must point to an array with room for at least `nr_span_lines` elements.
@@ -526,7 +524,7 @@ pub extern "C" fn simulation_result_sectional_forces(
 
 /// The circulation strength on each line element.
 ///
-/// Returns the number of values written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of values written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_span_lines` is zero.
 ///
 /// # Safety
@@ -552,8 +550,8 @@ pub extern "C" fn simulation_result_force_input_circulation_strength(
 /// The velocity used to compute the forces on each line element, including the induced
 /// velocities and the motion of the sails, written as 3 doubles per line element.
 ///
-/// Returns the number of line elements written, or a negative error code: -1 if a pointer is null,
-/// -2 if `nr_span_lines` is zero.
+/// Returns the number of line elements written, or a negative error code: -20 if a pointer is null,
+/// -3 if `nr_span_lines` is zero.
 ///
 /// # Safety
 /// - `velocity_out` must point to an array with room for at least `3 * nr_span_lines` doubles.
@@ -574,7 +572,7 @@ pub extern "C" fn simulation_result_force_input_velocity(
 
 /// The angle of attack on each line element, in radians.
 ///
-/// Returns the number of values written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of values written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_span_lines` is zero.
 ///
 /// # Safety
@@ -600,7 +598,7 @@ pub extern "C" fn simulation_result_force_input_angles_of_attack(
 /// The internal state given to the section model on each line element, e.g., the spin ratio for
 /// a rotating cylinder.
 ///
-/// Returns the number of values written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of values written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_span_lines` is zero.
 ///
 /// # Safety
@@ -628,7 +626,7 @@ pub extern "C" fn simulation_result_force_input_section_models_internal_state(
 /// The amount of stall used for the lift and drag on each line element, between 0 (no stall) and
 /// 1 (full stall).
 ///
-/// Returns the number of values written, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns the number of values written, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_span_lines` is zero.
 ///
 /// # Safety
@@ -653,8 +651,8 @@ pub extern "C" fn simulation_result_force_input_amount_of_stall(
 
 /// The acceleration of each line element, written as 3 doubles per line element.
 ///
-/// Returns the number of line elements written, or a negative error code: -1 if a pointer is null,
-/// -2 if `nr_span_lines` is zero.
+/// Returns the number of line elements written, or a negative error code: -20 if a pointer is null,
+/// -3 if `nr_span_lines` is zero.
 ///
 /// # Safety
 /// - `acceleration_out` must point to an array with room for at least `3 * nr_span_lines` doubles.
@@ -678,7 +676,7 @@ pub extern "C" fn simulation_result_force_input_acceleration(
 
 /// The angular velocity of the sails, written as 3 doubles to `rotation_velocity_out`.
 ///
-/// Returns 0 on success, or -1 if a pointer is null.
+/// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
 /// - `rotation_velocity_out` must point to an array with room for at least 3 doubles.
