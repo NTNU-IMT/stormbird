@@ -25,6 +25,7 @@ pub struct CompleteSailModelSettings {
     #[serde(default)]
     pub retractable: bool,
     /// A vector defining the direction of the thrust
+    #[serde(default="CompleteSailModelSettings::default_thrust_direction")]
     pub thrust_direction: SpatialVector
 }
 

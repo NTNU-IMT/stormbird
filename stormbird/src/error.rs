@@ -29,6 +29,26 @@ impl Error {
     pub fn invalid_input(message: impl Into<String>) -> Self {
         Error::InvalidInput(message.into())
     }
+
+    /// Returns a numeric code for the type of error. This is useful for interfaces that can only
+    /// report errors as numbers, such as the FMU version of the library. The codes are:
+    ///
+    /// | Code | Error                           |
+    /// |------|---------------------------------|
+    /// | 1    | [`Error::IoError`]              |
+    /// | 2    | [`Error::SerdeJsonError`]       |
+    /// | 3    | [`Error::InvalidInput`]         |
+    /// | 4    | [`Error::CustomStringError`]    |
+    ///
+    /// Zero is never used, so that it can represent *no error* in the interfaces.
+    pub fn code(&self) -> i32 {
+        match self {
+            Error::IoError(_) => 1,
+            Error::SerdeJsonError(_) => 2,
+            Error::InvalidInput(_) => 3,
+            Error::CustomStringError(_) => 4,
+        }
+    }
 }
 
 impl From<std::io::Error> for Error {
@@ -67,5 +87,24 @@ impl std::error::Error for Error {
             Error::SerdeJsonError(error) => Some(error),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_codes_are_unique_and_non_zero() {
+        let errors = [
+            Error::IoError(std::io::Error::other("io")),
+            Error::SerdeJsonError(serde_json::from_str::<i32>("not json").unwrap_err()),
+            Error::invalid_input("invalid"),
+            Error::CustomStringError("custom".to_string()),
+        ];
+
+        let codes: Vec<i32> = errors.iter().map(|error| error.code()).collect();
+
+        assert_eq!(codes, vec![1, 2, 3, 4]);
     }
 }

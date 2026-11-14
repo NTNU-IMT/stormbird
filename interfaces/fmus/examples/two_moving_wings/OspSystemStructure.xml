@@ -6,7 +6,7 @@
     <Algorithm>fixedStep</Algorithm>
 
     <Simulators>
-        <Simulator name="wing_sails" source="../../stormbird_lifting_line/StormbirdLiftingLine.fmu">
+        <Simulator name="wing_sails" source="../../stormbird_lifting_line/target/fmu/release/StormbirdLiftingLine.fmu">
             <InitialValues>
                 <InitialValue variable = "parameters_path"> <String value="stormbird_parameters.json"/> </InitialValue>
 
@@ -16,7 +16,7 @@
             </InitialValues>
         </Simulator>
 
-        <Simulator name="motion" source="../../utils/tabulated_motion/TabulatedMotion.fmu">
+        <Simulator name="motion" source="../../utils/tabulated_motion/target/fmu/release/TabulatedMotion.fmu">
             <InitialValues>
                 <InitialValue variable = "motion_file_path"> <String value="motion.csv"/> </InitialValue>
             </InitialValues>

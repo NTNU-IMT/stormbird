@@ -8,6 +8,7 @@ use serde::{Serialize, Deserialize};
 use crate::lifting_line::simulation_builder::SimulationBuilder;
 use crate::wind::environment::WindEnvironment;
 use crate::controller::builder::ControllerBuilder;
+use crate::controller::measurements::SpanwiseMeasurementBuilder;
 
 use super::CompleteSailModel;
 use super::settings::CompleteSailModelSettings;
@@ -18,11 +19,18 @@ use crate::error::Error;
 #[serde(deny_unknown_fields)]
 /// Builder for the complete sail model
 pub struct CompleteSailModelBuilder {
-    lifting_line_simulation: SimulationBuilder,
-    wind_environment: WindEnvironment,
-    controller: ControllerBuilder,
+    /// Builder for the lifting line simulation of the sails
+    pub lifting_line_simulation: SimulationBuilder,
+    /// The model of the wind environment. The default wind environment is used if not given.
     #[serde(default)]
-    settings: CompleteSailModelSettings
+    pub wind_environment: WindEnvironment,
+    /// Optional builder for the control system of the sails. Without a controller, the sails are
+    /// operated with the local wing angles and internal states that are set directly on the model.
+    #[serde(default)]
+    pub controller: Option<ControllerBuilder>,
+    /// Settings that are specific to the complete sail model
+    #[serde(default)]
+    pub settings: CompleteSailModelSettings
 }
 
 impl CompleteSailModelBuilder {
@@ -44,13 +52,22 @@ impl CompleteSailModelBuilder {
     pub fn build(&self) -> Result<CompleteSailModel, Error> {
         let lifting_line_simulation = self.lifting_line_simulation.build()?;
 
-        let controller = self.controller.build(&lifting_line_simulation.line_force_model)?;
+        let line_force_model = &lifting_line_simulation.line_force_model;
+
+        let controller = match &self.controller {
+            Some(controller_builder) => Some(controller_builder.build(line_force_model)?),
+            None => None,
+        };
+
+        let default_spanwise_measurement = SpanwiseMeasurementBuilder::default()
+            .build(line_force_model)?;
 
         Ok(CompleteSailModel {
             lifting_line_simulation,
             wind_environment: self.wind_environment.clone(),
             controller,
-            settings: self.settings.clone()
+            settings: self.settings.clone(),
+            default_spanwise_measurement,
         })
     }
 }

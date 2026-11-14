@@ -4,29 +4,22 @@
 
 
 use serde::{Deserialize, Serialize};
-use std::fs::File;
 
 use std::path::Path;
 
 use stormbird::error::Error;
+use stormbird::lifting_line::complete_sail_model::builder::CompleteSailModelBuilder;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-/// Parameters for the Stormbird lifting line FMU. These variables could also be part of the FMU
-/// directly. However, they are stored in a separate JSON file to facilitate easier usage when using
-/// the FMU with runtimes that have limited to no support for other data types than f64.
+/// Parameters for the Stormbird lifting line FMU, read from a single JSON file. These variables
+/// could also be part of the FMU directly. However, they are stored in a separate JSON file to
+/// facilitate easier usage when using the FMU with runtimes that have limited to no support for
+/// other data types than f64.
 pub struct FmuParameters {
-    /// Path to the JSON file describing the lifting line model.
-    pub lifting_line_setup_file_path: String,
-    #[serde(default)]
-    /// Path to the JSON file describing the wind environment, if any thing different than the
-    /// default should be used.
-    pub wind_environment_setup_file_path: String,
-    #[serde(default)]
-    /// Path to the JSON file describing the controller, if used
-    pub controller_setup_file_path: String,
-    #[serde(default)]
-    pub superstructure_force_setup_path: String,
+    /// The complete sail model, i.e., the lifting line simulation, the wind environment and the
+    /// optional controller.
+    pub sail_model: CompleteSailModelBuilder,
     #[serde(default)]
     /// Switch to specify if angles is given in degrees or radians.
     pub angles_in_degrees: bool,
@@ -43,26 +36,20 @@ pub struct FmuParameters {
     /// the translation is always zero. It can be used with rotation.
     pub use_motion_velocity_linear_as_freestream: bool,
     #[serde(default)]
-    /// Non-dimensional spanwise position for measuring effective angle of attack
-    pub non_dim_spanwise_measurement_position: f64,
-    #[serde(default)]
     /// If larger than zero, this variable is used to construct moving average filters on the input
     pub input_moving_average_window_size: usize,
     #[serde(default)]
-    /// If larger than zero, this variable can be used to delay the construction of the model. This
-    /// is useful if situations where the input velocity may not be properly set until a couple if
-    /// time steps in to the simulation.
+    /// If larger than zero, the model is not simulated until this number of time steps have been
+    /// completed. This is useful in situations where the input velocity may not be properly set
+    /// until a couple of time steps into the simulation.
     pub number_of_iterations_before_building_model: usize
 }
 
 impl FmuParameters {
     /// Construct a new Parameters object from a JSON file.
     pub fn from_json_file(file_path: &Path) -> Result<Self, Error> {
-        let file = File::open(file_path)?;
+        let json_string = std::fs::read_to_string(file_path)?;
 
-        let reader = std::io::BufReader::new(file);
-        let result = serde_json::from_reader(reader)?;
-
-        Ok(result)
+        Ok(serde_json::from_str(&json_string)?)
     }
 }

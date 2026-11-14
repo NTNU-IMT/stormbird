@@ -30,7 +30,7 @@ class CompleteSailModelSettings(StormbirdSetupBaseModel):
 
 class CompleteSailModelBuilder(StormbirdSetupBaseModel):
     lifting_line_simulation: SimulationBuilder
-    controller: ControllerBuilder
+    controller: ControllerBuilder | None = None
     wind_environment: WindEnvironment = Field(default_factory=lambda: WindEnvironment())
     settings: CompleteSailModelSettings = Field(default_factory=lambda: CompleteSailModelSettings())
 

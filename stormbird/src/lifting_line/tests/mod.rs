@@ -16,3 +16,4 @@ mod coordinate_systems;
 mod wing_sails_speed_test;
 mod linearized_solver;
 mod dynamic_stall;
+mod complete_sail_model;

@@ -1,18 +1,18 @@
 # Complete sail model
 
-A lifting line [`Simulation`](./simulation_overview.md) needs the freestream velocity at every relevant point, and the sail settings, such as the local wing angles and the internal states, must be set from the outside. The `CompleteSailModel` combines a lifting line simulation with a [wind environment](../utils/wind_environment.md) and a [control system](../utils/control_system.md), so that the sails can be simulated as a *complete unit*. The input is then a wind condition and a ship velocity, and the output is the forces and the input power for each sail, with the sails operated as the control system dictates.
+A lifting line [`Simulation`](./simulation_overview.md) needs the freestream velocity at every relevant point, and the sail settings, such as the local wing angles and the internal states, must be set from the outside. The `CompleteSailModel` combines a lifting line simulation with a [wind environment](../utils/wind_environment.md) and an optional [control system](../utils/control_system.md), so that the sails can be simulated as a *complete unit*. The input is then a wind condition and a ship velocity, and the output is the forces and the input power for each sail, with the sails operated as the control system dictates.
 
-The typical use case is to predict the performance of a sail system in many different conditions, for instance in power prediction or voyage simulation tools. The model is available in Rust, in [pystormbird](../different_versions/python_interface.md), and through the [C interface](../different_versions/c_interface.md).
+The typical use case is to predict the performance of a sail system in many different conditions, for instance in power prediction or voyage simulation tools. The model is available in Rust, in [pystormbird](../different_versions/python_interface.md), and through the [C interface](../different_versions/c_interface.md). It is also the model that is used in the [FMU](../different_versions/fmu_version.md), for time-domain simulations, as explained [below](#use-in-the-fmu).
 
 ## Input
 The model is created from a `CompleteSailModelBuilder`:
 
 ```rust
 pub struct CompleteSailModelBuilder {
-    lifting_line_simulation: SimulationBuilder,
-    wind_environment: WindEnvironment,
-    controller: ControllerBuilder,
-    settings: CompleteSailModelSettings, // Optional
+    pub lifting_line_simulation: SimulationBuilder,
+    pub wind_environment: WindEnvironment,          // Optional, default wind environment if not given
+    pub controller: Option<ControllerBuilder>,      // Optional
+    pub settings: CompleteSailModelSettings,        // Optional
 }
 
 pub struct CompleteSailModelSettings {
@@ -25,8 +25,8 @@ pub struct CompleteSailModelSettings {
 ```
 
 - `lifting_line_simulation`: the [simulation builder](./simulation_overview.md) for the sails. Quasi-steady settings are the natural choice for steady state conditions.
-- `wind_environment`: the [wind environment](../utils/wind_environment.md), which defines how a wind condition is turned into a freestream velocity at each point, including optional inflow corrections.
-- `controller`: the [controller builder](../utils/control_system.md), with one set of set points for each sail.
+- `wind_environment`: the [wind environment](../utils/wind_environment.md), which defines how a wind condition is turned into a freestream velocity at each point, including optional inflow corrections. The default wind environment is used if it is not given.
+- `controller`: the optional [controller builder](../utils/control_system.md), with one set of set points for each sail. Without a controller, the sails are operated with the local wing angles and internal states that are set directly on the model, with `set_local_wing_angles` and `set_internal_state`, and the controller loading has no effect.
 - `settings`: settings that are specific to the complete sail model, explained in the sections below.
 
 The ship velocity is given as a scalar. The velocity due to the ship motion is the ship velocity times the `zero_direction_vector` in the wind environment, which is added to the true wind to give the apparent wind. In other words, the ship is assumed to sail in the opposite direction of the `zero_direction_vector`, and a wind direction of zero is a head wind. With the default values, the ship sails in the negative x-direction, which is why the default `thrust_direction` is `(-1, 0, 0)`. The [coordinate system](#coordinate-system) section below shows how to use other directions.
@@ -59,13 +59,15 @@ def simulate_optimal_steady_state_condition(
 1. The controller is first applied based on the wind condition alone, which neglects the velocities induced by the sails.
 2. The model then alternates between running the lifting line simulation and updating the controller based on the result, until the change in the local wing angles is smaller than `allowed_angle_error` or until `max_controller_iterations` is reached. This makes it possible to reach the set points also when they depend on the induced velocities, e.g., when the controller uses the effective angle of attack.
 
+Without a controller, the sail settings are not changed, so `simulate_steady_state_condition` runs a single simulation with the current local wing angles and internal states.
+
 `simulate_optimal_steady_state_condition` runs `simulate_steady_state_condition` for `nr_loadings_to_test_during_optimization` loadings, evenly distributed from 0.0 to `max_loading`, and returns the result with the highest *effective power*:
 
 \\[
     P\_{effective} = \mathbf{F} \cdot \mathbf{e}\_{thrust} \\, V\_{ship} - P\_{input}
 \\]
 
-where \\( \mathbf{F} \\) is the sum of the forces on all sails, \\( \mathbf{e}\_{thrust} \\) is the `thrust_direction`, and \\( P\_{input} \\) is the sum of the [input power](../line_model/input_power.md) for all sails. This is mainly useful for sails that need power, such as rotor sails and suction sails. For these sails, the maximum thrust does not necessarily give the best net result. It can also be used to reduce the loading in conditions where the full set points give a drag rather than thrust. If `retractable` is `true`, and the best effective power is still negative, the sails are assumed to be retracted, and the forces, moments and input power in the returned result are set to zero.
+where \\( \mathbf{F} \\) is the sum of the forces on all sails, \\( \mathbf{e}\_{thrust} \\) is the `thrust_direction`, and \\( P\_{input} \\) is the sum of the [input power](../line_model/input_power.md) for all sails. This is mainly useful for sails that need power, such as rotor sails and suction sails. For these sails, the maximum thrust does not necessarily give the best net result. It can also be used to reduce the loading in conditions where the full set points give a drag rather than thrust. If `retractable` is `true`, and the best effective power is still negative, the sails are assumed to be retracted, and the forces, moments and input power in the returned result are set to zero. Without a controller, the loading has no effect, so only a single simulation is run, while the check for retractable sails is still applied.
 
 ### Simple output
 The methods above return a full [`SimulationResult`](../line_model/force_calculations.md), which contains sectional values, the input to the force calculations, and more. Usually only the total values for each sail are needed. Both methods therefore also have a `_simple_output` variant, which takes the same arguments but returns a list with one `SingleSailResult` for each sail:
@@ -235,7 +237,19 @@ The thrust is the negative x-component of the force, which matches the default `
 The model also has methods for more direct control of the simulation:
 
 - `do_step` and `do_multiple_steps`: run the lifting line simulation for a given wind condition and ship velocity, with the current sail settings. The controller is **not** applied. `do_multiple_steps` re-initializes the wake and runs from time zero to `end_time`, and is mainly useful with dynamic simulation settings, for instance with [gusts](../utils/wind_environment.md) in the wind condition.
-- `apply_controller_based_on_wind_condition`, `apply_controller_based_on_freestream` and `apply_controller_based_on_simulation_result`: update the sail settings with the controller, based on different types of input.
+- `apply_controller_based_on_wind_condition`, `apply_controller_based_on_freestream` and `apply_controller_based_on_simulation_result`: update the sail settings with the controller, based on different types of input. They do nothing if there is no controller.
 - `set_local_wing_angles` and `set_internal_state`: set the sail settings manually. Any later controller update overwrites them. In Python, there are also `set_internal_state_linear` and `set_internal_state_piecewise_constant` for internal states that vary along the span.
 - `freestream_velocity`: the apparent wind at all the points where the simulation needs it, including the ship velocity and any inflow corrections.
-- `local_wing_angles`, `internal_state`, `get_number_of_sails` and `get_wind_environment` (Python): query the current state of the model.
+- `do_step_with_ship_velocity_vector` and `freestream_velocity_with_ship_velocity_vector` (Rust): the same as `do_step` and `freestream_velocity`, but with the velocity of the ship given as a vector, rather than as a scalar along the negative `zero_direction_vector`. This is useful when the ship velocity comes from an external motion simulation, for instance in the FMU. `ship_velocity_vector` returns the vector that corresponds to a scalar ship velocity.
+- `flow_measurements_from_simulation_result` (Rust): the angle of attack, velocity and apparent wind direction measured on each sail, as used by the controller. The measurements use the spanwise measurement of the controller if there is one, and the default spanwise measurement otherwise, so they are also available without a controller. `update_controller` updates the controller with given measurements.
+- `local_wing_angles`, `internal_state`, `get_number_of_sails` and `get_wind_environment` (Python): query the current state of the model. `has_controller` (Rust) returns true if the model has a controller.
+
+## Use in the FMU
+The [FMU](../different_versions/fmu_version.md) uses the complete sail model for time-domain simulations, typically with dynamic simulation settings. The model is set up from the JSON representation of the `CompleteSailModelBuilder`, given under the key `sail_model` in the parameters file of the FMU. In each time step, the FMU:
+
+1. Sets the translation and rotation of the sails from the inputs, and computes the velocity of the motion with finite differences. Without a controller, the local wing angles and internal states are also set from the inputs. With a controller, the inputs are only used in the first time step.
+2. Creates a wind condition from the wind velocity and direction inputs, and computes the freestream velocity with `freestream_velocity_with_ship_velocity_vector`. The ship velocity vector is the linear motion velocity input if `use_motion_velocity_linear_as_freestream` is set in the FMU parameters, and zero otherwise, in which case the velocity of the ship is included through the motion of the sails.
+3. Runs a single time step of the lifting line simulation.
+4. Measures the flow on each sail with `flow_measurements_from_simulation_result`, which is given as output, and updates the controller, if any, with the same measurements. The updated sail settings are used in the next time step.
+
+The steady state methods are not used in the FMU.

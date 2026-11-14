@@ -21,6 +21,7 @@ use crate::wind::{
 use crate::controller::{
     Controller,
     input::ControllerInput,
+    measurements::SpanwiseMeasurement,
 };
 
 use crate::common_utils::results::{
@@ -42,17 +43,21 @@ use crate::line_force_model::wing_internal_state::WingInternalState;
 #[derive(Debug, Clone)]
 /// Collection of the necessary functionality to simulate a *complete sail system* using the lifting
 /// line model. This means combining a lifting line model of the sails with a model of the wind
-/// environment and a control system that adjust the control parameters of the sails based on the
-/// wind conditions.
+/// environment and an optional control system that adjust the control parameters of the sails
+/// based on the wind conditions.
 pub struct CompleteSailModel {
     /// The lifting line simulation of the sails
     pub lifting_line_simulation: LiftingLineSimulation,
     /// The model of the wind environment
     pub wind_environment: WindEnvironment,
-    /// The control system for the sails
-    pub controller: Controller,
+    /// Optional control system for the sails. Without a controller, the sails are operated with the
+    /// local wing angles and internal states that are set directly on the model, and the controller
+    /// loading has no effect.
+    pub controller: Option<Controller>,
     /// Settings that are specific to the complete sail model
-    pub settings: CompleteSailModelSettings
+    pub settings: CompleteSailModelSettings,
+    /// Spanwise measurement used for the flow measurements when there is no controller
+    default_spanwise_measurement: SpanwiseMeasurement,
 }
 
 impl CompleteSailModel {
@@ -68,18 +73,41 @@ impl CompleteSailModel {
         self.lifting_line_simulation.line_force_model.nr_wings()
     }
     
-    /// Runs multiple `simulate_steady_state_condition` calls with different loadings, and chooses 
-    /// the best one based on the maximum delivered power
+    /// Returns true if the model has a controller
+    pub fn has_controller(&self) -> bool {
+        self.controller.is_some()
+    }
+
+    /// Returns the spanwise measurement used to measure the flow conditions on the sails. This is
+    /// the measurement of the controller, if there is one, and a default measurement otherwise.
+    pub fn spanwise_measurement(&self) -> &SpanwiseMeasurement {
+        match &self.controller {
+            Some(controller) => &controller.spanwise_measurement,
+            None => &self.default_spanwise_measurement,
+        }
+    }
+
+    /// Runs multiple `simulate_steady_state_condition` calls with different loadings, and chooses
+    /// the best one based on the maximum delivered power.
+    ///
+    /// Without a controller, the loading has no effect, so only a single simulation is run.
     pub fn simulate_optimal_steady_state_condition(
         &mut self,
         wind_condition: &WindCondition,
         ship_velocity: Float,
         max_loading: Float
     ) -> SimulationResult {
+        let loadings_to_test = if self.has_controller() {
+            array_generation::linspace(
+                0.0,
+                max_loading,
+                self.settings.nr_loadings_to_test_during_optimization
+            )
+        } else {
+            vec![max_loading]
+        };
 
-        let nr_loadings_to_test = self.settings.nr_loadings_to_test_during_optimization;
-        
-        let loadings_to_test = array_generation::linspace(0.0, max_loading, nr_loadings_to_test);
+        let nr_loadings_to_test = loadings_to_test.len();
         
         let mut results: Vec<SimulationResult> = Vec::with_capacity(nr_loadings_to_test);
         let mut effective_power: Vec<Float> = Vec::with_capacity(nr_loadings_to_test);
@@ -126,7 +154,11 @@ impl CompleteSailModel {
     }
     
     /// The main interface to use the sail model in steady state conditions.
-    /// 
+    ///
+    /// With a controller, the model alternates between running the simulation and updating the
+    /// controller until the local wing angles converge. Without a controller, a single simulation
+    /// is run with the current local wing angles and internal states.
+    ///
     /// # Arguments
     /// - `wind_condition`: structure containing variables defining the wind condition.
     /// - `ship_velocity`: The velocity of the ship in m/s
@@ -275,9 +307,28 @@ impl CompleteSailModel {
         wind_condition: &WindCondition,
         ship_velocity: Float
     ) -> SimulationResult {
-        let freestream_velocity = self.freestream_velocity(
+        let ship_velocity_vector = self.ship_velocity_vector(ship_velocity);
+
+        self.do_step_with_ship_velocity_vector(
+            current_time,
+            time_step,
             wind_condition,
-            ship_velocity,
+            ship_velocity_vector
+        )
+    }
+
+    /// Same as [`do_step`](Self::do_step), but with the velocity of the ship given as a vector, see
+    /// [`freestream_velocity_with_ship_velocity_vector`](Self::freestream_velocity_with_ship_velocity_vector).
+    pub fn do_step_with_ship_velocity_vector(
+        &mut self,
+        current_time: Float,
+        time_step: Float,
+        wind_condition: &WindCondition,
+        ship_velocity_vector: SpatialVector
+    ) -> SimulationResult {
+        let freestream_velocity = self.freestream_velocity_with_ship_velocity_vector(
+            wind_condition,
+            ship_velocity_vector,
             current_time
         );
 
@@ -286,6 +337,12 @@ impl CompleteSailModel {
             time_step,
             &freestream_velocity
         )
+    }
+
+    /// Returns the velocity vector of the ship for the given ship velocity. The ship is assumed to
+    /// move in the opposite direction of the `zero_direction_vector` in the wind environment.
+    pub fn ship_velocity_vector(&self, ship_velocity: Float) -> SpatialVector {
+        -ship_velocity * self.wind_environment.zero_direction_vector
     }
     
     /// Updates the controller, based on the freestream velocity from the given wind condition and
@@ -320,10 +377,29 @@ impl CompleteSailModel {
         ship_velocity: Float,
         time: Float
     ) -> Vec<SpatialVector> {
+        self.freestream_velocity_with_ship_velocity_vector(
+            wind_condition,
+            self.ship_velocity_vector(ship_velocity),
+            time
+        )
+    }
+
+    /// Returns the apparent wind velocity at the freestream velocity points, from the given wind
+    /// condition and the velocity vector of the ship. The apparent wind is the true wind minus the
+    /// velocity of the ship. This is the general version of
+    /// [`freestream_velocity`](Self::freestream_velocity), which can be used when the ship does not
+    /// move in the opposite direction of the `zero_direction_vector` in the wind environment, for
+    /// instance when the ship velocity comes from an external motion simulation.
+    pub fn freestream_velocity_with_ship_velocity_vector(
+        &self,
+        wind_condition: &WindCondition,
+        ship_velocity_vector: SpatialVector,
+        time: Float
+    ) -> Vec<SpatialVector> {
         let freestream_velocity_points = self.lifting_line_simulation
             .get_freestream_velocity_points();
 
-        let linear_velocity = ship_velocity * self.wind_environment.zero_direction_vector;
+        let linear_velocity = -ship_velocity_vector;
         
         let nr_points = freestream_velocity_points.len();
         
@@ -359,7 +435,8 @@ impl CompleteSailModel {
         freestream_velocity
     }
 
-    /// Updates the controller, based on the given freestream velocity
+    /// Updates the controller, based on the given freestream velocity. Does nothing if there is no
+    /// controller.
     pub fn apply_controller_based_on_freestream(
         &mut self,
         current_time: Float,
@@ -367,33 +444,50 @@ impl CompleteSailModel {
         loading: Float,
         freestream_velocity: &[SpatialVector]
     ) {
+        if !self.has_controller() {
+            return;
+        }
+
         let nr_ctrl_points = self.lifting_line_simulation.line_force_model.nr_span_lines();
-        
+
         let ctrl_points_velocity = &freestream_velocity[0..nr_ctrl_points];
-        
+
         let controller_inputs = ControllerInput::new_from_velocity(
             loading,
             &self.lifting_line_simulation.line_force_model,
             ctrl_points_velocity,
-            &self.controller.spanwise_measurement,
+            self.spanwise_measurement(),
             &self.wind_environment,
         );
 
-        let controller_output = self.controller.update(
-            current_time,
-            time_step,
-            &controller_inputs,
-            &self.lifting_line_simulation.line_force_model
-        );
-
-        if let Some(output) = &controller_output {
-            self.lifting_line_simulation.line_force_model.set_controller_output(
-                output
-            );
-        }
+        self.update_controller(current_time, time_step, &controller_inputs);
     }
 
-    /// Updates the controller, based on the result of a simulation
+    /// Returns the flow conditions measured on each sail for the given simulation result, in the
+    /// form of controller input. The measurements use the spanwise measurement of the controller,
+    /// if there is one, and a default measurement otherwise, see
+    /// [`spanwise_measurement`](Self::spanwise_measurement). This makes it possible to get the
+    /// measured flow conditions also when there is no controller.
+    pub fn flow_measurements_from_simulation_result(
+        &self,
+        loading: Float,
+        simulation_result: &SimulationResult
+    ) -> Vec<ControllerInput> {
+        let use_input_velocity_for_apparent_wind_direction = self.controller.as_ref()
+            .is_some_and(|controller| controller.use_input_velocity_for_apparent_wind_direction);
+
+        ControllerInput::new_from_simulation_result(
+            loading,
+            &self.lifting_line_simulation.line_force_model,
+            simulation_result,
+            self.spanwise_measurement(),
+            &self.wind_environment,
+            use_input_velocity_for_apparent_wind_direction
+        )
+    }
+
+    /// Updates the controller, based on the result of a simulation. Does nothing if there is no
+    /// controller.
     pub fn apply_controller_based_on_simulation_result(
         &mut self,
         current_time: Float,
@@ -401,20 +495,34 @@ impl CompleteSailModel {
         loading: Float,
         simulation_result: &SimulationResult
     ) {
-        
-        let controller_inputs = ControllerInput::new_from_simulation_result(
+        if !self.has_controller() {
+            return;
+        }
+
+        let controller_inputs = self.flow_measurements_from_simulation_result(
             loading,
-            &self.lifting_line_simulation.line_force_model,
-            simulation_result,
-            &self.controller.spanwise_measurement,
-            &self.wind_environment,
-            self.controller.use_input_velocity_for_apparent_wind_direction
+            simulation_result
         );
 
-        let controller_output = self.controller.update(
+        self.update_controller(current_time, time_step, &controller_inputs);
+    }
+
+    /// Updates the controller with the given inputs, and applies the output to the line force
+    /// model, if there is any output. Does nothing if there is no controller.
+    pub fn update_controller(
+        &mut self,
+        current_time: Float,
+        time_step: Float,
+        controller_inputs: &[ControllerInput]
+    ) {
+        let Some(controller) = &mut self.controller else {
+            return;
+        };
+
+        let controller_output = controller.update(
             current_time,
             time_step,
-            &controller_inputs,
+            controller_inputs,
             &self.lifting_line_simulation.line_force_model
         );
 
