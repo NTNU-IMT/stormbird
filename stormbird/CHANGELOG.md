@@ -20,6 +20,8 @@ This file contains an overview of the changes made to the Stormbird Rust library
 - Validation errors use the new `Error::InvalidInput` variant, rather than `Error::CustomStringError`. This includes the existing checks of the dynamic stall model, the dynamic wake, the spanwise measurements in the controller, and the use of dynamic stall in quasi-steady simulations.
 - The `dynamic_stall` field in `SingleWing` holds the built `DynamicStallModel` rather than the `DynamicStallModelBuilder`, so that the model is built, and checked, in `WingBuilder::build`.
 - `Simulation::new_from_string` and `CompleteSailModelBuilder::build` no longer call `SimulationBuilder::check_settings` separately, as the checks are done in `SimulationBuilder::build`.
+- Depends on Stormath 0.4.1, where the `YawPitchRoll` rotation type is removed, as it was the same rotation as `XYZ`. Line force models with `"rotation_type": "YawPitchRoll"` in the JSON input give an error, and should use `XYZ` instead.
+- `ControllerBuilder::build` returns an error if `time_steps_between_updates` is zero, which gave a division by zero when the controller was updated.
 - The controller in the complete sail model is optional. The `controller` field in `CompleteSailModelBuilder` is an `Option<ControllerBuilder>`, and the `controller` field in `CompleteSailModel` is an `Option<Controller>`. JSON input with a controller works as before. Code that accesses the controller of the model directly must handle the `None` case.
 
 ### Features
@@ -36,6 +38,10 @@ This file contains an overview of the changes made to the Stormbird Rust library
     - `do_step_with_ship_velocity_vector` and `freestream_velocity_with_ship_velocity_vector`, which take the velocity of the ship as a vector, for cases where the ship does not move along the negative `zero_direction_vector` in the wind environment, e.g., when the ship velocity comes from an external motion simulation. The existing `do_step` and `freestream_velocity` use these functions, with the vector from the new `ship_velocity_vector` function, and give the same results as before.
     - `flow_measurements_from_simulation_result`, which returns the measured flow conditions on each sail, as input to a controller. It uses the spanwise measurement of the controller, if there is one, and a default spanwise measurement otherwise, so that the measurements are also available without a controller.
     - `update_controller`, which updates the controller with the given measurements and applies the output to the sails, `has_controller`, and `spanwise_measurement`.
+
+### Bug fixes
+- The angular velocity of the rigid body motion, computed with finite differences in `LineForceModel::set_translation_and_rotation_with_finite_difference_for_the_velocity`, was wrong when more than one rotation angle was different from zero, e.g., for a ship with a heading that rolls. The roll rate was then applied around the global x-axis rather than the x-axis of the ship. The fix is in Stormath 0.4.1, where the angular velocity is computed from the change in the rotation matrix. This affects the felt velocity on the sails, the gyroscopic moment, and the apparent wind direction measured by the controller. Results for rotations around a single axis are unchanged.
+- The `rotation_type` in the `LineForceModelBuilder` was not used, so the model always used the default rotation type.
 
 ### Changes
 - The linearized solver and `ActuatorLine::update_controller` use `expect` with a descriptive message, rather than `unwrap`, for the cases that can still panic: a singular equation system in the linearized solver, and updating the controller before the first time step in the actuator line model.

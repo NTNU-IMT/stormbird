@@ -416,6 +416,14 @@ impl CompleteSailModel {
             );
         }
         
+        // NOTE: potential issue. The reference height is meant as 10 meters above the water plane.
+        // However, `apparent_wind_direction_from_condition_and_linear_velocity` treats the height
+        // as a coordinate along the up direction, and subtracts the `water_plane_height` in the wind
+        // environment. The two are only the same when the water plane height is zero. For a
+        // non-zero water plane height, the true wind is evaluated at the wrong height, or at zero
+        // height, where the velocity is zero, if the water plane height is larger than 10 meters.
+        // The apparent wind direction is then only based on the ship velocity. The direction is
+        // only used to look up the inflow corrections, if any.
         let reference_height = 10.0;
         
         let apparent_wind_direction = self.wind_environment

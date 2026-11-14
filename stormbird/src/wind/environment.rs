@@ -274,7 +274,12 @@ impl WindEnvironment {
         }
     }
 
-    /// Computes the apparent wind direction from the supplied condition and linear velocity
+    /// Computes the apparent wind direction from the supplied condition and linear velocity.
+    ///
+    /// **Note**: the `height` is used as a coordinate along the up direction, i.e., the location
+    /// `height * up_direction`, and the `water_plane_height` is subtracted from it when the true
+    /// wind is computed. It is therefore not the height above the water plane, unless the water
+    /// plane height is zero. This may be an issue for callers that give a height above the water.
     pub fn apparent_wind_direction_from_condition_and_linear_velocity(
         &self,
         condition: &WindCondition,

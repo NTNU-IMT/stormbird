@@ -32,7 +32,7 @@ The `angle_of_attack_correction` is an enum with the variants `None` and `Gaussi
 
 The `output_coordinate_system` is an enum that specifies how the forces and moments from the line force model should be calculated. The default is `Global`, which means all values are in a global coordinate system. That is, the coordinate system for the forces are not moved even if the wings are moved during a simulation. The other option is to set it to `Body`. In this case, the coordinate system of the forces will always follow the wings when they are moved.
 
-The `local_wing_angles`, `rotation`, and `translation` specify the initial values for the local rotation of the wing angles as well as the global rotation and translation of the whole line force model. The `rotation_type` specifies the order of the rotations, where the default is `XYZ`. See the [move line models chapter](/line_model/move_line_models.md) for more.
+The `local_wing_angles`, `rotation`, and `translation` specify the initial values for the local rotation of the wing angles as well as the global rotation and translation of the whole line force model. The `rotation_type` specifies the order of the rotations around the fixed axes, where the default is `XYZ`, i.e., first around x, then y, and then z. The other options are `XZY`, `YXZ`, `YZX`, `ZXY` and `ZYX`. See the [move line models chapter](/line_model/move_line_models.md) for more.
 
 The `force_calculation_settings` controls details in how the forces on each line element are calculated. See the [force calculations chapter](./force_calculations.md) for more.
 

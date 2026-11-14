@@ -4,6 +4,7 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 
 ## 0.13.0 - Unreleased
 ### Changes
+- New `rotation_type` field in the `LineForceModelBuilder`, with the new `RotationType` enum, which sets the order of the rotations of the line force model: `XYZ` (default), `XZY`, `YXZ`, `YZX`, `ZXY` or `ZYX`. Requires Stormbird 0.13.0 or newer for other values than `XYZ`.
 - The `controller` field in the `CompleteSailModelBuilder` is optional, following the changes in Stormbird 0.13.0. Without a controller, the sails are operated with the local wing angles and internal states that are set directly on the model. Requires Stormbird 0.13.0 or newer when the controller is not set.
 
 ## 0.12.0 - 2026-10-31

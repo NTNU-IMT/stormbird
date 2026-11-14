@@ -60,7 +60,16 @@ impl ControllerBuilder {
     }
 
     /// Builds the controller for the given line force model
+    ///
+    /// # Errors
+    /// If `time_steps_between_updates` is zero, or if the spanwise measurement is not valid.
     pub fn build(&self, line_force_model: &LineForceModel) -> Result<Controller, Error> {
+        if self.time_steps_between_updates == 0 {
+            return Err(Error::invalid_input(
+                "time_steps_between_updates in the controller must be at least one"
+            ));
+        }
+
         let input_filters = match self.moving_average_window_size {
             Some(window_size) if window_size > 0 => Some(
                 vec![ControllerInputFilter::new(window_size); line_force_model.nr_wings()]
@@ -133,6 +142,18 @@ mod tests {
             velocity: 10.0,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn zero_time_steps_between_updates_gives_an_error() {
+        let model = single_wing_model();
+
+        let builder = ControllerBuilder {
+            time_steps_between_updates: 0,
+            ..controller_builder(None)
+        };
+
+        assert!(matches!(builder.build(&model), Err(Error::InvalidInput(_))));
     }
 
     #[test]

@@ -25,6 +25,18 @@ class CoordinateSystem(Enum):
     Global = "Global"
     Body = "Body"
 
+class RotationType(Enum):
+    '''
+    The order in which the rotation angles around the x, y and z axes are applied, as rotations
+    around the fixed axes. XYZ is the same as yaw, pitch and roll around the rotated axes.
+    '''
+    XYZ = "XYZ"
+    XZY = "XZY"
+    YXZ = "YXZ"
+    YZX = "YZX"
+    ZXY = "ZXY"
+    ZYX = "ZYX"
+
 class ForceCorrection(StormbirdSetupBaseModel):
     '''
     Empirical corrections of the forces on a wing. All corrections are zero by default.
@@ -200,6 +212,7 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     local_wing_angles: list[float] = []
     rotation: SpatialVector = SpatialVector()
     translation: SpatialVector = SpatialVector()
+    rotation_type: RotationType = RotationType.XYZ
     circulation_correction: CirculationCorrectionBuilder = CirculationCorrectionBuilder()
     output_coordinate_system: CoordinateSystem = CoordinateSystem.Global
     force_calculation_settings: ForceCalculationSettings = ForceCalculationSettings()

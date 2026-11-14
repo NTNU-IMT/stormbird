@@ -40,7 +40,10 @@ pub struct LineForceModelBuilder {
     /// The coordinate system for the output forces
     #[serde(default)]
     pub output_coordinate_system: CoordinateSystem,
-    /// How the rotation angles of the rigid body motion are applied
+    /// The order in which the rotation angles of the rigid body motion are applied, around the
+    /// fixed x, y and z axes. The default is `XYZ`, which is the same as yaw, pitch and roll around
+    /// the rotated axes. Used both for the initial `rotation` and for all later rotations of the
+    /// model.
     #[serde(default)]
     pub rotation_type: RotationType,
     /// Initial local angles for each wing, i.e., rotation around the span axis of each wing
@@ -162,6 +165,7 @@ impl LineForceModelBuilder {
         
         line_force_model.force_calculation_settings = self.force_calculation_settings.clone();
 
+        line_force_model.rigid_body_motion.rotation_type = self.rotation_type;
         line_force_model.rigid_body_motion.translation = self.translation;
         line_force_model.rigid_body_motion.rotation = self.rotation;
 
