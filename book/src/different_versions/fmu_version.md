@@ -30,7 +30,7 @@ See the [README of the FMU](https://github.com/NTNU-IMT/stormbird/tree/main/inte
 The sails are modeled with a [complete sail model](../lifting_line/complete_sail_model.md), which combines a dynamic lifting line simulation with a wind environment and an optional controller. The FMU has two parameters:
 
 - `parameters_path`: the path to a JSON file with the parameters for the model. If it is empty, the file `parameters.json` in the resources folder of the FMU is used.
-- `time_model_scale`: if larger than zero, the time is scaled from model scale to full scale with the square root of this value. This is useful in hybrid experiments.
+- `time_model_scale`: if larger than zero, the time and time step are scaled from model scale to full scale with the square root of this value. This is a deliberate workaround for hybrid experiments. All FMUs in a system share the same real time, so it is not possible to give a scaled time to a single FMU. **Only the time is scaled**. All other inputs, such as the translation, the motion velocities and the wind velocity, are used as they are, and the forces and moments are given as they are. The normal way to use the FMU in hybrid experiments is to do all other scaling between model scale and full scale outside the FMU, e.g., in dedicated logic between the experiment and the simulation. Note that the velocities that are computed from the translation and rotation with finite differences use the scaled time step, so the translation must be given in full scale.
 
 The parameters file contains the complete sail model, under the key `sail_model`, together with a few settings that are specific to the FMU:
 
@@ -56,7 +56,7 @@ The settings that are specific to the FMU are:
 
 - `angles_in_degrees`: whether the angles in the inputs and outputs are given in degrees, rather than radians.
 - `use_motion_velocity`: whether the motion velocity inputs should override the velocities that are computed from the translation and rotation inputs with finite differences.
-- `motion_velocity_in_body_fixed_frame`: whether the linear motion velocity input is given in the body-fixed coordinate system, rather than the global one.
+- `motion_velocity_in_body_fixed_frame`: whether the motion velocity inputs, both linear and angular, are given in the body-fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a ship simulator, rather than the global one.
 - `use_motion_velocity_linear_as_freestream`: whether the linear motion velocity should be included in the apparent wind, rather than as motion of the sails. This should only be used if the translation input is always zero.
 - `input_moving_average_window_size`: if larger than zero, the motion inputs are filtered with a moving average over this number of time steps.
 - `number_of_iterations_before_building_model`: if larger than zero, the sails are not simulated before this number of time steps are completed. This is useful if the inputs are not properly set in the first time steps.
@@ -65,10 +65,12 @@ The settings that are specific to the FMU are:
 The inputs to the FMU are, in short:
 
 - The wind velocity, `wind_velocity`, and the direction the wind is coming from, `wind_direction_coming_from`, which are used to create the wind condition in each time step. The variation of the wind velocity with height follows a power model, where the wind velocity is the velocity at the default reference height of 10 meters.
-- The translation and rotation of the sails, and, optionally, the velocity of the motion.
+- The translation and rotation of the sails, and, optionally, the velocity of the motion. The rotation inputs are the angles around the x, y and z axes, applied in the order given by the `rotation_type` of the line force model (see [moving line models](../line_model/move_line_models.md)). The velocities are computed from the change in translation and rotation with finite differences, where the angular velocity is computed from the change in the rotation matrix. It is therefore the angular velocity vector, which is correct also when several angles are different from zero, e.g., for a roll motion with a heading. In the first time step, there is no previous position, so the velocities are zero. The motion is tracked in every time step, also while waiting for `number_of_iterations_before_building_model`. The angular motion velocity inputs, if used, must also be the angular velocity vector, and not the time derivative of the rotation angles.
 - The local wing angles and the internal states of each sail. Without a controller, these are used in every time step. With a controller, they are only used as initial values, and the sails are controlled by the controller after the first time step. The `controller_loading` input sets the loading of the controller.
 
 The outputs are the total forces and moments, the forces and moments on each sail, the angle of attack, velocity and apparent wind direction measured on each sail, and an error code (see below). The FMU supports up to 10 sails, which is the number of inputs and outputs for each sail.
+
+The sails are simulated in each time step where the velocity they feel, i.e., the wind minus the motion of the sails, is not zero. A moving ship in calm wind therefore gives forces.
 
 ## Error handling
 A typical use case for the FMU is that it is set up with small errors in the input. Some of the software that runs FMUs does not handle failing FMUs well, so the Stormbird FMU is designed to not crash, or return an error status, due to errors in the input or in the simulation. Instead, errors are reported with the `error_code` output, which is zero when everything is OK. The error message is printed to the standard error output.

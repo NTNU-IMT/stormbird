@@ -254,6 +254,8 @@ pub struct StormbirdLiftingLine {
     iterations_completed: usize,
     /// Tracker of the number of time steps where the sail model was simulated
     model_steps_completed: usize,
+    /// Whether the motion of the sails has been set from the input at least once
+    motion_is_initialized: bool,
 
     /// Non public variables containing functionality from the Stormbird library
     parameters: Option<FmuParameters>,
@@ -327,6 +329,10 @@ impl StormbirdLiftingLine {
             ));
         };
 
+        // The motion is updated in every time step, also while waiting for the simulation to start,
+        // so that the velocities from finite differences are correct when the simulation starts.
+        self.update_motion(&parameters, time_step)?;
+
         let waiting_iterations_is_done =
             self.iterations_completed >= parameters.number_of_iterations_before_building_model;
 
@@ -336,7 +342,7 @@ impl StormbirdLiftingLine {
             return Ok(());
         }
 
-        self.set_line_force_model_state(&parameters, time_step)?;
+        self.set_control_values(&parameters)?;
 
         let wind_condition = self.wind_condition(&parameters);
         let ship_velocity_vector = self.ship_velocity_vector(&parameters);
@@ -347,17 +353,31 @@ impl StormbirdLiftingLine {
             current_time
         );
 
-        let finite_input = freestream_velocity.iter()
-            .all(|velocity| (0..3).all(|i| velocity[i].is_finite()));
+        // The velocity felt by the sails, i.e., the freestream minus the motion of the sails. The
+        // ship velocity can be part of either, depending on the settings.
+        let felt_ctrl_points_velocity = {
+            let line_force_model = &self.sail_model()?.lifting_line_simulation.line_force_model;
+
+            line_force_model.felt_ctrl_points_velocity(
+                &freestream_velocity[0..line_force_model.nr_span_lines()]
+            )
+        };
+
+        let is_finite = |velocity: &SpatialVector| (0..3).all(|i| velocity[i].is_finite());
+
+        let finite_input = freestream_velocity.iter().all(is_finite) &&
+            felt_ctrl_points_velocity.iter().all(is_finite);
 
         if !finite_input {
             return Err(FmuError::new(
                 error_codes::NON_FINITE_INPUT,
-                "The freestream velocity is not finite. Check the wind and motion input"
+                "The freestream velocity or the motion velocity is not finite. Check the wind and \
+                motion input"
             ));
         }
 
-        let non_zero_input = freestream_velocity.iter().any(|velocity| velocity.length_squared() > 0.0);
+        let non_zero_input = felt_ctrl_points_velocity.iter()
+            .any(|velocity| velocity.length_squared() > 0.0);
 
         if !non_zero_input {
             self.set_zero_force_output();
@@ -423,19 +443,9 @@ impl StormbirdLiftingLine {
         }
     }
 
-    /// Sets the state of the line force model before a step is performed, i.e., the control
-    /// values, if they are given as input, and the motion of the sails.
-    fn set_line_force_model_state(
-        &mut self,
-        parameters: &FmuParameters,
-        time_step: f64
-    ) -> Result<(), FmuError> {
-        let translation = self.translation_vector();
-        let rotation    = self.rotation_vector(parameters);
-
-        let motion_velocity_linear  = self.motion_velocity_linear_vector(parameters);
-        let motion_velocity_angular = self.motion_velocity_angular_vector(parameters);
-
+    /// Sets the control values of the sails from the input, if there is no controller. With a
+    /// controller, the input is only used as initial values.
+    fn set_control_values(&mut self, parameters: &FmuParameters) -> Result<(), FmuError> {
         let nr_sails = self.sail_model()?.get_number_of_sails();
 
         let local_wing_angles = self.local_wing_angles(parameters, nr_sails);
@@ -445,21 +455,52 @@ impl StormbirdLiftingLine {
 
         let model = self.sail_model_mut()?;
 
-        // The control values are taken from the input if there is no controller. With a controller,
-        // the input is only used as initial values.
         if !model.has_controller() || model_steps_completed == 0 {
             model.set_local_wing_angles(&local_wing_angles);
             model.set_internal_state(&section_models_internal_state);
         }
 
+        Ok(())
+    }
+
+    /// Updates the motion of the sails from the input.
+    ///
+    /// The translation and rotation are set from the input, and the velocities are computed with
+    /// finite differences from the previous translation and rotation. In the first call, the
+    /// translation and rotation are set directly, with zero velocity, as there is no previous
+    /// motion. Otherwise, a non-zero initial position, e.g., a ship position far from the origin or
+    /// a heading, would give a large velocity in the first time step. The velocities are replaced
+    /// by the motion velocity input, if it is used.
+    fn update_motion(&mut self, parameters: &FmuParameters, time_step: f64) -> Result<(), FmuError> {
+        let translation = self.translation_vector();
+        let rotation    = self.rotation_vector(parameters);
+
+        let motion_velocity_linear  = self.motion_velocity_linear_vector(parameters);
+        let motion_velocity_angular = self.motion_velocity_angular_vector(parameters);
+
+        let motion_is_initialized = self.motion_is_initialized;
+
+        let model = self.sail_model_mut()?;
+
         let line_force_model = &mut model.lifting_line_simulation.line_force_model;
 
-        // Apply translation and rotation, and compute the velocity using finite differences
-        line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
-            time_step,
-            translation,
-            rotation
-        );
+        if motion_is_initialized {
+            // Apply translation and rotation, and compute the velocity using finite differences
+            line_force_model.set_translation_and_rotation_with_finite_difference_for_the_velocity(
+                time_step,
+                translation,
+                rotation
+            );
+        } else {
+            let motion = &mut line_force_model.rigid_body_motion;
+
+            motion.translation = translation;
+            motion.rotation = rotation;
+            motion.velocity_linear = SpatialVector::default();
+            motion.velocity_angular = SpatialVector::default();
+
+            line_force_model.update_global_data_representations();
+        }
 
         let calculated_velocity_linear = line_force_model.rigid_body_motion.velocity_linear;
         let calculated_velocity_angular = line_force_model.rigid_body_motion.velocity_angular;
@@ -483,6 +524,8 @@ impl StormbirdLiftingLine {
         self.calculated_motion_velocity_angular_x = calculated_velocity_angular[0];
         self.calculated_motion_velocity_angular_y = calculated_velocity_angular[1];
         self.calculated_motion_velocity_angular_z = calculated_velocity_angular[2];
+
+        self.motion_is_initialized = true;
 
         Ok(())
     }
@@ -577,13 +620,27 @@ impl StormbirdLiftingLine {
         }
     }
 
-    /// Returns the angular motion velocity as a vector, in radians per second
+    /// Returns the angular motion velocity as a vector in the global coordinate system, in radians
+    /// per second. The input is the angular velocity vector, either in the global coordinate
+    /// system, or in the body fixed coordinate system if `motion_velocity_in_body_fixed_frame` is
+    /// true, e.g., (p, q, r) from a ship simulator. It is not the time derivative of the rotation
+    /// angles.
     fn motion_velocity_angular_vector(&self, parameters: &FmuParameters) -> SpatialVector {
-        SpatialVector::new(
+        let velocity = SpatialVector::new(
             Self::input_angle(parameters, self.motion_velocity_angular_x),
             Self::input_angle(parameters, self.motion_velocity_angular_y),
             Self::input_angle(parameters, self.motion_velocity_angular_z),
-        )
+        );
+
+        match &self.sail_model {
+            Some(model) if parameters.motion_velocity_in_body_fixed_frame => {
+                velocity.from_rotated_to_global_system(
+                    self.rotation_vector(parameters),
+                    model.lifting_line_simulation.line_force_model.rigid_body_motion.rotation_type
+                )
+            },
+            _ => velocity,
+        }
     }
 
     /// Returns the wind direction in radians, within +/- 180 degrees

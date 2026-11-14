@@ -44,8 +44,37 @@ The FMU has two parameters:
 
 - `parameters_path`: path to a JSON file with the parameters for the model. If empty, the file
   `parameters.json` in the resources folder of the FMU is used.
-- `time_model_scale`: if larger than zero, the time is scaled from model scale to full scale with
-  the square root of this value, which is useful in hybrid experiments.
+- `time_model_scale`: if larger than zero, the time and time step are scaled from model scale to
+  full scale with the square root of this value. This is a deliberate workaround for hybrid
+  experiments, where all FMUs in the system share the same real time, so a scaled time can not be
+  given to a single FMU. **Only the time is scaled.** All other inputs, such as the translation,
+  the motion velocities and the wind velocity, are used as they are, and the forces and moments are
+  given as they are. The normal way to use the FMU in hybrid experiments is to do all other
+  scaling between model scale and full scale outside the FMU, e.g., in dedicated logic between the
+  experiment and the simulation. Note that the velocities computed from the translation and
+  rotation inputs with finite differences use the scaled time step, so the translation must be
+  given in full scale.
+
+## Motion
+The translation and rotation inputs set the position of the sails. The rotation inputs are the
+angles around the x, y and z axes, applied in the order given by the `rotation_type` in the line
+force model (default: around x, then y, then z, i.e., the same as yaw, pitch and roll). The
+velocities of the motion are computed from the change in the translation and rotation with finite
+differences. The angular velocity is computed from the change in the rotation matrix, so it is the
+angular velocity vector, which is correct also when several angles are different from zero, e.g., a
+roll motion with a heading.
+
+In the first time step, there is no previous position, so the velocities are zero. The motion is
+tracked in every time step, also while waiting for `number_of_iterations_before_building_model`.
+
+If `use_motion_velocity` is true, the velocity inputs are used instead of the computed velocities.
+The `motion_velocity_angular_*` inputs are the angular velocity *vector*, not the time derivative of
+the rotation angles. With `motion_velocity_in_body_fixed_frame`, both the linear and the angular
+velocity inputs are given in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a
+ship simulator. Otherwise, they are given in the global coordinate system.
+
+The sails are simulated as long as the velocity they feel, i.e., the wind minus the motion of the
+sails, is not zero. A moving ship in calm wind therefore gives forces.
 
 The parameters file contains the complete sail model, under `sail_model`, and settings that are
 specific to the FMU. Only `sail_model` is required:
