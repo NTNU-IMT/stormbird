@@ -2,6 +2,15 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
+## 0.4.0 - Unreleased
+### Breaking changes
+- Stormflow now depends on version 0.13.0 of Stormbird and version 0.5.0 of Stormath. See the [Stormbird change log](../stormbird/CHANGELOG.md) and the [Stormath change log](../stormath/CHANGELOG.md) for details. Setup files that are valid for Stormflow 0.3.0 give the same results, but invalid settings in the actuator line model, e.g., an inconsistent wing geometry, are now reported as errors instead of causing a panic, or a crash later in the simulation.
+- `SimulationBuilder::build` returns a `Result<Simulation, Error>`, rather than panicking when the grid can not be built or when the settings of the actuator line model are not valid. `Simulation::new_from_string` and the command line program report these errors.
+- New `StormbirdError` variant in the `Error` enum, for errors from Stormbird. The `Error` type also implements `std::error::Error::source`.
+
+### Other changes
+- The test that reads all the example setup files also builds the full actuator line model of each example, which checks all the settings in Stormbird 0.13.0.
+
 ## 0.3.0 - 2026-10-31
 ### Breaking changes
 - Stormflow now depends on version 0.12.0 of Stormbird. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details of what that update entails

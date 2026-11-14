@@ -94,14 +94,18 @@ impl SimulationBuilder {
         Self::new_from_string(&file_content)
     }
     
-    pub fn build(&self) -> Simulation {
+    /// Builds the simulation.
+    ///
+    /// # Errors
+    /// If the grid can not be built from the internal length, or if the settings of the actuator
+    /// line model are not valid, see `stormbird::actuator_line::builder::ActuatorLineBuilder::build`.
+    pub fn build(&self) -> Result<Simulation, Error> {
         let grid = if let Some(actuator_line_builder) = &self.actuator_line {
             self.grid.build_from_line_force_model_builder(
                 &actuator_line_builder.line_force_model
             )
         } else {
-            self.grid.build_from_internal_length()
-                .unwrap_or_else(|err| panic!("{}", err))
+            self.grid.build_from_internal_length()?
         };
 
         println!("Interior shape of the grid: {:?}", &grid.interior_shape);
@@ -124,21 +128,24 @@ impl SimulationBuilder {
 
         let velocity = velocity_boundary_conditions.initial_velocity(&grid);
 
-        let actuator_line = self.actuator_line.as_ref().map(|builder| {
-            let mut model = builder.build();
+        let actuator_line = match &self.actuator_line {
+            Some(builder) => {
+                let mut model = builder.build()?;
 
-            if model.line_force_model.density != density {
-                println!(
-                    "Note: the density of the actuator line model ({}) is replaced by the density \
-                     of the flow solver ({})",
-                    model.line_force_model.density, density
-                );
+                if model.line_force_model.density != density {
+                    println!(
+                        "Note: the density of the actuator line model ({}) is replaced by the \
+                         density of the flow solver ({})",
+                        model.line_force_model.density, density
+                    );
 
-                model.line_force_model.density = density;
-            }
+                    model.line_force_model.density = density;
+                }
 
-            ActuatorLineInterface::new(model, &grid)
-        });
+                Some(ActuatorLineInterface::new(model, &grid))
+            },
+            None => None,
+        };
 
         let mut geometries: Vec<Geometry> = Vec::new();
 
@@ -224,13 +231,13 @@ impl SimulationBuilder {
             ),
         });
 
-        Simulation {
+        Ok(Simulation {
             grid,
             velocity_solver,
             pressure_solver,
             turbulence_solver,
             actuator_line,
             solver_settings: self.solver_settings.clone()
-        }
+        })
     }
 }
