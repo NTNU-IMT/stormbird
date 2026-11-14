@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 use pythonize::pythonize;
 
 use stormbird::section_models::rotating_cylinder::RotatingCylinder as RotatingCylinderRust;
@@ -21,9 +21,9 @@ pub struct RotatingCylinder {
 impl RotatingCylinder {
     #[new]
     pub fn new(input_string: String) -> PyResult<Self> {
-        let data = RotatingCylinderRust::new_from_string(&input_string).map_err(|e| {
-            PyValueError::new_err(format!("Failed to parse rotating cylinder from string: {}", e))
-        })?;
+        let data = RotatingCylinderRust::new_from_string(&input_string).map_err(
+            |e| to_py_err("Failed to parse rotating cylinder from string", e)
+        )?;
 
         Ok(Self { data })
     }

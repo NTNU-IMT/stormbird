@@ -5,6 +5,7 @@
 //! Model of the fans driving the internal flow in a foil with active air flow, based on fan
 //! curves.
 
+use crate::error::Error;
 use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;
@@ -38,7 +39,7 @@ struct FanCurveDataInput {
 }
 
 impl TryFrom<FanCurveDataInput> for FanCurveData {
-    type Error = String;
+    type Error = Error;
 
     fn try_from(input: FanCurveDataInput) -> Result<Self, Self::Error> {
         Self::new(input.flow_data, input.pressure_data, input.power_data)
@@ -51,40 +52,45 @@ impl FanCurveData {
         flow_data: Vec<Float>,
         pressure_data: Vec<Float>,
         power_data: Vec<Float>
-    ) -> Result<Self, String> {
+    ) -> Result<Self, Error> {
         let n = flow_data.len();
 
         if n < 2 {
-            return Err("The fan curves must have at least two data points".to_string());
+            return Err(Error::invalid_input("The fan curves must have at least two data points"));
         }
 
         if pressure_data.len() != n || power_data.len() != n {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "The fan curve data must have the same length. Flow: {}, pressure: {}, power: {}",
                 n, pressure_data.len(), power_data.len()
-            ));
+            )));
         }
 
         if flow_data[0] < 0.0 {
-            return Err("The flow data for the fan curves can not be negative".to_string());
+            return Err(Error::invalid_input(
+                "The flow data for the fan curves can not be negative"
+            ));
         }
 
         for i in 1..n {
             if flow_data[i] <= flow_data[i - 1] {
-                return Err("The flow data for the fan curves must be strictly increasing".to_string());
+                return Err(Error::invalid_input(
+                    "The flow data for the fan curves must be strictly increasing"
+                ));
             }
 
             if pressure_data[i] >= pressure_data[i - 1] {
-                return Err(
+                return Err(Error::invalid_input(
                     "The pressure data for the fan curves must be strictly decreasing with \
                     increasing flow. Only the stable operating range of the fan should be included"
-                    .to_string()
-                );
+                ));
             }
         }
 
         if power_data.iter().any(|&power| power < 0.0) {
-            return Err("The power data for the fan curves can not be negative".to_string());
+            return Err(Error::invalid_input(
+                "The power data for the fan curves can not be negative"
+            ));
         }
 
         Ok(Self { flow_data, pressure_data, power_data })

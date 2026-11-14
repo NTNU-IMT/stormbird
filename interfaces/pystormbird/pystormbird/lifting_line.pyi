@@ -171,6 +171,62 @@ class CompleteSailModel:
         ship_velocity: float
     ) -> list[SimulationResult]: ...
 
+    def has_controller(self) -> bool:
+        """True if the model has a controller."""
+        ...
+
+    def ship_velocity_vector(self, ship_velocity: float) -> list[float]:
+        """
+        The velocity vector of the ship for the given ship velocity. The ship is assumed to move in
+        the opposite direction of the `zero_direction_vector` in the wind environment.
+        """
+        ...
+
+    def simulate_steady_state_condition_with_ship_velocity_vector(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity_vector: list[float],
+        controller_loading: float
+    ) -> SimulationResult:
+        """Same as `simulate_steady_state_condition`, but with the ship velocity as a vector."""
+        ...
+
+    def simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity_vector: list[float],
+        max_loading: float
+    ) -> SimulationResult:
+        """
+        Same as `simulate_optimal_steady_state_condition`, but with the ship velocity as a vector.
+        The delivered power is the thrust times the component of the ship velocity along the thrust
+        direction in the settings.
+        """
+        ...
+
+    def freestream_velocity_with_ship_velocity_vector(
+        self,
+        *,
+        wind_condition: WindCondition,
+        ship_velocity_vector: list[float],
+        time: float
+    ) -> list[list[float]]:
+        """Same as `freestream_velocity`, but with the ship velocity as a vector."""
+        ...
+
+    def do_step_with_ship_velocity_vector(
+        self,
+        *,
+        time: float,
+        time_step: float,
+        wind_condition: WindCondition,
+        ship_velocity_vector: list[float]
+    ) -> SimulationResult:
+        """Same as `do_step`, but with the ship velocity as a vector."""
+        ...
+
     def internal_state(self) -> list[float]: ...
     def local_wing_angles(self) -> list[float]: ...
     def set_local_wing_angles(self, local_wing_angles: list[float]) -> None: ...

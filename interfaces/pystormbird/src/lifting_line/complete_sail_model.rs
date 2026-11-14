@@ -5,7 +5,7 @@
 //! Interface to a complete simulation model for sails
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 
 use stormbird::lifting_line::complete_sail_model::CompleteSailModel as CompleteSailModelRust;
 use stormath::spatial_vector::SpatialVector;
@@ -26,9 +26,9 @@ pub struct CompleteSailModel {
 impl CompleteSailModel {
     #[new]
     pub fn new(setup_string: String) -> PyResult<Self> {
-        let data = CompleteSailModelRust::new_from_string(&setup_string).map_err(|e| {
-            PyValueError::new_err(format!("Failed to create complete sail model from string: {}", e))
-        })?;
+        let data = CompleteSailModelRust::new_from_string(&setup_string).map_err(
+            |e| to_py_err("Failed to create complete sail model from string", e)
+        )?;
 
         Ok(Self { data })
     }
@@ -295,6 +295,117 @@ impl CompleteSailModel {
         }
 
         out
+    }
+
+    /// True if the model has a controller
+    pub fn has_controller(&self) -> bool {
+        self.data.has_controller()
+    }
+
+    /// The velocity vector of the ship for the given ship velocity. The ship is assumed to move in
+    /// the opposite direction of the `zero_direction_vector` in the wind environment.
+    pub fn ship_velocity_vector(&self, ship_velocity: f64) -> [f64; 3] {
+        self.data.ship_velocity_vector(ship_velocity).0
+    }
+
+    /// Same as `simulate_steady_state_condition`, but with the velocity of the ship given as a
+    /// vector
+    #[pyo3(signature=(
+        *,
+        wind_condition,
+        ship_velocity_vector,
+        controller_loading
+    ))]
+    pub fn simulate_steady_state_condition_with_ship_velocity_vector(
+        &mut self,
+        wind_condition: WindCondition,
+        ship_velocity_vector: [f64; 3],
+        controller_loading: f64
+    ) -> SimulationResult {
+        let result_rs = self.data.simulate_steady_state_condition_with_ship_velocity_vector(
+            &wind_condition.data,
+            SpatialVector::from(ship_velocity_vector),
+            controller_loading
+        );
+
+        SimulationResult {
+            data: result_rs
+        }
+    }
+
+    /// Same as `simulate_optimal_steady_state_condition`, but with the velocity of the ship given
+    /// as a vector. The delivered power is the thrust times the component of the ship velocity
+    /// along the thrust direction in the settings.
+    #[pyo3(signature=(
+        *,
+        wind_condition,
+        ship_velocity_vector,
+        max_loading
+    ))]
+    pub fn simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+        &mut self,
+        wind_condition: WindCondition,
+        ship_velocity_vector: [f64; 3],
+        max_loading: f64
+    ) -> SimulationResult {
+        let result_rs = self.data.simulate_optimal_steady_state_condition_with_ship_velocity_vector(
+            &wind_condition.data,
+            SpatialVector::from(ship_velocity_vector),
+            max_loading
+        );
+
+        SimulationResult {
+            data: result_rs
+        }
+    }
+
+    /// Same as `freestream_velocity`, but with the velocity of the ship given as a vector
+    #[pyo3(signature=(
+        *,
+        wind_condition,
+        ship_velocity_vector,
+        time
+    ))]
+    pub fn freestream_velocity_with_ship_velocity_vector(
+        &self,
+        wind_condition: WindCondition,
+        ship_velocity_vector: [f64; 3],
+        time: f64
+    ) -> Vec<[f64; 3]> {
+        let freestream_velocity = self.data.freestream_velocity_with_ship_velocity_vector(
+            &wind_condition.data,
+            SpatialVector::from(ship_velocity_vector),
+            time
+        );
+
+        freestream_velocity.iter().map(|v| v.0).collect()
+    }
+
+    /// Same as `do_step`, but with the velocity of the ship given as a vector
+    #[pyo3(signature=(
+        *,
+        time,
+        time_step,
+        wind_condition,
+        ship_velocity_vector
+    ))]
+    pub fn do_step_with_ship_velocity_vector(
+        &mut self,
+        time: f64,
+        time_step: f64,
+        wind_condition: WindCondition,
+        ship_velocity_vector: [f64; 3]
+    ) -> SimulationResult {
+        let result_rs = self.data.do_step_with_ship_velocity_vector(
+            time,
+            time_step,
+            &wind_condition.data,
+            SpatialVector::from(ship_velocity_vector)
+        );
+
+        SimulationResult {
+            data: result_rs
+        }
     }
 
     pub fn internal_state(&self) -> Vec<f64> {

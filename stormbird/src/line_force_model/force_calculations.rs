@@ -139,9 +139,6 @@ impl LineForceModel {
 
         match &self.angle_of_attack_correction {
             AngleOfAttackCorrection::None => angles_of_attack,
-            AngleOfAttackCorrection::GaussianSmoothing => {
-                todo!()
-            }
         }
     }
 

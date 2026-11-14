@@ -88,12 +88,8 @@ pub struct ControllerSetPoints {
 impl ControllerSetPoints {
     /// Returns the new local wing angle, limited by the maximum change rate if given
     pub fn get_local_wing_angle(&self, input: &ControllerInput, time_step: Float) -> Float {
-        let mut local_wing_angle = if self.use_effective_angle_of_attack {
-            self.get_local_wing_angle_effective(input)
-        } else {
-            self.get_local_wing_angle_geometric(input)
-        };
-        
+        let mut local_wing_angle = self.get_local_wing_angle_without_rate_limit(input);
+
         if let Some(max_change_rate) = self.max_local_wing_angle_change_rate {
             local_wing_angle = limit_value(
                 input.current_local_wing_angle,
@@ -103,6 +99,15 @@ impl ControllerSetPoints {
         }
 
         local_wing_angle
+    }
+
+    /// Returns the local wing angle given by the set points, without any limit on the change rate
+    pub fn get_local_wing_angle_without_rate_limit(&self, input: &ControllerInput) -> Float {
+        if self.use_effective_angle_of_attack {
+            self.get_local_wing_angle_effective(input)
+        } else {
+            self.get_local_wing_angle_geometric(input)
+        }
     }
 
     /// Returns the angle of attack set point at the given apparent wind direction, or zero if no
@@ -167,6 +172,29 @@ impl ControllerSetPoints {
         input: &ControllerInput,
         time_step: Float
     ) -> Float {
+        self.internal_state(wing_index, line_force_model, input, Some(time_step))
+    }
+
+    /// Returns the internal state of the wing given by the set points, limited by the maximum
+    /// value if given, but without any limit on the change rate
+    pub fn get_internal_state_without_rate_limit(
+        &self,
+        wing_index: usize,
+        line_force_model: &LineForceModel,
+        input: &ControllerInput,
+    ) -> Float {
+        self.internal_state(wing_index, line_force_model, input, None)
+    }
+
+    /// Implementation of the internal state, where the change rate is only limited if a time step
+    /// is given
+    fn internal_state(
+        &self,
+        wing_index: usize,
+        line_force_model: &LineForceModel,
+        input: &ControllerInput,
+        time_step: Option<Float>
+    ) -> Float {
         if self.internal_state_data.is_some() {
             let set_point = input.loading * self.get_internal_state_set_point(
                 input.apparent_wind_direction
@@ -183,10 +211,12 @@ impl ControllerSetPoints {
                 internal_state = internal_state.abs().min(max_value) * internal_state.signum();
             }
 
-            if let Some(max_change_rate) = self.wing_internal_state_max_change_rate {
+            if let (Some(max_change_rate), Some(time_step)) =
+                (self.wing_internal_state_max_change_rate, time_step)
+            {
                 internal_state = limit_value(
-                    input.current_internal_state, 
-                    internal_state, 
+                    input.current_internal_state,
+                    internal_state,
                     max_change_rate * time_step
                 )
             }

@@ -7,6 +7,7 @@
 use pyo3::prelude::*;
 use pyo3::wrap_pymodule;
 
+mod error;
 mod section_models;
 mod span_varying_internal_state;
 mod result_structs;

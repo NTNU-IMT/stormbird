@@ -123,7 +123,7 @@ mod tests {
 
     /// Two straight wings along the z-axis, with different span lengths
     fn two_wings() -> LineForceModel {
-        two_wings_builder().build()
+        two_wings_builder().build().unwrap()
     }
 
     fn two_wings_builder() -> LineForceModelBuilder {
@@ -150,7 +150,7 @@ mod tests {
         let mut actuator_line = ActuatorLineBuilder {
             tip_loss_correction,
             ..ActuatorLineBuilder::new(two_wings_builder())
-        }.build();
+        }.build().unwrap();
 
         actuator_line.ctrl_points_velocity = vec![
             SpatialVector::from([8.0, 1.0, 0.0]);

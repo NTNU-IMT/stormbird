@@ -89,7 +89,7 @@ fn no_self_induced_velocity() {
     let mut sim = SimulationBuilder::new(
         line_force_model_builder,
         SimulationSettings::Dynamic(settings)
-    ).build();
+    ).build().unwrap();
 
     sim.line_force_model.set_internal_state(
         &vec![revolutions_per_second; wing_x_positions.len()]

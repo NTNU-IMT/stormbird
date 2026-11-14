@@ -42,13 +42,11 @@ fn all_example_setup_files_can_be_read() {
             Some(actuator_line) => {
                 builder.grid.build_from_line_force_model_builder(&actuator_line.line_force_model);
 
-                let line_force_model = actuator_line.line_force_model.build();
-
-                if let Some(controller) = &actuator_line.controller {
-                    controller.build(&line_force_model).unwrap_or_else(
-                        |error| panic!("Invalid controller in {}: {:?}", file.display(), error)
-                    );
-                }
+                // Checks all the settings of the actuator line model, including the line force
+                // model and the controller
+                actuator_line.build().unwrap_or_else(
+                    |error| panic!("Invalid actuator line model in {}: {}", file.display(), error)
+                );
             },
             None => {
                 builder.grid.build_from_internal_length().unwrap_or_else(

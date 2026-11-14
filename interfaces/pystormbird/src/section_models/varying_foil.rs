@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 use pythonize::pythonize;
 
 use stormbird::section_models::varying_foil::VaryingFoil as VaryingFoilRust;
@@ -21,9 +21,9 @@ pub struct VaryingFoil {
 impl VaryingFoil {
     #[new]
     pub fn new(input_str: String) -> PyResult<Self> {
-        let data = VaryingFoilRust::new_from_string(&input_str).map_err(|e| {
-            PyValueError::new_err(format!("Failed to parse varying foil from string: {}", e))
-        })?;
+        let data = VaryingFoilRust::new_from_string(&input_str).map_err(
+            |e| to_py_err("Failed to parse varying foil from string", e)
+        )?;
 
         Ok(Self { data })
     }

@@ -42,9 +42,7 @@ impl Simulation {
     ) -> Result<Self, Error> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
-        builder.check_settings()?;
-
-        Ok(builder.build())
+        builder.build()
     }
 
     /// Returns the points where the freestream velocity must be specified in order to execute a

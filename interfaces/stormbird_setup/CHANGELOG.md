@@ -2,6 +2,20 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.13.0 - 2026-11-14
+### Breaking changes
+- The optional `force-tuning` dependency requires pystormbird 0.13.0 or newer.
+- Some settings that are invalid in Stormbird 0.13.0 give a validation error already in Python: `time_steps_between_updates` in the `ControllerBuilder`, `write_iterations_full_result` in the `ActuatorLineBuilder`, and `nr_sections` in the `LineForceModelBuilder` and the `WingBuilder` must be at least one.
+
+### Features
+- New `stormbird_setup.fmu` module, with the new `LiftingLineFmuParameters` class for the parameters file of the Stormbird lifting line FMU. It has all the settings in the file as fields, with the same default values as the FMU, and the sail model as a `CompleteSailModelBuilder`. It checks the same consistency of the settings as the FMU: that `steady_state_optimize_loading` is only used together with `steady_state`, and that the steady state mode uses quasi-steady settings for the lifting line simulation. Requires version 0.13.0 or newer of the FMU.
+
+- New `allowed_relative_internal_state_error` field in the `CompleteSailModelSettings`, with a default value of 0.001, following the new setting in Stormbird 0.13.0. It sets the allowed relative change in the internal states when the steady state simulations of the complete sail model iterate with a controller.
+
+### Changes
+- New `rotation_type` field in the `LineForceModelBuilder`, with the new `RotationType` enum, which sets the order of the rotations of the line force model: `XYZ` (default), `XZY`, `YXZ`, `YZX`, `ZXY` or `ZYX`. Requires Stormbird 0.13.0 or newer for other values than `XYZ`.
+- The `controller` field in the `CompleteSailModelBuilder` is optional, following the changes in Stormbird 0.13.0. Without a controller, the sails are operated with the local wing angles and internal states that are set directly on the model. Requires Stormbird 0.13.0 or newer when the controller is not set.
+
 ## 0.12.0 - 2026-10-31
 ### Breaking changes
 - `InflowCorrectionsSingleDirection.from_simulation_results_aligned_with_freestream` is replaced by `InflowCorrectionsSingleDirection.from_simulation_result`, which takes the wind environment, the wind condition and the ship velocity as input, rather than a single freestream velocity. The measured velocity at each control point is compared with the undisturbed apparent wind at the same location, so the function also works with inflow conditions that vary with height. The angle correction is computed from the velocity vectors, around the up direction, rather than from the angle of attack, so the sails no longer need to be aligned with the flow.

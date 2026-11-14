@@ -117,7 +117,7 @@ pub fn main() -> Result<(), Error> {
         sim_builder.wind_condition.direction_coming_from = args.wind_direction_deg.to_radians();
     }
     
-    let mut sim = sim_builder.build();
+    let mut sim = sim_builder.build()?;
 
     sim.initialize_after_build();
 

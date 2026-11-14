@@ -34,6 +34,7 @@ use crate::controller::prelude::*;
 use crate::wind::environment::WindEnvironment;
 
 use crate::io_utils;
+use crate::error::Error;
 
 use projection::ProjectionSettings;
 use sampling::SamplingSettings;
@@ -90,15 +91,15 @@ pub struct ActuatorLine {
 impl ActuatorLine {
     /// Loads a file containing settings for an actuator line builder, and constructs a new model
     /// based on this data.
-    pub fn new_from_file<P: AsRef<Path>>(file_path: P) -> Self {
-        let read_file_result = fs::read_to_string(file_path).unwrap();
+    pub fn new_from_file<P: AsRef<Path>>(file_path: P) -> Result<Self, Error> {
+        let read_file_result = fs::read_to_string(file_path)?;
 
         Self::new_from_string(&read_file_result)
     }
 
     /// Constructs a new model from a string containing settings for an actuator line builder.
-    pub fn new_from_string(builder_string: &str) -> Self {
-        let builder: ActuatorLineBuilder = serde_json::from_str(builder_string).unwrap();
+    pub fn new_from_string(builder_string: &str) -> Result<Self, Error> {
+        let builder: ActuatorLineBuilder = serde_json::from_str(builder_string)?;
 
         builder.build()
     }
@@ -210,7 +211,9 @@ impl ActuatorLine {
     pub fn update_controller(&mut self, time: Float, time_step: Float) -> bool {
         if time >= self.start_time {
             let controller_output = if let Some(controller) = &mut self.controller {
-                let simulation_result = self.simulation_result.as_ref().unwrap();
+                let simulation_result = self.simulation_result.as_ref().expect(
+                    "The controller in the actuator line model can only be updated after the first                     call to do_step, as it depends on the simulation result"
+                );
 
                 let wind_environment = WindEnvironment::default();
 
@@ -388,39 +391,42 @@ impl ActuatorLine {
         }
     }
 
-    /// Writes the resulting values from the line force model to a file.
-    pub fn write_results(&self, folder_path: &str) {
+    /// Writes the resulting values from the line force model to a file. Does nothing if there are
+    /// no results yet.
+    ///
+    /// # Errors
+    /// If the folders or files can not be created or written to.
+    pub fn write_results(&self, folder_path: &str) -> Result<(), Error> {
         if let Some(simulation_result) = &self.simulation_result {
             let overall_folder_path = Path::new(folder_path);
 
-            io_utils::folder_management::ensure_folder_exists(overall_folder_path).unwrap();
+            io_utils::folder_management::ensure_folder_exists(overall_folder_path)?;
 
             let (header, data) = simulation_result.as_reduced_flatten_csv_string();
 
-            let force_file_path = format!("{}/stormbird_forces.csv", folder_path);
+            let force_file_path = overall_folder_path.join("stormbird_forces.csv");
 
-            let _ = io_utils::csv_data::create_or_append_header_and_data_strings_file(
-                &force_file_path,
+            io_utils::csv_data::create_or_append_header_and_data_strings_file(
+                &force_file_path.to_string_lossy(),
                 &header,
                 &data
-            );
+            )?;
 
             if self.current_iteration % self.write_iterations_full_result == 0 {
-                let result_folder_path = Path::new(folder_path).join("stormbird_full_results");
-                io_utils::folder_management::ensure_folder_exists(&result_folder_path).unwrap();
+                let result_folder_path = overall_folder_path.join("stormbird_full_results");
+                io_utils::folder_management::ensure_folder_exists(&result_folder_path)?;
 
-                let json_string = serde_json::to_string_pretty(&simulation_result).unwrap();
+                let json_string = serde_json::to_string_pretty(&simulation_result)?;
 
-                io_utils::write_text_to_file(
-                    format!(
-                        "{}/full_results_{}.json",
-                        result_folder_path.to_str().unwrap(),
-                        self.current_iteration
-                    ).as_str(),
-                    &json_string
-                ).unwrap();
+                let result_file_path = result_folder_path.join(
+                    format!("full_results_{}.json", self.current_iteration)
+                );
+
+                io_utils::write_text_to_file(&result_file_path.to_string_lossy(), &json_string)?;
             }
         }
+
+        Ok(())
     }
     
     /// Updates the lift and drag forces that are projected onto the CFD grid, based on the latest

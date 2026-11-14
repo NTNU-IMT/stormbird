@@ -77,7 +77,7 @@ impl DynamicStallModelBuilder {
         self.check_time_constants()?;
 
         if self.has_foil_parameters() && !DynamicStallModel::uses_foil_stall_model(section_model) {
-            return Err(Error::CustomStringError(
+            return Err(Error::InvalidInput(
                 "The parameters for the stall in the dynamic stall model, i.e., \
                 pressure_time_constant, separation_time_constant, vortex_time_constant and \
                 vortex_passage_time, are only used together with section models that build on the \
@@ -104,7 +104,7 @@ impl DynamicStallModelBuilder {
         for (name, value) in time_constants {
             if let Some(value) = value {
                 if value < 0.0 {
-                    return Err(Error::CustomStringError(format!(
+                    return Err(Error::InvalidInput(format!(
                         "The time constants in the dynamic stall model can not be negative, but \
                         {} = {}", name, value
                     )));
@@ -117,9 +117,11 @@ impl DynamicStallModelBuilder {
 
     /// Builds the dynamic stall model for a wing with the given number of line segments.
     ///
-    /// # Panics
+    /// # Errors
     /// If any of the time constants are negative.
-    pub fn build(&self, nr_segments: usize) -> DynamicStallModel {
+    pub fn build(&self, nr_segments: usize) -> Result<DynamicStallModel, Error> {
+        self.check_time_constants()?;
+
         let pressure_time_constant = self.pressure_time_constant
             .unwrap_or_else(Self::default_pressure_time_constant);
         let separation_time_constant = self.separation_time_constant
@@ -129,11 +131,7 @@ impl DynamicStallModelBuilder {
         let vortex_passage_time = self.vortex_passage_time
             .unwrap_or_else(Self::default_vortex_passage_time);
 
-        if let Err(error) = self.check_time_constants() {
-            panic!("{}", error);
-        }
-
-        DynamicStallModel {
+        Ok(DynamicStallModel {
             pressure_time_constant,
             separation_time_constant,
             vortex_time_constant,
@@ -142,6 +140,6 @@ impl DynamicStallModelBuilder {
             time_step: 0.0,
             segment_states: vec![DynamicStallSegmentState::default(); nr_segments],
             is_initialized: false,
-        }
+        })
     }
 }

@@ -60,17 +60,17 @@ fn coordinate_systems() {
     let mut sim_fixed = SimulationBuilder::new(
         model_builder_fixed.clone(),
         SimulationSettings::QuasiSteady(steady_settings.clone())
-    ).build();
+    ).build().unwrap();
 
     let mut sim_global = SimulationBuilder::new(
         model_builder_global.clone(),
         SimulationSettings::QuasiSteady(steady_settings.clone())
-    ).build();
+    ).build().unwrap();
     
     let mut sim_body = SimulationBuilder::new(
         model_builder_body.clone(),
         SimulationSettings::QuasiSteady(steady_settings.clone()),
-    ).build();
+    ).build().unwrap();
 
     let velocity_points = sim_global.get_freestream_velocity_points();
 

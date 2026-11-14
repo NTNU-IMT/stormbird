@@ -108,3 +108,34 @@ fn test_wing_angles() {
         assert_eq!(span_point, original_span_point);
     }
 }
+#[test]
+/// The rotation type in the builder should be used for the rigid body motion of the model
+fn rotation_type_from_builder_is_used() {
+    use stormath::spatial_vector::transformations::RotationType;
+
+    let mut builder = LineForceModelBuilder::new(5);
+
+    builder.add_wing(WingBuilder {
+        section_points: vec![
+            SpatialVector::from([0.0, 0.0, 0.0]),
+            SpatialVector::from([0.0, 0.0, 10.0]),
+        ],
+        chord_vectors: vec![SpatialVector::from([1.0, 0.0, 0.0]); 2],
+        section_model: SectionModel::SingleElementFoil(Foil::default()),
+        ..Default::default()
+    });
+
+    builder.rotation = SpatialVector::from([0.3, -0.2, 0.5]);
+    builder.rotation_type = RotationType::ZYX;
+
+    let model = builder.build().unwrap();
+
+    assert_eq!(model.rigid_body_motion.rotation_type, RotationType::ZYX);
+
+    let expected_top = SpatialVector::from([0.0, 0.0, 10.0])
+        .rotate(builder.rotation, RotationType::ZYX);
+
+    let last_index = model.nr_span_lines() - 1;
+
+    assert!((model.span_lines_global[last_index].end_point - expected_top).length() < 1e-9);
+}

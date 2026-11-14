@@ -18,7 +18,7 @@ fn model(pressure_time_constant: Float, separation_time_constant: Float) -> Dyna
         pressure_time_constant: Some(pressure_time_constant),
         separation_time_constant: Some(separation_time_constant),
         ..Default::default()
-    }.build(1);
+    }.build(1).unwrap();
 
     model.set_time_step(TIME_STEP);
 
@@ -236,7 +236,7 @@ fn builder_from_json() {
     assert!(!default_builder.has_foil_parameters());
     assert_eq!(default_builder.internal_state_time_constant, 0.0);
 
-    let default_model = default_builder.build(1);
+    let default_model = default_builder.build(1).unwrap();
 
     assert_eq!(default_model.pressure_time_constant, DynamicStallModelBuilder::default_pressure_time_constant());
     assert_eq!(default_model.separation_time_constant, DynamicStallModelBuilder::default_separation_time_constant());
@@ -254,7 +254,7 @@ fn builder_from_json() {
         }"#
     ).unwrap();
 
-    let model = builder.build(5);
+    let model = builder.build(5).unwrap();
 
     assert_eq!(model.pressure_time_constant, 2.0);
     assert_eq!(model.separation_time_constant, 4.0);
@@ -267,21 +267,19 @@ fn builder_from_json() {
 }
 
 #[test]
-#[should_panic]
 fn negative_time_constants_are_not_allowed() {
-    DynamicStallModelBuilder {
+    assert!(DynamicStallModelBuilder {
         pressure_time_constant: Some(-1.0),
         ..Default::default()
-    }.build(1);
+    }.build(1).is_err());
 }
 
 #[test]
-#[should_panic]
 fn negative_vortex_time_constants_are_not_allowed() {
-    DynamicStallModelBuilder {
+    assert!(DynamicStallModelBuilder {
         vortex_passage_time: Some(-1.0),
         ..Default::default()
-    }.build(1);
+    }.build(1).is_err());
 }
 
 fn model_with_vortex(vortex_time_constant: Float, vortex_passage_time: Float) -> DynamicStallModel {
@@ -289,7 +287,7 @@ fn model_with_vortex(vortex_time_constant: Float, vortex_passage_time: Float) ->
         vortex_time_constant: Some(vortex_time_constant),
         vortex_passage_time: Some(vortex_passage_time),
         ..Default::default()
-    }.build(1);
+    }.build(1).unwrap();
 
     model.set_time_step(TIME_STEP);
 
@@ -480,7 +478,7 @@ fn model_with_internal_state_lag(internal_state_time_constant: Float) -> Dynamic
     let mut model = DynamicStallModelBuilder {
         internal_state_time_constant,
         ..Default::default()
-    }.build(1);
+    }.build(1).unwrap();
 
     model.set_time_step(TIME_STEP);
 
@@ -504,7 +502,7 @@ fn step_internal_state(
 #[test]
 fn internal_state_lag_is_off_by_default() {
     let section_model = rotating_cylinder();
-    let mut model = DynamicStallModelBuilder::default().build(1);
+    let mut model = DynamicStallModelBuilder::default().build(1).unwrap();
 
     model.set_time_step(TIME_STEP);
 
@@ -618,12 +616,11 @@ fn check_gives_an_error_for_negative_time_constants() {
 }
 
 #[test]
-#[should_panic]
 fn negative_internal_state_time_constants_are_not_allowed() {
-    DynamicStallModelBuilder {
+    assert!(DynamicStallModelBuilder {
         internal_state_time_constant: -1.0,
         ..Default::default()
-    }.build(1);
+    }.build(1).is_err());
 }
 
 #[test]

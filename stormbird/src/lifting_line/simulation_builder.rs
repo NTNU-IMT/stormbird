@@ -105,8 +105,9 @@ impl SimulationBuilder {
     }
 
     /// Checks that the settings are consistent. At the moment, this checks the settings of the line
-    /// force model, see [`LineForceModelBuilder::check_settings`], and that dynamic stall models
-    /// are only used together with a dynamic simulation.
+    /// force model, see [`LineForceModelBuilder::check_settings`], that dynamic stall models are
+    /// only used together with a dynamic simulation, and the settings of the dynamic wake, if
+    /// used, see [`DynamicWakeBuilder::settings_is_valid`].
     pub fn check_settings(&self) -> Result<(), Error> {
         self.line_force_model.check_settings()?;
 
@@ -114,10 +115,14 @@ impl SimulationBuilder {
             .any(|wing_builder| wing_builder.dynamic_stall.is_some());
 
         if has_dynamic_stall && matches!(self.simulation_settings, SimulationSettings::QuasiSteady(_)) {
-            return Err(Error::CustomStringError(
+            return Err(Error::InvalidInput(
                 "The dynamic stall model can only be used together with dynamic simulation \
                 settings, as it depends on the time history of the flow".to_string()
             ));
+        }
+
+        if let SimulationSettings::Dynamic(settings) = &self.simulation_settings {
+            settings.wake.settings_is_valid()?;
         }
 
         Ok(())
@@ -125,14 +130,12 @@ impl SimulationBuilder {
 
     /// Builds the [Simulation] struct based on the current state of the builder.
     ///
-    /// # Panics
+    /// # Errors
     /// If the settings are not consistent, see [SimulationBuilder::check_settings].
-    pub fn build(&self) -> Simulation {
-        if let Err(error) = self.check_settings() {
-            panic!("Invalid simulation settings: {}", error);
-        }
+    pub fn build(&self) -> Result<Simulation, Error> {
+        self.check_settings()?;
 
-        let line_force_model = self.line_force_model.build();
+        let line_force_model = self.line_force_model.build()?;
 
         let nr_of_lines = line_force_model.nr_span_lines();
 
@@ -141,7 +144,7 @@ impl SimulationBuilder {
                 WakeData::Dynamic(
                     settings.wake.build(
                         &line_force_model
-                    )
+                    )?
                 )
             },
             SimulationSettings::QuasiSteady(settings) => {
@@ -168,7 +171,7 @@ impl SimulationBuilder {
             &vec![SpatialVector::from([0.0, 0.0, 0.0]); nr_of_lines]
         );
 
-        Simulation {
+        Ok(Simulation {
             line_force_model,
             flow_derivatives,
             wake_data,
@@ -176,6 +179,6 @@ impl SimulationBuilder {
             solver,
             previous_circulation_strength,
             first_time_step_completed: false,
-        }
+        })
     }
 }

@@ -45,7 +45,7 @@ fn actuator_line(dynamic_stall: Option<DynamicStallModelBuilder>) -> ActuatorLin
     ActuatorLineBuilder {
         solver_settings: SolverSettings { damping_factor: 1.0 },
         ..ActuatorLineBuilder::new(line_force_model)
-    }.build()
+    }.build().unwrap()
 }
 
 /// Ramps the wing angle linearly from zero to the max angle, with a constant velocity at the
@@ -165,4 +165,30 @@ fn amount_of_stall_in_the_result_is_the_one_used_for_the_forces() {
         "The dynamic amount of stall is not lagging. Static = {}, dynamic = {}",
         stall_static[last_index], stall_dynamic[last_index]
     );
+}
+
+#[test]
+fn invalid_settings_give_errors() {
+    let mut builder = LineForceModelBuilder::new(10);
+    builder.add_wing(WingBuilder {
+        section_points: vec![
+            SpatialVector::from([0.0, 0.0, 0.0]),
+            SpatialVector::from([0.0, 0.0, 10.0]),
+        ],
+        chord_vectors: vec![SpatialVector::from([2.0, 0.0, 0.0]); 2],
+        section_model: SectionModel::SingleElementFoil(Foil::default()),
+        ..Default::default()
+    });
+
+    assert!(ActuatorLineBuilder {
+        write_iterations_full_result: 0,
+        ..ActuatorLineBuilder::new(builder.clone())
+    }.build().is_err());
+
+    builder.local_wing_angles = vec![0.0, 0.0];
+
+    assert!(ActuatorLineBuilder::new(builder).build().is_err());
+
+    assert!(ActuatorLine::new_from_string("not json").is_err());
+    assert!(ActuatorLine::new_from_file("this_file_does_not_exist.json").is_err());
 }

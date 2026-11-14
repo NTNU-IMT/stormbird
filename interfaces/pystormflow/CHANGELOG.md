@@ -2,6 +2,13 @@
 
 This file contains an overview of the changes made to pystormflow, the Python interface to the Stormflow CFD solver. See the [Stormflow change log](../../stormflow/CHANGELOG.md) for changes to the solver, and the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the actuator line model.
 
+## 0.4.0 - 2026-11-14
+### Breaking changes
+- Depends on the published versions of Stormflow 0.4.0, Stormbird 0.13.0 and Stormath 0.5.0. There are no changes to the Python interface itself. Setup files that are valid for pystormflow 0.3.0 give the same results. See the [Stormflow change log](../../stormflow/CHANGELOG.md) and the [Stormbird change log](../../stormbird/CHANGELOG.md) for the details.
+
+### Other changes
+- Settings that are found to be invalid when the simulation is built, e.g., an inconsistent wing geometry or an invalid controller in the actuator line model, raise a `ValueError` when the `Simulation` is created, with the error message from Stormbird or Stormflow. Before, these settings gave a panic.
+
 ## 0.3.0 - 2026-10-31
 ### Breaking changes
 - Depends on the published versions of Stormflow 0.3.0 and Stormbird 0.12.0. There are no changes to the Python interface itself, but the setup files may need to be updated. See the [Stormflow change log](../../stormflow/CHANGELOG.md) for the changes to the solver, such as the new `boundary_condition_type` setting, and the [Stormbird change log](../../stormbird/CHANGELOG.md) for the changes to the actuator line model, such as the new dynamic stall model.

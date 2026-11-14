@@ -4,6 +4,8 @@
 
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+
+use crate::error::to_py_err;
 use pythonize::pythonize;
 
 use stormbird::section_models::active_air_flow_foil::{
@@ -25,9 +27,9 @@ pub struct ActiveAirFlowFoil {
 impl ActiveAirFlowFoil {
     #[new]
     pub fn new(input_str: String) -> PyResult<Self> {
-        let data = ActiveAirFlowFoilRust::new_from_string(&input_str).map_err(|e| {
-            PyValueError::new_err(format!("Failed to parse active air flow foil from string: {}", e))
-        })?;
+        let data = ActiveAirFlowFoilRust::new_from_string(&input_str).map_err(
+            |e| to_py_err("Failed to parse active air flow foil from string", e)
+        )?;
 
         Ok(Self { data })
     }

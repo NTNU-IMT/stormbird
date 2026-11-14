@@ -55,12 +55,12 @@ fn right_force_magnitude_with_steady_forward_motion() {
     let mut sim_translation = SimulationBuilder::new (
         wing_builder.clone(),
         sim_settings_dynamic.clone(),
-    ).build();
+    ).build().unwrap();
 
     let mut sim_inflow = SimulationBuilder::new (
         wing_builder,
         sim_settings_dynamic.clone(),
-    ).build();
+    ).build().unwrap();
 
     let freestream_velocity_points = sim_inflow.get_freestream_velocity_points();
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
@@ -144,7 +144,7 @@ fn right_sign_of_the_force_when_translating() {
     let mut sim = SimulationBuilder::new (
         wing_builder,
         SimulationSettings::QuasiSteady(QuasiSteadySettings::default()),
-    ).build();
+    ).build().unwrap();
 
     let freestream_velocity_points = sim.get_freestream_velocity_points();
     let input_freestream_velocity = vec![freestream_velocity; freestream_velocity_points.len()];
@@ -210,7 +210,7 @@ fn right_sign_of_the_moment_when_rotating() {
         SimulationSettings::QuasiSteady(
             QuasiSteadySettings::default()
         ),
-    ).build();
+    ).build().unwrap();
 
     let frequency = TAU / period;
 

@@ -464,3 +464,54 @@ fn the_internal_state_can_be_set_and_read() {
 
     lifting_line_simulation_drop(simulation);
 }
+
+#[test]
+fn span_varying_internal_states_can_be_set() {
+    let simulation = new_simulation(QUASI_STEADY_SETUP);
+
+    let locations = [-0.5, 0.5];
+    let values = [0.2, 0.6];
+
+    assert_eq!(
+        lifting_line_simulation_set_internal_state_linear(
+            simulation, 0, locations.as_ptr(), values.as_ptr(), 2
+        ),
+        0,
+        "{}",
+        last_error_message().unwrap_or_default()
+    );
+
+    let mut internal_state_out = [0.0; 1];
+
+    assert_eq!(
+        lifting_line_simulation_internal_state(simulation, internal_state_out.as_mut_ptr(), 1),
+        1
+    );
+
+    // The representative value is the mean over the span
+    assert!((internal_state_out[0] - 0.4).abs() < 1e-12);
+
+    let boundaries = [-0.5, 0.0, 0.5];
+    let zone_values = [0.1, 0.3];
+
+    assert_eq!(
+        lifting_line_simulation_set_internal_state_piecewise_constant(
+            simulation, 0, boundaries.as_ptr(), 3, zone_values.as_ptr(), 2
+        ),
+        0
+    );
+
+    // A wing index that is out of range is reported
+    stormbird_clear_last_error();
+
+    assert_eq!(
+        lifting_line_simulation_set_internal_state_piecewise_constant(
+            simulation, 1, boundaries.as_ptr(), 3, zone_values.as_ptr(), 2
+        ),
+        -6
+    );
+
+    assert!(last_error_message().unwrap().contains("out of range"));
+
+    lifting_line_simulation_drop(simulation);
+}

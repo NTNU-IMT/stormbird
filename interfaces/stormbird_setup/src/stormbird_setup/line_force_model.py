@@ -18,12 +18,24 @@ from .circulation_corrections import CirculationCorrectionBuilder
 from .input_power import InputPowerModel
 
 from enum import Enum
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from typing import Iterator
 
 class CoordinateSystem(Enum):
     Global = "Global"
     Body = "Body"
+
+class RotationType(Enum):
+    '''
+    The order in which the rotation angles around the x, y and z axes are applied, as rotations
+    around the fixed axes. XYZ is the same as yaw, pitch and roll around the rotated axes.
+    '''
+    XYZ = "XYZ"
+    XZY = "XZY"
+    YXZ = "YXZ"
+    YZX = "YZX"
+    ZXY = "ZXY"
+    ZYX = "ZYX"
 
 class ForceCorrection(StormbirdSetupBaseModel):
     '''
@@ -67,7 +79,7 @@ class WingBuilder(StormbirdSetupBaseModel):
     section_model: SectionModel
     line_segment_is_virtual: list[bool] | None = None
     non_zero_circulation_at_ends: tuple[bool, bool] = (False, False)
-    nr_sections: int | None = None
+    nr_sections: int | None = Field(default=None, ge=1)
     input_power_model: InputPowerModel = InputPowerModel()
     internal_compartment_boundaries: list[float] | None = None
     force_correction: ForceCorrection | None = None
@@ -195,11 +207,12 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     Interface to the line force model builder
     '''
     wing_builders: list[WingBuilder] = []
-    nr_sections: int = 32
+    nr_sections: int = Field(default=32, ge=1)
     density: float = 1.225
     local_wing_angles: list[float] = []
     rotation: SpatialVector = SpatialVector()
     translation: SpatialVector = SpatialVector()
+    rotation_type: RotationType = RotationType.XYZ
     circulation_correction: CirculationCorrectionBuilder = CirculationCorrectionBuilder()
     output_coordinate_system: CoordinateSystem = CoordinateSystem.Global
     force_calculation_settings: ForceCalculationSettings = ForceCalculationSettings()

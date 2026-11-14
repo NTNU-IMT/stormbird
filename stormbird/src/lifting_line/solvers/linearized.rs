@@ -141,7 +141,9 @@ impl Linearized {
         }
 
         // Solve for the circulation strength
-        let mut circulation_strength = equation_matrix.solve_gaussian_elimination(&rhs).unwrap();
+        let mut circulation_strength = equation_matrix.solve_gaussian_elimination(&rhs).expect(
+            "The equation system in the linearized solver is singular. This can happen if the             chord length or the tangential velocity is zero for one or more line elements"
+        );
 
         frozen_wake.update_induced_velocities_at_control_points(&circulation_strength);
 

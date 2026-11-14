@@ -54,7 +54,7 @@ impl Simulation {
     pub fn new_from_string(setup_string: &str) -> Result<Self, Error> {
         let builder = SimulationBuilder::new_from_string(setup_string)?;
 
-        let mut sim = builder.build();
+        let mut sim = builder.build()?;
 
         sim.initialize_after_build();
 

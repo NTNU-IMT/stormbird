@@ -2,6 +2,22 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.13.0 - 2026-11-14
+### Breaking changes
+- Depends on the published version of Stormbird 0.13.0. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for all the changes to the underlying models. The most important ones for Python users are:
+  - Invalid settings, e.g., a wing with fewer than two section points, a line force model without wings, or an invalid controller, raise a `ValueError` when the model is created, rather than a panic or invalid results later.
+  - The controller in the complete sail model is optional.
+  - The steady state methods of the complete sail model no longer depend on earlier calls or on settings in the controller that are only meaningful in the time domain, and they neglect gusts. Results with controllers that use input filters, rate limits, an update interval or a start time can therefore change, as can results for rotor sails where the internal state is set as a spin ratio.
+  - The angular velocity of the sails, computed from the rotation with finite differences, is correct also when more than one rotation angle is different from zero.
+  - The `YawPitchRoll` rotation type and the `GaussianSmoothing` angle of attack correction are removed.
+- `WindCondition.set_parallel_gust_from_json_string`, `set_perpendicular_gust_from_json_string` and `set_vertical_gust_from_json_string` raise a `ValueError` if the string can not be parsed. Before, an invalid string caused a panic.
+
+### Features
+- New methods on the `CompleteSailModel`: `has_controller`, `ship_velocity_vector`, and versions of `do_step`, `freestream_velocity`, `simulate_steady_state_condition` and `simulate_optimal_steady_state_condition` where the ship velocity is given as a vector, with names that end with `_with_ship_velocity_vector`.
+
+### Changes
+- All errors from Stormbird are converted to Python exceptions in the same way: errors from reading files become an `OSError`, while invalid input and invalid JSON become a `ValueError`. The error messages include the error from Stormbird.
+
 ## 0.12.0 - 2026-10-31
 - Depends on the published version of Stormbird 0.12.0. The main new feature is the dynamic stall model, which is set through the JSON input to the simulation, so it does not need any changes to the Python interface. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for all the changes to the underlying models, including changes to the input format and default values.
 - Creating a `LineForceModel` with invalid settings, e.g., an invalid dynamic stall model, raises a `ValueError`, rather than a panic.

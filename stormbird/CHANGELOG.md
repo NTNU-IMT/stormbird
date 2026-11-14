@@ -2,6 +2,60 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## 0.13.0 - 2026-11-14
+### Breaking changes
+- Invalid user input is now returned as errors rather than causing panics. The following functions return a `Result<_, Error>` instead of the value directly:
+    - `LineForceModelBuilder::build` and `LineForceModelBuilder::build_with_nr_sections`
+    - `WingBuilder::build`, `WingBuilder::internal_compartments`, `WingBuilder::gyroscopic_moment` and `WingBuilder::dynamic_stall`
+    - `DynamicStallModelBuilder::build`
+    - `DynamicWakeBuilder::build`
+    - `SimulationBuilder::build`
+    - `ActuatorLineBuilder::build`, `ActuatorLine::new_from_file` and `ActuatorLine::new_from_string`
+    - `ActuatorLine::write_results`, which also returns errors from writing the CSV file with the forces, which were silently ignored before
+    - `DiscretizedSpectrum::from_json_string` and `DiscretizedSpectrum::from_json_file`
+    - `VelocityVariation::from_json_string` and `VelocityVariation::from_json_file`
+    - `WindCondition::set_parallel_gust_from_json_string`, `WindCondition::set_perpendicular_gust_from_json_string` and `WindCondition::set_vertical_gust_from_json_string`
+- Functions that returned errors as a `String` or a `serde_json::Error` now return the common `Error` type of the library, so that all errors can be propagated with `?`. This applies to `VaryingFoil::new`, `SpanVariation::new_linear`, `SpanVariation::new_piecewise_constant`, `InternalCompartments::new`, `FanCurveData::new`, `InternalFlow::new`, `SectionModel::from_string` and `ActiveAirFlowFoil::new_from_string`.
+- New `InvalidInput` variant in the `Error` enum, see below. Code that matches exhaustively on the error must handle the new variant.
+- Validation errors use the new `Error::InvalidInput` variant, rather than `Error::CustomStringError`. This includes the existing checks of the dynamic stall model, the dynamic wake, the spanwise measurements in the controller, and the use of dynamic stall in quasi-steady simulations.
+- The `dynamic_stall` field in `SingleWing` holds the built `DynamicStallModel` rather than the `DynamicStallModelBuilder`, so that the model is built, and checked, in `WingBuilder::build`.
+- `Simulation::new_from_string` and `CompleteSailModelBuilder::build` no longer call `SimulationBuilder::check_settings` separately, as the checks are done in `SimulationBuilder::build`.
+- Depends on Stormath 0.5.0, where the `YawPitchRoll` rotation type is removed, as it was the same rotation as `XYZ`. Line force models with `"rotation_type": "YawPitchRoll"` in the JSON input give an error, and should use `XYZ` instead.
+- `ControllerBuilder::build` returns an error if `time_steps_between_updates` is zero, which gave a division by zero when the controller was updated.
+- The `GaussianSmoothing` variant of the `AngleOfAttackCorrection` is removed. It was not implemented, and gave a panic when it was used. The only variant is now `None`, which is the default. JSON input with `"GaussianSmoothing"` gives an error.
+- New `allowed_relative_internal_state_error` field in the `CompleteSailModelSettings`, so code that creates the settings directly must set it, or use `..Default::default()`. The field has a default value when deserialized.
+- The controller in the complete sail model is optional. The `controller` field in `CompleteSailModelBuilder` is an `Option<ControllerBuilder>`, and the `controller` field in `CompleteSailModel` is an `Option<Controller>`. JSON input with a controller works as before. Code that accesses the controller of the model directly must handle the `None` case.
+
+### Features
+- New `Error::InvalidInput` variant for invalid input or settings, with a helper constructor `Error::invalid_input`. The `Error` type also implements `std::error::Error::source` for the IO and JSON errors.
+- New `WingBuilder::check_geometry` function, which checks that a wing has at least two section points, one chord vector for each section point, one `line_segment_is_virtual` value for each segment if given, at least one section, and a span larger than zero. Before, these cases gave index panics or invalid values when building the model.
+- New `WingBuilder::check` function, which checks the geometry, the internal compartments, the gyroscopic moment model and the dynamic stall model of a wing.
+- `LineForceModelBuilder::check_settings` checks that there is at least one wing, all the settings of each wing, and that the number of `local_wing_angles` matches the number of wings. New `LineForceModelBuilder::check_settings_with_nr_sections` for the same checks with a given number of sections. Errors from a wing include the index of the wing.
+- `SimulationBuilder::check_settings` also checks the settings of the dynamic wake, if used.
+- New `ActuatorLineBuilder::check_settings` function, which checks the settings of the line force model, and that `write_iterations_full_result` is not zero, which gave a division by zero when writing results before.
+- New `Error::code` function, which returns a numeric code for each type of error (1: IO, 2: JSON, 3: invalid input, 4: custom string error), for interfaces that can only report errors as numbers, such as the FMU.
+- The complete sail model can be used without a controller, which is mainly intended for time-domain simulations where the sail settings are given from the outside, such as in the FMU. Without a controller, the `apply_controller_*` functions do nothing, `simulate_steady_state_condition` runs a single simulation with the current local wing angles and internal states, and `simulate_optimal_steady_state_condition` runs a single simulation, as the loading has no effect.
+- The `wind_environment` field in the `CompleteSailModelBuilder` is optional in JSON input, with the default wind environment as the default value, and the fields of the builder are public. The `thrust_direction` in the `CompleteSailModelSettings` is also optional in JSON input. Before, it was required whenever the settings were given.
+- New functions on the `CompleteSailModel`:
+    - `do_step_with_ship_velocity_vector` and `freestream_velocity_with_ship_velocity_vector`, which take the velocity of the ship as a vector, for cases where the ship does not move along the negative `zero_direction_vector` in the wind environment, e.g., when the ship velocity comes from an external motion simulation. The existing `do_step` and `freestream_velocity` use these functions, with the vector from the new `ship_velocity_vector` function, and give the same results as before.
+    - `flow_measurements_from_simulation_result`, which returns the measured flow conditions on each sail, as input to a controller. It uses the spanwise measurement of the controller, if there is one, and a default spanwise measurement otherwise, so that the measurements are also available without a controller.
+    - `update_controller`, which updates the controller with the given measurements and applies the output to the sails, `has_controller`, and `spanwise_measurement`.
+- New `CompleteSailModel::simulate_steady_state_condition_with_ship_velocity_vector` and `CompleteSailModel::simulate_optimal_steady_state_condition_with_ship_velocity_vector`, with the ship velocity given as a vector. In the optimal version, the delivered power is the thrust times the component of the ship velocity along the `thrust_direction`. The versions with a scalar ship velocity give the same results as before.
+- New `Controller::steady_state_output`, which gives the output directly from the set points, without input filters, rate limits, update interval or start time, and without changing the state of the controller. New `ControllerSetPoints::get_local_wing_angle_without_rate_limit` and `ControllerSetPoints::get_internal_state_without_rate_limit`.
+- New `allowed_relative_internal_state_error` setting in the `CompleteSailModelSettings`, with a default value of 0.001, used in the convergence check of the steady state simulations.
+- The `rotation_type` in the `LineForceModelBuilder` can be set to any of the rotation types in Stormath 0.5.0, i.e., the order of the rotations around the fixed axes: `XYZ` (default), `XZY`, `YXZ`, `YZX`, `ZXY` or `ZYX`.
+
+### Bug fixes
+- The angular velocity of the rigid body motion, computed with finite differences in `LineForceModel::set_translation_and_rotation_with_finite_difference_for_the_velocity`, was wrong when more than one rotation angle was different from zero, e.g., for a ship with a heading that rolls. The roll rate was then applied around the global x-axis rather than the x-axis of the ship. The fix is in Stormath 0.5.0, where the angular velocity is computed from the change in the rotation matrix. This affects the felt velocity on the sails, the gyroscopic moment, and the apparent wind direction measured by the controller. Results for rotations around a single axis are unchanged.
+- The `rotation_type` in the `LineForceModelBuilder` was not used, so the model always used the default rotation type.
+- The steady state simulations in the `CompleteSailModel` used the controller in the same way as in the time domain, with the iteration number as time and a time step of one. Input filters, rate limits, `time_steps_between_updates` and `start_time` in the controller therefore affected the result, and the state of the controller was kept between calls, so the result could depend on the earlier conditions that were simulated. The steady state simulations now use the new `Controller::steady_state_output`, and the result only depends on the input.
+- The steady state simulations used the unsteady wind with the iteration number as time, so gusts in the wind condition made each iteration see a different wind. Only the steady part of the wind is now used.
+- The steady state simulations only checked the local wing angles for convergence, and returned the result from before the last controller update. For sails where the controller only changes the internal state, such as rotor sails with the set point given as a spin ratio, the iterations stopped after the first simulation, and the result did not correspond to the final internal state. The convergence check now includes the internal states, and the result is from a simulation with the final settings.
+- The inflow corrections in the `CompleteSailModel` were looked up with an apparent wind direction that only included the ship velocity, and not the linear motion of the sails. When the velocity of the ship was given as motion of the sails, e.g., through the translation in the FMU, the corrections were looked up at the true wind direction. The linear velocity of the rigid body motion is now included.
+
+### Changes
+- The linearized solver and `ActuatorLine::update_controller` use `expect` with a descriptive message, rather than `unwrap`, for the cases that can still panic: a singular equation system in the linearized solver, and updating the controller before the first time step in the actuator line model.
+
 ## 0.12.0 - 2026-10-31
 ### Breaking changes
 - The default `wind_rotation_axis` in the `WindEnvironment` is changed from the positive to the negative z-axis, i.e., opposite of the default up direction, so that the wind direction is measured clockwise seen from above. This is the same default as in stormbird_setup, and the convention that is described in the book. Wind environments that are created from JSON without a `wind_rotation_axis` get the opposite sign of the wind direction. Set `wind_rotation_axis` to `{"x": 0.0, "y": 0.0, "z": 1.0}` to get the same behavior as before.

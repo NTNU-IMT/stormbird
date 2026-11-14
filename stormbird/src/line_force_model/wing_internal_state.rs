@@ -4,6 +4,7 @@
 
 //! The internal state of a wing, which can either be constant or vary along the span.
 
+use crate::error::Error;
 use serde::{Serialize, Deserialize};
 
 use stormath::type_aliases::Float;
@@ -55,7 +56,7 @@ enum SpanVariationInput {
 }
 
 impl TryFrom<SpanVariationInput> for SpanVariation {
-    type Error = String;
+    type Error = Error;
 
     fn try_from(input: SpanVariationInput) -> Result<Self, Self::Error> {
         match input {
@@ -71,17 +72,19 @@ impl TryFrom<SpanVariationInput> for SpanVariation {
 
 impl SpanVariation {
     /// Creates a linear span variation, and checks that the input is valid
-    pub fn new_linear(locations: Vec<Float>, values: Vec<Float>) -> Result<Self, String> {
+    pub fn new_linear(locations: Vec<Float>, values: Vec<Float>) -> Result<Self, Error> {
         if locations.is_empty() {
-            return Err("A linear span variation must have at least one value".to_string());
+            return Err(Error::invalid_input(
+                "A linear span variation must have at least one value"
+            ));
         }
 
         if locations.len() != values.len() {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "A linear span variation must have the same number of locations and values. \
                 Locations: {}, values: {}",
                 locations.len(), values.len()
-            ));
+            )));
         }
 
         Self::check_increasing(&locations, "locations")?;
@@ -90,17 +93,19 @@ impl SpanVariation {
     }
 
     /// Creates a piecewise constant span variation, and checks that the input is valid
-    pub fn new_piecewise_constant(boundaries: Vec<Float>, values: Vec<Float>) -> Result<Self, String> {
+    pub fn new_piecewise_constant(boundaries: Vec<Float>, values: Vec<Float>) -> Result<Self, Error> {
         if values.is_empty() {
-            return Err("A piecewise constant span variation must have at least one value".to_string());
+            return Err(Error::invalid_input(
+                "A piecewise constant span variation must have at least one value"
+            ));
         }
 
         if boundaries.len() != values.len() + 1 {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "A piecewise constant span variation must have one more boundary than values. \
                 Boundaries: {}, values: {}",
                 boundaries.len(), values.len()
-            ));
+            )));
         }
 
         Self::check_increasing(&boundaries, "boundaries")?;
@@ -108,9 +113,11 @@ impl SpanVariation {
         Ok(Self::PiecewiseConstant { boundaries, values })
     }
 
-    fn check_increasing(data: &[Float], name: &str) -> Result<(), String> {
+    fn check_increasing(data: &[Float], name: &str) -> Result<(), Error> {
         if data.windows(2).any(|pair| pair[1] <= pair[0]) {
-            return Err(format!("The {} of a span variation must be strictly increasing", name));
+            return Err(Error::invalid_input(
+                format!("The {} of a span variation must be strictly increasing", name)
+            ));
         }
 
         Ok(())
@@ -312,26 +319,27 @@ impl Default for InternalCompartments {
 
 impl InternalCompartments {
     /// Creates compartments from the boundaries, and checks that they are valid
-    pub fn new(boundaries: Vec<Float>) -> Result<Self, String> {
+    pub fn new(boundaries: Vec<Float>) -> Result<Self, Error> {
         if boundaries.len() < 2 {
-            return Err(
+            return Err(Error::invalid_input(
                 "The internal compartment boundaries must at least contain the two ends of the wing"
-                .to_string()
-            );
+            ));
         }
 
         let ends_are_correct = (boundaries[0] - SPAN_START).abs() < 1e-12 &&
             (boundaries[boundaries.len() - 1] - SPAN_END).abs() < 1e-12;
 
         if !ends_are_correct {
-            return Err(format!(
+            return Err(Error::invalid_input(format!(
                 "The internal compartment boundaries must start at {} and end at {}",
                 SPAN_START, SPAN_END
-            ));
+            )));
         }
 
         if boundaries.windows(2).any(|pair| pair[1] <= pair[0]) {
-            return Err("The internal compartment boundaries must be strictly increasing".to_string());
+            return Err(Error::invalid_input(
+                "The internal compartment boundaries must be strictly increasing"
+            ));
         }
 
         Ok(Self { boundaries })
