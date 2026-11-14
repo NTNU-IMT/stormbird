@@ -9,7 +9,7 @@ use stormbird::wind::{
 use stormath::spatial_vector::SpatialVector;
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 
 use std::ops::Range;
 
@@ -25,9 +25,9 @@ pub struct WindEnvironment {
 impl WindEnvironment {
     #[new]
     pub fn new(setup_string: String) -> PyResult<Self> {
-        let data = WindEnvironmentRust::from_json_string(&setup_string).map_err(|e| {
-            PyValueError::new_err(format!("Failed to create wind environment from string: {}", e))
-        })?;
+        let data = WindEnvironmentRust::from_json_string(&setup_string).map_err(
+            |e| to_py_err("Failed to create wind environment from string", e)
+        )?;
 
         Ok(Self { data })
     }

@@ -5,7 +5,11 @@
 //! Helper functions for setting internal states that vary along the span of a wing.
 
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyValueError, PyIndexError};
+use pyo3::exceptions::PyIndexError;
+
+use stormbird::error::Error;
+
+use crate::error::to_py_err;
 
 use stormbird::line_force_model::LineForceModel;
 use stormbird::line_force_model::wing_internal_state::{SpanVariation, WingInternalState};
@@ -14,7 +18,7 @@ use stormbird::line_force_model::wing_internal_state::{SpanVariation, WingIntern
 fn set_span_variation(
     line_force_model: &mut LineForceModel,
     wing_index: usize,
-    span_variation: Result<SpanVariation, String>,
+    span_variation: Result<SpanVariation, Error>,
 ) -> PyResult<()> {
     if wing_index >= line_force_model.nr_wings() {
         return Err(PyIndexError::new_err(format!(
@@ -23,7 +27,7 @@ fn set_span_variation(
         )));
     }
 
-    let span_variation = span_variation.map_err(PyValueError::new_err)?;
+    let span_variation = span_variation.map_err(|e| to_py_err("Invalid span variation", e))?;
 
     line_force_model.set_wing_internal_state(
         wing_index, WingInternalState::SpanVarying(span_variation)

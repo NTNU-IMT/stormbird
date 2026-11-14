@@ -4,9 +4,9 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyType;
-use pyo3::exceptions::{PyIOError, PyValueError};
-
 use stormbird::error::Error;
+
+use crate::error::to_py_err;
 
 use stormbird::common_utils::results::simulation::SimulationResult as SimulationResultRust;
 use stormbird::common_utils::results::simplfied::SingleSailResult as SingleSailResultRust;
@@ -230,12 +230,7 @@ impl SimulationResult {
     /// Converts an error from reading a result file to a Python error. Errors from reading the
     /// file become an OSError, while errors from parsing the content become a ValueError.
     fn read_file_error(file_path: &str, error: Error) -> PyErr {
-        let message = format!("Failed to read simulation result from file {}: {}", file_path, error);
-
-        match error {
-            Error::IoError(_) => PyIOError::new_err(message),
-            _ => PyValueError::new_err(message),
-        }
+        to_py_err(&format!("Failed to read simulation result from file {}", file_path), error)
     }
 }
 

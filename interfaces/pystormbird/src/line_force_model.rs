@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 use stormbird::common_utils::prelude::CoordinateSystem;
 
 use stormath::spatial_vector::SpatialVector;
@@ -22,15 +22,15 @@ pub struct LineForceModel {
 impl LineForceModel {
     #[new]
     pub fn new(json_string: String) -> PyResult<Self> {
-        let builder = LineForceModelBuilder::new_from_string(&json_string).map_err(|e| {
-            PyValueError::new_err(format!("Failed to create line force model from string: {}", e))
-        })?;
+        let builder = LineForceModelBuilder::new_from_string(&json_string).map_err(
+            |e| to_py_err("Failed to create line force model from string", e)
+        )?;
 
-        builder.check_settings().map_err(|e| {
-            PyValueError::new_err(format!("Invalid settings for the line force model: {}", e))
-        })?;
+        let data = builder.build().map_err(
+            |e| to_py_err("Invalid settings for the line force model", e)
+        )?;
 
-        Ok(Self { data: builder.build() })
+        Ok(Self { data })
     }
 
     pub fn circulation_strength(

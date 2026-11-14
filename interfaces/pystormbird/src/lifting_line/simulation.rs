@@ -5,7 +5,7 @@
 //! Interface to a dynamic simulation using a lifting line model.
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 use pyo3::types::PyBytes;
 
 use stormbird::lifting_line::simulation::Simulation as SimulationRust;
@@ -25,9 +25,9 @@ pub struct Simulation {
 impl Simulation {
     #[new]
     pub fn new(setup_string: String) -> PyResult<Self> {
-        let data = SimulationRust::new_from_string(&setup_string).map_err(|e| {
-            PyValueError::new_err(format!("Failed to create simulation from string: {}", e))
-        })?;
+        let data = SimulationRust::new_from_string(&setup_string).map_err(
+            |e| to_py_err("Failed to create simulation from string", e)
+        )?;
 
         Ok(Self { data })
     }

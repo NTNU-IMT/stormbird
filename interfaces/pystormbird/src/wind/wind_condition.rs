@@ -12,7 +12,7 @@ use stormbird::wind::wind_condition::velocity_variation::{
 
 use pyo3::prelude::*;
 use pyo3::types::PyType;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 
 #[pyclass(from_py_object)]
 #[derive(Clone)]
@@ -26,9 +26,9 @@ impl WindCondition {
     /// Creates a wind condition from a JSON string, with the same format as the `WindCondition`
     /// in Stormbird, e.g., as written by the `WindCondition` class in `stormbird_setup`
     pub fn from_json_string(_cls: &Bound<'_, PyType>, json_string: String) -> PyResult<Self> {
-        let data: WindConditionRust = serde_json::from_str(&json_string).map_err(|e| {
-            PyValueError::new_err(format!("Failed to create wind condition from string: {}", e))
-        })?;
+        let data: WindConditionRust = serde_json::from_str(&json_string).map_err(
+            |e| to_py_err("Failed to create wind condition from string", e.into())
+        )?;
 
         Ok(Self { data })
     }
@@ -51,16 +51,25 @@ impl WindCondition {
         }
     }
     
-    pub fn set_parallel_gust_from_json_string(&mut self, gust_string: String) {
-        self.data.set_parallel_gust_from_json_string(&gust_string);
+    /// Sets the parallel gust from a JSON string with a discretized spectrum. Raises a `ValueError`
+    /// if the string can not be parsed.
+    pub fn set_parallel_gust_from_json_string(&mut self, gust_string: String) -> PyResult<()> {
+        self.data.set_parallel_gust_from_json_string(&gust_string)
+            .map_err(|e| to_py_err("Failed to set the parallel gust from string", e))
     }
     
-    pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: String) {
-        self.data.set_perpendicular_gust_from_json_string(&gust_string);
+    /// Sets the perpendicular gust from a JSON string with a discretized spectrum. Raises a `ValueError`
+    /// if the string can not be parsed.
+    pub fn set_perpendicular_gust_from_json_string(&mut self, gust_string: String) -> PyResult<()> {
+        self.data.set_perpendicular_gust_from_json_string(&gust_string)
+            .map_err(|e| to_py_err("Failed to set the perpendicular gust from string", e))
     }
     
-    pub fn set_vertical_gust_from_json_string(&mut self, gust_string: String) {
-        self.data.set_vertical_gust_from_json_string(&gust_string);
+    /// Sets the vertical gust from a JSON string with a discretized spectrum. Raises a `ValueError`
+    /// if the string can not be parsed.
+    pub fn set_vertical_gust_from_json_string(&mut self, gust_string: String) -> PyResult<()> {
+        self.data.set_vertical_gust_from_json_string(&gust_string)
+            .map_err(|e| to_py_err("Failed to set the vertical gust from string", e))
     }
     
     #[classmethod]

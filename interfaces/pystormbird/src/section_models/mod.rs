@@ -3,7 +3,7 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use crate::error::to_py_err;
 use pythonize::pythonize;
 
 pub mod foil;
@@ -23,7 +23,8 @@ pub struct SectionModel{
 impl SectionModel {
     #[new]
     pub fn new(setup_string: String) -> PyResult<Self> {
-        let data = SectionModelRust::from_string(&setup_string).map_err(PyValueError::new_err)?;
+        let data = SectionModelRust::from_string(&setup_string)
+            .map_err(|e| to_py_err("Failed to parse section model from string", e))?;
 
         Ok(Self { data })
     }
