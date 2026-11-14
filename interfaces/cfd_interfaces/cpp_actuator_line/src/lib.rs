@@ -69,8 +69,16 @@ pub struct CppActuatorLine {
     model: ActuatorLine
 }
 
+/// Creates the actuator line model from a setup file.
+///
+/// # Panics
+/// If the file can not be read, or if the settings are not valid. The panic message contains the
+/// error from Stormbird. The panic can not unwind into the C++ code, so the program is stopped with
+/// the message.
 fn new_actuator_line_from_file(file_path: &str) -> *mut CppActuatorLine {
-    let mut model = ActuatorLine::new_from_file(file_path);
+    let mut model = ActuatorLine::new_from_file(file_path).unwrap_or_else(|error| {
+        panic!("Failed to create the actuator line model from the file {}: {}", file_path, error)
+    });
 
     // TODO: this is currently a hack. The density needs to be set to one for incompressible,
     // single-phase, flow, but should ideally take in the values from the CFD simulations in cases
@@ -181,7 +189,14 @@ impl CppActuatorLine {
         body_force.into()
     }
 
+    /// Writes the results to the given folder. Errors when writing are printed as a warning, so
+    /// that the simulation can continue.
     pub fn write_results(&self, folder_path: &str) {
-        self.model.write_results(folder_path);
+        if let Err(error) = self.model.write_results(folder_path) {
+            eprintln!(
+                "Warning: failed to write the actuator line results to {}: {}",
+                folder_path, error
+            );
+        }
     }
 }
