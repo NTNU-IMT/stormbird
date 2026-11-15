@@ -37,6 +37,12 @@ The overall execution of an actuator line simulation is, necessarily, controlled
 4) Based on the estimated circulation strength, the forces on each line segment are calculated, and the **circulatory forces are projected back to the CFD grid** using the methods and settings specified in the [force projection chapter](force_projection.md). The projected forces are computed from the same circulation as the forces on the wings, unless the tip loss correction is only applied to the projected forces.
 5) The **[result data](../line_model/force_calculations.md)** for each time step will finally be written to disk, and the actuator line model is ready for the next time step.
 
+## Sail settings
+The local wing angles and the internal states of the wings can either be fixed during the simulation, or be set by a [controller](../utils/control_system.md):
+
+- **Fixed settings:** leave out the `controller`, and set the `local_wing_angles` and the `internal_states` in the [line force model builder](../line_model/building_line_model.md). The values are then used for the whole simulation. This is, for instance, useful when comparing with lifting line simulations or experiments at fixed angles of attack. The `internal_states` were added in version 0.13.1. Before that, the internal state could only be set by a controller in actuator line simulations, and was zero otherwise.
+- **Controller:** the controller sets both the local wing angles and the internal states each time it is updated, starting at the first time step. The values in the builder are then only used as starting values. Note that a controller without angle of attack set points sets the local wing angles to zero, so it can not be combined with fixed local wing angles.
+
 ## Dynamic stall
 The [dynamic stall model](../sectional_models/dynamic_stall.md) can be used in actuator line simulations in the same way as in dynamic lifting line simulations, by setting it on the wings in the line force model. The actuator line model can be called several times per time step, e.g., in each outer iteration of the CFD solver, and the state of the dynamic stall model is only updated when the time increases.
 

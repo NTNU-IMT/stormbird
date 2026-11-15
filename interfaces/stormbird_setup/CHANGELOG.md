@@ -2,6 +2,10 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.13.1 - Unreleased
+### Features
+- New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, following the new setting in Stormbird 0.13.1. The default is `None`, which gives the same initial internal state of zero as before, and the field is then not written to the JSON input, so the builder can still be used with older versions of Stormbird. When it is set, the number of values must match the number of wings, and `add_wing_builder` adds an internal state of zero for each new wing. Together with the existing `local_wing_angles`, this makes it possible to run actuator line simulations in OpenFOAM with a fixed angle of attack and internal state, without a controller. Requires Stormbird 0.13.1 or newer when it is set.
+
 ## 0.13.0 - 2026-11-14
 ### Breaking changes
 - The optional `force-tuning` dependency requires pystormbird 0.13.0 or newer.

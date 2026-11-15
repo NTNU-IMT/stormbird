@@ -4,7 +4,76 @@ use stormath::type_aliases::Float;
 use crate::line_force_model::input_power::InputPowerModel;
 use crate::line_force_model::wing_internal_state::{SpanVariation, WingInternalState};
 
-use super::get_example_model;
+use crate::line_force_model::builder::LineForceModelBuilder;
+
+use super::{get_example_builder, get_example_model};
+
+/// The internal states in the builder are set as constant values on each wing
+#[test]
+fn internal_states_from_builder() {
+    let mut builder = get_example_builder();
+
+    builder.internal_states = vec![0.3, -0.7];
+
+    let model = builder.build().unwrap();
+
+    assert!(model.internal_state[0].is_constant());
+    assert!(model.internal_state[1].is_constant());
+    assert!((model.internal_state[0].representative_value() - 0.3).abs() < 1e-12);
+    assert!((model.internal_state[1].representative_value() + 0.7).abs() < 1e-12);
+
+    let velocity = vec![SpatialVector::from([10.0, 0.0, 0.0]); model.nr_span_lines()];
+
+    let section_states = model.section_models_internal_state(&velocity);
+
+    for (index, &section_state) in section_states.iter().enumerate() {
+        let expected = if model.wing_index_from_global(index) == 0 { 0.3 } else { -0.7 };
+
+        assert!((section_state - expected).abs() < 1e-12);
+    }
+}
+
+/// Without internal states in the builder, all wings start with the default internal state
+#[test]
+fn default_internal_states_from_builder() {
+    let model = get_example_model();
+
+    for state in &model.internal_state {
+        assert!(state.is_constant());
+        assert!(state.representative_value().abs() < 1e-12);
+    }
+}
+
+/// The number of internal states must match the number of wings
+#[test]
+fn wrong_number_of_internal_states_is_an_error() {
+    let mut builder = get_example_builder();
+
+    builder.internal_states = vec![0.3];
+
+    assert!(builder.check_settings().is_err());
+    assert!(builder.build().is_err());
+}
+
+/// The internal states are optional in JSON input, and are read when given
+#[test]
+fn internal_states_from_json() {
+    let mut builder = get_example_builder();
+
+    builder.internal_states = vec![0.1, 0.2];
+
+    let mut json: serde_json::Value = serde_json::to_value(&builder).unwrap();
+
+    let read_builder: LineForceModelBuilder = serde_json::from_value(json.clone()).unwrap();
+
+    assert_eq!(read_builder.internal_states, vec![0.1, 0.2]);
+
+    json.as_object_mut().unwrap().remove("internal_states");
+
+    let read_builder: LineForceModelBuilder = serde_json::from_value(json).unwrap();
+
+    assert!(read_builder.internal_states.is_empty());
+}
 
 /// The internal state of the section models should follow the span variation, evaluated at the
 /// control point of each line element

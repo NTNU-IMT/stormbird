@@ -210,6 +210,18 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     nr_sections: int = Field(default=32, ge=1)
     density: float = 1.225
     local_wing_angles: list[float] = []
+    internal_states: list[float] | None = None
+    """
+    Initial internal state for each wing, as a constant value along the span. The meaning depends
+    on the section model, e.g., the flap angle for multi-element foils, the revolutions per second
+    for rotor sails, or the wing internal state of an active air flow foil. None means that all
+    wings start with the default internal state of zero.
+
+    The values are kept until they are changed, e.g., by a controller. This makes it possible to
+    run simulations with a fixed internal state without a controller, for instance in actuator line
+    simulations. Requires Stormbird 0.13.1 or later. The field is not written to the JSON input when
+    it is None, so the builder can still be used with older versions when it is not set.
+    """
     rotation: SpatialVector = SpatialVector()
     translation: SpatialVector = SpatialVector()
     rotation_type: RotationType = RotationType.XYZ
@@ -217,9 +229,27 @@ class LineForceModelBuilder(StormbirdSetupBaseModel):
     output_coordinate_system: CoordinateSystem = CoordinateSystem.Global
     force_calculation_settings: ForceCalculationSettings = ForceCalculationSettings()
 
+    @model_validator(mode='after')
+    def check_internal_states(self) -> "LineForceModelBuilder":
+        '''
+        The number of internal states must match the number of wings, if they are given. The check
+        is only done when the internal states are set, as wings are often added after the builder
+        is created.
+        '''
+        if self.internal_states is not None and len(self.internal_states) != len(self.wing_builders):
+            raise ValueError(
+                f"The number of internal states ({len(self.internal_states)}) does not match the "
+                f"number of wings ({len(self.wing_builders)})"
+            )
+
+        return self
+
     def add_wing_builder(self, wing_builder: WingBuilder) -> None:
         self.wing_builders.append(wing_builder)
         self.local_wing_angles.append(0.0)
+
+        if self.internal_states is not None:
+            self.internal_states.append(0.0)
 
     def has_dynamic_stall(self) -> bool:
         '''Returns true if any of the wings have a dynamic stall model'''

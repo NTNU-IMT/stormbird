@@ -2,6 +2,14 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## 0.13.1 - Unreleased
+### Features
+- New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, set as a constant value along the span. It is optional in JSON input, and the default, an empty list, gives the same initial internal state of zero as before. The values are kept until they are changed, e.g., by a controller. This makes it possible to run simulations with a fixed internal state without a controller, which was not possible in actuator line simulations before, as the internal state of the wings could only be set by a controller. Together with the existing `local_wing_angles`, the operating point of each wing can now be fully set in the builder.
+- `LineForceModelBuilder::check_settings` checks that the number of `internal_states`, if given, matches the number of wings.
+
+### Changes
+- The OpenFOAM actuator line interface (`cpp_actuator_line` 0.13.1) and pystormbird 0.13.1 depend on this version. The new field is read through the JSON input, so the interfaces themselves are unchanged.
+
 ## 0.13.0 - 2026-11-14
 ### Breaking changes
 - Invalid user input is now returned as errors rather than causing panics. The following functions return a `Result<_, Error>` instead of the value directly:

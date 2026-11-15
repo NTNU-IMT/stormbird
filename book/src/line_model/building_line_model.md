@@ -18,6 +18,7 @@ pub struct LineForceModelBuilder {
     pub output_coordinate_system: CoordinateSystem,
     pub rotation_type: RotationType,
     pub local_wing_angles: Vec<f64>,
+    pub internal_states: Vec<f64>,
     pub rotation: SpatialVector,
     pub translation: SpatialVector,
     pub force_calculation_settings: ForceCalculationSettings,
@@ -33,6 +34,8 @@ The `angle_of_attack_correction` is an enum that is reserved for corrections of 
 The `output_coordinate_system` is an enum that specifies how the forces and moments from the line force model should be calculated. The default is `Global`, which means all values are in a global coordinate system. That is, the coordinate system for the forces are not moved even if the wings are moved during a simulation. The other option is to set it to `Body`. In this case, the coordinate system of the forces will always follow the wings when they are moved.
 
 The `local_wing_angles`, `rotation`, and `translation` specify the initial values for the local rotation of the wing angles as well as the global rotation and translation of the whole line force model. The `rotation_type` specifies the order of the rotations around the fixed axes, where the default is `XYZ`, i.e., first around x, then y, and then z. The other options are `XZY`, `YXZ`, `YZX`, `ZXY` and `ZYX`. See the [move line models chapter](/line_model/move_line_models.md) for more.
+
+The `internal_states` specify the initial internal state of each wing, as a constant value along the span. The meaning of the internal state depends on the section model, e.g., the flap angle for a multi-element foil, the revolutions per second for a rotor sail, or the wing internal state of a foil with active air flow, such as the suction coefficient or the fan power for a suction sail. The field is optional, and all wings start with an internal state of zero if it is left out. If it is given, there must be one value for each wing. The values are kept until they are changed, e.g., by a [controller](/utils/control_system.md).
 
 The `force_calculation_settings` controls details in how the forces on each line element are calculated. See the [force calculations chapter](./force_calculations.md) for more.
 

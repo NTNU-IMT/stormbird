@@ -22,6 +22,11 @@ use stormath::spatial_vector::SpatialVector;
 
 /// Returns an example line force model with two wings, oriented along the z-axis.
 pub fn get_example_model() -> LineForceModel {
+    get_example_builder().build().unwrap()
+}
+
+/// Returns the builder for the [example model](get_example_model)
+pub fn get_example_builder() -> LineForceModelBuilder {
     let chord_length = 11.0;
     let span = 33.0;
     let start_height = 5.2;
@@ -52,7 +57,7 @@ pub fn get_example_model() -> LineForceModel {
         builder.add_wing(wing);
     }
 
-    builder.build().unwrap()
+    builder
 }
 
 #[test]
