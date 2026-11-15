@@ -1,15 +1,27 @@
-/*
- * -Wno-overloaded-virtual: silences a warning from the OpenFOAM header coupledPointPatchField.H,
- * triggered by interpolationCellPoint<vector> in sampling.cpp. It is not an issue in this code.
- */
+#if 0
+# This file is read by both OpenFOAM versions: directly by make in the Foundation version, and
+# through the C preprocessor in the ESI version. Comments must therefore be inside this #if 0 block.
+#
+# The ESI version (version names starting with v) also needs fvOptions. The name of the include
+# folder is kept in the LN_INCLUDE variable, because the Foundation wmake scans every line in this
+# file for include paths, and fails on any path that does not exist there, such as fvOptions.
+# This comment can therefore not contain the include flag followed by that folder name either.
+#endif
+
+LN_INCLUDE = lnInclude
+
+ifneq (,$(filter v%,$(WM_PROJECT_VERSION)))
+VERSION_INC = -I$(LIB_SRC)/fvOptions/$(LN_INCLUDE)
+VERSION_LIBS = -lfvOptions
+endif
+
 EXE_INC = \
-    -Wno-overloaded-virtual \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
-    -I$(LIB_SRC)/fvOptions/lnInclude
+    $(VERSION_INC)
 
 LIB_LIBS = \
     -lfiniteVolume \
     -lmeshTools \
-    -lfvOptions \
+    $(VERSION_LIBS) \
     -L../rust_build -lcpp_actuator_line

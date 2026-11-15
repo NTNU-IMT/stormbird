@@ -3,24 +3,19 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 #include "fvMesh.H"
-#include "fvMatrix.H"
-#include "geometricOneField.H"
-#include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "interpolationCellPoint.H"
-
-#include "OFstream.H"
 
 #include "actuator_line.hpp"
 
 #include "cpp_actuator_line.hpp"
 
-void Foam::fv::ActuatorLine::set_projection_data() {
-    const vectorField& cell_centers = mesh_.C();
+void Foam::fv::ActuatorLine::set_projection_data() const {
+    const vectorField& cell_centers = mesh().C();
     
-    const labelList& cell_ids = cells();
+    const labelUList& cell_ids = this->selected_cells();
 
-    this->relevant_cells_for_projection = labelList();
+    this->relevant_cells_for_projection.clear();
+    this->dominating_line_element_index_projection.clear();
 
     double weight_limit = this->model->projection_weight_limit();
 
