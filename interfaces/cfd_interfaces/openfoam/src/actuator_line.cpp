@@ -14,6 +14,7 @@
 #include "actuator_line.hpp"
 
 #include "cpp_actuator_line.hpp"
+#include "floating_point_guard.hpp"
 
 namespace Foam {
     namespace fv {
@@ -33,7 +34,25 @@ Foam::fv::ActuatorLine::ActuatorLine(
     coeffs_.readEntry("fields", fieldNames_);
     applied_.setSize(fieldNames_.size(), false);
 
-    this->model = stormbird_interface::new_actuator_line_from_file("system/stormbird_actuator_line.json");
+    // Path to the Stormbird setup file. Environment variables and OpenFOAM tags such as <case> are
+    // expanded, and relative paths are taken relative to the case directory.
+    fileName setup_path = coeffs_.getOrDefault<fileName>(
+        "stormbirdSetupPath", "system/stormbird_actuator_line.json"
+    );
+
+    setup_path.expand();
+
+    if (!setup_path.isAbsolute()) {
+        setup_path = mesh_.time().globalPath() / setup_path;
+    }
+
+    Info<< "    Reading Stormbird setup from " << setup_path << endl;
+
+    {
+        FloatingPointExceptionGuard fpe_guard;
+
+        this->model = stormbird_interface::new_actuator_line_from_file(setup_path);
+    }
 
     this->body_force_field = new volVectorField(
         IOobject(
@@ -89,6 +108,10 @@ void Foam::fv::ActuatorLine::sync_line_force_model_state() {
 
 void Foam::fv::ActuatorLine::add(const volVectorField& velocity_field, fvMatrix<vector>& eqn)
 {
+    // All calls to the Stormbird library happen inside this function, so floating point exception
+    // trapping is disabled for the whole scope. See floating_point_guard.hpp for why.
+    FloatingPointExceptionGuard fpe_guard;
+
     const scalarField& cell_volumes = mesh_.V();
     double time_step = mesh_.time().deltaTValue();
     double time = mesh_.time().value();

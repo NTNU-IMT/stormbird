@@ -42,7 +42,7 @@ actuatorLine
 }
 ```
 
-This activates the actuator line functionality. The `ActuatorLine` class will then look for a JSON input file in the `system` folder called `stormbird_actuator_line.json`. The content of this file is a JSON representation of the `ActuatorLineBuilder` structure. If the file does not exist, or contains invalid settings, the OpenFOAM simulation will crash. The error message from OpenFOAM is messy in general, but there should be instructions from the Rust side within the crash log, typically on the top, explaining what went wrong.
+This activates the actuator line functionality. The `ActuatorLine` class will then look for a JSON input file in the `system` folder called `stormbird_actuator_line.json`. A different file can be used by adding `stormbirdSetupPath "path/to/file.json";` to the `actuatorLine` entry. Relative paths are taken relative to the case directory, and environment variables such as `$FOAM_CASE` are expanded. The content of this file is a JSON representation of the `ActuatorLineBuilder` structure. If the file does not exist, or contains invalid settings, the OpenFOAM simulation will crash. The error message from OpenFOAM is messy in general, but there should be instructions from the Rust side within the crash log, typically on the top, explaining what went wrong.
 
 ## Results
 
