@@ -1,24 +1,27 @@
+#if 0
+# This file is read by both OpenFOAM versions: directly by make in the Foundation version, and
+# through the C preprocessor in the ESI version. Comments must therefore be inside this #if 0 block.
+#
+# The ESI version (version names starting with v) also needs fvOptions. The name of the include
+# folder is kept in the LN_INCLUDE variable, because the Foundation wmake scans every line in this
+# file for include paths, and fails on any path that does not exist there, such as fvOptions.
+# This comment can therefore not contain the include flag followed by that folder name either.
+#endif
+
+LN_INCLUDE = lnInclude
+
+ifneq (,$(filter v%,$(WM_PROJECT_VERSION)))
+VERSION_INC = -I$(LIB_SRC)/fvOptions/$(LN_INCLUDE)
+VERSION_LIBS = -lfvOptions
+endif
+
 EXE_INC = \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
-    -I$(LIB_SRC)/sampling/lnInclude \
-    -I$(LIB_SRC)/thermophysicalModels/solidThermo/lnInclude \
-    -I$(LIB_SRC)/transportModels \
-    -I$(LIB_SRC)/transportModels/compressible/lnInclude \
-    -I$(LIB_SRC)/transportModels/incompressible/lnInclude \
-    -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
-    -I$(LIB_SRC)/thermophysicalModels/specie/lnInclude \
-    -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
-    -I$(LIB_SRC)/TurbulenceModels/compressible/lnInclude \
-    -I$(LIB_SRC)/TurbulenceModels/incompressible/lnInclude \
-    -I$(LIB_SRC)/fvOptions/lnInclude
+    $(VERSION_INC)
 
 LIB_LIBS = \
     -lfiniteVolume \
-    -lsampling \
     -lmeshTools \
-    -lturbulenceModels \
-    -lincompressibleTurbulenceModels \
-    -lcompressibleTurbulenceModels \
-    -lfvOptions \
+    $(VERSION_LIBS) \
     -L../rust_build -lcpp_actuator_line
