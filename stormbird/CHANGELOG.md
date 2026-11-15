@@ -8,7 +8,7 @@ This file contains an overview of the changes made to the Stormbird Rust library
 - `LineForceModelBuilder::check_settings` checks that the number of `internal_states`, if given, matches the number of wings.
 
 ### Changes
-- The OpenFOAM actuator line interface (`cpp_actuator_line` 0.13.1) and pystormbird 0.13.1 depend on this version. The new field is read through the JSON input, so the interfaces themselves are unchanged.
+- The OpenFOAM actuator line interface (`cpp_actuator_line` 0.13.1), pystormbird 0.13.1, Stormflow 0.4.1 and pystormflow 0.4.1 depend on this version. The new field is read through the JSON input, so the interfaces themselves are unchanged.
 
 ## 0.13.0 - 2026-11-14
 ### Breaking changes

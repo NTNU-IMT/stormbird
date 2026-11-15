@@ -2,6 +2,10 @@
 
 This file contains an overview of the changes made to pystormflow, the Python interface to the Stormflow CFD solver. See the [Stormflow change log](../../stormflow/CHANGELOG.md) for changes to the solver, and the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the actuator line model.
 
+## 0.4.1 - Unreleased
+### Changes
+- Depends on Stormflow 0.4.1 and Stormbird 0.13.1, so that setup files can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. There are no changes to the Python interface itself. Setup files that are valid for pystormflow 0.4.0 give the same results.
+
 ## 0.4.0 - 2026-11-14
 ### Breaking changes
 - Depends on the published versions of Stormflow 0.4.0, Stormbird 0.13.0 and Stormath 0.5.0. There are no changes to the Python interface itself. Setup files that are valid for pystormflow 0.3.0 give the same results. See the [Stormflow change log](../../stormflow/CHANGELOG.md) and the [Stormbird change log](../../stormbird/CHANGELOG.md) for the details.
