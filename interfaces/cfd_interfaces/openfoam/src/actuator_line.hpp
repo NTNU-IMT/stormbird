@@ -23,11 +23,17 @@
 
 #include "openfoam_compatibility.hpp"
 
+// The version specific headers are included through macros, because the dependency scanner in
+// wmake ignores #ifdef, and warns about headers that only exist in the other version. It only
+// follows includes of literal file names, so the headers below are skipped by the scanner.
 #ifdef STORMBIRD_OPENFOAM_ESI
-    #include "cellSetOption.H"
+    #define STORMBIRD_BASE_CLASS_HEADER "cellSetOption.H"
+    #include STORMBIRD_BASE_CLASS_HEADER
 #else
-    #include "fvModel.H"
-    #include "fvCellZone.H"
+    #define STORMBIRD_BASE_CLASS_HEADER "fvModel.H"
+    #define STORMBIRD_CELL_ZONE_HEADER "fvCellZone.H"
+    #include STORMBIRD_BASE_CLASS_HEADER
+    #include STORMBIRD_CELL_ZONE_HEADER
 #endif
 
 #include "volFields.H"
