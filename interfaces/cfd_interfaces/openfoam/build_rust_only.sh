@@ -10,4 +10,4 @@ cd ../openfoam/
 cp $CPP_AL_FOLDER/target/release/libcpp_actuator_line.a rust_build/libcpp_actuator_line.a
 
 cxxbridge $CPP_AL_FOLDER/src/lib.rs --header > src/cpp_actuator_line.hpp
-cxxbridge $CPP_AL_FOLDER/src/lib.rs > src/cpp_actuator_line.cpp
+cxxbridge $CPP_AL_FOLDER/src/lib.rs > src/cpp_actuator_line.C

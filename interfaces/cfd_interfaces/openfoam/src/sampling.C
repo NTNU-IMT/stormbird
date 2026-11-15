@@ -3,22 +3,17 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 #include "fvMesh.H"
-#include "fvMatrix.H"
-#include "geometricOneField.H"
-#include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "interpolationCellPoint.H"
-
-#include "OFstream.H"
+#include "interpolation.H"
 
 #include "actuator_line.hpp"
 
 #include "cpp_actuator_line.hpp"
 
-void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
-    const vectorField& cell_centers = mesh_.C();
+void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() const {
+    const vectorField& cell_centers = mesh().C();
     
-    const labelList& cell_ids = cells();
+    const labelUList& cell_ids = this->selected_cells();
 
     this->relevant_cells_for_velocity_sampling.clear();
     this->dominating_line_element_index_sampling.clear();
@@ -55,7 +50,7 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() {
     }
 }
 
-void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
+void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() const {
     this->ctrl_points.clear();
     this->interpolation_cells.clear();
     
@@ -67,16 +62,16 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_interpolation() {
         );
 
         this->interpolation_cells.push_back(
-            mesh_.findCell(this->ctrl_points[i])
+            openfoam_compatibility::find_cell(mesh(), this->ctrl_points[i])
         );
     }
 }
 
 
 // --------------------- Perform the interpolation -------------------------------------------------
-void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) {
-    const vectorField& cell_centers = mesh_.C();
-    const scalarField& cell_volumes = mesh_.V();
+void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorField& velocity_field) const {
+    const vectorField& cell_centers = mesh().C();
+    const scalarField& cell_volumes = mesh().V();
 
     // Initialize the numerator and denominator
     std::vector<vector> numerator;
@@ -143,8 +138,12 @@ void Foam::fv::ActuatorLine::set_integrated_weighted_velocity(const volVectorFie
     }
 }
 
-void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) {    
-    interpolationCellPoint<vector> u_interpolator(velocity_field); // create interpolation object
+void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& velocity_field) const {    
+    // Cell-point interpolation. Created through the run-time selection, as the class name differs
+    // between the OpenFOAM versions.
+    autoPtr<interpolation<vector>> u_interpolator = interpolation<vector>::New(
+        "cellPoint", velocity_field
+    );
 
     for (unsigned int i = 0; i < this->ctrl_points.size(); i++) {
         vector u_sample = vector(VGREAT, VGREAT, VGREAT);
@@ -152,7 +151,7 @@ void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& vel
         label cell_id = this->interpolation_cells[i];
 
         if (this->interpolation_cells[i] != -1) {
-            u_sample = u_interpolator.interpolate(this->ctrl_points[i], cell_id);
+            u_sample = u_interpolator->interpolate(this->ctrl_points[i], cell_id);
         }
         
         reduce(u_sample, minOp<vector>());
