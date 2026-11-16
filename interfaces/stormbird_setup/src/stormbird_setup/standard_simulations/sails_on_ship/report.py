@@ -38,8 +38,8 @@ attack. When there are several setups, the overview and the comparison have a dr
      the last full result, together with the target angle: the fixed geometric angle of attack, or
      the angle of attack set point of the controller
    - the time history of the thrust and the side force coefficients, with a vertical line at the
-     start of the averaging window, as a check of the convergence, and horizontal lines at the
-     reference values
+     start of the averaging window, as a check of the convergence
+   - the mean force coefficients of the simulation and the reference data, as numbers in the title
 
 All angles of attack and circulation strengths are shown with the sign that gives thrust, i.e.,
 positive values give lift with a positive thrust component, as in the test conditions. Note that the
@@ -1112,8 +1112,8 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
     '''
     Spanwise distributions and force histories for a single case, chosen with a dropdown menu. The
     color is the color of the source in the overview, and the line style shows the wing. The
-    reference values are shown as gray horizontal lines in the force histories, with the line style
-    of the wing, and a legend entry for each wing and reference data set.
+    reference values are only given as numbers in the title, as they have no time history or
+    spanwise distribution.
     '''
     import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
     from plotly.subplots import make_subplots # type: ignore[import-not-found, import-untyped, unused-ignore]
@@ -1222,8 +1222,7 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
         title_lines += [
             f"Distributions at t = {case.distribution_time:.1f}. Target: {case.target_label}",
             wing_text,
-            "<i>Dotted lines: target angle of attack and start of the averaging window. Gray lines: "
-            "reference values, with the line style of the wing</i>",
+            "<i>Dotted lines: target angle of attack and start of the averaging window</i>",
         ]
 
         titles.append("<br>".join(title_lines))
@@ -1250,36 +1249,6 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
                     line=dict(color="gray", dash="dot", width=1.5),
                 )
             )
-
-        # Reference values in the force histories, as horizontal lines over the simulated time.
-        # Traces rather than shapes, so that they get legend entries.
-        time_range = [float(case.time[0]), float(case.time[-1])] if len(case.time) > 0 else [0.0, 1.0]
-
-        for reference in case.references:
-            for col, key, quantity in ((1, "thrust", "C_T"), (2, "side_force", "C_S")):
-                for wing_index, value in enumerate(reference.coefficients[key]):
-                    if value is None or wing_index >= len(case.wings):
-                        continue
-
-                    name = f"{reference.label}, {case.wings[wing_index].label}"
-
-                    figure.add_trace(
-                        go.Scatter(
-                            x=time_range,
-                            y=[value, value],
-                            mode="lines",
-                            name=name,
-                            legendgroup=f"reference: {reference.label}, wing_{wing_index}",
-                            showlegend=(col == 1),
-                            line=dict(
-                                color="dimgray", dash=_WING_DASH[wing_index % len(_WING_DASH)], width=2
-                            ),
-                            hovertemplate=f"{name}, {quantity}<br>value = {value:.3f}<extra></extra>",
-                        ),
-                        row=2, col=col
-                    )
-
-                    trace_group_index.append(case_index)
 
         shapes.append(case_shapes)
 
