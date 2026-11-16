@@ -80,7 +80,7 @@ class OpenFoamShipSettings(StormbirdSetupBaseModel):
     actuator_line_cells_per_chord: int = 16
     actuator_line_refinement_padding: float = 1.0
     """See RefinementBuilder.padding in the OpenFOAM grid"""
-    ship_cells_per_chord: int = 4
+    ship_cells_per_chord: int = 8
     time_control: SteadyTimeControl | DynamicTimeControl = Field(default_factory=SteadyTimeControl)
 
 
