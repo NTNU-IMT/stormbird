@@ -30,6 +30,8 @@ dependencies = [
 dev = ["mypy>=1.18"]
 # Needed for the force tuning of the inflow corrections, which runs lifting line simulations
 force-tuning = ["pystormbird>=0.13.0"]
+# Needed for the reports of the standard simulations
+report = ["plotly>=5.0"]
 
 [project.urls]
 Homepage = "https://github.com/NTNU-IMT/stormbird"
