@@ -3,30 +3,38 @@ Copyright (C) 2026, NTNU
 Author: Jarle Vinje Kramer <jarlekramer@gmail.com; jarle.a.kramer@ntnu.no>
 License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
-Report of the results from simulations of sails on a ship, as an HTML file with two interactive
-figures, made from a folder with result files. Requires plotly, which is an optional dependency
-(install with the "report" extra).
+Report of the results from simulations of sails on a ship, as an HTML file with interactive
+figures, made from a folder with result files, and optionally reference data. Requires plotly,
+which is an optional dependency (install with the "report" extra).
 
 The result files must be named with the naming convention in naming.py, and contain the simulation
 builder that was used, as stored by the run functions in standard_simulations. Other files are
-skipped. The results can be from several setups, solvers and test conditions.
+skipped. The results can be from several setups, solvers and test conditions. Reference data, e.g.,
+from experiments, is read from the files in the same folder that end in REFERENCE_FILE_SUFFIX, or
+from the given files, and is matched to the cases with the same setup name and test condition (see
+reference_data.py).
 
 The cases are grouped in sources, where a source is everything in the case name except the true
 wind direction, i.e., the setup, the solver, the wind and ship velocities, the wind profile and the
-fixed sail settings. Each source has its own color, and each wing its own line style.
+fixed sail settings. Each source has its own color, and each wing its own line style. When there
+are several setups, the overview and the comparison have a dropdown menu to choose the setup.
 
 1) Overview, as a function of the apparent wind direction at mid-span:
-   - the mean thrust coefficient (force along the forward direction of the ship) of each wing
-   - the mean side force coefficient (force towards port) of each wing
+   - the mean thrust coefficient (force along the forward direction of the ship) of each wing, and
+     of all wings together, with the reference values as open markers
+   - the mean side force coefficient (force towards port), in the same way
    - the effective angle of attack of each wing, i.e., the angle used in the sectional model,
      including the induced velocities, as the median over the wing and the mean over the full
      results in the averaging window
-2) Detailed view of a single case, chosen from a dropdown menu:
+2) Comparison with the reference data, if any: the simulated against the reference thrust and side
+   force coefficients of each wing, and of all wings together, for all cases with reference data.
+3) Detailed view of a single case, chosen from a dropdown menu:
    - the spanwise distributions of the circulation strength and the effective angle of attack, from
      the last full result, together with the target angle: the fixed geometric angle of attack, or
      the angle of attack set point of the controller
    - the time history of the thrust and the side force coefficients, with a vertical line at the
-     start of the averaging window, as a check of the convergence
+     start of the averaging window, as a check of the convergence, and horizontal lines at the
+     reference values
 
 All angles of attack and circulation strengths are shown with the sign that gives thrust, i.e.,
 positive values give lift with a positive thrust component, as in the test conditions. Note that the
@@ -34,15 +42,17 @@ effective angle of attack can be negative for sails with a large lift at zero an
 suction sails, as the induced velocities then are large.
 
 The force coefficients of each wing are made non-dimensional with the dynamic pressure of the
-undisturbed apparent wind at the mid-span of the wing, and the projected area of the wing. The
-forces in the results are forces per unit density, so the density in the dynamic pressure is
-ACTUATOR_LINE_FORCE_DENSITY. The means are taken over the last part of the simulated time, given by
-the averaging fraction. For the steady OpenFOAM simulations, the time is the iteration number.
+undisturbed apparent wind at the mid-span of the wing, and the projected area of the wing. The total
+coefficients are the sum of the forces on all wings, divided by the sum of the dynamic pressure
+times the projected area of each wing, so that they are consistent with the coefficients of each
+wing. The forces in the results are forces per unit density, so the density in the dynamic pressure
+is ACTUATOR_LINE_FORCE_DENSITY. The means are taken over the last part of the simulated time, given
+by the averaging fraction. For the steady OpenFOAM simulations, the time is the iteration number.
 """
 
 import math
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -54,10 +64,11 @@ from ...actuator_line import ActuatorLineBuilder
 from ...line_force_model import WingBuilder
 from ...openfoam.results import ActuatorLineResults
 from ..actuator_line_runs import ACTUATOR_LINE_FORCE_DENSITY
-from ..plot_utils import add_dropdown, averaging_start_index, write_html
+from ..plot_utils import add_dropdown, add_selector, averaging_start_index, write_html
 
 from .conditions import ShipTestCondition, WindProfile
-from .naming import parse_case_name
+from .naming import parse_case_name, condition_key
+from .reference_data import ReferenceData, REFERENCE_FILE_SUFFIX, reference_files_in_folder
 from .simulation_settings import CfdSolver
 from .sails_on_ship import thrust_sign, _mid_span_point, _non_virtual_end_points
 
@@ -69,23 +80,27 @@ DEFAULT_REPORT_FILE_NAME = "sails_on_ship_report.html"
 # Line and marker styles for each wing
 _WING_DASH = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
 _WING_MARKER = ["circle", "diamond", "square", "triangle-up", "cross", "x"]
+_TOTAL_MARKER = "star"
 
-# Layout of the detailed figure, in pixels. From the top: the dropdown menu, the title with the
-# details of the selected case, and the subplots. The values are chosen so that these do not overlap.
-_DETAILED_HEIGHT = 1100
-_DETAILED_TOP_MARGIN = 185
-_DETAILED_BOTTOM_MARGIN = 80
+# Layout of the top of the figures, in pixels. From the top: an optional dropdown menu, the title,
+# and the subplots with their titles. The values are chosen so that these do not overlap.
 _DROPDOWN_TOP = 10
-_DETAILED_TITLE_TOP = 60
+_DROPDOWN_HEIGHT = 50
+_TITLE_TOP_WITHOUT_DROPDOWN = 25
+_TITLE_LINE_HEIGHT = 21
+_SUBPLOT_TITLE_SPACE = 50
+_BOTTOM_MARGIN = 80
 
-_OVERVIEW_HEIGHT = 1050
-_OVERVIEW_TOP_MARGIN = 130
+_OVERVIEW_HEIGHT = 1100
+_COMPARISON_HEIGHT = 650
+_DETAILED_HEIGHT = 1150
 
 
 @dataclass
 class ReportWing:
     '''A wing in a case, with the values needed in the report'''
     label: str
+    short_label: str
     area: float
     thrust_sign: float
     """Sign that the angles of attack and circulation strengths are multiplied with"""
@@ -95,6 +110,21 @@ class ReportWing:
     """The fixed geometric angle of attack or the controller set point, with thrust positive"""
     real_point_indices: list[int]
     """Indices of the control points on the wing itself, i.e., not on virtual segments"""
+
+    @property
+    def force_scale(self) -> float:
+        '''The dynamic pressure, per unit density, times the projected area'''
+        return 0.5 * ACTUATOR_LINE_FORCE_DENSITY * self.apparent_wind_velocity**2 * self.area
+
+
+@dataclass
+class ReportReference:
+    '''The reference values for a case, from one reference data set'''
+    label: str
+    coefficients: dict[str, list[float | None]]
+    """The "thrust" and "side_force" coefficients of each wing, None if not available"""
+    total: dict[str, float | None]
+    """The total "thrust" and "side_force" coefficients, None if not available for all wings"""
 
 
 @dataclass
@@ -112,15 +142,22 @@ class ReportCase:
     """Time histories of the "thrust" and "side_force" coefficients of each wing"""
     mean: dict[str, list[float]]
     """Mean "thrust" and "side_force" coefficients of each wing"""
+    total_mean: dict[str, float]
+    """Mean "thrust" and "side_force" coefficients of all wings together"""
     effective_aoa_deg: list[float]
     averaging_start_time: float
     distributions: list[dict[str, np.ndarray]] | None
     """Spanwise "height", "circulation" and "aoa_deg" of each wing, from the last full result"""
     distribution_time: float
+    references: list[ReportReference] = field(default_factory=list)
 
     @property
     def true_wind_direction_deg(self) -> float:
         return round(math.degrees(self.condition.true_wind_direction), 1)
+
+    def key(self) -> str:
+        '''The setup name and the rounded test condition, used to match reference data'''
+        return condition_key(self.condition, self.setup_name)
 
     def source_key(self) -> tuple[Any, ...]:
         '''Everything in the case name except the true wind direction'''
@@ -132,9 +169,22 @@ class ReportCase:
             condition.true_wind_velocity,
             condition.ship_velocity,
             condition.wind_profile,
-            None if condition.angle_of_attack is None else round(math.degrees(condition.angle_of_attack), 1),
+            _rounded_angles_deg(condition),
             condition.internal_state,
         )
+
+
+def _rounded_angles_deg(condition: ShipTestCondition) -> tuple[float, ...] | None:
+    '''The fixed angles of attack in degrees, rounded as in the case names, or None if not set'''
+    if condition.angle_of_attack is None:
+        return None
+
+    angles = (
+        condition.angle_of_attack if isinstance(condition.angle_of_attack, list)
+        else [condition.angle_of_attack]
+    )
+
+    return tuple(round(math.degrees(angle), 1) for angle in angles)
 
 
 def _source_sort_key(source: tuple[Any, ...]) -> tuple[Any, ...]:
@@ -148,7 +198,7 @@ def _source_sort_key(source: tuple[Any, ...]) -> tuple[Any, ...]:
         ship_velocity,
         list(WindProfile).index(wind_profile),
         aoa_deg is not None,
-        aoa_deg or 0.0,
+        aoa_deg or (),
         internal_state is not None,
         internal_state or 0.0,
     )
@@ -182,7 +232,10 @@ def _source_labels(sources: list[tuple[Any, ...]]) -> dict[tuple[Any, ...], str]
         if varying[4]:
             parts.append("constant wind" if wind_profile == WindProfile.Constant else "power law wind")
 
-        control = "controller" if aoa_deg is None else f"fixed AoA {aoa_deg:.1f} deg"
+        if aoa_deg is None:
+            control = "controller"
+        else:
+            control = "fixed AoA " + "/".join(f"{value:.1f}" for value in aoa_deg) + " deg"
 
         if internal_state is not None:
             control += f", IS {internal_state:g}"
@@ -230,8 +283,10 @@ def _target_aoa_deg(
     thrust positive. The set point is only given for controllers with a single set point, as it
     otherwise varies with the apparent wind direction.
     '''
-    if condition.angle_of_attack is not None:
-        return math.degrees(condition.angle_of_attack)
+    angles_of_attack = condition.angles_of_attack(len(actuator_line.line_force_model.wing_builders))
+
+    if angles_of_attack is not None:
+        return math.degrees(angles_of_attack[wing_index])
 
     if actuator_line.controller is None:
         return None
@@ -333,6 +388,7 @@ def read_report_case(
 
         wings.append(ReportWing(
             label = f"Wing {wing_index} ({side})",
+            short_label = f"W{wing_index}",
             area = wing_builder.projected_area(),
             thrust_sign = sign,
             apparent_wind_velocity = apparent_wind.length(),
@@ -364,6 +420,16 @@ def read_report_case(
 
     mean = {
         key: [float(np.mean(values[start:])) for values in history[key]] for key in history
+    }
+
+    # Total coefficients: the sum of the forces divided by the sum of the force scales
+    total_scale = sum(wing.force_scale for wing in wings)
+
+    total_mean = {
+        key: float(np.mean(
+            np.sum([values * wing.force_scale for values, wing in zip(history[key], wings)], axis=0)[start:]
+        )) / total_scale
+        for key in history
     }
 
     # Effective angle of attack, from the full results in the averaging window
@@ -438,6 +504,7 @@ def read_report_case(
         time = time,
         history = history,
         mean = mean,
+        total_mean = total_mean,
         effective_aoa_deg = effective_aoa_deg,
         averaging_start_time = averaging_start_time,
         distributions = distributions,
@@ -445,19 +512,90 @@ def read_report_case(
     )
 
 
+def _reference_for_case(case: ReportCase, label: str, point: Any) -> ReportReference | None:
+    '''
+    The reference values of a reference point for a case, with the total coefficients computed in
+    the same way as for the simulations. Returns None, with a warning, if the number of sails does not
+    match.
+    '''
+    if point.nr_sails() != len(case.wings):
+        warnings.warn(
+            f"Skipping the reference point '{point.key()}' in '{label}', as it has "
+            f"{point.nr_sails()} sails, while the simulation has {len(case.wings)}"
+        )
+
+        return None
+
+    coefficients: dict[str, list[float | None]] = {
+        "thrust": list(point.thrust_coefficients or [None] * len(case.wings)),
+        "side_force": list(point.side_force_coefficients or [None] * len(case.wings)),
+    }
+
+    total: dict[str, float | None] = {}
+
+    for key, values in coefficients.items():
+        if any(value is None for value in values):
+            total[key] = None
+        else:
+            total[key] = (
+                sum(float(value) * wing.force_scale for value, wing in zip(values, case.wings) if value is not None)
+                / sum(wing.force_scale for wing in case.wings)
+            )
+
+    return ReportReference(label=label, coefficients=coefficients, total=total)
+
+
 def read_report_cases(
     results_folder: Path | str,
-    averaging_fraction: float = DEFAULT_AVERAGING_FRACTION
+    averaging_fraction: float = DEFAULT_AVERAGING_FRACTION,
+    reference_files: list[Path | str] | None = None,
 ) -> list[ReportCase]:
     '''
     All cases in the results folder that can be used in the report, sorted by source and then by
-    apparent wind direction
+    apparent wind direction, with the matching reference values. The reference data is read from
+    the given files, or, if not given, from the reference files in the results folder.
     '''
+    result_files = [
+        file_path for file_path in sorted(Path(results_folder).glob("*.json"))
+        if not file_path.name.endswith(REFERENCE_FILE_SUFFIX)
+    ]
+
     cases = [
         case
-        for file_path in sorted(Path(results_folder).glob("*.json"))
+        for file_path in result_files
         if (case := read_report_case(file_path, averaging_fraction)) is not None
     ]
+
+    if reference_files is None:
+        reference_files = list(reference_files_in_folder(results_folder))
+
+    cases_by_key: dict[str, list[ReportCase]] = {}
+
+    for case in cases:
+        cases_by_key.setdefault(case.key(), []).append(case)
+
+    for reference_file in reference_files:
+        reference_data = ReferenceData.from_json_file(reference_file)
+
+        nr_unmatched = 0
+
+        for key, point in reference_data.points_by_key().items():
+            matching_cases = cases_by_key.get(key, [])
+
+            if not matching_cases:
+                nr_unmatched += 1
+
+            for case in matching_cases:
+                reference = _reference_for_case(case, reference_data.label, point)
+
+                if reference is not None:
+                    case.references.append(reference)
+
+        if nr_unmatched > 0:
+            warnings.warn(
+                f"{nr_unmatched} of {len(reference_data.points)} points in the reference data "
+                f"'{reference_data.label}' have no simulation results"
+            )
 
     cases.sort(
         key=lambda case: (_source_sort_key(case.source_key()), case.apparent_wind_direction_deg)
@@ -483,17 +621,100 @@ def _case_label(case: ReportCase, source_labels: dict[tuple[Any, ...], str]) -> 
     )
 
 
+def _setup_names(cases: list[ReportCase]) -> list[str | None]:
+    '''The setup names in the cases, sorted, with None last'''
+    names = set(case.setup_name for case in cases)
+
+    return sorted(name for name in names if name is not None) + ([None] if None in names else [])
+
+
+def _setup_label(setup_name: str | None) -> str:
+    return "No setup name" if setup_name is None else setup_name
+
+
 def _setup_names_text(cases: list[ReportCase]) -> str:
-    names = sorted(set(case.setup_name for case in cases if case.setup_name is not None))
+    names = [name for name in _setup_names(cases) if name is not None]
 
     return ", ".join(names) if names else "sails on ship"
+
+
+def _values_text(labels: list[str], values: list[float | None], total: float | None) -> str:
+    '''The values of each wing and the total, e.g., "W0 0.374, W1 0.729, total 0.552"'''
+    parts = [
+        f"{label} {'-' if value is None else f'{value:.3f}'}" for label, value in zip(labels, values)
+    ]
+
+    parts.append(f"total {'-' if total is None else f'{total:.3f}'}")
+
+    return ", ".join(parts)
+
+
+def _header_layout(
+    figure: Any,
+    height: int,
+    nr_title_lines: int,
+    has_dropdown: bool
+) -> float:
+    '''
+    Places the title, and makes room for an optional dropdown menu above it, so that the dropdown
+    menu, the title and the subplot titles do not overlap. Returns the y position of the dropdown
+    menu, in paper coordinates, anchored at the top.
+    '''
+    title_top = _DROPDOWN_TOP + _DROPDOWN_HEIGHT if has_dropdown else _TITLE_TOP_WITHOUT_DROPDOWN
+    top_margin = title_top + nr_title_lines * _TITLE_LINE_HEIGHT + _SUBPLOT_TITLE_SPACE
+
+    plot_height = height - top_margin - _BOTTOM_MARGIN
+
+    figure.update_layout(
+        height=height,
+        template="plotly_white",
+        margin=dict(t=top_margin, b=_BOTTOM_MARGIN),
+        title=dict(
+            x=0.0,
+            xref="paper",
+            xanchor="left",
+            y=1.0 - title_top / height,
+            yref="container",
+            yanchor="top",
+            font=dict(size=14),
+        ),
+    )
+
+    return 1.0 + (top_margin - _DROPDOWN_TOP) / plot_height
+
+
+def _add_setup_selector(
+    figure: Any,
+    trace_setups: list[str | None],
+    setup_names: list[str | None],
+    dropdown_y: float,
+    include_all: bool,
+) -> None:
+    '''
+    Adds a dropdown menu to choose the setup, when there are several setups. trace_setups gives the
+    setup of each trace in the figure.
+    '''
+    if len(setup_names) < 2:
+        return
+
+    labels = [_setup_label(name) for name in setup_names]
+    visible = [[setup == name for setup in trace_setups] for name in setup_names]
+
+    if include_all:
+        labels.append("All setups")
+        visible.append([True] * len(trace_setups))
+
+    add_selector(figure, labels, visible, x=0.0, y=dropdown_y, yanchor="top")
 
 
 def make_overview_figure(
     cases: list[ReportCase],
     averaging_fraction: float = DEFAULT_AVERAGING_FRACTION
 ) -> Any:
-    '''Mean values as a function of the apparent wind direction, for all cases'''
+    '''
+    Mean values as a function of the apparent wind direction, for all cases, with the reference
+    values as open markers. With several setups, a dropdown menu chooses the setup.
+    '''
     import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
     from plotly.subplots import make_subplots # type: ignore[import-not-found, import-untyped, unused-ignore]
 
@@ -510,24 +731,37 @@ def make_overview_figure(
     )
 
     colors = _source_colors(cases)
-    source_labels = _source_labels(list(colors))
+
+    # The setup is chosen in the dropdown menu, so it is not part of the labels
+    source_labels: dict[tuple[Any, ...], str] = {}
+
+    for setup_name in _setup_names(cases):
+        source_labels.update(_source_labels([source for source in colors if source[0] == setup_name]))
+
+    trace_setups: list[str | None] = []
+
+    def add_trace(trace: Any, row: int, setup_name: str | None) -> None:
+        figure.add_trace(trace, row=row, col=1)
+        trace_setups.append(setup_name)
 
     for source, color in colors.items():
         source_cases = [case for case in cases if case.source_key() == source]
+        setup_name = source[0]
+        source_label = source_labels[source]
 
         x = [case.apparent_wind_direction_deg for case in source_cases]
 
-        hover_text = [
-            f"{source_labels[source]}, TWD {case.true_wind_direction_deg:.1f} deg"
-            for case in source_cases
-        ]
+        hover_text = [f"{source_label}, TWD {case.true_wind_direction_deg:.1f} deg" for case in source_cases]
 
         nr_wings = max(len(case.wings) for case in source_cases)
 
         for wing_index in range(nr_wings):
             wing_cases = [case for case in source_cases if wing_index < len(case.wings)]
 
-            name = f"{source_labels[source]}, {wing_cases[0].wings[wing_index].label}"
+            wing_label = wing_cases[0].wings[wing_index].label
+            name = source_label if wing_index == 0 else f"{source_label}, {wing_label}"
+            line = dict(color=color, dash=_WING_DASH[wing_index % len(_WING_DASH)])
+            marker_symbol = _WING_MARKER[wing_index % len(_WING_MARKER)]
 
             rows = (
                 (1, [case.mean["thrust"][wing_index] for case in wing_cases]),
@@ -536,20 +770,83 @@ def make_overview_figure(
             )
 
             for row, y in rows:
-                figure.add_trace(
+                add_trace(
                     go.Scatter(
                         x=[case.apparent_wind_direction_deg for case in wing_cases],
                         y=y,
                         mode="lines+markers",
                         name=name,
-                        # Grouped per source, so that one click in the legend toggles the source
-                        legendgroup=source_labels[source],
-                        showlegend=(row == 1),
-                        line=dict(color=color, dash=_WING_DASH[wing_index % len(_WING_DASH)]),
-                        marker=dict(symbol=_WING_MARKER[wing_index % len(_WING_MARKER)], size=8),
+                        # One legend entry per source, which toggles all its traces
+                        legendgroup=source_label,
+                        showlegend=(row == 1 and wing_index == 0),
+                        line=line,
+                        marker=dict(symbol=marker_symbol, size=8),
                         text=hover_text if len(wing_cases) == len(x) else None,
                     ),
-                    row=row, col=1
+                    row, setup_name
+                )
+
+            # Reference values of each wing, as open markers
+            for row, key in ((1, "thrust"), (2, "side_force")):
+                points = [
+                    (case.apparent_wind_direction_deg, reference.coefficients[key][wing_index], reference.label)
+                    for case in wing_cases
+                    for reference in case.references
+                    if reference.coefficients[key][wing_index] is not None
+                ]
+
+                if points:
+                    add_trace(
+                        go.Scatter(
+                            x=[point[0] for point in points],
+                            y=[point[1] for point in points],
+                            mode="markers",
+                            name=f"{name}, reference",
+                            legendgroup=source_label,
+                            showlegend=False,
+                            marker=dict(symbol=marker_symbol + "-open", size=11, color=color),
+                            text=[point[2] for point in points],
+                        ),
+                        row, setup_name
+                    )
+
+        # Totals of all wings, with the reference totals
+        for row, key in ((1, "thrust"), (2, "side_force")):
+            add_trace(
+                go.Scatter(
+                    x=x,
+                    y=[case.total_mean[key] for case in source_cases],
+                    mode="lines+markers",
+                    name=f"{source_label}, total",
+                    legendgroup=source_label,
+                    showlegend=False,
+                    line=dict(color=color, width=3),
+                    marker=dict(symbol=_TOTAL_MARKER, size=12),
+                    text=hover_text,
+                ),
+                row, setup_name
+            )
+
+            points = [
+                (case.apparent_wind_direction_deg, reference.total[key], reference.label)
+                for case in source_cases
+                for reference in case.references
+                if reference.total[key] is not None
+            ]
+
+            if points:
+                add_trace(
+                    go.Scatter(
+                        x=[point[0] for point in points],
+                        y=[point[1] for point in points],
+                        mode="markers",
+                        name=f"{source_label}, total, reference",
+                        legendgroup=source_label,
+                        showlegend=False,
+                        marker=dict(symbol=_TOTAL_MARKER + "-open", size=14, color=color),
+                        text=[point[2] for point in points],
+                    ),
+                    row, setup_name
                 )
 
     figure.update_yaxes(title_text="C_T [-]", row=1, col=1)
@@ -560,24 +857,187 @@ def make_overview_figure(
         row=3, col=1
     )
 
+    setup_names = _setup_names(cases)
+
+    nr_wings = max((len(case.wings) for case in cases), default=0)
+
+    line_styles = ", ".join(
+        f"wing {index} {_WING_DASH[index % len(_WING_DASH)]}" for index in range(nr_wings)
+    )
+
+    dropdown_y = _header_layout(figure, _OVERVIEW_HEIGHT, 3, has_dropdown=len(setup_names) > 1)
+
     figure.update_layout(
-        height=_OVERVIEW_HEIGHT,
-        margin=dict(t=_OVERVIEW_TOP_MARGIN),
-        title=dict(
-            text=(
-                f"Overview: {_setup_names_text(cases)}<br>"
-                f"<sub>Means over the last {averaging_fraction:.0%} of the simulated time. "
-                "Coefficients relative to the apparent wind at mid-span and the projected area. "
-                "Color: source, line style: wing</sub>"
-            ),
-            x=0.0,
-            xref="paper",
-            xanchor="left",
+        title_text=(
+            f"<b>Overview</b>: {_setup_names_text(cases)}<br>"
+            f"<sub>Means over the last {averaging_fraction:.0%} of the simulated time. Coefficients "
+            "relative to the apparent wind at mid-span and the projected area.<br>"
+            f"Color: source. Line style: {line_styles}. Stars: total of all wings. Open markers: "
+            "reference values</sub>"
         ),
-        hovermode="x unified",
-        template="plotly_white",
+        hovermode="closest",
         legend=dict(groupclick="togglegroup"),
     )
+
+    _add_setup_selector(figure, trace_setups, setup_names, dropdown_y, include_all=False)
+
+    return figure
+
+
+def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
+    '''
+    The simulated against the reference thrust and side force coefficients, of each wing and of all
+    wings together, for all cases with reference values. The color shows the wing, and the marker
+    the solver. With several setups, a dropdown menu chooses the setup. None if no case has
+    reference values.
+    '''
+    import plotly.colors # type: ignore[import-not-found, import-untyped, unused-ignore]
+    import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
+    from plotly.subplots import make_subplots # type: ignore[import-not-found, import-untyped, unused-ignore]
+
+    cases_with_references = [case for case in cases if case.references]
+
+    if not cases_with_references:
+        return None
+
+    figure = make_subplots(
+        rows=1,
+        cols=2,
+        horizontal_spacing=0.1,
+        subplot_titles=(
+            "Thrust coefficient (dashed: equal values)",
+            "Side force coefficient (dashed: equal values)",
+        )
+    )
+
+    palette = plotly.colors.qualitative.Plotly
+    solver_markers = {CfdSolver.OpenFOAM: "circle", CfdSolver.Stormflow: "square"}
+
+    colors = _source_colors(cases)
+    source_labels = _source_labels(list(colors))
+
+    setup_names = _setup_names(cases_with_references)
+    reference_labels = sorted(set(
+        reference.label for case in cases_with_references for reference in case.references
+    ))
+
+    trace_setups: list[str | None] = []
+    all_values: dict[str, list[float]] = {"thrust": [], "side_force": []}
+
+    for setup_name in setup_names:
+        setup_cases = [case for case in cases_with_references if case.setup_name == setup_name]
+
+        nr_wings = max(len(case.wings) for case in setup_cases)
+
+        for solver in CfdSolver:
+            solver_cases = [case for case in setup_cases if case.solver == solver]
+
+            for reference_label in reference_labels:
+                # One trace for each wing, and one for the total, in each subplot
+                for wing_index in list(range(nr_wings)) + [None]:
+                    for col, key in ((1, "thrust"), (2, "side_force")):
+                        x, y, text = [], [], []
+
+                        for case in solver_cases:
+                            for reference in case.references:
+                                if reference.label != reference_label:
+                                    continue
+
+                                if wing_index is None:
+                                    reference_value = reference.total[key]
+                                    value = case.total_mean[key]
+                                elif wing_index < len(case.wings):
+                                    reference_value = reference.coefficients[key][wing_index]
+                                    value = case.mean[key][wing_index]
+                                else:
+                                    continue
+
+                                if reference_value is None:
+                                    continue
+
+                                x.append(reference_value)
+                                y.append(value)
+                                text.append(_case_label(case, source_labels))
+
+                        if not x:
+                            continue
+
+                        all_values[key] += x + y
+
+                        if wing_index is None:
+                            wing_name = "Total"
+                            color = "black"
+                            symbol = _TOTAL_MARKER
+                        else:
+                            wing_name = next(
+                                case.wings[wing_index].label for case in solver_cases
+                                if wing_index < len(case.wings)
+                            )
+                            color = palette[wing_index % len(palette)]
+                            symbol = solver_markers.get(solver, "circle")
+
+                        name = f"{wing_name}, {solver.value}"
+
+                        if len(reference_labels) > 1:
+                            name += f" vs. {reference_label}"
+
+                        figure.add_trace(
+                            go.Scatter(
+                                x=x,
+                                y=y,
+                                mode="markers",
+                                name=name,
+                                legendgroup=name,
+                                showlegend=(col == 1),
+                                marker=dict(symbol=symbol, size=10 if wing_index is not None else 13, color=color),
+                                text=text,
+                                hovertemplate=(
+                                    f"{name}<br>%{{text}}<br>reference = %{{x:.3f}}<br>"
+                                    f"simulation = %{{y:.3f}}<extra></extra>"
+                                ),
+                            ),
+                            row=1, col=col
+                        )
+
+                        trace_setups.append(setup_name)
+
+    shapes = []
+
+    for col, key in ((1, "thrust"), (2, "side_force")):
+        values = all_values[key]
+
+        if not values:
+            continue
+
+        low, high = min(values), max(values)
+        padding = 0.05 * (high - low) if high > low else 0.1
+
+        low, high = low - padding, high + padding
+
+        axis = "" if col == 1 else str(col)
+
+        shapes.append(dict(
+            type="line", xref=f"x{axis}", yref=f"y{axis}", x0=low, y0=low, x1=high, y1=high,
+            line=dict(color="gray", dash="dash", width=1.5),
+        ))
+
+        figure.update_xaxes(range=[low, high], title_text="Reference [-]", row=1, col=col)
+        figure.update_yaxes(range=[low, high], title_text="Simulation [-]", row=1, col=col)
+
+    dropdown_y = _header_layout(figure, _COMPARISON_HEIGHT, 2, has_dropdown=len(setup_names) > 1)
+
+    figure.update_layout(
+        title_text=(
+            f"<b>Comparison with reference data</b>: {', '.join(reference_labels)}<br>"
+            "<sub>Mean simulated coefficients against the reference values, for the cases with "
+            "reference data. Color: wing (black stars: total), marker: solver (circle: OpenFOAM, "
+            "square: Stormflow)</sub>"
+        ),
+        shapes=shapes,
+        hovermode="closest",
+    )
+
+    _add_setup_selector(figure, trace_setups, setup_names, dropdown_y, include_all=False)
 
     return figure
 
@@ -585,7 +1045,9 @@ def make_overview_figure(
 def make_detailed_figure(cases: list[ReportCase]) -> Any:
     '''
     Spanwise distributions and force histories for a single case, chosen with a dropdown menu. The
-    color is the color of the source in the overview, and the line style shows the wing.
+    color is the color of the source in the overview, and the line style shows the wing. The
+    reference values are shown as gray horizontal lines in the force histories, with the line style
+    of the wing.
     '''
     import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
     from plotly.subplots import make_subplots # type: ignore[import-not-found, import-untyped, unused-ignore]
@@ -597,9 +1059,9 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
         horizontal_spacing=0.09,
         subplot_titles=(
             "Circulation strength (+ gives thrust)",
-            "Effective angle of attack (dotted: target)",
-            "Thrust coefficient (dotted: averaging start)",
-            "Side force coefficient (dotted: averaging start)",
+            "Effective angle of attack (+ gives thrust)",
+            "Thrust coefficient",
+            "Side force coefficient",
         )
     )
 
@@ -663,16 +1125,9 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
 
                 trace_group_index.append(case_index)
 
-        labels.append(_case_label(case, source_labels))
-
-        thrust_text = ", ".join(
-            f"{wing.label} {value:.3f}" for wing, value in zip(case.wings, case.mean["thrust"])
-        )
-        side_force_text = ", ".join(
-            f"{wing.label} {value:.3f}" for wing, value in zip(case.wings, case.mean["side_force"])
-        )
-
         case_label = _case_label(case, source_labels)
+
+        labels.append(case_label)
 
         title = f"<b>{case_label}</b>"
 
@@ -680,12 +1135,32 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
         if case.setup_name is not None and not case_label.startswith(case.setup_name + ","):
             title = f"<b>{case.setup_name}: {case_label}</b>"
 
-        titles.append(
-            f"{title}<br>"
-            f"Mean C_T: {thrust_text}<br>"
-            f"Mean C_S: {side_force_text}<br>"
-            f"Distributions at t = {case.distribution_time:.1f}. Target: {case.target_label}"
-        )
+        short_labels = [wing.short_label for wing in case.wings]
+
+        title_lines = [
+            title,
+            "Simulation C_T: " + _values_text(short_labels, list(case.mean["thrust"]), case.total_mean["thrust"]),
+            "Simulation C_S: " + _values_text(short_labels, list(case.mean["side_force"]), case.total_mean["side_force"]),
+        ]
+
+        for reference in case.references:
+            title_lines += [
+                f"{reference.label} C_T: "
+                + _values_text(short_labels, reference.coefficients["thrust"], reference.total["thrust"]),
+                f"{reference.label} C_S: "
+                + _values_text(short_labels, reference.coefficients["side_force"], reference.total["side_force"]),
+            ]
+
+        wing_text = ", ".join(f"{wing.short_label} = {wing.label}" for wing in case.wings)
+
+        title_lines += [
+            f"Distributions at t = {case.distribution_time:.1f}. Target: {case.target_label}",
+            wing_text,
+            "<i>Dotted lines: target angle of attack and start of the averaging window. Gray lines: "
+            "reference values, with the line style of the wing</i>",
+        ]
+
+        titles.append("<br>".join(title_lines))
 
         case_shapes = [
             # Start of the averaging window in the force histories
@@ -710,6 +1185,21 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
                 )
             )
 
+        # Reference values in the force histories
+        for reference in case.references:
+            for axis, key in (("3", "thrust"), ("4", "side_force")):
+                for wing_index, value in enumerate(reference.coefficients[key]):
+                    if value is None:
+                        continue
+
+                    case_shapes.append(
+                        dict(
+                            type="line", xref=f"x{axis} domain", yref=f"y{axis}",
+                            x0=0.0, x1=1.0, y0=value, y1=value,
+                            line=dict(color="dimgray", dash=_WING_DASH[wing_index % len(_WING_DASH)], width=2),
+                        )
+                    )
+
         shapes.append(case_shapes)
 
     history_axis_title = "Time [s] (iteration for steady OpenFOAM)"
@@ -723,30 +1213,14 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
     figure.update_xaxes(title_text=history_axis_title, row=2, col=2)
     figure.update_yaxes(title_text="C_S [-]", row=2, col=2)
 
-    plot_height = _DETAILED_HEIGHT - _DETAILED_TOP_MARGIN - _DETAILED_BOTTOM_MARGIN
+    nr_title_lines = max((title.count("<br>") + 1 for title in titles), default=1)
 
-    figure.update_layout(
-        height=_DETAILED_HEIGHT,
-        template="plotly_white",
-        margin=dict(t=_DETAILED_TOP_MARGIN, b=_DETAILED_BOTTOM_MARGIN),
-        # The title is placed below the dropdown menu, in pixels from the top of the figure
-        title=dict(
-            x=0.0,
-            xref="paper",
-            xanchor="left",
-            y=1.0 - _DETAILED_TITLE_TOP / _DETAILED_HEIGHT,
-            yref="container",
-            yanchor="top",
-            font=dict(size=14),
-        ),
-    )
+    dropdown_y = _header_layout(figure, _DETAILED_HEIGHT, nr_title_lines, has_dropdown=True)
 
     if len(cases) > 0:
         add_dropdown(
             figure, labels, titles, trace_group_index, shapes=shapes,
-            x=0.0,
-            y=1.0 + (_DETAILED_TOP_MARGIN - _DROPDOWN_TOP) / plot_height,
-            yanchor="top",
+            x=0.0, y=dropdown_y, yanchor="top",
         )
 
     return figure
@@ -755,13 +1229,16 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
 def sails_on_ship_report(
     results_folder: Path | str,
     output_file: Path | str | None = None,
-    averaging_fraction: float = DEFAULT_AVERAGING_FRACTION
+    averaging_fraction: float = DEFAULT_AVERAGING_FRACTION,
+    reference_files: list[Path | str] | None = None,
 ) -> Path:
     '''
     Writes an HTML report of all the result files in the results folder that follow the naming
-    convention and contain the simulation builder. See the module documentation for the content.
-    The report is written to the output file, or to "sails_on_ship_report.html" in the results
-    folder if not given. Returns the path of the report.
+    convention and contain the simulation builder, compared with the reference data, if any. See
+    the module documentation for the content. The reference data is read from the given files, or,
+    if not given, from the files in the results folder that end in REFERENCE_FILE_SUFFIX. The report
+    is written to the output file, or to "sails_on_ship_report.html" in the results folder if not
+    given. Returns the path of the report.
     '''
     results_folder = Path(results_folder)
 
@@ -769,14 +1246,20 @@ def sails_on_ship_report(
         results_folder / DEFAULT_REPORT_FILE_NAME if output_file is None else Path(output_file)
     )
 
-    cases = read_report_cases(results_folder, averaging_fraction)
+    cases = read_report_cases(results_folder, averaging_fraction, reference_files)
 
     if len(cases) == 0:
         raise ValueError(f"No result files for the report in {results_folder}")
 
-    write_html(
-        [make_overview_figure(cases, averaging_fraction), make_detailed_figure(cases)],
-        output_path
-    )
+    figures = [make_overview_figure(cases, averaging_fraction)]
+
+    comparison = make_comparison_figure(cases)
+
+    if comparison is not None:
+        figures.append(comparison)
+
+    figures.append(make_detailed_figure(cases))
+
+    write_html(figures, output_path)
 
     return output_path

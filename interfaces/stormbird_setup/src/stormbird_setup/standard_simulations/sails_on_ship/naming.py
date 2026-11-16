@@ -14,7 +14,8 @@ A name consists of parts separated by underscores, in this order:
 - "twv" + the true wind velocity, with two decimals
 - "sv" + the ship velocity, with two decimals
 - "constant_wind", only with a constant wind profile. The power law profile is the default.
-- "aoa" + the fixed angle of attack in degrees, with one decimal, only if given
+- "aoa" + the fixed angle of attack in degrees, with one decimal, only if given. With one angle
+  for each wing, the angles are separated by underscores, e.g., "aoa10.0_12.0_8.0_9.0".
 - "is" + the fixed internal state, with six significant digits, only if given
 
 For instance: "example_ship_stormflow_twd45.0_twv8.00_sv6.17_aoa10.0_is0.1". The names
@@ -42,7 +43,7 @@ _CASE_NAME_PATTERN = re.compile(
     rf"_twv(?P<twv>{_NUMBER})"
     rf"_sv(?P<sv>{_NUMBER})"
     r"(?P<constant_wind>_constant_wind)?"
-    rf"(?:_aoa(?P<aoa>{_NUMBER}))?"
+    rf"(?:_aoa(?P<aoa>{_NUMBER}(?:_{_NUMBER})*))?"
     r"(?:_is(?P<internal_state>-?\d+(?:\.\d+)?(?:e[-+]?\d+)?))?$"
 )
 
@@ -97,8 +98,23 @@ def case_name(
     '''
     parts = [] if setup_name is None else [check_setup_name(setup_name)]
 
-    parts += [
-        _solver_name(solver),
+    return "_".join(parts + [_solver_name(solver)] + _condition_parts(condition))
+
+
+def condition_key(condition: ShipTestCondition, setup_name: str | None = None) -> str:
+    '''
+    The case name without the solver, i.e., the setup name, if given, and all values in the test
+    condition, rounded as in the case names. Used to match the results from different solvers, and
+    reference data, to the same case.
+    '''
+    parts = [] if setup_name is None else [check_setup_name(setup_name)]
+
+    return "_".join(parts + _condition_parts(condition))
+
+
+def _condition_parts(condition: ShipTestCondition) -> list[str]:
+    '''The parts of a case name that come from the test condition'''
+    parts = [
         "twd" + _fixed(math.degrees(condition.true_wind_direction), 1),
         "twv" + _fixed(condition.true_wind_velocity, 2),
         "sv" + _fixed(condition.ship_velocity, 2),
@@ -108,12 +124,17 @@ def case_name(
         parts.append("constant_wind")
 
     if condition.angle_of_attack is not None:
-        parts.append("aoa" + _fixed(math.degrees(condition.angle_of_attack), 1))
+        angles = (
+            condition.angle_of_attack if isinstance(condition.angle_of_attack, list)
+            else [condition.angle_of_attack]
+        )
+
+        parts.append("aoa" + "_".join(_fixed(math.degrees(angle), 1) for angle in angles))
 
     if condition.internal_state is not None:
         parts.append(f"is{condition.internal_state + 0.0:g}")
 
-    return "_".join(parts)
+    return parts
 
 
 def parse_case_name(name: str) -> ParsedCaseName | None:
@@ -130,6 +151,13 @@ def parse_case_name(name: str) -> ParsedCaseName | None:
         return None
 
     aoa = match.group("aoa")
+
+    angle_of_attack: float | list[float] | None = None
+
+    if aoa is not None:
+        angles = [math.radians(float(value)) for value in aoa.split("_")]
+
+        angle_of_attack = angles[0] if len(angles) == 1 else angles
     internal_state = match.group("internal_state")
 
     condition = ShipTestCondition(
@@ -139,7 +167,7 @@ def parse_case_name(name: str) -> ParsedCaseName | None:
         wind_profile = (
             WindProfile.Constant if match.group("constant_wind") else WindProfile.PowerLaw
         ),
-        angle_of_attack = None if aoa is None else math.radians(float(aoa)),
+        angle_of_attack = angle_of_attack,
         internal_state = None if internal_state is None else float(internal_state),
     )
 

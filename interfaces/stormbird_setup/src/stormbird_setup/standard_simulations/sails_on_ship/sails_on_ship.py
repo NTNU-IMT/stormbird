@@ -197,22 +197,40 @@ class SailsOnShip(StormbirdSetupBaseModel):
             )
         ]
 
-    def local_wing_angles(self, condition: ShipTestCondition, angle_of_attack: float) -> list[float]:
+    def local_wing_angles(
+        self,
+        condition: ShipTestCondition,
+        angle_of_attack: float | list[float]
+    ) -> list[float]:
         '''
         Local wing angles that give the angle of attack, relative to the undisturbed apparent wind
-        at the mid-span of each wing, with the sign set so that a positive angle gives thrust.
+        at the mid-span of each wing, with the sign set so that a positive angle gives thrust. The
+        angle of attack is either one value for all wings, or one value for each wing.
 
         The angle of attack is the right-handed angle around the span from the chord to the apparent
         wind, so the local wing angle is the angle of the apparent wind minus the angle of attack.
         The local wing angle is zero when the chord is as given in the actuator line setup. The
         results are kept between -pi and pi.
         '''
+        wing_builders = self.actuator_line.line_force_model.wing_builders
+
+        if isinstance(angle_of_attack, list):
+            if len(angle_of_attack) != len(wing_builders):
+                raise ValueError(
+                    f"Got {len(angle_of_attack)} angles of attack for {len(wing_builders)} wings"
+                )
+
+            angles_of_attack = list(angle_of_attack)
+        else:
+            angles_of_attack = [angle_of_attack] * len(wing_builders)
+
         angles = []
 
-        for wing_builder, apparent_wind, sign in zip(
-            self.actuator_line.line_force_model.wing_builders,
+        for wing_builder, apparent_wind, sign, wing_angle_of_attack in zip(
+            wing_builders,
             self.apparent_wind_at_mid_span(condition),
-            self.thrust_signs(condition)
+            self.thrust_signs(condition),
+            angles_of_attack
         ):
             span_direction = _span_direction(wing_builder)
 
@@ -221,7 +239,7 @@ class SailsOnShip(StormbirdSetupBaseModel):
 
             wind_angle = chord.signed_angle_between(apparent_wind_in_plane, span_direction)
 
-            angle = wind_angle - sign * angle_of_attack
+            angle = wind_angle - sign * wing_angle_of_attack
 
             angles.append(math.atan2(math.sin(angle), math.cos(angle)))
 
@@ -231,8 +249,9 @@ class SailsOnShip(StormbirdSetupBaseModel):
         '''
         A copy of the actuator line setup, adjusted to the test condition:
 
-        - With a fixed angle of attack, the local wing angles are set to give that angle, and the
-          controller is removed, so that the angles are kept constant.
+        - With a fixed angle of attack, either one for all wings or one for each wing, the local
+          wing angles are set to give that angle, and the controller is removed, so that the angles
+          are kept constant.
         - With a fixed internal state, the internal states are set, with the sign that gives thrust.
 
         Without any of these, the copy is the same as the actuator line setup.
@@ -241,10 +260,10 @@ class SailsOnShip(StormbirdSetupBaseModel):
 
         line_force_model = actuator_line.line_force_model
 
-        if condition.angle_of_attack is not None:
-            line_force_model.local_wing_angles = self.local_wing_angles(
-                condition, condition.angle_of_attack
-            )
+        angles_of_attack = condition.angles_of_attack(len(line_force_model.wing_builders))
+
+        if angles_of_attack is not None:
+            line_force_model.local_wing_angles = self.local_wing_angles(condition, angles_of_attack)
             actuator_line.controller = None
 
         if condition.internal_state is not None:

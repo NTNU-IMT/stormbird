@@ -12,15 +12,24 @@ from .simulation_settings import (
     CfdSolver, ShipDomain, OpenFoamShipSettings, StormflowShipSettings, StormflowRunSettings,
     AIR_KINEMATIC_VISCOSITY
 )
-from .naming import case_name, parse_case_name, check_setup_name, ParsedCaseName
+from .naming import case_name, parse_case_name, check_setup_name, condition_key, ParsedCaseName
+from .reference_data import ReferenceData, ReferencePoint, REFERENCE_FILE_SUFFIX
 from .sails_on_ship import SailsOnShip
-from .report import sails_on_ship_report, read_report_cases, make_overview_figure, make_detailed_figure
+from .report import (
+    sails_on_ship_report, read_report_cases, make_overview_figure, make_comparison_figure,
+    make_detailed_figure
+)
 
 __all__ = [
     "sails_on_ship_report",
     "read_report_cases",
     "make_overview_figure",
+    "make_comparison_figure",
     "make_detailed_figure",
+    "condition_key",
+    "ReferenceData",
+    "ReferencePoint",
+    "REFERENCE_FILE_SUFFIX",
     "case_name",
     "parse_case_name",
     "check_setup_name",

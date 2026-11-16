@@ -52,47 +52,81 @@ def add_dropdown(
             f"Got {len(trace_group_index)} group indices for {len(figure.data)} traces"
         )
 
-    for trace, group_index in zip(figure.data, trace_group_index):
-        trace.visible = (group_index == 0)
+    layout_updates: list[dict[str, Any]] = []
 
-    buttons = []
-
-    for group_index, (label, title) in enumerate(zip(labels, titles)):
+    for group_index, title in enumerate(titles):
         layout_update: dict[str, Any] = {"title.text": title}
 
         if shapes is not None:
             layout_update["shapes"] = shapes[group_index]
 
-        buttons.append(
-            dict(
-                label=label,
-                method="update",
-                args=[
-                    {"visible": [index == group_index for index in trace_group_index]},
-                    layout_update,
-                ],
-            )
-        )
+        layout_updates.append(layout_update)
 
     if shapes is not None:
         figure.update_layout(shapes=shapes[0])
 
-    figure.update_layout(
-        title_text=titles[0],
-        updatemenus=[
-            dict(
-                type="dropdown",
-                buttons=buttons,
-                active=0,
-                direction="down",
-                showactive=True,
-                x=x,
-                xanchor="left",
-                y=y,
-                yanchor=yanchor,
-            )
-        ],
+    figure.update_layout(title_text=titles[0])
+
+    add_selector(
+        figure,
+        labels,
+        [[index == group_index for index in trace_group_index] for group_index in range(len(labels))],
+        layout_updates,
+        x=x, y=y, yanchor=yanchor,
     )
+
+
+def add_selector(
+    figure: Any,
+    labels: list[str],
+    visible: list[list[bool]],
+    layout_updates: list[dict[str, Any]] | None = None,
+    x: float = 0.0,
+    y: float = 1.12,
+    yanchor: str = "bottom",
+) -> None:
+    '''
+    Adds a dropdown menu with one option for each label. Each option shows the traces that are true
+    in the corresponding list in visible, which has one value for each trace in the figure, and
+    optionally applies a layout update. The first option is selected initially. The menu is added
+    after any menus already in the figure, and is placed as in add_dropdown.
+    '''
+    for option_visible in visible:
+        if len(option_visible) != len(figure.data):
+            raise ValueError(
+                f"Got {len(option_visible)} visibility values for {len(figure.data)} traces"
+            )
+
+    for trace, trace_visible in zip(figure.data, visible[0]):
+        trace.visible = trace_visible
+
+    buttons = []
+
+    for index, (label, option_visible) in enumerate(zip(labels, visible)):
+        args: list[Any] = [{"visible": option_visible}]
+
+        if layout_updates is not None:
+            args.append(layout_updates[index])
+
+        buttons.append(dict(label=label, method="update", args=args))
+
+    menus = list(figure.layout.updatemenus or [])
+
+    menus.append(
+        dict(
+            type="dropdown",
+            buttons=buttons,
+            active=0,
+            direction="down",
+            showactive=True,
+            x=x,
+            xanchor="left",
+            y=y,
+            yanchor=yanchor,
+        )
+    )
+
+    figure.update_layout(updatemenus=menus)
 
 
 def write_html(figures: list[Any], file_path: Path | str) -> None:
