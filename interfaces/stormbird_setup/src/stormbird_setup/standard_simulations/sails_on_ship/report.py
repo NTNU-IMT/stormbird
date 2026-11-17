@@ -19,14 +19,21 @@ velocities, the wind profile, and whether the sail settings are fixed or set by 
 values of the fixed sail settings, i.e., the angles of attack and the internal state, are not part
 of the source, as they often vary with the wind direction. They are shown in the hover text and in
 the detailed view instead. A different controller setup should therefore be a different setup name.
-Each source has its own color, and each wing its own line style. In the overview, the cases in a
+Each wing has its own color, the same in all figures. The simulations are shown as lines without
+markers in the overview and the detailed view, so that they are easy to tell apart from the reference
+values, which are shown as markers. In the overview, each source has its own line style, and
+marker style for the reference values. The cases in a
 source are connected with lines, sorted by the apparent wind direction. Several cases with the same
 wind direction, e.g., with different angles of attack, are connected in the order of the angles of
-attack. When there are several setups, the overview and the comparison have a dropdown menu to choose the setup.
+attack. The overview and the comparison have buttons to show either the force coefficients of each
+wing, which is the default, or of all wings together.
+
+When there are several setups, a single dropdown menu at the top of the page chooses the setup, and
+all the figures below only show the cases of that setup.
 
 1) Overview, as a function of the apparent wind direction at mid-span:
    - the mean thrust coefficient (force along the forward direction of the ship) of each wing, and
-     of all wings together, with the reference values as open markers
+     of all wings together, with the reference values as markers
    - the mean side force coefficient (force towards port), in the same way
    - the effective angle of attack of each wing, i.e., the angle used in the sectional model,
      including the induced velocities, as the median over the wing and the mean over the full
@@ -69,7 +76,10 @@ from ...actuator_line import ActuatorLineBuilder
 from ...line_force_model import WingBuilder
 from ...openfoam.results import ActuatorLineResults
 from ..actuator_line_runs import ACTUATOR_LINE_FORCE_DENSITY
-from ..plot_utils import add_dropdown, add_selector, averaging_start_index, write_html
+from ..plot_utils import (
+    add_data_toggle, add_dropdown, averaging_start_index, lock_subplot_aspect_ratio, write_html,
+    write_html_with_selector
+)
 
 from .conditions import ShipTestCondition, WindProfile
 from .naming import parse_case_name, condition_key
@@ -82,27 +92,53 @@ DEFAULT_AVERAGING_FRACTION = 0.25
 
 DEFAULT_REPORT_FILE_NAME = "sails_on_ship_report.html"
 
-# Line and marker styles for each wing
-_WING_DASH = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
-_WING_MARKER = ["circle", "diamond", "square", "triangle-up", "cross", "x"]
+REPORT_TITLE = "Stormbird sails-on-ship standard report"
+
+# Line and marker styles for each source in the overview. The wings have different colors.
+_SOURCE_DASH = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"]
+_SOURCE_MARKER = ["circle", "diamond", "square", "triangle-up", "cross", "x"]
 _TOTAL_MARKER = "star"
+_TOTAL_COLOR = "#636EFA"
+"""The color of the total of all wings in the overview, which is the same as for the first wing, as
+they are not shown at the same time"""
 
 # Marker fill for each reference data set in the comparison
 _REFERENCE_FILLS = ["", "-open", "-dot", "-open-dot"]
 _REFERENCE_FILL_NAMES = ["filled", "open", "dot", "open with dot"]
 
+# Options of the buttons that choose between the coefficients of each wing and of all wings together
+_WING_TOGGLE_LABELS = ["Wings", "Total"]
+
+SUBPLOT_WIDTH_TO_HEIGHT = 1.85
+"""
+The aspect ratio of each subplot, as the width divided by the height. The height of the figures is
+adjusted to the width of the window, so that this ratio is kept.
+"""
+
 # Layout of the top of the figures, in pixels. From the top: an optional dropdown menu, the title,
 # and the subplots with their titles. The values are chosen so that these do not overlap.
 _DROPDOWN_TOP = 10
 _DROPDOWN_HEIGHT = 50
+_MENU_HEIGHT = 30
 _TITLE_TOP_WITHOUT_DROPDOWN = 25
 _TITLE_LINE_HEIGHT = 21
 _SUBPLOT_TITLE_SPACE = 50
 _BOTTOM_MARGIN = 80
 
-_OVERVIEW_HEIGHT = 1100
-_COMPARISON_HEIGHT = 650
-_DETAILED_HEIGHT = 1150
+REPORT_MAX_WIDTH = 1600
+"""
+The maximum width of the figures in the report, in pixels. The figures are centered in wider windows.
+"""
+
+# Width of the plot area, in pixels, that the initial height of the figures is computed for, i.e.,
+# about the max width without the margins and the legend. The height is adjusted to the real width
+# when the report is opened.
+_INITIAL_PLOT_WIDTH = REPORT_MAX_WIDTH - 400
+
+# Spacing between the subplots, as fractions of the plot area
+_OVERVIEW_SPACING = 0.05
+_COMPARISON_SPACING = 0.1
+_DETAILED_SPACING = (0.15, 0.09)
 
 
 @dataclass
@@ -633,6 +669,15 @@ def _source_colors(cases: list[ReportCase]) -> dict[tuple[Any, ...], str]:
     return {source: palette[index % len(palette)] for index, source in enumerate(sources)}
 
 
+def _wing_color(wing_index: int) -> str:
+    '''The color of a wing in the comparison and the detailed view'''
+    import plotly.colors # type: ignore[import-not-found, import-untyped, unused-ignore]
+
+    palette = plotly.colors.qualitative.Plotly
+
+    return palette[wing_index % len(palette)]
+
+
 def _case_label(case: ReportCase, source_labels: dict[tuple[Any, ...], str]) -> str:
     parts = [
         source_labels[case.source_key()],
@@ -659,6 +704,7 @@ def _setup_label(setup_name: str | None) -> str:
 
 
 def _setup_names_text(cases: list[ReportCase]) -> str:
+    '''The setup names for the title, or a general text if the cases have no setup name'''
     names = [name for name in _setup_names(cases) if name is not None]
 
     return ", ".join(names) if names else "sails on ship"
@@ -675,62 +721,50 @@ def _values_text(labels: list[str], values: list[float | None], total: float | N
     return ", ".join(parts)
 
 
-def _header_layout(
+def _figure_layout(
     figure: Any,
-    height: int,
+    rows: int,
+    cols: int,
+    vertical_spacing: float,
+    horizontal_spacing: float,
     nr_title_lines: int,
     has_dropdown: bool
-) -> float:
+) -> dict[str, Any]:
     '''
-    Places the title, and makes room for an optional dropdown menu above it, so that the dropdown
-    menu, the title and the subplot titles do not overlap. Returns the y position of the dropdown
-    menu, in paper coordinates, anchored at the top.
+    Sets the height of the figure, so that the subplots get the aspect ratio SUBPLOT_WIDTH_TO_HEIGHT,
+    and places the title, with room for optional dropdown menus above it, so that the menus, the
+    title and the subplot titles do not overlap. The positions are given in pixels from the top, so
+    that they do not change when the height is adjusted to the width of the window. Returns the
+    position of the menus, as keyword arguments to the functions that add them.
     '''
     title_top = _DROPDOWN_TOP + _DROPDOWN_HEIGHT if has_dropdown else _TITLE_TOP_WITHOUT_DROPDOWN
     top_margin = title_top + nr_title_lines * _TITLE_LINE_HEIGHT + _SUBPLOT_TITLE_SPACE
 
-    plot_height = height - top_margin - _BOTTOM_MARGIN
+    subplot_width = _INITIAL_PLOT_WIDTH * (1.0 - horizontal_spacing * (cols - 1)) / cols
+    plot_height = (
+        rows * subplot_width / SUBPLOT_WIDTH_TO_HEIGHT / (1.0 - vertical_spacing * (rows - 1))
+    )
 
     figure.update_layout(
-        height=height,
+        height=round(top_margin + plot_height + _BOTTOM_MARGIN),
         template="plotly_white",
         margin=dict(t=top_margin, b=_BOTTOM_MARGIN),
         title=dict(
             x=0.0,
             xref="paper",
             xanchor="left",
-            y=1.0 - title_top / height,
+            y=1.0,
             yref="container",
             yanchor="top",
+            pad=dict(t=title_top),
             font=dict(size=14),
         ),
     )
 
-    return 1.0 + (top_margin - _DROPDOWN_TOP) / plot_height
+    lock_subplot_aspect_ratio(figure, SUBPLOT_WIDTH_TO_HEIGHT)
 
-
-def _add_setup_selector(
-    figure: Any,
-    trace_setups: list[str | None],
-    setup_names: list[str | None],
-    dropdown_y: float,
-    include_all: bool,
-) -> None:
-    '''
-    Adds a dropdown menu to choose the setup, when there are several setups. trace_setups gives the
-    setup of each trace in the figure.
-    '''
-    if len(setup_names) < 2:
-        return
-
-    labels = [_setup_label(name) for name in setup_names]
-    visible = [[setup == name for setup in trace_setups] for name in setup_names]
-
-    if include_all:
-        labels.append("All setups")
-        visible.append([True] * len(trace_setups))
-
-    add_selector(figure, labels, visible, x=0.0, y=dropdown_y, yanchor="top")
+    # The menus are placed above the plot area, with the given distance in pixels
+    return dict(y=1.0, yanchor="bottom", pad=dict(b=top_margin - _DROPDOWN_TOP - _MENU_HEIGHT))
 
 
 def make_overview_figure(
@@ -739,7 +773,7 @@ def make_overview_figure(
 ) -> Any:
     '''
     Mean values as a function of the apparent wind direction, for all cases, with the reference
-    values as open markers. With several setups, a dropdown menu chooses the setup.
+    values as markers.
     '''
     import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
     from plotly.subplots import make_subplots # type: ignore[import-not-found, import-untyped, unused-ignore]
@@ -748,7 +782,7 @@ def make_overview_figure(
         rows=3,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.07,
+        vertical_spacing=_OVERVIEW_SPACING,
         subplot_titles=(
             "Mean thrust coefficient (+ towards the bow)",
             "Mean side force coefficient (+ towards port)",
@@ -756,32 +790,35 @@ def make_overview_figure(
         )
     )
 
-    colors = _source_colors(cases)
+    sources = sorted(set(case.source_key() for case in cases), key=_source_sort_key)
+    source_labels = _source_labels(sources)
 
-    # The setup is chosen in the dropdown menu, so it is not part of the labels
-    source_labels: dict[tuple[Any, ...], str] = {}
+    # The thrust and side force traces of the individual wings and of the total, of which only one
+    # kind is shown at a time
+    wing_traces: list[int] = []
+    total_traces: list[int] = []
 
-    for setup_name in _setup_names(cases):
-        source_labels.update(_source_labels([source for source in colors if source[0] == setup_name]))
+    def add_trace(trace: Any, row: int, wing_level: bool = False, total: bool = False) -> None:
+        if wing_level and row in (1, 2):
+            wing_traces.append(len(figure.data))
 
-    trace_setups: list[str | None] = []
+        if total:
+            total_traces.append(len(figure.data))
 
-    def add_trace(trace: Any, row: int, setup_name: str | None) -> None:
         figure.add_trace(trace, row=row, col=1)
-        trace_setups.append(setup_name)
 
     reference_labels = sorted(set(
         reference.label for case in cases for reference in case.references
     ))
 
-    # The reference data sets that have a legend entry, for each setup, as only one setup is shown
-    # at a time
-    reference_legend_shown: set[tuple[str | None, str]] = set()
+    # The reference data sets that have a legend entry, for the wings and for the total, as only one
+    # of them is shown at a time
+    reference_legend_shown: set[tuple[bool, str]] = set()
 
     def reference_trace(
         points: list[tuple[float, Any]],
         reference_label: str,
-        setup_name: str | None,
+        total: bool,
         hover_name: str,
         marker: dict[str, Any],
     ) -> Any:
@@ -789,25 +826,32 @@ def make_overview_figure(
         Reference values as markers. All markers from the same reference data are in the same
         legend group, with one legend entry, so they can be shown or hidden together.
         '''
-        show_legend = (setup_name, reference_label) not in reference_legend_shown
+        show_legend = (total, reference_label) not in reference_legend_shown
 
-        reference_legend_shown.add((setup_name, reference_label))
+        reference_legend_shown.add((total, reference_label))
 
         return go.Scatter(
             x=[point[0] for point in points],
             y=[point[1] for point in points],
             mode="markers",
-            name=f"{reference_label} (open markers)",
+            name=reference_label,
             legendgroup=f"reference: {reference_label}",
             showlegend=show_legend,
+            # After the simulations in the legend, which have the default rank of 1000
+            legendrank=2000,
             marker=marker,
             hovertemplate=f"{hover_name}<br>%{{x:.1f}} deg, %{{y:.3f}}<extra></extra>",
         )
 
-    for source, color in colors.items():
+    for source_index, source in enumerate(sources):
         source_cases = [case for case in cases if case.source_key() == source]
-        setup_name = source[0]
         source_label = source_labels[source]
+
+        # The source is only part of the legend entries when there are several sources
+        source_suffix = f", {source_label}" if len(sources) > 1 else ""
+
+        dash = _SOURCE_DASH[source_index % len(_SOURCE_DASH)]
+        marker_symbol = _SOURCE_MARKER[source_index % len(_SOURCE_MARKER)]
 
         x = [case.apparent_wind_direction_deg for case in source_cases]
 
@@ -820,9 +864,8 @@ def make_overview_figure(
             wing_cases = [case for case in source_cases if wing_index < len(case.wings)]
 
             wing_label = wing_cases[0].wings[wing_index].label
-            name = source_label if wing_index == 0 else f"{source_label}, {wing_label}"
-            line = dict(color=color, dash=_WING_DASH[wing_index % len(_WING_DASH)])
-            marker_symbol = _WING_MARKER[wing_index % len(_WING_MARKER)]
+            name = wing_label + source_suffix
+            color = _wing_color(wing_index)
 
             rows = (
                 (1, [case.mean["thrust"][wing_index] for case in wing_cases]),
@@ -835,19 +878,19 @@ def make_overview_figure(
                     go.Scatter(
                         x=[case.apparent_wind_direction_deg for case in wing_cases],
                         y=y,
-                        mode="lines+markers",
+                        # Lines only, so that the markers are the reference values
+                        mode="lines",
                         name=name,
-                        # One legend entry per source, which toggles all its traces
-                        legendgroup=source_label,
-                        showlegend=(row == 1 and wing_index == 0),
-                        line=line,
-                        marker=dict(symbol=marker_symbol, size=8),
+                        # One legend entry per wing and source, which toggles it in all rows
+                        legendgroup=name,
+                        showlegend=(row == 1),
+                        line=dict(color=color, dash=dash),
                         text=hover_text(wing_cases),
                     ),
-                    row, setup_name
+                    row, wing_level=True
                 )
 
-            # Reference values of each wing, as open markers
+            # Reference values of each wing, as markers
             for row, key in ((1, "thrust"), (2, "side_force")):
                 for reference_label in reference_labels:
                     points = [
@@ -861,28 +904,29 @@ def make_overview_figure(
                     if points:
                         add_trace(
                             reference_trace(
-                                points, reference_label, setup_name,
+                                points, reference_label, False,
                                 f"{reference_label}, {source_label}, {wing_label}",
-                                dict(symbol=marker_symbol + "-open", size=11, color=color),
+                                dict(symbol=marker_symbol, size=9, color=color),
                             ),
-                            row, setup_name
+                            row, wing_level=True
                         )
 
         # Totals of all wings, with the reference totals
+        total_name = "Total" + source_suffix
+
         for row, key in ((1, "thrust"), (2, "side_force")):
             add_trace(
                 go.Scatter(
                     x=x,
                     y=[case.total_mean[key] for case in source_cases],
-                    mode="lines+markers",
-                    name=f"{source_label}, total",
-                    legendgroup=source_label,
-                    showlegend=False,
-                    line=dict(color=color, width=3),
-                    marker=dict(symbol=_TOTAL_MARKER, size=12),
+                    mode="lines",
+                    name=total_name,
+                    legendgroup=total_name,
+                    showlegend=(row == 1),
+                    line=dict(color=_TOTAL_COLOR, dash=dash, width=3),
                     text=hover_text(source_cases),
                 ),
-                row, setup_name
+                row, total=True
             )
 
             for reference_label in reference_labels:
@@ -896,11 +940,11 @@ def make_overview_figure(
                 if points:
                     add_trace(
                         reference_trace(
-                            points, reference_label, setup_name,
+                            points, reference_label, True,
                             f"{reference_label}, {source_label}, total",
-                            dict(symbol=_TOTAL_MARKER + "-open", size=14, color=color),
+                            dict(symbol=marker_symbol, size=9, color=_TOTAL_COLOR),
                         ),
-                        row, setup_name
+                        row, total=True
                     )
 
     figure.update_yaxes(title_text="C_T [-]", row=1, col=1)
@@ -911,29 +955,33 @@ def make_overview_figure(
         row=3, col=1
     )
 
-    setup_names = _setup_names(cases)
+    if len(sources) > 1:
+        source_text = "Line style: " + ", ".join(
+            f"{source_labels[source]} {_SOURCE_DASH[index % len(_SOURCE_DASH)]}"
+            for index, source in enumerate(sources)
+        )
+    else:
+        source_text = "Source: " + source_labels[sources[0]] if sources else ""
 
-    nr_wings = max((len(case.wings) for case in cases), default=0)
-
-    line_styles = ", ".join(
-        f"wing {index} {_WING_DASH[index % len(_WING_DASH)]}" for index in range(nr_wings)
-    )
-
-    dropdown_y = _header_layout(figure, _OVERVIEW_HEIGHT, 3, has_dropdown=len(setup_names) > 1)
+    # Room for the buttons for the wings and the total
+    menu_position = _figure_layout(figure, 3, 1, _OVERVIEW_SPACING, 0.0, 3, has_dropdown=True)
 
     figure.update_layout(
         title_text=(
             f"<b>Overview</b>: {_setup_names_text(cases)}<br>"
             f"<sub>Means over the last {averaging_fraction:.0%} of the simulated time. Coefficients "
             "relative to the apparent wind at mid-span and the projected area.<br>"
-            f"Color: source. Line style: {line_styles}. Stars: total of all wings. Open markers: "
-            "reference values</sub>"
+            f"Color: wing. {source_text}. Lines: simulations. Markers: reference values</sub>"
         ),
         hovermode="closest",
         legend=dict(groupclick="togglegroup"),
     )
 
-    _add_setup_selector(figure, trace_setups, setup_names, dropdown_y, include_all=False)
+    # The legend shows the entries of the wings or of the total, depending on what is shown
+    add_data_toggle(
+        figure, _WING_TOGGLE_LABELS, [total_traces, wing_traces], x=1.0,
+        keep_legend=False, **menu_position
+    )
 
     return figure
 
@@ -942,10 +990,8 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
     '''
     The simulated against the reference thrust and side force coefficients, of each wing and of all
     wings together, for all cases with reference values. The color shows the wing, and the marker
-    the solver. With several setups, a dropdown menu chooses the setup. None if no case has
-    reference values.
+    the solver. None if no case has reference values.
     '''
-    import plotly.colors # type: ignore[import-not-found, import-untyped, unused-ignore]
     import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
     from plotly.subplots import make_subplots # type: ignore[import-not-found, import-untyped, unused-ignore]
 
@@ -957,14 +1003,13 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
     figure = make_subplots(
         rows=1,
         cols=2,
-        horizontal_spacing=0.1,
+        horizontal_spacing=_COMPARISON_SPACING,
         subplot_titles=(
             "Thrust coefficient",
             "Side force coefficient",
         )
     )
 
-    palette = plotly.colors.qualitative.Plotly
     solver_markers = {CfdSolver.OpenFOAM: "circle", CfdSolver.Stormflow: "square"}
 
     colors = _source_colors(cases)
@@ -975,8 +1020,11 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
         reference.label for case in cases_with_references for reference in case.references
     ))
 
-    trace_setups: list[str | None] = []
     all_values: dict[str, list[float]] = {"thrust": [], "side_force": []}
+
+    # The traces of the individual wings and of the total, of which only one kind is shown at a time
+    wing_traces: list[int] = []
+    total_traces: list[int] = []
 
     for setup_name in setup_names:
         setup_cases = [case for case in cases_with_references if case.setup_name == setup_name]
@@ -1030,10 +1078,15 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
                                 case.wings[wing_index].label for case in solver_cases
                                 if wing_index < len(case.wings)
                             )
-                            color = palette[wing_index % len(palette)]
+                            color = _wing_color(wing_index)
                             symbol = solver_markers.get(solver, "circle") + reference_fill
 
                         name = f"{wing_name}, {solver.value}"
+
+                        if wing_index is None:
+                            total_traces.append(len(figure.data))
+                        else:
+                            wing_traces.append(len(figure.data))
 
                         if len(reference_labels) > 1:
                             name += f" vs. {reference_label}"
@@ -1055,8 +1108,6 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
                             ),
                             row=1, col=col
                         )
-
-                        trace_setups.append(setup_name)
 
     shapes = []
 
@@ -1083,9 +1134,8 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
         figure.update_xaxes(range=[low, high], title_text=f"Reference ({reference_text}) [-]", row=1, col=col)
         figure.update_yaxes(range=[low, high], title_text="Simulation [-]", row=1, col=col)
 
-    dropdown_y = _header_layout(
-        figure, _COMPARISON_HEIGHT, 3, has_dropdown=len(setup_names) > 1
-    )
+    # Room for the buttons for the wings and the total
+    menu_position = _figure_layout(figure, 1, 2, 0.0, _COMPARISON_SPACING, 3, has_dropdown=True)
 
     figure.update_layout(
         title_text=(
@@ -1103,7 +1153,11 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
         hovermode="closest",
     )
 
-    _add_setup_selector(figure, trace_setups, setup_names, dropdown_y, include_all=False)
+    # The legend entries are the wings and the total, so only the entries of the shown kind are kept
+    add_data_toggle(
+        figure, _WING_TOGGLE_LABELS, [total_traces, wing_traces], x=1.0,
+        keep_legend=False, **menu_position
+    )
 
     return figure
 
@@ -1111,8 +1165,7 @@ def make_comparison_figure(cases: list[ReportCase]) -> Any | None:
 def make_detailed_figure(cases: list[ReportCase]) -> Any:
     '''
     Spanwise distributions and force histories for a single case, chosen with a dropdown menu. The
-    color is the color of the source in the overview, and the line style shows the wing. The
-    reference values are only given as numbers in the title, as they have no time history or
+    color shows the wing, with the same colors as in the comparison. The reference values are only given as numbers in the title, as they have no time history or
     spanwise distribution.
     '''
     import plotly.graph_objects as go # type: ignore[import-not-found, import-untyped, unused-ignore]
@@ -1121,8 +1174,8 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
     figure = make_subplots(
         rows=2,
         cols=2,
-        vertical_spacing=0.16,
-        horizontal_spacing=0.09,
+        vertical_spacing=_DETAILED_SPACING[0],
+        horizontal_spacing=_DETAILED_SPACING[1],
         subplot_titles=(
             "Circulation strength (+ gives thrust)",
             "Effective angle of attack (+ gives thrust)",
@@ -1140,11 +1193,8 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
     shapes = []
 
     for case_index, case in enumerate(cases):
-        color = colors[case.source_key()]
-
         for wing_index, wing in enumerate(case.wings):
-            line = dict(color=color, dash=_WING_DASH[wing_index % len(_WING_DASH)])
-            marker = dict(size=5, symbol=_WING_MARKER[wing_index % len(_WING_MARKER)])
+            line = dict(color=_wing_color(wing_index))
 
             if case.distributions is not None:
                 distribution = case.distributions[wing_index]
@@ -1154,12 +1204,11 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
                         go.Scatter(
                             x=distribution["height"],
                             y=distribution[key],
-                            mode="lines+markers",
+                            mode="lines",
                             name=wing.label,
                             legendgroup=f"wing_{wing_index}",
                             showlegend=(col == 1),
                             line=line,
-                            marker=marker,
                             hovertemplate=(
                                 f"{wing.label}<br>height = %{{x:.2f}} m<br>"
                                 f"value = %{{y:.2f}} {unit}<extra></extra>"
@@ -1265,15 +1314,31 @@ def make_detailed_figure(cases: list[ReportCase]) -> Any:
 
     nr_title_lines = max((title.count("<br>") + 1 for title in titles), default=1)
 
-    dropdown_y = _header_layout(figure, _DETAILED_HEIGHT, nr_title_lines, has_dropdown=True)
+    menu_position = _figure_layout(
+        figure, 2, 2, *_DETAILED_SPACING, nr_title_lines, has_dropdown=True
+    )
 
     if len(cases) > 0:
         add_dropdown(
             figure, labels, titles, trace_group_index, shapes=shapes,
-            x=0.0, y=dropdown_y, yanchor="top",
+            x=0.0, **menu_position,
         )
 
     return figure
+
+
+def _report_figures(cases: list[ReportCase], averaging_fraction: float) -> list[Any]:
+    '''The overview, the comparison, if there is reference data, and the detailed view'''
+    figures = [make_overview_figure(cases, averaging_fraction)]
+
+    comparison = make_comparison_figure(cases)
+
+    if comparison is not None:
+        figures.append(comparison)
+
+    figures.append(make_detailed_figure(cases))
+
+    return figures
 
 
 def sails_on_ship_report(
@@ -1301,15 +1366,28 @@ def sails_on_ship_report(
     if len(cases) == 0:
         raise ValueError(f"No result files for the report in {results_folder}")
 
-    figures = [make_overview_figure(cases, averaging_fraction)]
+    setup_names = _setup_names(cases)
 
-    comparison = make_comparison_figure(cases)
+    if len(setup_names) == 1:
+        write_html(
+            _report_figures(cases, averaging_fraction), output_path, title=REPORT_TITLE,
+            max_width=REPORT_MAX_WIDTH
+        )
+    else:
+        # One group of figures for each setup, chosen with a dropdown menu at the top of the page
+        groups = [
+            (
+                _setup_label(setup_name),
+                _report_figures(
+                    [case for case in cases if case.setup_name == setup_name], averaging_fraction
+                ),
+            )
+            for setup_name in setup_names
+        ]
 
-    if comparison is not None:
-        figures.append(comparison)
-
-    figures.append(make_detailed_figure(cases))
-
-    write_html(figures, output_path)
+        write_html_with_selector(
+            groups, output_path, selector_label="Setup", title=REPORT_TITLE,
+            max_width=REPORT_MAX_WIDTH
+        )
 
     return output_path
