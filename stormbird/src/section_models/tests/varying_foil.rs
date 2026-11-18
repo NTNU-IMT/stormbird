@@ -166,6 +166,18 @@ fn two_sided_data_is_used_directly() {
     assert_same_coefficients(&varying_foil.get_foil(0.5), &positive_foil);
 }
 
+/// A NaN internal state should give a clear error, and not an index out of bounds in the lookup
+#[test]
+#[should_panic(expected = "internal state of the varying foil is NaN")]
+fn nan_internal_state_gives_a_clear_error() {
+    let varying_foil = VaryingFoil::new(
+        vec![0.0, 0.018, 0.027, 0.036, 0.05],
+        vec![Foil::default(); 5]
+    ).unwrap();
+
+    varying_foil.get_foil(Float::NAN);
+}
+
 #[test]
 fn invalid_data_is_rejected() {
     assert!(VaryingFoil::new(vec![], vec![]).is_err());
