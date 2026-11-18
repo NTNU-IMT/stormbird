@@ -100,6 +100,7 @@ Setting up the lifting line simulation and the controller for a complete sail mo
 | `GenericTwoElementWingSail` | Wing sail with a flap. The internal state is the flap angle | Best guess |
 | `RotorSailDeybach2024` | Rotor sail | Lift fitted to Deybach (2024), *Aerodynamics of the Flettner rotor at high Reynolds number* |
 | `RotorSailOstman2023` | Rotor sail | Lift fitted to Ostman (2023), *Calculation of Flettner rotor forces using lifting line and CFD methods* |
+| `RotorSailTillig2020` | Rotor sail | Lift fitted to the empirical model in Tillig and Ringsberg (2020), *Design, operation and analysis of wind-assisted cargo ships*, which is based on CFD corrected to full-scale measurements, and gives considerably higher lift than the other rotor sail models |
 | `SuctionSailCharrier1985` | Suction sail. The internal state is the fan power | Tuned to the wind tunnel data for the original TurboSail in Charrier et al. (1985) |
 
 The names indicate whether a model is a generic best guess, or tuned to a specific source. None of the models are intended to represent a specific commercial sail. Each model is a `SailDefinition` that contains:
