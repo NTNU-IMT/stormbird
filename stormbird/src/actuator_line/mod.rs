@@ -250,8 +250,34 @@ impl ActuatorLine {
         }
     }
 
+    /// The circulation strength from the last simulation result, both the circulation that the
+    /// forces on the wings are computed from and the circulation that the projected forces are
+    /// computed from. Zero before the first time step.
+    fn last_circulation_strengths(&self) -> (Vec<Float>, Vec<Float>) {
+        if let Some(result) = &self.simulation_result {
+            (
+                result.force_input.circulation_strength.clone(),
+                self.projected_circulation_strength.clone()
+            )
+        } else {
+            let zero_strength = vec![0.0; self.line_force_model.nr_span_lines()];
+
+            (zero_strength.clone(), zero_strength)
+        }
+    }
+
+    /// Updates the wake model of the lifting line correction, if present, based on the current
+    /// sampled velocity at the control points. Called at the start of each call to
+    /// [`solve`](ActuatorLine::solve).
+    pub fn update_lifting_line_correction(&mut self) {
+        if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
+            lifting_line_correction.update(&self.line_force_model, &self.ctrl_points_velocity);
+        }
+    }
+
     /// Computes a corrected velocity at the control points, based on the sampling settings, and,
-    /// if present, the lifting line correction.
+    /// if present, the lifting line correction. The wake model of the lifting line correction must
+    /// be updated first, see [`update_lifting_line_correction`](Self::update_lifting_line_correction).
     pub fn corrected_ctrl_points_velocity(&self, time: Float) -> Vec<SpatialVector> {
         let mut corrected_velocity = if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
@@ -264,16 +290,7 @@ impl ActuatorLine {
 
         if let Some(lifting_line_correction) = &self.lifting_line_correction {
             let (last_circulation_strength, last_projected_circulation_strength) =
-                if let Some(result) = &self.simulation_result {
-                    (
-                        result.force_input.circulation_strength.clone(),
-                        self.projected_circulation_strength.clone()
-                    )
-                } else {
-                    let zero_strength = vec![0.0; self.line_force_model.nr_span_lines()];
-
-                    (zero_strength.clone(), zero_strength)
-                };
+                self.last_circulation_strengths();
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
@@ -324,6 +341,8 @@ impl ActuatorLine {
     /// Takes the estimated velocity at the control points as input and calculates a simulation
     /// result from the line force model.
     pub fn solve(&mut self, time: Float, _time_step: Float) -> SolverResult {
+        self.update_lifting_line_correction();
+
         let corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
 
         let angles_of_attack = self.line_force_model.angles_of_attack(

@@ -87,10 +87,15 @@ impl ActuatorLineBuilder {
     }
 
     /// Checks that the settings are consistent. At the moment, this checks the settings of the line
-    /// force model, see [`LineForceModelBuilder::check_settings`], and that the number of
-    /// iterations between each full result is written is not zero.
+    /// force model, see [`LineForceModelBuilder::check_settings`], the settings of the lifting line
+    /// correction, if used, see [`LiftingLineCorrectionBuilder::check_settings`], and that the
+    /// number of iterations between each full result is written is not zero.
     pub fn check_settings(&self) -> Result<(), Error> {
         self.line_force_model.check_settings()?;
+
+        if let Some(lifting_line_correction) = &self.lifting_line_correction {
+            lifting_line_correction.check_settings()?;
+        }
 
         if self.write_iterations_full_result == 0 {
             return Err(Error::invalid_input(
@@ -135,7 +140,7 @@ impl ActuatorLineBuilder {
             );
 
             Some(
-                lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)
+                lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)?
             )
         } else {
             None

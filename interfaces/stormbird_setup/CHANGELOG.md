@@ -8,7 +8,10 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 - `neglect_self_induced_velocities` is moved from the `DynamicWakeBuilder` to `InducedVelocitySettings`, so that it is set in the solver, and also works for quasi-steady simulations.
 - `SolverType.solver` in the default sails takes an `induced_velocities` argument instead of `velocity_corrections`, and `rotor_sail_velocity_corrections` is renamed to `rotor_sail_induced_velocities`. The rotor sails use the same limit as before, now as a `total_correction`.
 
+- `wake_length_factor` and `virtual_extension_factors` in the `LiftingLineCorrectionBuilder` are moved to the new `StraightWakeBuilder`, which is the default value of the new `wake` field, following the new settings in Stormbird 0.14.0. The other settings are unchanged. Requires Stormbird 0.14.0 or newer.
+
 ### Features
+- New `StraightPanelWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a straight wake that is split into panels, where the reference core length can grow downstream with the `reference_core_evolution_length_factor`. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer.
 - New `self_induced_correction` in `InducedVelocitySettings`, with the new `SelfInducedVelocityCorrection` class, to limit the self-induced velocities only.
 
 ## 0.13.1 - 2026-11-20

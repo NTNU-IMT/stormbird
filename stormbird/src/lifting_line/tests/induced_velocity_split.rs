@@ -21,6 +21,8 @@ use crate::lifting_line::singularity_elements::symmetry_condition::SymmetryCondi
 
 use stormath::type_aliases::Float;
 
+use crate::test_utils::tolerance;
+
 /// Three wings at different positions and with different number of line elements, close enough
 /// to each other to give significant wing-to-wing interactions
 fn line_force_model_builder() -> LineForceModelBuilder {
@@ -89,7 +91,7 @@ fn assert_split_is_equal(
 
     assert!(max_value > 1e-3, "The test case should have non-zero induced velocities");
 
-    let tolerance = 1e-10 * max_value;
+    let tolerance = tolerance(1e-10, 1e-4) * max_value;
 
     for i in 0..induced_velocities.len() {
         let self_error = (induced_velocities.self_induced[i] - reference_self_induced[i]).length();
@@ -177,7 +179,7 @@ fn check_dynamic_wake(symmetry_condition: SymmetryCondition, steady_state_streng
         let total_wake = wake.induced_velocities(ctrl_points);
 
         for (u_i, u_i_wake) in total.iter().zip(&total_wake) {
-            assert!((*u_i - *u_i_wake).length() < 1e-10 * u_i_wake.length().max(1.0));
+            assert!((*u_i - *u_i_wake).length() < tolerance(1e-10, 1e-4) * u_i_wake.length().max(1.0));
         }
     }
 }

@@ -91,7 +91,7 @@ impl DynamicWake {
     ///
     /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom
     /// left corner when viewing the panel from above.
-    fn panel_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
+    pub fn panel_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
         let wing_index = self.wing_index(panel_span_index);
 
         [

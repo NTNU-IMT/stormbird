@@ -55,41 +55,49 @@ Committed in `86e485a`. Summary:
   steps within 0-3 % of the previous version. Lesson: the panels must be visited in storage order;
   a column-wise traversal was 1.5x slower.
 
-## Step 1: restructure the correction and add `StraightPanels`  `[~]`
+## Step 1: restructure the correction and add `StraightPanels`  `[x]`
 
 Structure: `stormbird/src/actuator_line/corrections/lifting_line/`
-- `mod.rs`: `LiftingLineCorrection`, the runtime `CorrectionWake` enum, `update` (geometry and
-  state, `&mut self`, called in `do_step` before solving) and `velocity_correction` (`&self`,
-  evaluation: initialization ramp and `max_correction_ratio` applied here, as before).
-- `builder.rs`: `LiftingLineCorrectionBuilder`, `CorrectionWakeBuilder` and the builders for each
-  variant, with `check_settings`.
-- `straight.rs`: the horseshoe model (previous behaviour, including virtual extensions). One
-  implementation for isolated wings and wing interactions, using the column ranges of each wing.
-- `panel_wake.rs`: `PanelWakePair` (viscous and reference `DynamicWake`), the induced velocity
-  kernel with the self/other split, and the core length evolution along the wake.
+- `mod.rs`: `LiftingLineCorrection` (shared `CorrectionSettings`, `initialization_time`,
+  `max_correction_ratio`, `wake: CorrectionWake`), `update` (geometry and state, `&mut self`,
+  called from `ActuatorLine::solve` through `update_lifting_line_correction`) and
+  `velocity_correction` (`&self`, evaluation; the initialization ramp and `max_correction_ratio`
+  are applied here, as before).
+- `builder.rs`: `LiftingLineCorrectionBuilder`, `CorrectionWakeBuilder` (`Straight`,
+  `StraightPanels`), `StraightWakeBuilder`, `StraightPanelWakeBuilder`, and `check_settings`.
+- `straight.rs`: horseshoe model, previous behaviour including virtual extensions. One
+  implementation for isolated wings and wing interactions: the columns (line elements) included for
+  a control point are the wing's own range, or all.
+- `straight_panels.rs`: `StraightPanelWake`, geometry `x_k = L (k/N)^p` along the sampled velocity
+  direction, rebuilt in each `update`.
+- `panel_wake.rs`: `PanelWakePair` (viscous and reference `DynamicWake`, same geometry), the
+  induced velocity kernel, and `core_lengths_along_wake` (distance along the streamwise lines,
+  average of the four panel corners, sine blend). Shared with the dynamic wake in step 2a. The
+  kernel takes `nr_rows_with_given_strength`: all rows for `StraightPanels`, the first row for
+  `Dynamic` (the rest use the stored strengths).
 - `tests.rs`
 
-Induced velocity kernel for the panel wakes: for each control point, loop over the streamwise rows
-in storage order, and within each row over the column segments before, inside and after the wing of
-the point (only inside for isolated wings). The strength of a row is either the given circulation
-(first row, or all rows for `StraightPanels`) or the stored strength from earlier time steps
-(`Dynamic`). The correction is then a pure function of the inputs and the stored wake state.
+Results:
+- `Straight` gives the same correction as before the restructuring (max relative difference 6e-16
+  for a three-wing case, isolated and with interactions; checked with a temporary test against the
+  output of the old code).
+- `StraightPanels` with constant core differs from `Straight` by up to 3.6 % at the outermost
+  control points. Cause: the viscous core term in `VortexLine` uses the distance to the closest
+  point on the segment, so a trailing vortex split into segments is damped less than one long line
+  close to its start. Not a bug, documented in the test and the book.
+- With `reference_core_evolution_length_factor = 2` and a downstream wing 10 chords behind, the
+  correction from the upstream wing at the downstream wing goes from 1.0 to 2e-15.
+- Timing (3 wings x 40 elements, symmetry, per call of update + correction):
+  `Straight` 0.6 ms isolated / 1.8 ms with interactions; `StraightPanels` (50 panels) 5.4 / 14.8 ms
+  serial, 2.0 / 4.4 ms with `parallel`. Run with
+  `cargo test --release lifting_line_correction_benchmark -- --ignored --nocapture`.
+- Python (`stormbird_setup.actuator_line`: `StraightWakeBuilder`, `StraightPanelWakeBuilder`),
+  book (`actuator_line/corrections.md`) and change logs are updated. Python only syntax-checked
+  (no pydantic in the local Python).
 
-Geometry of `StraightPanels`: points at distances `x_k = L (k/N)^p` along the direction of the
-sampled velocity at each span point, where `L` is the wake length, `N` the number of panels and `p`
-is chosen so that the first panel has the given length. Rebuilt in each call to `update`.
-
-Tasks:
-- [ ] Capture the output of the current correction for a multi-wing case, to check that the
-      `Straight` variant gives the same results after the restructuring (temporary check)
-- [ ] Folder structure, builder and runtime enum
-- [ ] `Straight` with one implementation for isolated and all wings
-- [ ] `StraightPanels`, with the reference core evolution
-- [ ] Tests: `Straight` unchanged; `StraightPanels` with constant core is close to `Straight`;
-      the correction from the far wake goes to zero with core evolution; isolated vs all wings for
-      a single wing; settings checks
-- [ ] Timing of the correction for a typical case
-- [ ] Python (`stormbird_setup.actuator_line.corrections`), book, change logs
+Possible later optimization, if the cost of `StraightPanels` matters: fewer panels (the cost is
+proportional), or skipping the panels beyond the evolution length when the reference and the
+projected circulation are equal (the two wakes then cancel exactly there).
 
 ## Step 2a: dynamic wake in Stormbird  `[ ]`
 
@@ -119,3 +127,9 @@ Tasks:
 ## Open questions
 
 - How virtual extensions should work for the panel wakes, in particular the dynamic wake.
+
+## Notes
+
+- `controller::set_points::tests::limit_angle_takes_the_shortest_way_across_pi` fails with the
+  `single_precision` feature (used by Stormflow). It is from 0.13.1 and not related to this work.
+  All other tests pass in single and double precision, with and without `parallel`.

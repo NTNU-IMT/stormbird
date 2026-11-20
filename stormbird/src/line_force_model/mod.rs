@@ -272,6 +272,11 @@ impl LineForceModel {
         panic!("Line element index not found. The span point index is not part of any wing")
     }
 
+    /// The average chord length of all line elements in the model
+    pub fn average_chord_length(&self) -> Float {
+        self.chord_lengths.iter().sum::<Float>() / self.chord_lengths.len() as Float
+    }
+
     /// Finds the wing index from the global index of a line element.
     pub fn wing_index_from_global(&self, global_index: usize) -> usize {
         for (wing_index, wing_indices) in self.wing_indices.iter().enumerate() {
