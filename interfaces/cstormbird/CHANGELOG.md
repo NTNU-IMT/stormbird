@@ -2,6 +2,13 @@
 
 This file contains an overview of the changes made to cstormbird, the C interface to the Stormbird library. The version number of cstormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.13.1 - 2026-11-20
+### Changes
+- Depends on the published version of Stormbird 0.13.1, which contains bug fixes and one small feature. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for details. The C functions and the header are unchanged. The changes that are relevant for users of the C interface are:
+    - The setup strings for the line force model accept the new `internal_states` field, with one initial internal state for each wing, in the same way as `local_wing_angles`.
+    - The rate limit of the local wing angles in the controller (`max_local_wing_angle_change_rate`) works correctly when the wing angle crosses pi. Before, the wings could be turned the wrong way and get stuck, typically with stalled sails.
+    - Suction sails with the `PowerToInternalFlow` conversion no longer panic for very small, but non-zero, powers.
+
 ## 0.13.0 - 2026-11-14
 ### Breaking changes
 - Depends on the published versions of Stormbird 0.13.0 and Stormath 0.5.0. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for the changes to the underlying models, which also cover the changes in Stormbird 0.12.0. The most important ones for users of the C interface are:
