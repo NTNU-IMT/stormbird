@@ -2,6 +2,10 @@
 
 Status legend: `[x]` done, `[~]` in progress, `[ ]` not started.
 
+**Current state:** steps 0 and 1 are done and committed (`86e485a`, `a900e6a`). Step 2a is next,
+see its section for the detailed design. Run the tests with `cargo test --release` in `stormbird`
+(also with `--features parallel` and `--features single_precision`).
+
 ## Goal
 
 The lifting line correction (Dag and Sørensen, 2020) adds the difference in induced velocity
@@ -99,20 +103,90 @@ Possible later optimization, if the cost of `StraightPanels` matters: fewer pane
 proportional), or skipping the panels beyond the evolution length when the reference and the
 projected circulation are equal (the two wakes then cancel exactly there).
 
-## Step 2a: dynamic wake in Stormbird  `[ ]`
+## Step 2a: dynamic wake in Stormbird  `[ ]`  <- NEXT STEP
 
-- `CorrectionWake::Dynamic`: `PanelWakePair` plus the velocity at the wake points and the time of
-  the last update.
-- The wake is advanced once per new time step in `update` (same check as for the dynamic stall
-  models, so that outer iterations in the CFD solver do not advance it): set the strength of the
-  first row from the previous circulation, store the sampled velocities, stream the points and the
-  strengths, update the core lengths and the panels.
-- The wake points move with the sampled CFD velocity only (it already contains the induced
-  velocities from the actuator line), so no induced velocity calculation on the wake points.
-- New functions on `ActuatorLine`: `wake_points_to_sample`, `set_wake_point_velocity_at_index` and
-  a slice version. Non-finite velocities (e.g. points outside the domain) keep the previous value.
-- Tests in Stormbird with a prescribed velocity field (no CFD): the dynamic wake converges to the
-  straight panel wake for a uniform velocity.
+Paused by the user before any code was written (the working tree was clean after `a900e6a`). The
+design below is ready to implement. Confirm with the user before starting, as they may want to
+adjust it.
+
+### Builder (`builder.rs`)
+New variant `CorrectionWakeBuilder::Dynamic(DynamicCorrectionWakeBuilder)` with:
+- `nr_panels_per_line_element` (default 100, at least 2)
+- `first_panel_relative_length` (default 0.75, positive), relative to the average chord length
+- `last_panel_relative_length` (default 1.0, positive)
+- `first_wake_points_direction: FirstWakePointsDirection` (default `Freestream`)
+- `shape_damping_factor` (default 0.0, in [0, 1])
+- `reference_core_evolution_length_factor: Option<Float>` (same meaning as for `StraightPanels`)
+- `far_field_ratio` (default 5.0)
+
+Built into a `DynamicWakeBuilder` with `steady_state_strength_update: false` and
+`ratio_of_wake_affected_by_induced_velocities: 0.0`, then `PanelWakePair::new` (which sets the
+core lengths and the symmetry condition). Add the checks to `check_settings`.
+
+### Runtime (`dynamic.rs`, new file)
+```rust
+pub struct DynamicCorrectionWake {
+    pub wakes: PanelWakePair,
+    /// Sampled velocity at the points of the wake (same geometry for both wakes)
+    pub wake_points_velocity: Vec<SpatialVector>,
+    /// Time of the last update, to detect new time steps
+    last_update_time: Option<Float>,
+}
+```
+Add `CorrectionWake::Dynamic(DynamicCorrectionWake)`.
+
+`update` needs more input than today: the previous circulation (reference and projected), the time
+and the time step. Change `LiftingLineCorrection::update` to take them, and
+`ActuatorLine::update_lifting_line_correction(time, time_step)` to pass them, using the existing
+private `last_circulation_strengths`. `ActuatorLine::solve` already has `time` and `time_step`
+(rename `_time_step`).
+
+Logic in `DynamicCorrectionWake::update`:
+1. First call (`last_update_time` is `None`): mean of the sampled control point velocities `U`;
+   for both wakes `initialize_with_velocity_and_time_step(lfm, U, time_step)` (straight wake with
+   the full length, zero strength); `wake_points_velocity = vec![U; nr_points]`;
+   `wakes.update_panels(settings)`.
+2. New time step (`time > last_update_time`), for both wakes, with the projected circulation for
+   the viscous wake and the reference circulation for the reference wake:
+   - `wake.update_after_solving(previous_circulation, &wake_points_velocity)`: first row strength
+     and the stored velocity at the points (no induced velocities, as the ratio is zero)
+   - `wake.update_wake_points_before_solving(time_step, lfm, ctrl_points_velocity)`: sync to the
+     wing geometry, Euler step of the points, first and last row
+   - `wake.stream_strength_values_downstream()`
+
+   then `wakes.update_panels(settings)` (core lengths along the wake, and the panel data).
+3. Same time as the last update (outer iterations in the CFD solver): do nothing.
+
+Evaluation: `wakes.induced_velocity_difference(..., nr_rows_with_given_strength = 1)`, so the first
+row gets the current circulation and the rest use the stored history.
+
+The wake points move with the sampled CFD velocity only (it already contains the induced
+velocities from the actuator line). Euler forward: the velocity sampled at time t, at the positions
+from the last update, moves the points to the positions used at time t.
+
+### `ActuatorLine` interface (Rust, used by the CFD interfaces in step 2b)
+- `wake_points_to_sample(&self) -> &[SpatialVector]`: the points of the reference wake, empty
+  unless the wake is `Dynamic`
+- `nr_wake_points_to_sample(&self) -> usize`
+- `set_wake_point_velocity_at_index(&mut self, index, velocity)` and
+  `set_wake_points_velocity(&mut self, &[SpatialVector])`. Non-finite values (e.g. points outside
+  the domain, OpenFOAM returns VGREAT) keep the previous value.
+
+### Tests (no CFD, prescribed velocities)
+- For a uniform velocity and constant circulation, the dynamic correction converges (after more
+  steps than panels) to the `Straight` correction with the same wake length, within a few percent
+  (see the segmentation effect in step 1).
+- Calling `update` several times with the same time does not move the wake; a new time does.
+- The wake follows the sampled wake point velocities, e.g. a sideways component moves the points
+  sideways.
+- The strength of row k is the circulation from k time steps earlier.
+- Non-finite velocities are ignored by the setter.
+- Settings checks and JSON.
+
+Then: book (`actuator_line/corrections.md`, add the dynamic wake and the sampling of the wake
+points), change logs (Stormbird, stormbird_setup), Python (`DynamicCorrectionWakeBuilder` in
+`stormbird_setup.actuator_line.corrections`, and the `wake` union and (de)serializer in
+`LiftingLineCorrectionBuilder`), this plan.
 
 ## Step 2b: CFD interfaces  `[ ]`
 
