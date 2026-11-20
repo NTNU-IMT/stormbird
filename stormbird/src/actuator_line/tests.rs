@@ -232,6 +232,7 @@ fn dynamic_correction_wake_points_through_the_actuator_line() {
     actuator_line.ctrl_points_velocity = vec![velocity; actuator_line.line_force_model.nr_span_lines()];
 
     assert_eq!(actuator_line.nr_wake_points_to_sample(), 0);
+    assert!(actuator_line.correction_wake_as_vtk(false).is_none());
 
     actuator_line.do_step(0.0, TIME_STEP);
 
@@ -268,4 +269,14 @@ fn dynamic_correction_wake_points_through_the_actuator_line() {
     let circulation = &actuator_line.simulation_result.as_ref().unwrap().force_input.circulation_strength;
 
     assert!(circulation.iter().all(|value| value.is_finite() && *value != 0.0));
+
+    // The wake can be written to a file
+    let file_path = std::env::temp_dir().join(format!("stormbird_correction_wake_{}.vtk", std::process::id()));
+
+    assert!(actuator_line.write_correction_wake_to_vtk_file(&file_path, true).unwrap());
+
+    let content = std::fs::read(&file_path).unwrap();
+    std::fs::remove_file(&file_path).unwrap();
+
+    assert_eq!(Some(content), actuator_line.correction_wake_as_vtk(true));
 }

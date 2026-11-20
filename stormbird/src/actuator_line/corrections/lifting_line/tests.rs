@@ -755,6 +755,75 @@ fn non_finite_wake_point_velocities_are_ignored() {
 }
 
 #[test]
+/// The panel wakes can be exported as VTK, with the geometry and the strength of the panels, and
+/// the sampled velocity at the points for the dynamic wake. The straight wake has no panels.
+fn correction_wake_can_be_exported_as_vtk() {
+    let (line_force_model, velocity, _) = single_wing();
+    let nr_span_lines = line_force_model.nr_span_lines();
+
+    let reference_circulation = vec![3.0; nr_span_lines];
+    let projected_circulation = vec![2.0; nr_span_lines];
+    let nr_panels = 10;
+
+    let vtk_text = |correction: &LiftingLineCorrection| -> Option<String> {
+        correction.wake_as_vtk(&reference_circulation, &projected_circulation, false)
+            .map(|content| String::from_utf8(content).unwrap())
+    };
+
+    let build = |wake| LiftingLineCorrectionBuilder { wake, ..Default::default() }
+        .build(VISCOUS_CORE_LENGTH_FACTOR, &line_force_model).unwrap();
+
+    // The straight wake has nothing to export
+    let mut straight = build(CorrectionWakeBuilder::default());
+    update_static(&mut straight, &line_force_model, &velocity);
+
+    assert!(vtk_text(&straight).is_none());
+
+    let mut straight_panels = build(CorrectionWakeBuilder::StraightPanels(StraightPanelWakeBuilder {
+        nr_panels_per_line_element: nr_panels,
+        ..Default::default()
+    }));
+
+    let mut dynamic = build(dynamic_with_nr_panels(nr_panels));
+
+    // The geometry is set in the first update
+    assert!(vtk_text(&straight_panels).is_none());
+    assert!(vtk_text(&dynamic).is_none());
+
+    update_static(&mut straight_panels, &line_force_model, &velocity);
+    update_at_step(&mut dynamic, &line_force_model, &velocity, &reference_circulation, 0);
+
+    let nr_points = (nr_span_lines + 1) * (nr_panels + 1);
+    let nr_polygons = nr_span_lines * nr_panels;
+
+    for (correction, has_point_data) in [(&straight_panels, false), (&dynamic, true)] {
+        let text = vtk_text(correction).unwrap();
+
+        assert!(text.contains(&format!("POINTS {} float", nr_points)));
+        assert!(text.contains(&format!("POLYGONS {} {}", nr_polygons, 5 * nr_polygons)));
+
+        for name in ["reference_strength", "projected_strength", "reference_core_length", "viscous_core_length"] {
+            assert!(text.contains(&format!("SCALARS {} float 1", name)), "{name}");
+        }
+
+        assert_eq!(text.contains("VECTORS sampled_velocity float"), has_point_data);
+
+        // The first row of panels has the given circulation
+        let reference_values: Vec<Float> = text.split("SCALARS reference_strength float 1\nLOOKUP_TABLE default\n")
+            .nth(1).unwrap()
+            .lines().take(nr_polygons)
+            .map(|line| line.parse().unwrap())
+            .collect();
+
+        assert!(reference_values[..nr_span_lines].iter().all(|value| *value == 3.0));
+    }
+
+    let binary = dynamic.wake_as_vtk(&reference_circulation, &projected_circulation, true).unwrap();
+
+    assert!(binary.starts_with(b"# vtk DataFile Version 3.0"));
+}
+
+#[test]
 fn invalid_settings_are_reported() {
     let (line_force_model, _, _) = single_wing();
 

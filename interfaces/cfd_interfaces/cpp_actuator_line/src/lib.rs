@@ -8,6 +8,8 @@ use stormbird::line_force_model::wing_internal_state::WingInternalState;
 
 use stormath::spatial_vector::SpatialVector;
 
+use std::path::Path;
+
 #[cxx::bridge(namespace="stormbird_interface")]
 mod ffi {
     struct DominatingLineWeight {
@@ -48,6 +50,11 @@ mod ffi {
 
         fn set_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]);
 
+        // ---- Wake points of the dynamic lifting line correction ----
+        fn nr_wake_points_to_sample(&self) -> usize;
+        fn get_wake_point_at_index(&self, index: usize) -> [f64; 3];
+        fn set_wake_point_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]);
+
         fn dominating_line_element_and_weight_at_point(&self, point: &[f64; 3]) -> DominatingLineWeight;
 
         // ---- Force methods ----
@@ -62,6 +69,7 @@ mod ffi {
 
         // ---- Export data ----
         fn write_results(&self, folder_path: &str);
+        fn write_correction_wake(&self, folder_path: &str, time_name: &str, time: f64);
     }
 }
 
@@ -160,6 +168,22 @@ impl CppActuatorLine {
         self.model.ctrl_points_velocity[index] = SpatialVector::from(velocity);
     }
 
+    /// The number of points in the wake of the lifting line correction where the velocity must be
+    /// sampled. Zero unless the correction uses the dynamic wake, and before the first time step.
+    fn nr_wake_points_to_sample(&self) -> usize {
+        self.model.nr_wake_points_to_sample()
+    }
+
+    fn get_wake_point_at_index(&self, index: usize) -> [f64; 3] {
+        self.model.wake_points_to_sample()[index].into()
+    }
+
+    /// Sets the sampled velocity at a wake point. Values that are not finite are ignored, so that
+    /// the previous value is kept.
+    fn set_wake_point_velocity_at_index(&mut self, index: usize, velocity: [f64; 3]) {
+        self.model.set_wake_point_velocity_at_index(index, SpatialVector::from(velocity));
+    }
+
     fn dominating_line_element_and_weight_at_point(&self, point: &[f64; 3]) -> ffi::DominatingLineWeight {
         let (line_index, weight) = self.model.dominating_line_element_and_weight_at_point(
             SpatialVector::from(*point)
@@ -198,5 +222,60 @@ impl CppActuatorLine {
                 folder_path, error
             );
         }
+    }
+
+    /// Writes the wake of the lifting line correction as a legacy VTK file in the given folder,
+    /// with the name `correction_wake_<time_name>.vtk`, and adds it to the ParaView series file
+    /// `correction_wake.vtk.series` in the same folder, so that the files can be opened as one time
+    /// series. Entries in the series file at or after the given time are replaced, e.g., after a
+    /// restart. Does nothing if the correction has no panel wake. Errors are printed as a warning,
+    /// so that the simulation can continue.
+    pub fn write_correction_wake(&self, folder_path: &str, time_name: &str, time: f64) {
+        if let Err(error) = self.try_write_correction_wake(folder_path, time_name, time) {
+            eprintln!(
+                "Warning: failed to write the lifting line correction wake to {}: {}",
+                folder_path, error
+            );
+        }
+    }
+
+    fn try_write_correction_wake(
+        &self,
+        folder_path: &str,
+        time_name: &str,
+        time: f64
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(content) = self.model.correction_wake_as_vtk(true) else {
+            return Ok(());
+        };
+
+        let folder = Path::new(folder_path);
+
+        std::fs::create_dir_all(folder)?;
+
+        let file_name = format!("correction_wake_{}.vtk", time_name);
+
+        std::fs::write(folder.join(&file_name), content)?;
+
+        let series_path = folder.join("correction_wake.vtk.series");
+
+        let mut files: Vec<serde_json::Value> = match std::fs::read_to_string(&series_path) {
+            Ok(text) => {
+                let series: serde_json::Value = serde_json::from_str(&text)?;
+
+                series["files"].as_array().cloned().unwrap_or_default()
+            },
+            Err(_) => Vec::new(),
+        };
+
+        files.retain(|entry| entry["time"].as_f64().is_some_and(|entry_time| entry_time < time));
+
+        files.push(serde_json::json!({"name": file_name, "time": time}));
+
+        let series = serde_json::json!({"file-series-version": "1.0", "files": files});
+
+        std::fs::write(&series_path, serde_json::to_string_pretty(&series)?)?;
+
+        Ok(())
     }
 }

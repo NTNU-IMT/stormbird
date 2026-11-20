@@ -72,6 +72,25 @@ impl Simulation {
         PyBytes::new(py, &content)
     }
 
+    /// Writes the wake of the lifting line correction in the actuator line model to a VTK legacy
+    /// file, with the geometry, the strength and the core length of the panels, and the sampled
+    /// velocity at the points for the dynamic wake. Returns False, without writing a file, if there
+    /// is nothing to export: no lifting line correction, the straight wake, which has no panels, or
+    /// before the first time step of the actuator line model.
+    pub fn export_correction_wake_as_vtk(&self, file_path: String, binary: bool) -> PyResult<bool> {
+        self.data.export_correction_wake_as_vtk(&file_path, binary).map_err(|e| {
+            PyValueError::new_err(format!("Failed to export the correction wake to {}: {}", file_path, e))
+        })
+    }
+
+    /// Returns the VTK legacy file content of the wake of the lifting line correction as raw
+    /// bytes, see `export_correction_wake_as_vtk`, or None if there is nothing to export. The
+    /// content is PolyData, which can be read with `vtk.vtkPolyDataReader` in the same way as
+    /// described for `fields_as_vtk`.
+    pub fn correction_wake_as_vtk<'py>(&self, py: Python<'py>, binary: bool) -> Option<Bound<'py, PyBytes>> {
+        self.data.correction_wake_as_vtk(binary).map(|content| PyBytes::new(py, &content))
+    }
+
     pub fn get_stormbird_simulation_result(&self) -> Option<SimulationResult> {
         if let Some(actuator_line) = &self.data.actuator_line {
             if let Some(result) = &actuator_line.model.simulation_result {

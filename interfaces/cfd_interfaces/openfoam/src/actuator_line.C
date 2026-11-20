@@ -239,6 +239,11 @@ void Foam::fv::ActuatorLine::add(
     double time = mesh().time().value();
     vectorField& equation_source = eqn.source();
 
+    // Some of the work is only done in the first call of each time step, and not in the outer
+    // iterations
+    const bool new_time_step = time > this->last_time;
+    this->last_time = time;
+
     // Synchronize the line force model state across all processors
     this->sync_line_force_model_state();
 
@@ -262,8 +267,19 @@ void Foam::fv::ActuatorLine::add(
         this->set_integrated_weighted_velocity(velocity_field);
     }
 
+    // The wake of a dynamic lifting line correction is moved once per time step, with the velocity
+    // at the start of the time step, at the positions from the previous time step
+    if (new_time_step) {
+        this->set_wake_points_velocity(velocity_field);
+    }
+
     // Calculate the circulation
     this->model->do_step(time, time_step);
+
+    // The wake of the correction is written together with the other fields
+    if (new_time_step && mesh().time().writeTime()) {
+        this->write_correction_wake();
+    }
 
     // Apply the body force to the equation source
     forAll(cell_ids, i) {
@@ -305,4 +321,18 @@ void Foam::fv::ActuatorLine::add(
         this->model->write_results("postProcessing");
     }
     reduce(this->need_update, orOp<bool>());
+}
+
+void Foam::fv::ActuatorLine::write_correction_wake() const {
+    if (!Pstream::master()) {
+        return;
+    }
+
+    const fileName folder = mesh().time().globalPath() / "postProcessing" / "correctionWake";
+
+    this->model->write_correction_wake(
+        folder,
+        openfoam_compatibility::time_name(mesh().time()),
+        mesh().time().value()
+    );
 }

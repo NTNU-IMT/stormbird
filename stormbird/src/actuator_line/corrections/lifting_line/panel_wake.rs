@@ -19,6 +19,7 @@ use crate::lifting_line::wake::dynamic_wake::builder::{
     ViscousCoreLengthEvolution,
 };
 use crate::lifting_line::wake::settings::ViscousCoreLength;
+use crate::lifting_line::wake::vtk::polygons_as_vtk;
 use crate::line_force_model::LineForceModel;
 use crate::error::Error;
 
@@ -121,6 +122,60 @@ impl PanelWakePair {
         u_i_reference.iter().zip(&u_i_viscous)
             .map(|(&u_reference, &u_viscous)| u_reference - u_viscous)
             .collect()
+    }
+}
+
+impl PanelWakePair {
+    /// Serialize the geometry of the wakes as a legacy VTK PolyData buffer, with one quad per
+    /// panel. The cell data is the strength and the core length of each panel in both wakes, where
+    /// the first `nr_rows_with_given_strength` rows get the given circulation strength, as in
+    /// [`induced_velocity_difference`](Self::induced_velocity_difference). The optional point
+    /// velocities are written as point data, with the name `sampled_velocity`.
+    pub fn as_vtk(
+        &self,
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
+        nr_rows_with_given_strength: usize,
+        point_velocities: Option<&[SpatialVector]>,
+        binary: bool,
+    ) -> Vec<u8> {
+        let indices = &self.reference.indices;
+
+        let polygons: Vec<Vec<usize>> = (0..indices.nr_panels()).map(|panel_index| {
+            let (stream_index, span_index) = indices.reverse_panel_index(panel_index);
+
+            self.reference.panel_point_indices(stream_index, span_index).to_vec()
+        }).collect();
+
+        let strengths = |wake: &DynamicWake, given_strength: &[Float]| -> Vec<Float> {
+            (0..indices.nr_panels()).map(|panel_index| {
+                let (stream_index, span_index) = indices.reverse_panel_index(panel_index);
+
+                if stream_index < nr_rows_with_given_strength {
+                    given_strength[span_index]
+                } else {
+                    wake.strengths[panel_index]
+                }
+            }).collect()
+        };
+
+        let point_vectors: Vec<(&str, Vec<SpatialVector>)> = point_velocities
+            .map(|velocities| vec![("sampled_velocity", velocities.to_vec())])
+            .unwrap_or_default();
+
+        polygons_as_vtk(
+            "Stormbird lifting line correction wake",
+            &self.reference.points,
+            &polygons,
+            &[
+                ("reference_strength", strengths(&self.reference, reference_circulation_strength)),
+                ("projected_strength", strengths(&self.viscous, projected_circulation_strength)),
+                ("reference_core_length", self.reference.panels_viscous_core_length.clone()),
+                ("viscous_core_length", self.viscous.panels_viscous_core_length.clone()),
+            ],
+            &point_vectors,
+            binary
+        )
     }
 }
 

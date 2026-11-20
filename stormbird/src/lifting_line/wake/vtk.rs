@@ -25,6 +25,7 @@ use stormath::type_aliases::Float;
 /// * `polygons` - The indices of the points making up each polygon. The polygons can have
 ///   different numbers of points.
 /// * `cell_scalars` - Named scalar values, with one value for each polygon
+/// * `point_vectors` - Named vector values, with one value for each point. Can be empty.
 /// * `binary` - Whether to use the binary or ASCII variant of the format
 // The casts to f32 are only unnecessary when compiling with the `single_precision` feature
 #[allow(clippy::unnecessary_cast)]
@@ -33,6 +34,7 @@ pub fn polygons_as_vtk(
     points: &[SpatialVector],
     polygons: &[Vec<usize>],
     cell_scalars: &[(&str, Vec<Float>)],
+    point_vectors: &[(&str, Vec<SpatialVector>)],
     binary: bool
 ) -> Vec<u8> {
     let mut w: Vec<u8> = Vec::new();
@@ -109,6 +111,29 @@ pub fn polygons_as_vtk(
             }
         }
         if binary { writeln!(w).unwrap(); }
+    }
+
+    // ------------------------------------------------------------------ //
+    // Point data                                                           //
+    // ------------------------------------------------------------------ //
+    if !point_vectors.is_empty() {
+        writeln!(w, "POINT_DATA {}", nr_points).unwrap();
+
+        for (name, values) in point_vectors {
+            writeln!(w, "VECTORS {} float", name).unwrap();
+            for value in values {
+                let components = [value[0] as f32, value[1] as f32, value[2] as f32];
+
+                if binary {
+                    for component in components {
+                        w.write_all(&component.to_be_bytes()).unwrap();
+                    }
+                } else {
+                    writeln!(w, "{} {} {}", components[0], components[1], components[2]).unwrap();
+                }
+            }
+            if binary { writeln!(w).unwrap(); }
+        }
     }
 
     w

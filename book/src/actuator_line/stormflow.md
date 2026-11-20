@@ -12,7 +12,7 @@ Stormflow solves the incompressible Navier-Stokes equations on a cartesian grid 
 A uniform grid needs more cells than a mesh that is refined locally, so the solver is written with speed as a priority. Both the velocity solver and the pressure solver can run either on the CPU or on the GPU, and the choice is made separately for each. Running both on the GPU is the fastest. The actuator line model itself always runs on the CPU, but only the velocity and the forces in the cells close to the wings are transferred between the CPU and the GPU.
 
 ### Actuator line
-The actuator line model is the same as described in the rest of this chapter: the velocity is sampled from the flow field, the forces are computed with the sectional models in Stormbird, and the forces are projected back to the grid as body forces.
+The actuator line model is the same as described in the rest of this chapter: the velocity is sampled from the flow field, the forces are computed with the sectional models in Stormbird, and the forces are projected back to the grid as body forces. With the `Dynamic` wake in the lifting line correction, the velocity is also interpolated linearly from the cell centers to the points of the wake, in each time step. Points outside the domain keep their previous velocity.
 
 ### Geometries
 Other structures can be included as triangle meshes (`.obj` files), cuboids, spheres or disks. They are represented with an immersed boundary method on the cartesian grid, in a deliberately simplified way. The goal is not to predict the boundary layer on the structures, but to capture their overall effect on the flow to the sails.
@@ -82,6 +82,8 @@ while time < end_time:
 ```
 
 The result from `get_stormbird_simulation_result` is a `SimulationResult` from the latest time step, with the same content as for a lifting line simulation, such as the sectional forces and the integrated forces and moments on each wing. The flow fields can be exported as a VTK file, or returned as bytes with `fields_as_vtk`, for instance to be read directly with [PyVista](https://pyvista.org/).
+
+If the [lifting line correction](corrections.md) uses a wake with panels (`StraightPanels` or `Dynamic`), the wake can be exported in the same way, with `export_correction_wake_as_vtk(file_path, binary)`, or returned as bytes with `correction_wake_as_vtk(binary)`. Nothing is exported automatically, so the methods must be called, e.g., at a regular interval during the simulation, to follow the shape of the wake. The export function returns `False`, without writing a file, if there is no wake to export. See the [dynamic wake section](corrections.md#dynamic-wake) for the content.
 
 ### Selected settings
 All solver settings have default values. Some settings that are useful to know about:

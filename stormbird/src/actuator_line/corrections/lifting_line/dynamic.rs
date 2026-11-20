@@ -168,6 +168,28 @@ impl DynamicCorrectionWake {
         self.last_update_time = Some(time);
     }
 
+    /// The wake as a legacy VTK PolyData buffer, see [`PanelWakePair::as_vtk`]. The first row of
+    /// panels has the given circulation, and the sampled velocity at the wake points is included as
+    /// point data. None before the first update.
+    pub fn as_vtk(
+        &self,
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
+        binary: bool,
+    ) -> Option<Vec<u8>> {
+        if !self.is_initialized() {
+            return None;
+        }
+
+        Some(self.wakes.as_vtk(
+            reference_circulation_strength,
+            projected_circulation_strength,
+            1,
+            Some(&self.wake_points_velocity),
+            binary
+        ))
+    }
+
     /// The difference between the induced velocities from the reference wake and the viscous wake,
     /// at the control points of the line force model. The first row of panels gets the given
     /// circulation, while the rest use the circulation from earlier time steps.

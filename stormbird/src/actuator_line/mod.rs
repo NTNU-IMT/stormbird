@@ -300,6 +300,44 @@ impl ActuatorLine {
         }
     }
 
+    /// The wake of the lifting line correction as a legacy VTK PolyData buffer, with the
+    /// circulation from the last simulation result. See
+    /// [`LiftingLineCorrection::wake_as_vtk`] for the content. None if there is no correction, if
+    /// the correction uses the straight wake, which has no panels, or before the first call to
+    /// [`do_step`](Self::do_step).
+    pub fn correction_wake_as_vtk(&self, binary: bool) -> Option<Vec<u8>> {
+        let lifting_line_correction = self.lifting_line_correction.as_ref()?;
+
+        let (last_circulation_strength, last_projected_circulation_strength) =
+            self.last_circulation_strengths();
+
+        lifting_line_correction.wake_as_vtk(
+            &last_circulation_strength,
+            &last_projected_circulation_strength,
+            binary
+        )
+    }
+
+    /// Writes the wake of the lifting line correction to a legacy VTK file, see
+    /// [`correction_wake_as_vtk`](Self::correction_wake_as_vtk). Returns false, without writing a
+    /// file, if there is no wake to export.
+    ///
+    /// # Errors
+    /// If the file can not be written.
+    pub fn write_correction_wake_to_vtk_file<P: AsRef<Path>>(
+        &self,
+        file_path: P,
+        binary: bool
+    ) -> Result<bool, Error> {
+        let Some(content) = self.correction_wake_as_vtk(binary) else {
+            return Ok(false);
+        };
+
+        std::fs::write(file_path, content)?;
+
+        Ok(true)
+    }
+
     /// The number of points in [`wake_points_to_sample`](Self::wake_points_to_sample)
     pub fn nr_wake_points_to_sample(&self) -> usize {
         self.wake_points_to_sample().len()

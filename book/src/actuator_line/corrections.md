@@ -126,6 +126,12 @@ The CFD solver must sample the velocity at the points of the wake in each time s
 - `wake_points_to_sample` and `nr_wake_points_to_sample`: the points to sample. Empty unless the wake is dynamic, and before the first time step, as the geometry is set there.
 - `set_wake_point_velocity_at_index` and `set_wake_points_velocity`: sets the sampled velocity. Values that are not finite are ignored, so that the previous value is kept.
 
+The wake can be exported as legacy VTK files, to check the shape during a simulation. The OpenFOAM interface writes the wake automatically each time the fields are written, while it must be done explicitly in [Stormflow](stormflow.md#running-a-simulation). The same export is available for the `StraightPanels` wake. The files contain:
+
+- The geometry of the wake, with one quad for each panel.
+- As cell data: `reference_strength` and `projected_strength`, the strength of each panel in the reference model and the model with the viscous core, and `reference_core_length` and `viscous_core_length`, the core length of each panel in the two models. The rows of panels that use the current circulation in the correction (the first row for the dynamic wake, all rows for the straight panel wake) have the circulation from the last time step.
+- As point data, for the dynamic wake only: `sampled_velocity`, the velocity sampled from the CFD solver at each point.
+
 The other settings, `nr_panels_per_line_element`, `last_panel_relative_length`, `shape_damping_factor` and `far_field_ratio`, have the same meaning as in the [dynamic wake](../lifting_line/wake.md) of the lifting line, and `reference_core_evolution_length_factor` the same meaning as for the straight panel wake. Virtual extensions are not available for the dynamic wake.
 
 With a uniform velocity and a constant circulation, the dynamic wake gives almost the same correction as the straight wake with the same length (about 1 % difference in a test with two wings, for the same reason as for the straight panel wake).

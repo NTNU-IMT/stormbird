@@ -114,6 +114,27 @@ impl StraightPanelWake {
         self.geometry_is_set = true;
     }
 
+    /// The wake as a legacy VTK PolyData buffer, see [`PanelWakePair::as_vtk`]. All panels have the
+    /// given circulation. None if the geometry has not been set yet.
+    pub fn as_vtk(
+        &self,
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
+        binary: bool,
+    ) -> Option<Vec<u8>> {
+        if !self.geometry_is_set {
+            return None;
+        }
+
+        Some(self.wakes.as_vtk(
+            reference_circulation_strength,
+            projected_circulation_strength,
+            self.wakes.reference.indices.nr_panels_per_line_element,
+            None,
+            binary
+        ))
+    }
+
     /// The difference between the induced velocities from the reference wake and the viscous wake,
     /// at the control points of the line force model.
     pub fn induced_velocity_difference(

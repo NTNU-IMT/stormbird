@@ -161,6 +161,28 @@ impl LiftingLineCorrection {
         }
     }
 
+    /// The wake as a legacy VTK PolyData buffer, with the geometry, the strength and the core
+    /// length of the panels in both wake models, and the sampled velocity at the points for the
+    /// dynamic wake. The rows of panels that use the current circulation in the correction get the
+    /// given circulation. None for the straight wake, which has no panels, and before the first
+    /// call to [`update`](Self::update).
+    pub fn wake_as_vtk(
+        &self,
+        reference_circulation_strength: &[Float],
+        projected_circulation_strength: &[Float],
+        binary: bool,
+    ) -> Option<Vec<u8>> {
+        match &self.wake {
+            CorrectionWake::Straight(_) => None,
+            CorrectionWake::StraightPanels(wake) => wake.as_vtk(
+                reference_circulation_strength, projected_circulation_strength, binary
+            ),
+            CorrectionWake::Dynamic(wake) => wake.as_vtk(
+                reference_circulation_strength, projected_circulation_strength, binary
+            ),
+        }
+    }
+
     /// Sets the sampled velocity at the wake point with the given index, see
     /// [`wake_points_to_sample`](Self::wake_points_to_sample). Values that are not finite are
     /// ignored, so that the previous value is kept.

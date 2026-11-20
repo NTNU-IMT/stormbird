@@ -2,6 +2,18 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
+## Unreleased
+### Features
+- The velocity is sampled at the wake points of the lifting line correction in the actuator line model, when the correction uses the new `Dynamic` wake in Stormbird. The cell-centered velocity is interpolated linearly to the points in each time step, before the actuator line model is solved. Points outside the domain are not sampled, so that they keep the previous velocity.
+- New `Simulation::correction_wake_as_vtk` and `Simulation::export_correction_wake_as_vtk`, to export the wake of the lifting line correction as a legacy VTK file, for the `StraightPanels` and `Dynamic` wakes.
+
+### Bug fixes
+- The trilinear and tricubic interpolation stencils (`Grid::trilinear_stencil_at`, `trilinear_stencil_at_interior`, `tricubic_stencil_at` and `tricubic_stencil_at_interior`) could not reach the last interval of their valid range on each axis. A point in that interval was clamped to the lower sample, which gives a constant value in the interval instead of the interpolated one. The stencils are used for the slip mirror and zero gradient boundary conditions, the wall model and the wall treatment of the turbulence model, on both the CPU and the GPU, as the stencils are built on the CPU. The effect is usually small, as only points close to the end of the grid on an axis are affected, e.g., on the coarse levels of the multigrid pressure solver: in a coarse test with a rotor sail with end disks, one zero gradient stencil was affected, and the forces changed by about 1e-5 relative over 60 time steps, while a test with the SOBC1 superstructure gave identical results.
+
+### Changes
+- The GPU velocity solver keeps the buffers for exchanging data at up to two sets of cells, rather than one, so that the cells of the actuator line are not recreated in each time step when the velocity is also sampled at the wake points.
+- Stormflow depends on the development version of Stormbird in this repository (0.14.0), with the new settings of the lifting line correction. See the [Stormbird change log](../stormbird/CHANGELOG.md).
+
 ## 0.4.1 - 2026-11-20
 ### Changes
 - Stormflow now depends on version 0.13.1 of Stormbird, so that the line force model in the actuator line can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. Setup files that are valid for Stormflow 0.4.0 give the same results. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details.

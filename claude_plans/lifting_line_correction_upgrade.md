@@ -4,8 +4,8 @@ Status legend: `[x]` done, `[~]` in progress, `[ ]` not started.
 
 **Current state:** steps 0 and 1 are done and committed (`86e485a`, `a900e6a`). Step 2a is
 implemented and committed (2026-11-20, together with the fix of the induced velocity points in
-the dynamic wake), see its results section. **Wait for the user's input
-before starting step 2b.** Run the tests with `cargo test --release` in `stormbird`
+the dynamic wake), see its results section. Step 2b is implemented and committed (2026-11-20),
+waiting for the user's manual tests, see its results section. Run the tests with `cargo test --release` in `stormbird`
 (also with `--features parallel` and `--features single_precision`).
 
 ## Goal
@@ -225,17 +225,63 @@ points), change logs (Stormbird, stormbird_setup), Python (`DynamicCorrectionWak
 `stormbird_setup.actuator_line.corrections`, and the `wake` union and (de)serializer in
 `LiftingLineCorrectionBuilder`), this plan.
 
-## Step 2b: CFD interfaces  `[ ]`
+## Step 2b: CFD interfaces  `[~]`  <- implemented, waiting for the user's tests
 
+### Results (2026-11-20)
+- Implemented as in the design below. Coarse tests only:
+  - OpenFOAM v2412, two wings, 11k cells, 4 processes, 60 steps: stable, wake exported at every
+    write time with the series file, sensible shape (downstream, deflected away from the lift).
+    Foundation 14: compiles without warnings, not run (the case builder only writes ESI cases).
+  - Stormflow, two rotors at 0 deg with the new variant, 4 cells per chord, 10 s: stable on CPU and
+    GPU (same result, cl 2.568 / cd 1.051 vs. 2.590 / 1.013 for the existing recommended variant).
+    Wake about 6.4 diameters with 100 panels. GPU: 41 ms per step vs. 19 ms for the reference; with
+    the Stormbird `parallel` feature 27 ms (not enabled, the user's call).
+- Rotor example: new variant `ProjectedTipLossAndDynamicLiftingLine` (variant 5 in the README):
+  projected tip loss, dynamic wake (100 panels, evolution length 2 diameters), wing interactions.
+  `--export-wake-interval` in `run_single_rotor.py` and `run_two_rotors.py`. Not run by me.
+- `cpp_actuator_line` and pystormflow now depend on the local Stormbird/Stormath/Stormflow with
+  `version + path` (as Stormflow already does). Revert to published versions at release.
+- Fixed on request of the user: `Grid::clamped_floor_index_and_fraction` in Stormflow clamped the
+  raw index to `shape - 1 - margin_high`, so the last interval of the stencils was unreachable.
+  New tests `stencils_are_exact_in_the_whole_valid_range` and
+  `stencils_clamp_points_outside_the_valid_range`. Coarse comparison: rotor with end disks 1e-5
+  in force (one zero gradient stencil on a multigrid level with 5 cells), SOBC1 alone identical.
+  The wake sampling uses `trilinear_stencil_at_interior` again.
+- Observation: with `first_panel_relative_length = 0.75` and evolution length 2 chords, the first
+  row of panels already has about 30 % of the projection width as reference core (average distance
+  of the corners). May reduce the correction close to the wing more than intended.
+
+### Design
+
+User instructions (2026-11-20):
+- CFD runs are slow: only coarse-mesh tests while developing (compiles, no blow-up). Proper tests
+  are done later by the user.
+- The wake shape must be exportable. Stormflow/pystormflow: explicit method call only (like
+  `export_fields_as_vtk`). OpenFOAM: automatically at every write time.
+- Prepare `pystormflow/examples/rotor_sails/deybach_wind_tunnel/run_two_rotors.py` for the user to
+  run (do not run it).
+
+Design:
+- Stormbird: `ActuatorLine::correction_wake_as_vtk(binary) -> Option<Vec<u8>>` and
+  `write_correction_wake_to_vtk_file`. Panel wakes only (`StraightPanels`, `Dynamic`), `None` for
+  `Straight`. One legacy VTK PolyData with the reference wake geometry, cell data: reference and
+  projected strength (the rows with given strength filled with the last circulation, as in the
+  evaluation), reference and viscous core length; point data: sampled wake point velocity
+  (dynamic only). `polygons_as_vtk` gets point vector data.
 - `cpp_actuator_line`: `nr_wake_points_to_sample`, `get_wake_point_at_index`,
-  `set_wake_point_velocity_at_index`.
-- OpenFOAM: sample before `do_step`, `find_cell` every time step (the points move), one batched
-  reduce over all wake points (not one per point). Note: `VGREAT` is finite in double precision
-  (1e300), so the setter's non-finite check does not catch it. Skip points that are not found
-  (cell -1 on all processors) on the C++ side instead, so the previous value is kept.
-- Stormflow: trilinear stencils for the wake points, fetch the cells through
-  `cell_centered_velocity_at_cells` (works for CPU and GPU), interpolate and pass in.
-- Optional: export of the correction wake as VTK, for debugging.
+  `set_wake_point_velocity_at_index`, `write_correction_wake(folder, time)` (file per write time,
+  plus a ParaView `.vtk.series` file with the times).
+- OpenFOAM (`add`): sample the wake points once per time step (first call with a new time, before
+  `do_step`): `find_cell` per point, cellPoint interpolation, one `reduce` of a packed field
+  (velocity sum and count per point) with `sumOp`. Points not found on any processor are not set.
+  Export on the master at `time.writeTime()`, once per time step, to
+  `postProcessing/correctionWake`.
+- Stormflow: trilinear stencils on the cell centres for the wake points inside the domain, cells
+  fetched with `cell_centered_velocity_at_cells`. The GPU cell sampling cache keeps two cell sets
+  (actuator cells and wake cells), so the actuator cells are not rebuilt every step.
+  `Simulation::correction_wake_as_vtk` / `export_correction_wake_as_vtk`, exposed in pystormflow.
+- Rotor example: new variant with the dynamic wake and wing interactions; option to export the
+  wake at intervals.
 
 ## Possible improvements (after the simplest version works)
 

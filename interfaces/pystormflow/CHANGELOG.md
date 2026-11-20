@@ -2,6 +2,14 @@
 
 This file contains an overview of the changes made to pystormflow, the Python interface to the Stormflow CFD solver. See the [Stormflow change log](../../stormflow/CHANGELOG.md) for changes to the solver, and the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the actuator line model.
 
+## Unreleased
+### Features
+- New `Simulation.export_correction_wake_as_vtk(file_path, binary)` and `Simulation.correction_wake_as_vtk(binary)`, to export the wake of the lifting line correction as a legacy VTK file, e.g., to follow the shape of the new dynamic wake during a simulation. The export returns `False` if there is no wake to export.
+- The new `Dynamic` wake of the lifting line correction is supported, with the velocity at the wake points sampled by Stormflow. See the Stormflow and Stormbird change logs.
+
+### Changes
+- Depends on the local versions of Stormflow, Stormbird and Stormath in this repository (with the version numbers as before), as the new features are not published yet.
+
 ## 0.4.1 - 2026-11-20
 ### Changes
 - Depends on the published versions of Stormflow 0.4.1 and Stormbird 0.13.1, so that setup files can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. There are no changes to the Python interface itself. Setup files that are valid for pystormflow 0.4.0 give the same results, except for the bug fixes below.

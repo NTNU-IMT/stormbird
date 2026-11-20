@@ -46,7 +46,10 @@ This activates the actuator line functionality. The `ActuatorLine` class will th
 
 ## Results
 
-Results from the simulation will be placed in the `postProcessing` folder in the case directory, like other post-processing data in OpenFOAM. There will be two types of result files:
+Results from the simulation will be placed in the `postProcessing` folder in the case directory, like other post-processing data in OpenFOAM. There will be two types of result files, and a third for some settings:
 
 - **The first is a simple csv file with forces** as a function of time. This file will be called `stormbird_forces.csv`. The forces are written for every time step. The point of this file is to have a simple representation of the most important values from a simulation
 - **The second is a folder with full simulation result data**. How often this data is written is controlled by the `write_iterations_full_result` parameter in the [ActuatorLineBuilder](simulation_overview.md) structure. If this value is set to 100, the full results will be written every 100 time steps. The folder is called `stormbird_full_results` and will contain several JSON files with [SimulationResult](../line_model/force_calculations.md) data. This data is useful for looking more detailed into the results, such as the circulation distribution and the angles of attack on each line segment.
+- **The wake of the lifting line correction**, if the [correction](corrections.md) uses a wake with panels (`StraightPanels` or `Dynamic`). The wake is written to the folder `correctionWake` each time OpenFOAM writes the fields, as legacy VTK files called `correction_wake_<time>.vtk`. The file `correction_wake.vtk.series` lists the files with their times, so that they can be opened as one time series in ParaView. See the [dynamic wake section](corrections.md#dynamic-wake) for the content.
+
+With the `Dynamic` wake in the lifting line correction, the velocity is also sampled at the points of the wake, once per time step. The points move, so the cells that contain them are searched for in every time step. Points outside the domain keep their previous velocity.

@@ -18,6 +18,7 @@ from enum import Enum
 import numpy as np
 from stormbird_setup.actuator_line import (
     ActuatorLineBuilder,
+    DynamicCorrectionWakeBuilder,
     Gaussian,
     LiftingLineCorrectionBuilder,
     ProjectionSettings,
@@ -77,6 +78,16 @@ LIFT_SLOPE = 2.75
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
 MAX_CORRECTION_RATIO = 2.0
 
+# Settings for the dynamic wake in the lifting line correction, used in the variant
+# ProjectedTipLossAndDynamicLiftingLine. A new row of panels is shed in each time step, so the wake
+# is approximately the number of panels times the velocity times the time step long. With the
+# Courant number and the resolution below, this is roughly 5-6 diameters with 100 panels, which
+# reaches past the interfering rotor in the two rotor case. The reference core length grows to the
+# projection width over the evolution length, so that the tip vortices from one rotor do not give a
+# singular correction at the other rotor.
+DYNAMIC_WAKE_NR_PANELS = 100
+DYNAMIC_WAKE_REFERENCE_CORE_EVOLUTION_LENGTH_FACTOR = 2.0
+
 # Both solvers are incompressible, with the pressure divided by the density. The projected forces
 # are not divided by the density, so it must be one in the line force model.
 DENSITY = 1.0
@@ -124,10 +135,13 @@ class Variant(Enum):
     TipLossAndLiftingLine = "tip_loss_and_lifting_line"
     TipLossAndLiftingLineAndAdditionalCDi = "tip_loss_and_lifting_line_and_additional_cdi"
     ProjectedTipLossAndLiftingLine = "projected_tip_loss_and_lifting_line"
+    ProjectedTipLossAndDynamicLiftingLine = "projected_tip_loss_and_dynamic_lifting_line"
 
     @property
     def label(self) -> str:
         match self:
+            case Variant.ProjectedTipLossAndDynamicLiftingLine:
+                return "projected tip loss and dynamic lifting line"
             case Variant.ProjectedTipLossAndLiftingLine:
                 return "projected tip loss and lifting line"
             case Variant.LiftingLine:
@@ -140,7 +154,7 @@ class Variant(Enum):
                 return "tip loss and lifting line and additional CDi"
 
 # The recommended variant, used when no variant is given to the scripts
-DEFAULT_VARIANT = Variant.ProjectedTipLossAndLiftingLine
+DEFAULT_VARIANT = Variant.ProjectedTipLossAndDynamicLiftingLine
 
 TIP_LOSS_EXP_FACTOR = 16
 
@@ -304,6 +318,25 @@ def actuator_line_builder(
                 symmetry_condition=SymmetryCondition.Z,
                 max_correction_ratio=MAX_CORRECTION_RATIO,
                 include_wing_interactions=False
+            )
+        case Variant.ProjectedTipLossAndDynamicLiftingLine:
+            # Experimental. The same as ProjectedTipLossAndLiftingLine, but with a dynamic wake in
+            # the lifting line correction, where the shape follows the velocity in the CFD
+            # solver, and with the interactions between the rotors included in the correction.
+            tip_loss_correction = TipLossCorrection(
+                exp_factor = TIP_LOSS_EXP_FACTOR,
+                application = TipLossApplication.ProjectedForces
+            )
+            lifting_line_correction = LiftingLineCorrectionBuilder(
+                symmetry_condition=SymmetryCondition.Z,
+                max_correction_ratio=MAX_CORRECTION_RATIO,
+                include_wing_interactions=True,
+                wake=DynamicCorrectionWakeBuilder(
+                    nr_panels_per_line_element=DYNAMIC_WAKE_NR_PANELS,
+                    reference_core_evolution_length_factor=(
+                        DYNAMIC_WAKE_REFERENCE_CORE_EVOLUTION_LENGTH_FACTOR
+                    ),
+                ),
             )
         case Variant.LiftingLine:
             lifting_line_correction = LiftingLineCorrectionBuilder(
