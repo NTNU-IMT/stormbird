@@ -140,7 +140,6 @@ class DynamicWakeBuilder(StormbirdSetupBaseModel):
     ratio_of_wake_affected_by_induced_velocities: float = 0.0
     far_field_ratio: float = 5.0
     shape_damping_factor: float = 0.0
-    neglect_self_induced_velocities: bool = False
     steady_state_strength_update: bool = False
     initial_relative_wake_length: float = 50.0
     

@@ -14,6 +14,8 @@ mod no_self_induced_velocity;
 mod quasi_steady_wake;
 mod coordinate_systems;
 mod wing_sails_speed_test;
+mod induced_velocity_benchmark;
+mod induced_velocity_split;
 mod linearized_solver;
 mod dynamic_stall;
 mod complete_sail_model;

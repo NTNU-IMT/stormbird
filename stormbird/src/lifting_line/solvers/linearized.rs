@@ -13,7 +13,7 @@ use crate::common_utils::forces_and_moments::CoordinateSystem;
 use stormath::spatial_vector::SpatialVector;
 use stormath::matrix::Matrix;
 
-use super::velocity_corrections::VelocityCorrections;
+use super::velocity_corrections::InducedVelocitySettings;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 /// How the induced velocities are updated after the viscous correction of the circulation
@@ -36,9 +36,9 @@ pub enum InducedVelocityCorrectionMethod {
 /// Structure with settings for a linearized lifting line solver
 #[derive(Default)]
 pub struct Linearized {
-    /// Optional empirical corrections of the velocity
+    /// How the induced velocities are used, including optional empirical corrections
     #[serde(default)]
-    pub velocity_corrections: VelocityCorrections,
+    pub induced_velocities: InducedVelocitySettings,
     /// If true, the circulation is not corrected for non-linear effects, such as stall
     #[serde(default)]
     pub disable_viscous_corrections: bool,
@@ -65,11 +65,11 @@ impl Linearized {
         let mut ctrl_points_velocity = felt_ctrl_points_freestream.to_vec();
 
         // Add fixed velocities from the frozen wake
-        for (velocity, &fixed_velocity) in ctrl_points_velocity.iter_mut()
-            .zip(&frozen_wake.fixed_velocities)
-            .take(nr_unknowns)
-        {
-            *velocity += fixed_velocity;
+        for (i, velocity) in ctrl_points_velocity.iter_mut().enumerate().take(nr_unknowns) {
+            *velocity += self.induced_velocities.uncorrected_induced_velocity(
+                frozen_wake.fixed_velocities.self_induced[i],
+                frozen_wake.fixed_velocities.other_induced[i]
+            );
         }
 
         ctrl_points_velocity = line_force_model.remove_span_velocity(
@@ -120,24 +120,36 @@ impl Linearized {
         let mut equation_matrix = Matrix::new_default([nr_unknowns, nr_unknowns]);
         let mut rhs = vec![0.0; nr_unknowns];
 
-        for i_row in 0..nr_unknowns {
-            let u_t = ctrl_points_velocity[i_row].dot(velocity_dir[i_row]);
+        let neglect_self_induced = self.induced_velocities.neglect_self_induced_velocities;
 
-            for i_col in 0..nr_unknowns {
-                let u_i_n = frozen_wake.variable_velocity_factors[[i_row, i_col]]
-                    .dot(normal_dir[i_row]);
+        for wing_range in &frozen_wake.wing_indices {
+            // The columns of the same wing as the rows are skipped if the self-induced velocities
+            // are neglected. The equation matrix is then zero there, except for the diagonal below.
+            let skipped_columns = if neglect_self_induced {
+                wing_range.clone()
+            } else {
+                nr_unknowns..nr_unknowns
+            };
 
-                // Lift at ctrl_point i_row due to induced angle of attack from line i_col
-                equation_matrix[[i_row, i_col]] = -dcl_dalpha[i_row] * u_i_n / u_t;
+            for i_row in wing_range.clone() {
+                let u_t = ctrl_points_velocity[i_row].dot(velocity_dir[i_row]);
 
-                if i_row == i_col {
-                    // Lift due to circulation
-                    equation_matrix[[i_row, i_col]] += 2.0 /
-                        ( line_force_model.chord_lengths[i_row] * u_t);
+                let columns = (0..skipped_columns.start).chain(skipped_columns.end..nr_unknowns);
+
+                for i_col in columns {
+                    let u_i_n = frozen_wake.variable_velocity_factors[[i_row, i_col]]
+                        .dot(normal_dir[i_row]);
+
+                    // Lift at ctrl_point i_row due to induced angle of attack from line i_col
+                    equation_matrix[[i_row, i_col]] = -dcl_dalpha[i_row] * u_i_n / u_t;
                 }
-            }
 
-            rhs[i_row] = -cl_linear[i_row];
+                // Lift due to circulation
+                equation_matrix[[i_row, i_row]] += 2.0 /
+                    ( line_force_model.chord_lengths[i_row] * u_t);
+
+                rhs[i_row] = -cl_linear[i_row];
+            }
         }
 
         // Solve for the circulation strength
@@ -147,20 +159,10 @@ impl Linearized {
 
         frozen_wake.update_induced_velocities_at_control_points(&circulation_strength);
 
-        let corrected_velocity = self.velocity_corrections.corrected_velocity(
+        ctrl_points_velocity = self.induced_velocities.ctrl_points_velocity(
             felt_ctrl_points_freestream,
             &frozen_wake.induced_velocities_at_control_points
         );
-
-        if let Some(velocity) = corrected_velocity {
-            ctrl_points_velocity = velocity
-        } else {
-            for i in 0..nr_unknowns {
-                ctrl_points_velocity[i] =
-                    felt_ctrl_points_freestream[i] +
-                    frozen_wake.induced_velocities_at_control_points[i];
-            }
-        }
 
         // Calculate corrections on the circulation due to viscous effects
         if !self.disable_viscous_corrections {
@@ -203,20 +205,10 @@ impl Linearized {
                 }
             }
 
-            let corrected_velocity = self.velocity_corrections.corrected_velocity(
+            ctrl_points_velocity = self.induced_velocities.ctrl_points_velocity(
                 felt_ctrl_points_freestream,
                 &frozen_wake.induced_velocities_at_control_points
             );
-
-            if let Some(velocity) = corrected_velocity {
-                ctrl_points_velocity = velocity
-            } else {
-                for i in 0..nr_unknowns {
-                    ctrl_points_velocity[i] =
-                        felt_ctrl_points_freestream[i] +
-                        frozen_wake.induced_velocities_at_control_points[i];
-                }
-            }
         }
 
         let angles_of_attack = line_force_model.angles_of_attack(

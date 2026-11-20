@@ -291,10 +291,12 @@ impl LiftingLineCorrection {
                     span_line.ctrl_point()
                 );
 
+                // The frozen wakes only contain a single wing, so all induced velocities are
+                // self-induced
                 u_i_correction.push(
-                    frozen_wake_default.induced_velocities_at_control_points[i] +
+                    frozen_wake_default.induced_velocities_at_control_points.self_induced[i] +
                     u_i_extensions -
-                    frozen_wake_viscous.induced_velocities_at_control_points[i]
+                    frozen_wake_viscous.induced_velocities_at_control_points.self_induced[i]
                 );
             }
         }

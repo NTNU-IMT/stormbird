@@ -2,6 +2,27 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## 0.14.0 - Unreleased
+### Breaking changes
+- The lift-induced velocities at the control points are now always computed in two parts: the velocities induced by the wake of the same wing (self-induced) and by the wakes of the other wings (other-induced). The `FrozenWake` stores both parts in the new `InducedVelocities` struct, for the `fixed_velocities` and the `induced_velocities_at_control_points`, and `FrozenWake::initialize` takes the `wing_indices` of the line force model instead of the number of line elements. The total is given by `InducedVelocities::total`.
+- The `velocity_corrections` field in the `Iterative`, `QuasiSteadyIterativeBuilder` and `Linearized` solvers is replaced by `induced_velocities`, with the new `InducedVelocitySettings` struct. It has three fields:
+  - `neglect_self_induced_velocities`, moved from the `DynamicWakeBuilder`.
+  - `self_induced_correction`, a new `SelfInducedVelocityCorrection`, applied to the self-induced velocities only.
+  - `total_correction`, a `TotalVelocityCorrection` with the same options as the old `VelocityCorrections` enum, applied to the sum of the self-induced and the other-induced velocities.
+
+  In JSON input, `"velocity_corrections": X` becomes `"induced_velocities": {"total_correction": X}`, which gives the same results as before.
+- `neglect_self_induced_velocities` is removed from the `DynamicWakeBuilder` and the `WakeSettings` of the dynamic wake. Set it in the `induced_velocities` of the solver instead.
+- `DynamicWake::induced_velocities_from_free_wake` is replaced by `DynamicWake::induced_velocities_from_free_wake_per_line_element`, which returns the velocities from the panels shed from each line element separately, so that the `FrozenWake` can split them into self-induced and other-induced velocities. The unused `DynamicWake::induced_velocities_from_first_panels` is removed.
+
+### Features
+- The self-induced velocities can be neglected in quasi-steady simulations as well, not only in dynamic simulations.
+- New `self_induced_correction` in the `InducedVelocitySettings`, so that the magnitude of the self-induced velocities can be limited with `MaxInducedVelocityMagnitudeRatio`, without limiting the velocities induced by other wings. It can be combined with the `total_correction`.
+
+### Changes
+- The dynamic wake no longer looks up the wing index of each panel and point when the self-induced velocities are neglected. The split into self-induced and other-induced velocities is done in the `FrozenWake` with contiguous blocks of line elements, as the line elements of each wing are stored after each other, so the split has no measurable cost compared to computing the total velocity directly. There is now only one function for each type of induced velocity calculation, instead of separate functions for neglecting the self-induced velocities.
+- New `induced_velocity_benchmark` test, ignored by default, that times the induced velocity calculations in the frozen wake and full time steps of dynamic and quasi-steady simulations. Run it with `cargo test --release induced_velocity_benchmark -- --ignored --nocapture`, optionally with `--features parallel`.
+- The documentation of the `DynamicWake` describes the order of the panels and points more precisely: the stream index is the outer index and the span index the inner index, so that the panels of each wing are one contiguous segment in each streamwise row.
+
 ## 0.13.1 - 2026-11-20
 ### Features
 - New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, set as a constant value along the span. It is optional in JSON input, and the default, an empty list, gives the same initial internal state of zero as before. The values are kept until they are changed, e.g., by a controller. This makes it simpler to run simulations with a fixed internal state without a controller (no need to override the values manually in the CFD solver). Together with the existing `local_wing_angles`, the operating point of each wing can now be fully set in the builder.

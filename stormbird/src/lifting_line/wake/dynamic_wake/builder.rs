@@ -98,15 +98,6 @@ pub struct DynamicWakeBuilder {
     /// freely), while a value of 1.0 means that the wake points are fixed in space.
     pub shape_damping_factor: Float,
     #[serde(default)]
-    /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is
-    /// useful if the effect of self-induced velocities on lift and drag is calculated in another
-    /// way, for example with CFD, and the only reason for running lifting-line simulations is to
-    /// calculate the wing-to-wing interaction.
-    ///
-    /// **WARNING**: should probably always be used in combination with a prescribed circulation
-    /// shape in the line force model to maintain a realistic local shape.
-    pub neglect_self_induced_velocities: bool,
-    #[serde(default)]
     /// Switch to set the strength update to be "steady-state"
     pub steady_state_strength_update: bool,
     #[serde(default="DynamicWakeBuilder::default_initial_relative_wake_length")]
@@ -182,7 +173,6 @@ impl DynamicWakeBuilder {
             first_wake_points_direction: self.first_wake_points_direction,
             end_index_induced_velocities_on_wake,
             shape_damping_factor: self.shape_damping_factor,
-            neglect_self_induced_velocities: self.neglect_self_induced_velocities,
             steady_state_strength_update: self.steady_state_strength_update,
         };
 
@@ -327,7 +317,6 @@ impl Default for DynamicWakeBuilder {
             ratio_of_wake_affected_by_induced_velocities: Default::default(),
             far_field_ratio: PotentialTheorySettings::default_far_field_ratio(),
             shape_damping_factor: 0.0,
-            neglect_self_induced_velocities: false,
             steady_state_strength_update: false,
             initial_relative_wake_length: Self::default_initial_relative_wake_length(),
         }

@@ -2,6 +2,15 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.14.0 - Unreleased
+### Breaking changes
+- `VelocityCorrections` and `VelocityCorrectionType` are replaced by `InducedVelocitySettings`, following the new settings in Stormbird 0.14.0. The `velocity_corrections` field in `Linearized` and `Iterative` is replaced by `induced_velocities`. The old corrections are now set as the `total_correction`, with the new `TotalVelocityCorrection` class, e.g., `InducedVelocitySettings(total_correction = TotalVelocityCorrection.new_max_induced_velocity_magnitude(2.0))`. Requires Stormbird 0.14.0 or newer.
+- `neglect_self_induced_velocities` is moved from the `DynamicWakeBuilder` to `InducedVelocitySettings`, so that it is set in the solver, and also works for quasi-steady simulations.
+- `SolverType.solver` in the default sails takes an `induced_velocities` argument instead of `velocity_corrections`, and `rotor_sail_velocity_corrections` is renamed to `rotor_sail_induced_velocities`. The rotor sails use the same limit as before, now as a `total_correction`.
+
+### Features
+- New `self_induced_correction` in `InducedVelocitySettings`, with the new `SelfInducedVelocityCorrection` class, to limit the self-induced velocities only.
+
 ## 0.13.1 - 2026-11-20
 ### Features
 - New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, following the new setting in Stormbird 0.13.1. The default is `None`, which gives the same initial internal state of zero as before, and the field is then not written to the JSON input, so the builder can still be used with older versions of Stormbird. When it is set, the number of values must match the number of wings, and `add_wing_builder` adds an internal state of zero for each new wing. Together with the existing `local_wing_angles`, this makes it possible to run actuator line simulations in OpenFOAM with a fixed angle of attack and internal state, without a controller. Requires Stormbird 0.13.1 or newer when it is set.

@@ -2,6 +2,10 @@
 
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.14.0 - Unreleased
+### Changes
+- The `rotor_sails/deybach_wind_tunnel` and `wing_sails/stall_hysteresis` examples use the new `InducedVelocitySettings` in stormbird_setup 0.14.0, instead of `VelocityCorrections`. The settings of the velocity corrections in Stormbird 0.14.0 have changed, see the [Stormbird change log](../../stormbird/CHANGELOG.md). They are set through the JSON input, so there are no changes to the Python interface itself.
+
 ## 0.13.1 - 2026-11-20
 ### Features
 - Depends on the published version of Stormbird 0.13.1, where the line force model builder has a new, optional, `internal_states` field with the initial internal state of each wing. It is set through the JSON input, so there are no changes to the Python interface. See the [Stormbird change log](../../stormbird/CHANGELOG.md).

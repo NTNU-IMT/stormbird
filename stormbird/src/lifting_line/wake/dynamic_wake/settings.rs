@@ -84,8 +84,6 @@ pub struct WakeSettings {
     pub end_index_induced_velocities_on_wake: usize,
     /// The amount of damping in the shape of the wake
     pub shape_damping_factor: Float,
-    /// A variable to determine whether the self-induced velocities should be neglected or not
-    pub neglect_self_induced_velocities: bool,
     /// Switch to set the strength update to be "steady-state"
     pub steady_state_strength_update: bool,
 }

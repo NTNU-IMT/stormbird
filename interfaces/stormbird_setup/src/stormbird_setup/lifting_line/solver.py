@@ -5,7 +5,7 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 """
 
 from ..base_model import StormbirdSetupBaseModel
-from .velocity_corrections import VelocityCorrections
+from .velocity_corrections import InducedVelocitySettings
 
 from enum import Enum
 
@@ -18,7 +18,7 @@ class VariableToUpdate(Enum):
     AngleOfAttack = "AngleOfAttack"
 
 class Linearized(StormbirdSetupBaseModel):
-    velocity_corrections: VelocityCorrections = VelocityCorrections()
+    induced_velocities: InducedVelocitySettings = InducedVelocitySettings()
     disable_viscous_corrections: bool = False
     induced_velocity_correction_method: InducedVelocityCorrectionMethod = InducedVelocityCorrectionMethod.NoCorrection
     """
@@ -34,7 +34,7 @@ class Iterative(StormbirdSetupBaseModel):
     damping_factor: float = 0.1
     residual_tolerance_absolute: float = 1e-4
     strength_difference_tolerance: float = 1e-6
-    velocity_corrections: VelocityCorrections = VelocityCorrections()
+    induced_velocities: InducedVelocitySettings = InducedVelocitySettings()
     start_with_linearized_solution: bool = False
     correction_factor_initial_solution: float = 1.0
     variable_to_update: VariableToUpdate = VariableToUpdate.CirculationStrength

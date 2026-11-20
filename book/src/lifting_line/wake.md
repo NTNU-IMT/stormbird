@@ -125,7 +125,6 @@ pub struct DynamicWakeBuilder {
     pub ratio_of_wake_affected_by_induced_velocities: f64,    // Default: 0.0
     pub far_field_ratio: f64,                                 // Default: 5.0
     pub shape_damping_factor: f64,                            // Default: 0.0
-    pub neglect_self_induced_velocities: bool,                // Default: false
     pub steady_state_strength_update: bool,                   // Default: false
     pub initial_relative_wake_length: f64,                    // Default: 50.0
 }
@@ -174,8 +173,9 @@ where \\( i \\) is the streamwise index of the panel, \\( N \\) is the number of
 #### Computational settings
 - `symmetry_condition`: Symmetry plane, as explained [above](#symmetry-condition).
 - `far_field_ratio`: Determines when the induced velocity from a panel is calculated with a simplified far field model. If the distance from the center of the panel to the point is larger than the ratio times the largest side length of the panel, the panel is treated as a point doublet, which is faster to compute than the four vortex lines. The far field model does not include the viscous core. The default value is 5.0.
-- `neglect_self_induced_velocities`: If true, the induced velocities on a wing from its own wake are neglected, so that only the velocities induced by other wings are included. This is useful if the effect of the self-induced velocities is accounted for in another way, for instance with CFD data, and the only reason for running the lifting line simulation is to calculate the wing-to-wing interaction. **Warning**: this should probably always be used in combination with a [prescribed circulation shape](../line_model/circulation_strength.md) in the line force model, to maintain a realistic circulation distribution.
 - `steady_state_strength_update`: If true, all panels in a streamwise row get the same strength as the first panel, rather than having the strength shifted downstream one panel per time step. The whole row is then treated as unknown by the solver, in the same way as a horseshoe vortex in the quasi-steady wake. This gives a steady state solution for the current wake shape, without having to wait for the strength to be convected down the wake. It is useful for steady cases where the dynamic wake is used for its other features, such as a deformed wake shape or a viscous core that grows along the wake, but should not be used for cases where the dynamic variations in the wake strength are of interest.
+
+The option to neglect the self-induced velocities was earlier part of the dynamic wake settings. It is now part of the [solver settings](solver.md#induced-velocities-and-velocity-corrections), so that it works for both quasi-steady and dynamic wakes.
 
 ## Wake export and induced velocities
 

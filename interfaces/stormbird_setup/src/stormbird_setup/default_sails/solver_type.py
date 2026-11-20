@@ -7,7 +7,7 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from enum import Enum
 
 from ..lifting_line.solver import Linearized as LinearizedSolver, Iterative as IterativeSolver
-from ..lifting_line.velocity_corrections import VelocityCorrections
+from ..lifting_line.velocity_corrections import InducedVelocitySettings
 
 class SolverType(Enum):
     '''
@@ -22,23 +22,23 @@ class SolverType(Enum):
 
     def solver(
         self,
-        velocity_corrections: VelocityCorrections | None = None
+        induced_velocities: InducedVelocitySettings | None = None
     ) -> LinearizedSolver | IterativeSolver:
         '''
         The solver settings that are used for the default sails
         '''
-        if velocity_corrections is None:
-            velocity_corrections = VelocityCorrections()
+        if induced_velocities is None:
+            induced_velocities = InducedVelocitySettings()
 
         match self:
             case SolverType.Linearized:
-                return LinearizedSolver(velocity_corrections = velocity_corrections)
+                return LinearizedSolver(induced_velocities = induced_velocities)
             case SolverType.Iterative:
                 return IterativeSolver(
                     max_iterations_per_time_step = 1000,
                     damping_factor = 0.05,
                     start_with_linearized_solution = True,
-                    velocity_corrections = velocity_corrections
+                    induced_velocities = induced_velocities
                 )
             case _:
                 raise ValueError("Unsupported solver type:", self)

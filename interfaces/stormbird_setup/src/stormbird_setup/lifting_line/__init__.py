@@ -7,13 +7,20 @@ License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl
 from .solver import InducedVelocityCorrectionMethod, Linearized, Iterative, VariableToUpdate
 from .wake import SymmetryCondition, ViscousCoreLength, QuasiSteadyWakeSettings, DynamicWakeBuilder, ViscousCoreLengthEvolution, FirstWakePointsDirection
 from .simulation_builder import QuasiSteadySettings, DynamicSettings, SimulationBuilder
-from .velocity_corrections import VelocityCorrections
+from .velocity_corrections import (
+    InducedVelocitySettings,
+    SelfInducedVelocityCorrection,
+    SelfInducedVelocityCorrectionType,
+    TotalVelocityCorrection,
+    TotalVelocityCorrectionType,
+)
 from .complete_sail_model import CompleteSailModelBuilder
 
 __all__ = [
     "InducedVelocityCorrectionMethod", "Linearized", "Iterative", "VariableToUpdate",
     "SymmetryCondition", "ViscousCoreLength", "QuasiSteadyWakeSettings", "DynamicWakeBuilder", "ViscousCoreLengthEvolution", "FirstWakePointsDirection",
     "QuasiSteadySettings", "DynamicSettings", "SimulationBuilder",
-    "VelocityCorrections",
+    "InducedVelocitySettings", "SelfInducedVelocityCorrection", "SelfInducedVelocityCorrectionType",
+    "TotalVelocityCorrection", "TotalVelocityCorrectionType",
     "CompleteSailModelBuilder"
 ]
