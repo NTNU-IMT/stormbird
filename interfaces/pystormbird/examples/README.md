@@ -13,6 +13,7 @@ The examples are organized by sail type:
   - `dynamic_wake_shape`: simulations where the induced velocities affect the shape of the wake.
 - `rotor_sails`: examples with rotor sails:
   - `deybach_wind_tunnel`: one or two rotor sails, compared against the wind tunnel experiments by Deybach et al. (2024, 2026).
+  - `tillig_empirical_model`: the `RotorSailTillig2020` default sail model, compared against the empirical rotor sail model by Tillig and Ringsberg (2020) that it is fitted to.
 - `suction_sails`: examples with suction sails:
   - `turbosail`: tuning of the default suction sail model to experiments with the Turbosail.
 - `default_sail_models`: comparison of all the default sail models in `stormbird_setup`.

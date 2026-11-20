@@ -120,7 +120,16 @@ impl VaryingFoil {
 
     /// Linear interpolation of the foil parameters directly on the data, without any mirroring.
     /// The first or last foil is used if the internal state is outside the range of the data.
+    ///
+    /// # Panics
+    /// If the internal state is NaN, which means that something has gone wrong when computing it.
     fn interpolated_foil(&self, internal_state: Float) -> Foil {
+        // NaN fails all the comparisons below, which would give an index out of bounds further down
+        assert!(
+            !internal_state.is_nan(),
+            "The internal state of the varying foil is NaN, which can not be used to look up a foil"
+        );
+
         let x_data = &self.internal_state_data;
         let n = x_data.len();
 

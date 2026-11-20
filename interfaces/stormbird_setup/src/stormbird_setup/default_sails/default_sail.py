@@ -12,7 +12,7 @@ from ..controller import ControllerSetPoints
 from .sail_definition import SailDefinition
 from .solver_type import SolverType
 from .wing_sails import generic_single_element_wing_sail, generic_two_element_wing_sail
-from .rotor_sails import rotor_sail_deybach_2024, rotor_sail_ostman_2023
+from .rotor_sails import rotor_sail_deybach_2024, rotor_sail_ostman_2023, rotor_sail_tillig_2020
 from .suction_sails import suction_sail_charrier_1985
 
 class DefaultSail(Enum):
@@ -31,6 +31,7 @@ class DefaultSail(Enum):
     GenericTwoElementWingSail = "GenericTwoElementWingSail"
     RotorSailDeybach2024 = "RotorSailDeybach2024"
     RotorSailOstman2023 = "RotorSailOstman2023"
+    RotorSailTillig2020 = "RotorSailTillig2020"
     SuctionSailCharrier1985 = "SuctionSailCharrier1985"
 
     def definition(self, solver_type: SolverType = SolverType.Linearized) -> SailDefinition:
@@ -47,6 +48,8 @@ class DefaultSail(Enum):
                 return rotor_sail_deybach_2024(solver_type)
             case DefaultSail.RotorSailOstman2023:
                 return rotor_sail_ostman_2023(solver_type)
+            case DefaultSail.RotorSailTillig2020:
+                return rotor_sail_tillig_2020(solver_type)
             case DefaultSail.SuctionSailCharrier1985:
                 return suction_sail_charrier_1985(solver_type)
             case _:

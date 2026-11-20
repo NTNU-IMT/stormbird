@@ -2,6 +2,19 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
+## 0.13.1 - 2026-11-20
+### Features
+- New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, set as a constant value along the span. It is optional in JSON input, and the default, an empty list, gives the same initial internal state of zero as before. The values are kept until they are changed, e.g., by a controller. This makes it simpler to run simulations with a fixed internal state without a controller (no need to override the values manually in the CFD solver). Together with the existing `local_wing_angles`, the operating point of each wing can now be fully set in the builder.
+- `LineForceModelBuilder::check_settings` checks that the number of `internal_states`, if given, matches the number of wings.
+
+### Bug fixes
+- The maximum change rate of the local wing angles in the controller (`max_local_wing_angle_change_rate`) did not account for the wrapping of the angles between -pi and pi. When the controller moved a wing angle across pi, e.g., from 179 to -179 degrees, the rate limit saw a change of -358 degrees instead of +2 degrees, and turned the wing by the maximum change in the wrong direction. This could lock the wings at an angle where the controller output stays at pi, far from the angle of attack set point, typically with stalled sails. It happens when the local wing angles that give the set point are close to pi, e.g., for sails with the chord vector pointing towards the bow in head winds. The change is now limited along the shortest way around the circle, with the new function `limit_angle`, and the limited angle is between -pi and pi. Nothing changes for angles away from pi, and the internal state still uses `limit_value`.
+- `InternalFlow::internal_suction_from_flow_power` could return NaN for very small, but non-zero, powers, which then gave a panic with an index out of bounds in `VaryingFoil` (`the len is 5 but the index is 18446744073709551615`). This happened for suction sails with the `PowerToInternalFlow` conversion, e.g., with a controller loading close to, but not exactly, zero, such as 1e-16 from round-off. The root of the power balance is then so close to the threshold suction, where the flow starts, that the residual is constant or a staircase function in floating point, and the secant method divided by zero. The internal suction is now found with Brent's method, in a bracket from the threshold suction to an upper value that is increased until the power is exceeded, as already done for the fan based conversion. Tiny powers now give the threshold suction and zero suction coefficient, the same as zero power, and the results for normal powers are unchanged within the solver tolerance.
+- `VaryingFoil` gives a clear panic message if the internal state is NaN, instead of an index out of bounds in the interpolation.
+
+### Changes
+- The OpenFOAM actuator line interface (`cpp_actuator_line` 0.13.1), pystormbird 0.13.1, Stormflow 0.4.1 and pystormflow 0.4.1 depend on this version. The new field is read through the JSON input, so the interfaces themselves are unchanged.
+
 ## 0.13.0 - 2026-11-14
 ### Breaking changes
 - Invalid user input is now returned as errors rather than causing panics. The following functions return a `Result<_, Error>` instead of the value directly:

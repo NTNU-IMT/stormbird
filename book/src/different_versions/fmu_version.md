@@ -124,7 +124,7 @@ After an error, the sails are not simulated anymore, and all the other outputs a
 | 14   | A time step was simulated before the model was set up                         |
 | 15   | The input gave a freestream velocity that is not finite, e.g., a NaN input    |
 
-Codes 10 and 11 indicate a bug in Stormbird or in the FMU, and should be reported.
+Codes 10 and 11 indicate a bug in Stormbird or in the FMU, and should be reported. The codes from 1 to 4 are the codes of the errors in Stormbird itself, and are also used by the [C interface](./c_interface.md), which uses the codes from 20 and up for its own errors.
 
 ## What can the FMU-version do?
 The FMI-interface inherently comes with more limitations than a conventional API, such as the Python interface. For instance, there are limitations on what type of variables that can be passed to and from different FMUs, and there is a specific order to how functions are executed. Although there are many ways to work around these limitations, the FMU-version of Stormbird is, for simplicity's sake, designed to only cover the most typical use cases for running dynamic lifting line simulations. That is, **it is not intended to be a direct alternative to the Python interface**, but rather a specialized way to use *some* of the functionality.

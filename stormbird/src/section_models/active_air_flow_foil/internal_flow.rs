@@ -1,12 +1,17 @@
 use stormath::type_aliases::Float;
 use crate::error::Error;
 use stormath::consts::MIN_POSITIVE;
-use stormath::solvers::{secant_solver, brent_solver, SolverSettings};
+use stormath::solvers::{brent_solver, SolverSettings};
 
 use serde::{Serialize, Deserialize};
 
 use super::SegmentFlowConditions;
 use super::fan::Fan;
+
+/// Maximum number of times the upper end of the bracket is doubled when solving for the internal
+/// suction from the power. The bracket starts close to the solution, so only a few expansions are
+/// normally needed.
+const MAX_BRACKET_EXPANSIONS: usize = 100;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -290,27 +295,48 @@ impl InternalFlow {
             None => return 0.0,
         };
 
-        // The suction is written as s = s_threshold + x^2 so that the solver never ends up in the
-        // region with zero flow, where the residual is constant and the secant method fails.
-        let internal_suction = |x: Float| threshold_suction + x * x;
+        // Relative error in the power. It is -1 at the threshold suction, where there is no flow, and
+        // increases with the suction, as both the suction and the flow increase.
+        let residual = |internal_suction: Float| {
+            internal_suction * self.total_volume_flow(
+                segments, density, internal_suction
+            ) / flow_power - 1.0
+        };
 
-        let first_guess = (flow_power / flow_factor).powf(2.0 / 3.0).sqrt();
-        let second_guess = 1.1 * first_guess;
+        // A bracketed solver is used, as the residual is constant in the region with zero flow,
+        // and, for very small powers, the root is so close to the threshold suction that the
+        // residual is a staircase function in floating point. The secant method can then divide
+        // by zero, which gives NaN.
+        //
+        // The upper end of the bracket is the threshold suction plus an increment. The increment
+        // starts from the solution when neglecting the external pressure,
+        // P = s * flow_factor * sqrt(s), but is never smaller than what can be resolved relative to
+        // the threshold suction in floating point. It is doubled until the delivered power is
+        // larger than the specified power.
+        let mut suction_increment = (flow_power / flow_factor).powf(2.0 / 3.0)
+            .max(threshold_suction * Float::EPSILON)
+            .max(MIN_POSITIVE);
 
-        let x = secant_solver(
-            |x| {
-                let internal_suction = internal_suction(x);
+        let mut upper_suction = threshold_suction + suction_increment;
+        let mut nr_expansions = 0;
 
-                internal_suction * self.total_volume_flow(
-                    segments, density, internal_suction
-                ) / flow_power - 1.0
-            },
-            first_guess,
-            second_guess,
+        while residual(upper_suction) <= 0.0 {
+            nr_expansions += 1;
+
+            if nr_expansions > MAX_BRACKET_EXPANSIONS || !upper_suction.is_finite() {
+                return threshold_suction;
+            }
+
+            suction_increment *= 2.0;
+            upper_suction = threshold_suction + suction_increment;
+        }
+
+        brent_solver(
+            residual,
+            threshold_suction,
+            upper_suction,
             &self.solver_settings.wing_solver_settings()
-        );
-
-        internal_suction(x)
+        ).unwrap_or(threshold_suction)
     }
 
     /// Solves for the internal suction at the operating point of the fans, for a given rotational

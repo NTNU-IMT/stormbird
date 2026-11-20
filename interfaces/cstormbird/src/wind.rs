@@ -7,7 +7,7 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-use crate::error::set_last_error;
+use crate::error::{set_last_error, STORMBIRD_ERROR_INVALID_INPUT, STORMBIRD_ERROR_JSON, STORMBIRD_ERROR_NULL_POINTER};
 
 use stormbird::wind::wind_condition::WindCondition as WindConditionImpl;
 use stormbird::wind::wind_condition::discretized_spectrum::DiscretizedSpectrum;
@@ -177,7 +177,10 @@ pub extern "C" fn wind_condition_new_from_json_string(
     let json_str = match string_from_c(json_string) {
         Some(s) => s,
         None => {
+            let code = string_error_code(json_string);
+
             set_last_error(
+                code,
                 "wind_condition_new_from_json_string: the input string is null or not valid UTF-8"
             );
 
@@ -188,8 +191,7 @@ pub extern "C" fn wind_condition_new_from_json_string(
     match serde_json::from_str::<WindConditionImpl>(json_str) {
         Ok(wind_condition) => box_wind_condition(wind_condition),
         Err(error) => {
-            set_last_error(
-                format!("wind_condition_new_from_json_string: {}", error)
+            set_last_error(STORMBIRD_ERROR_JSON, format!("wind_condition_new_from_json_string: {}", error)
             );
 
             std::ptr::null_mut()
@@ -225,16 +227,16 @@ pub extern "C" fn wind_condition_get_direction_coming_from(
 
 /// Sets the direction the wind is coming from, in radians.
 ///
-/// Returns 0 on success, or -1 if the input pointer is null.
+/// Returns 0 on success, or -20 if the input pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_direction_coming_from(
     wind_condition: *mut WindCondition,
     direction_coming_from: f64,
 ) -> i32 {
     if wind_condition.is_null() {
-        set_last_error("wind_condition_set_direction_coming_from: the wind condition pointer is null");
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, "wind_condition_set_direction_coming_from: the wind condition pointer is null");
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_condition = unsafe { &mut *(wind_condition as *mut WindConditionImpl) };
@@ -247,7 +249,7 @@ pub extern "C" fn wind_condition_set_direction_coming_from(
 /// Sets the gust spectrum for the velocity component parallel to the true wind, from the discrete
 /// harmonic components of the spectrum.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_components` is zero.
 ///
 /// # Safety
@@ -274,7 +276,7 @@ pub extern "C" fn wind_condition_set_parallel_gust(
 /// Sets the gust spectrum for the velocity component perpendicular to the true wind, from the
 /// discrete harmonic components of the spectrum.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_components` is zero.
 ///
 /// # Safety
@@ -301,7 +303,7 @@ pub extern "C" fn wind_condition_set_perpendicular_gust(
 /// Sets the gust spectrum for the vertical velocity component, from the discrete harmonic
 /// components of the spectrum.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -2 if
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if
 /// `nr_components` is zero.
 ///
 /// # Safety
@@ -328,8 +330,8 @@ pub extern "C" fn wind_condition_set_vertical_gust(
 /// Sets the gust spectrum for the velocity component parallel to the true wind, from a JSON
 /// string with the frequencies, amplitudes and phases of the spectrum.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -3 if the string is
-/// not valid UTF-8 or valid JSON for a gust spectrum.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the string is
+/// not valid UTF-8, -2 if it is not valid JSON for a gust spectrum.
 ///
 /// # Safety
 /// - `gust_string` must be a valid null-terminated C string
@@ -344,8 +346,8 @@ pub extern "C" fn wind_condition_set_parallel_gust_from_json_string(
 /// Sets the gust spectrum for the velocity component perpendicular to the true wind, from a JSON
 /// string with the frequencies, amplitudes and phases of the spectrum.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -3 if the string is
-/// not valid UTF-8 or valid JSON for a gust spectrum.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the string is
+/// not valid UTF-8, -2 if it is not valid JSON for a gust spectrum.
 ///
 /// # Safety
 /// - `gust_string` must be a valid null-terminated C string
@@ -360,8 +362,8 @@ pub extern "C" fn wind_condition_set_perpendicular_gust_from_json_string(
 /// Sets the gust spectrum for the vertical velocity component, from a JSON string with the
 /// frequencies, amplitudes and phases of the spectrum.
 ///
-/// Returns 0 on success, or a negative error code: -1 if a pointer is null, -3 if the string is
-/// not valid UTF-8 or valid JSON for a gust spectrum.
+/// Returns 0 on success, or a negative error code: -20 if a pointer is null, -3 if the string is
+/// not valid UTF-8, -2 if it is not valid JSON for a gust spectrum.
 ///
 /// # Safety
 /// - `gust_string` must be a valid null-terminated C string
@@ -470,7 +472,7 @@ pub extern "C" fn wind_condition_get_friction_velocity(
 
 /// Sets the friction velocity of the logarithmic model.
 ///
-/// Returns 0 on success, -1 if the input pointer is null, and -4 if the velocity variation is not
+/// Returns 0 on success, -20 if the input pointer is null, and -3 if the velocity variation is not
 /// a logarithmic model.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_friction_velocity(
@@ -501,7 +503,7 @@ pub extern "C" fn wind_condition_get_surface_roughness(
 
 /// Sets the surface roughness of the logarithmic model.
 ///
-/// Returns 0 on success, -1 if the input pointer is null, and -4 if the velocity variation is not
+/// Returns 0 on success, -20 if the input pointer is null, and -3 if the velocity variation is not
 /// a logarithmic model.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_surface_roughness(
@@ -533,7 +535,7 @@ pub extern "C" fn wind_condition_get_obukhov_length(
 /// Sets the Obukhov length of the logarithmic model. A value of exactly 0.0 removes the stability
 /// correction.
 ///
-/// Returns 0 on success, -1 if the input pointer is null, and -4 if the velocity variation is not
+/// Returns 0 on success, -20 if the input pointer is null, and -3 if the velocity variation is not
 /// a logarithmic model.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_obukhov_length(
@@ -566,7 +568,7 @@ pub extern "C" fn wind_condition_get_von_karman_constant(
 
 /// Sets the Von Karman constant of the logarithmic model.
 ///
-/// Returns 0 on success, -1 if the input pointer is null, and -4 if the velocity variation is not
+/// Returns 0 on success, -20 if the input pointer is null, and -3 if the velocity variation is not
 /// a logarithmic model.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_von_karman_constant(
@@ -597,7 +599,7 @@ pub extern "C" fn wind_condition_get_stable_coefficient(
 
 /// Sets the coefficient used by the stable stability correction of the logarithmic model.
 ///
-/// Returns 0 on success, -1 if the input pointer is null, and -4 if the velocity variation is not
+/// Returns 0 on success, -20 if the input pointer is null, and -3 if the velocity variation is not
 /// a logarithmic model.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_stable_coefficient(
@@ -628,7 +630,7 @@ pub extern "C" fn wind_condition_get_unstable_coefficient(
 
 /// Sets the coefficient used by the unstable stability correction of the logarithmic model.
 ///
-/// Returns 0 on success, -1 if the input pointer is null, and -4 if the velocity variation is not
+/// Returns 0 on success, -20 if the input pointer is null, and -3 if the velocity variation is not
 /// a logarithmic model.
 #[unsafe(no_mangle)]
 pub extern "C" fn wind_condition_set_unstable_coefficient(
@@ -697,19 +699,17 @@ fn set_gust(
         || amplitudes.is_null()
         || phases.is_null()
     {
-        set_last_error(
-            format!("{}: one of the input pointers is null", component.setter_name())
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", component.setter_name())
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_components == 0 {
-        set_last_error(
-            format!("{}: the gust spectrum has no components", component.setter_name())
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: the gust spectrum has no components", component.setter_name())
         );
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let spectrum = unsafe {
@@ -734,33 +734,33 @@ fn set_gust_from_json_string(
     component: GustComponent,
 ) -> i32 {
     if wind_condition.is_null() {
-        set_last_error(
-            format!("{}: the wind condition pointer is null", component.json_setter_name())
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the wind condition pointer is null", component.json_setter_name())
         );
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let gust_str = match string_from_c(gust_string) {
         Some(s) => s,
         None => {
-            set_last_error(
-                format!(
+            let code = string_error_code(gust_string);
+
+            set_last_error(code, format!(
                     "{}: the gust string is null or not valid UTF-8",
                     component.json_setter_name()
                 )
             );
 
-            return -3;
+            return -code;
         }
     };
 
     let spectrum = match serde_json::from_str::<DiscretizedSpectrum>(gust_str) {
         Ok(spectrum) => spectrum,
         Err(error) => {
-            set_last_error(format!("{}: {}", component.json_setter_name(), error));
+            set_last_error(STORMBIRD_ERROR_JSON, format!("{}: {}", component.json_setter_name(), error));
 
-            return -3;
+            return -STORMBIRD_ERROR_JSON;
         }
     };
 
@@ -784,8 +784,7 @@ fn logarithmic_model_value(
     match unsafe { wind_condition_ref(wind_condition) }.velocity_variation {
         VelocityVariation::LogarithmicModel(ref model) => get_value(model),
         _ => {
-            set_last_error(
-                format!(
+            set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                     "{}: the wind condition does not use a logarithmic velocity variation",
                     function_name
                 )
@@ -803,9 +802,9 @@ fn set_logarithmic_model_value(
     set_value: impl FnOnce(&mut LogarithmicModel),
 ) -> i32 {
     if wind_condition.is_null() {
-        set_last_error(format!("{}: the wind condition pointer is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the wind condition pointer is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     let rust_condition = unsafe { &mut *(wind_condition as *mut WindConditionImpl) };
@@ -816,26 +815,35 @@ fn set_logarithmic_model_value(
             0
         },
         _ => {
-            set_last_error(
-                format!(
+            set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
                     "{}: the wind condition does not use a logarithmic velocity variation",
                     function_name
                 )
             );
 
-            -4
+            -STORMBIRD_ERROR_INVALID_INPUT
         }
     }
 }
 
 /// Helper that reports a null wind condition pointer for the functions that return a value.
 fn null_condition_error(function_name: &str) -> f64 {
-    set_last_error(format!("{}: the wind condition pointer is null", function_name));
+    set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: the wind condition pointer is null", function_name));
 
     f64::NAN
 }
 
 /// Helper that converts a C string to a rust string slice, if it is valid UTF-8.
+/// The error code for a string that could not be read by `string_from_c`: a null pointer, or a
+/// string that is not valid UTF-8.
+fn string_error_code(c_string: *const c_char) -> i32 {
+    if c_string.is_null() {
+        STORMBIRD_ERROR_NULL_POINTER
+    } else {
+        STORMBIRD_ERROR_INVALID_INPUT
+    }
+}
+
 fn string_from_c<'a>(c_string: *const c_char) -> Option<&'a str> {
     if c_string.is_null() {
         return None;

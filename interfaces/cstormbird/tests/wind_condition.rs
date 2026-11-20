@@ -3,7 +3,7 @@
 
 use std::ffi::{CStr, CString};
 
-use cstormbird::error::{stormbird_clear_last_error, stormbird_last_error_message};
+use cstormbird::error::*;
 use cstormbird::wind::*;
 
 const TOLERANCE: f64 = 1e-12;
@@ -75,7 +75,7 @@ fn logarithmic_model_getters_and_setters_work_on_the_right_variant() {
 fn logarithmic_setters_are_rejected_for_other_variants() {
     let condition = wind_condition_new_constant(0.0, 10.0);
 
-    assert_eq!(wind_condition_set_friction_velocity(condition, 0.6), -4);
+    assert_eq!(wind_condition_set_friction_velocity(condition, 0.6), -STORMBIRD_ERROR_INVALID_INPUT);
     assert!(wind_condition_get_friction_velocity(condition).abs() < TOLERANCE);
 
     wind_condition_drop(condition);
@@ -154,7 +154,7 @@ fn invalid_gust_json_is_reported_instead_of_panicking() {
         gust_string.as_ptr()
     );
 
-    assert_eq!(status, -3);
+    assert_eq!(status, -STORMBIRD_ERROR_JSON);
 
     // The condition is unchanged, so there is still no vertical gust
     assert!(wind_condition_unsteady_vertical_true_wind_velocity(condition, 1.0).abs() < TOLERANCE);
@@ -202,11 +202,11 @@ fn null_pointers_are_handled_by_all_the_accessors() {
     assert!(wind_condition_steady_true_wind_velocity_at_height(null_condition, 10.0).is_nan());
     assert!(wind_condition_get_friction_velocity(null_condition).is_nan());
 
-    assert_eq!(wind_condition_set_direction_coming_from(null_condition, 1.0), -1);
-    assert_eq!(wind_condition_set_friction_velocity(null_condition, 1.0), -1);
+    assert_eq!(wind_condition_set_direction_coming_from(null_condition, 1.0), -STORMBIRD_ERROR_NULL_POINTER);
+    assert_eq!(wind_condition_set_friction_velocity(null_condition, 1.0), -STORMBIRD_ERROR_NULL_POINTER);
     assert_eq!(
         wind_condition_set_parallel_gust(null_condition, std::ptr::null(), std::ptr::null(), std::ptr::null(), 1),
-        -1
+        -STORMBIRD_ERROR_NULL_POINTER
     );
 
     assert!(wind_condition_new_from_json_string(std::ptr::null()).is_null());
@@ -231,7 +231,7 @@ fn failures_describe_themselves_through_the_last_error_message() {
     // A later failure replaces the message
     let condition = wind_condition_new_constant(0.0, 10.0);
 
-    assert_eq!(wind_condition_set_friction_velocity(condition, 0.6), -4);
+    assert_eq!(wind_condition_set_friction_velocity(condition, 0.6), -STORMBIRD_ERROR_INVALID_INPUT);
 
     let message = last_error_message().expect("a failed call should store a message");
 
@@ -263,7 +263,7 @@ fn an_empty_gust_spectrum_is_rejected() {
         0
     );
 
-    assert_eq!(status, -2);
+    assert_eq!(status, -STORMBIRD_ERROR_INVALID_INPUT);
 
     wind_condition_drop(condition);
 }

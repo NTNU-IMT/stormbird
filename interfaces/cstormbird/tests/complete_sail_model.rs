@@ -2,7 +2,7 @@
 
 use std::ffi::{CStr, CString};
 
-use cstormbird::error::{stormbird_clear_last_error, stormbird_last_error_message};
+use cstormbird::error::*;
 use cstormbird::lifting_line::complete_sail_model::*;
 
 /// The last error message, read the same way a C caller would.
@@ -64,7 +64,7 @@ fn a_setup_string_missing_fields_is_reported() {
 fn queries_on_a_null_model_are_reported() {
     stormbird_clear_last_error();
 
-    assert_eq!(complete_sail_model_get_number_of_sails(std::ptr::null_mut()), -1);
+    assert_eq!(complete_sail_model_get_number_of_sails(std::ptr::null_mut()), -STORMBIRD_ERROR_NULL_POINTER);
 
     let message = last_error_message().expect("a failed call should store a message");
 

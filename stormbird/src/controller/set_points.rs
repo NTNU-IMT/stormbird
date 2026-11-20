@@ -29,6 +29,31 @@ pub fn limit_value(
     }
 }
 
+/// Limits the change of an angle to a maximum magnitude, along the shortest way around the circle.
+///
+/// Unlike [`limit_value`], the difference between the angles is wrapped to be between -pi and pi
+/// before it is limited, so that, e.g., a change from 179 to -179 degrees is a change of +2
+/// degrees, and not -358 degrees. The returned angle is between -pi and pi.
+pub fn limit_angle(
+    old_angle: Float,
+    raw_new_angle: Float,
+    max_change: Float,
+) -> Float {
+    let difference = ControllerSetPoints::correct_angle_to_be_between_pi_and_negative_pi(
+        raw_new_angle - old_angle
+    );
+
+    let limited_difference = if difference.abs() > max_change {
+        max_change * difference.signum()
+    } else {
+        difference
+    };
+
+    ControllerSetPoints::correct_angle_to_be_between_pi_and_negative_pi(
+        old_angle + limited_difference
+    )
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// Defines the units of the internal state set point data
 pub enum InternalStateSetPointType {
@@ -91,7 +116,7 @@ impl ControllerSetPoints {
         let mut local_wing_angle = self.get_local_wing_angle_without_rate_limit(input);
 
         if let Some(max_change_rate) = self.max_local_wing_angle_change_rate {
-            local_wing_angle = limit_value(
+            local_wing_angle = limit_angle(
                 input.current_local_wing_angle,
                 local_wing_angle,
                 max_change_rate * time_step
@@ -292,5 +317,42 @@ impl ControllerSetPoints {
         }
 
         corrected_angle
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOLERANCE: Float = 1e-12;
+
+    #[test]
+    fn limit_angle_takes_the_shortest_way_across_pi() {
+        let max_change = Float::to_radians(10.0);
+
+        // From 179 to -179 degrees is a change of +2 degrees, which is below the limit
+        let new_angle = limit_angle(Float::to_radians(179.0), Float::to_radians(-179.0), max_change);
+        assert!((new_angle - Float::to_radians(-179.0)).abs() < TOLERANCE);
+
+        // From 175 to -150 degrees is a change of +35 degrees, limited to +10 degrees, which
+        // crosses pi and is wrapped to -175 degrees
+        let new_angle = limit_angle(Float::to_radians(175.0), Float::to_radians(-150.0), max_change);
+        assert!((new_angle - Float::to_radians(-175.0)).abs() < TOLERANCE);
+
+        // The same in the negative direction
+        let new_angle = limit_angle(Float::to_radians(-175.0), Float::to_radians(150.0), max_change);
+        assert!((new_angle - Float::to_radians(175.0)).abs() < TOLERANCE);
+    }
+
+    #[test]
+    fn limit_angle_is_the_same_as_limit_value_away_from_pi() {
+        let max_change = Float::to_radians(10.0);
+
+        for (old, new) in [(0.0, 5.0), (0.0, 30.0), (20.0, -40.0), (-90.0, -95.0)] {
+            let old = Float::to_radians(old);
+            let new = Float::to_radians(new);
+
+            assert!((limit_angle(old, new, max_change) - limit_value(old, new, max_change)).abs() < TOLERANCE);
+        }
     }
 }

@@ -4,8 +4,6 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    println!("cargo:warning=BUILD SCRIPT RUNNING");
-    
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let include_dir = PathBuf::from(&crate_dir).join("include");
     std::fs::create_dir_all(&include_dir).expect("Failed to create include directory");

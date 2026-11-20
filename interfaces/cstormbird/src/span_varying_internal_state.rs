@@ -9,11 +9,11 @@ use stormbird::error::Error;
 use stormbird::line_force_model::LineForceModel;
 use stormbird::line_force_model::wing_internal_state::{SpanVariation, WingInternalState};
 
-use crate::error::set_last_error;
+use crate::error::{set_last_error, STORMBIRD_ERROR_INVALID_INPUT, STORMBIRD_ERROR_NULL_POINTER};
 use crate::ffi_utils::read_floats;
 
 /// Sets a span varying internal state on a wing, with checks of the input. Returns 0 on success,
-/// -1 if a pointer is null, -2 if an array has zero length, and -6 if the wing index is out of
+/// -20 if a pointer is null, -3 if an array has zero length, and -3 if the wing index is out of
 /// range or the span variation is not valid.
 fn set_span_variation(
     function_name: &str,
@@ -22,12 +22,12 @@ fn set_span_variation(
     span_variation: Result<SpanVariation, Error>,
 ) -> i32 {
     if wing_index >= line_force_model.nr_wings() {
-        set_last_error(format!(
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!(
             "{}: wing index {} is out of range. The model has {} wings",
             function_name, wing_index, line_force_model.nr_wings()
         ));
 
-        return -6;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     match span_variation {
@@ -39,9 +39,9 @@ fn set_span_variation(
             0
         },
         Err(error) => {
-            set_last_error(format!("{}: {}", function_name, error));
+            set_last_error(error.code(), format!("{}: {}", function_name, error));
 
-            -6
+            -error.code()
         }
     }
 }
@@ -57,15 +57,15 @@ pub(crate) fn set_internal_state_linear(
     length: usize,
 ) -> i32 {
     if locations.is_null() || values.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if length == 0 {
-        set_last_error(format!("{}: the input arrays have zero length", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: the input arrays have zero length", function_name));
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let span_variation = SpanVariation::new_linear(
@@ -88,15 +88,15 @@ pub(crate) fn set_internal_state_piecewise_constant(
     nr_values: usize,
 ) -> i32 {
     if boundaries.is_null() || values.is_null() {
-        set_last_error(format!("{}: one of the input pointers is null", function_name));
+        set_last_error(STORMBIRD_ERROR_NULL_POINTER, format!("{}: one of the input pointers is null", function_name));
 
-        return -1;
+        return -STORMBIRD_ERROR_NULL_POINTER;
     }
 
     if nr_boundaries == 0 || nr_values == 0 {
-        set_last_error(format!("{}: one of the input arrays has zero length", function_name));
+        set_last_error(STORMBIRD_ERROR_INVALID_INPUT, format!("{}: one of the input arrays has zero length", function_name));
 
-        return -2;
+        return -STORMBIRD_ERROR_INVALID_INPUT;
     }
 
     let span_variation = SpanVariation::new_piecewise_constant(

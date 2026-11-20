@@ -252,6 +252,42 @@ fn zero_velocity_gives_zero_suction_and_no_nan() {
     assert_eq!(fan_model.section_internal_states(&constant(20.0), &segments, &single_compartment(), DENSITY), vec![0.0; 3]);
 }
 
+/// Very small powers, e.g. from a controller loading close to zero, should give suction
+/// coefficients close to zero, and not NaN. For tiny powers, the internal suction is so close to the
+/// threshold where the flow starts that the two can not be distinguished in floating point, and the
+/// suction coefficient is zero.
+#[test]
+fn tiny_power_gives_small_suction_coefficient_and_no_nan() {
+    let internal_flow = test_internal_flow();
+    let model = test_model(power_conversion(FAN_EFFICIENCY));
+
+    let segments = test_segments();
+
+    let threshold_suction = internal_flow.threshold_internal_suction(&segments, DENSITY).unwrap();
+
+    for power in [1e-30, 1e-20, 1e-15, 1e-12, 1e-9, 1e-6, 1e-3] {
+        let internal_suction = internal_flow.internal_suction_from_flow_power(
+            FAN_EFFICIENCY * power, &segments, DENSITY
+        );
+
+        assert!(internal_suction.is_finite(), "power {power}: internal suction {internal_suction}");
+        assert!(internal_suction >= threshold_suction);
+
+        for sign in [1.0, -1.0] {
+            let suction_coefficients = model.section_internal_states(
+                &constant(sign * power), &segments, &single_compartment(), DENSITY
+            );
+
+            dbg!(power, sign, &suction_coefficients);
+
+            for &cq in &suction_coefficients {
+                assert!(cq.is_finite(), "power {}: suction coefficient {cq}", sign * power);
+                assert!(cq.abs() < 1e-3);
+            }
+        }
+    }
+}
+
 #[test]
 fn suction_coefficient_direct_is_passed_through_with_zero_power() {
     let model = test_model(InternalStateConversion::SuctionCoefficientDirect);

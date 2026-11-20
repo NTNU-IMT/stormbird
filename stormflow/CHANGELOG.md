@@ -2,6 +2,10 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
+## 0.4.1 - 2026-11-20
+### Changes
+- Stormflow now depends on version 0.13.1 of Stormbird, so that the line force model in the actuator line can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. Setup files that are valid for Stormflow 0.4.0 give the same results. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details.
+
 ## 0.4.0 - 2026-11-14
 ### Breaking changes
 - Stormflow now depends on version 0.13.0 of Stormbird and version 0.5.0 of Stormath. See the [Stormbird change log](../stormbird/CHANGELOG.md) and the [Stormath change log](../stormath/CHANGELOG.md) for details. Setup files that are valid for Stormflow 0.3.0 give the same results, but invalid settings in the actuator line model, e.g., an inconsistent wing geometry, are now reported as errors instead of causing a panic, or a crash later in the simulation.

@@ -21,6 +21,12 @@ class ActuatorLineResults(StormbirdSetupBaseModel):
     """The columns in stormbird_forces.csv, with the column names as keys."""
     full_results: dict[int, dict[str, Any]] = Field(default_factory=dict)
     """The files in stormbird_full_results, with the iteration number as key."""
+    simulation_builder: dict[str, Any] | None = None
+    """
+    The simulation builder that the results are from, as a dictionary, so that the results contain
+    the complete setup, e.g., the wind, the linear velocity and the actuator line model. Set by the
+    run functions in standard_simulations. None if not stored.
+    """
 
     @classmethod
     def from_case(cls, path: Path | str) -> "ActuatorLineResults":

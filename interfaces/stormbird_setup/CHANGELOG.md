@@ -2,6 +2,13 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.13.1 - 2026-11-20
+### Features
+- New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, following the new setting in Stormbird 0.13.1. The default is `None`, which gives the same initial internal state of zero as before, and the field is then not written to the JSON input, so the builder can still be used with older versions of Stormbird. When it is set, the number of values must match the number of wings, and `add_wing_builder` adds an internal state of zero for each new wing. Together with the existing `local_wing_angles`, this makes it possible to run actuator line simulations in OpenFOAM with a fixed angle of attack and internal state, without a controller. Requires Stormbird 0.13.1 or newer when it is set.
+- New, experimental, `stormbird_setup.standard_simulations` module, with standardized setups of typical simulations. The first is `sails_on_ship`, with the `SailsOnShip` class for actuator line simulations of sails on a ship in OpenFOAM or Stormflow, using standard settings for the coordinate system, domain, grid resolution and run time, a naming convention for the cases, a standard format for reference data, and an HTML report that compares the results with the reference data. Running the simulations requires OpenFOAM or pystormflow, and the report requires plotly, which is a new optional dependency that can be installed with `pip install stormbird_setup[report]`.
+- New, optional, `simulation_builder` field in `ActuatorLineResults`, which is set by the run functions in `standard_simulations`, so that the results contain the setup they come from.
+- New default sail `RotorSailTillig2020`, a rotor sail where the lift is fitted to the empirical model in Tillig and Ringsberg (2020), *Design, operation and analysis of wind-assisted cargo ships*. The empirical model is based on CFD corrected to full-scale measurements, and gives considerably higher lift than the other rotor sail models. The drag is fitted as a function of the lift coefficient, with tuned section drag parameters, and a virtual extension of 0.33 diameters at the top of the rotor that models the end disc in the empirical model. A new pystormbird example, `rotor_sails/tillig_empirical_model`, compares the model against the empirical model.
+
 ## 0.13.0 - 2026-11-14
 ### Breaking changes
 - The optional `force-tuning` dependency requires pystormbird 0.13.0 or newer.

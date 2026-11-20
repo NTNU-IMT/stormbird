@@ -8,7 +8,15 @@ pub mod wind;
 // Re-export all public C functions so cbindgen can find them
 pub use error::{
     stormbird_last_error_message,
+    stormbird_last_error_code,
     stormbird_clear_last_error,
+    STORMBIRD_OK,
+    STORMBIRD_ERROR_IO,
+    STORMBIRD_ERROR_JSON,
+    STORMBIRD_ERROR_INVALID_INPUT,
+    STORMBIRD_ERROR_OTHER,
+    STORMBIRD_ERROR_NULL_POINTER,
+    STORMBIRD_ERROR_UNEXPECTED,
 };
 
 pub use lifting_line::complete_sail_model::{

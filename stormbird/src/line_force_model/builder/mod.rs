@@ -49,6 +49,17 @@ pub struct LineForceModelBuilder {
     /// Initial local angles for each wing, i.e., rotation around the span axis of each wing
     #[serde(default)]
     pub local_wing_angles: Vec<Float>,
+    /// Initial internal state for each wing, as a constant value along the span. The meaning
+    /// depends on the section model, e.g., the flap angle for multi-element foils, the
+    /// revolutions per second for rotor sails, or the wing internal state of an active air flow
+    /// foil. Empty means that all wings start with the default internal state of zero.
+    ///
+    /// The values are kept until they are changed, e.g., by a controller. This makes it possible
+    /// to run simulations with a fixed internal state without a controller, for instance in
+    /// actuator line simulations, where the internal state can otherwise only be set by a
+    /// controller.
+    #[serde(default)]
+    pub internal_states: Vec<Float>,
     /// Initial rotation of the whole model
     #[serde(default)]
     pub rotation: SpatialVector,
@@ -73,6 +84,7 @@ impl LineForceModelBuilder {
             output_coordinate_system: CoordinateSystem::Global,
             rotation_type: RotationType::XYZ,
             local_wing_angles: Vec::new(),
+            internal_states: Vec::new(),
             rotation: SpatialVector::from([0.0, 0.0, 0.0]),
             translation: SpatialVector::from([0.0, 0.0, 0.0]),
             force_calculation_settings: ForceCalculationSettings::default()
@@ -93,7 +105,7 @@ impl LineForceModelBuilder {
 
     /// Checks that the settings are consistent, i.e., that there is at least one wing, that the
     /// settings for each wing are valid, see [`WingBuilder::check`], and that the number of local
-    /// wing angles, if given, matches the number of wings.
+    /// wing angles and internal states, if given, matches the number of wings.
     pub fn check_settings(&self) -> Result<(), Error> {
         self.check_settings_with_nr_sections(self.nr_sections)
     }
@@ -118,6 +130,13 @@ impl LineForceModelBuilder {
             return Err(Error::invalid_input(format!(
                 "The number of local wing angles ({}) does not match the number of wings ({})",
                 self.local_wing_angles.len(), self.wing_builders.len()
+            )));
+        }
+
+        if !self.internal_states.is_empty() && self.internal_states.len() != self.wing_builders.len() {
+            return Err(Error::invalid_input(format!(
+                "The number of internal states ({}) does not match the number of wings ({})",
+                self.internal_states.len(), self.wing_builders.len()
             )));
         }
 
@@ -162,7 +181,11 @@ impl LineForceModelBuilder {
         if !self.local_wing_angles.is_empty() {
             line_force_model.local_wing_angles = self.local_wing_angles.clone();
         }
-        
+
+        if !self.internal_states.is_empty() {
+            line_force_model.set_internal_state(&self.internal_states);
+        }
+
         line_force_model.force_calculation_settings = self.force_calculation_settings.clone();
 
         line_force_model.rigid_body_motion.rotation_type = self.rotation_type;
