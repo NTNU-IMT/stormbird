@@ -31,8 +31,8 @@ def _import_pystormbird() -> Any:
     dependency of stormbird_setup.
     '''
     try:
-        import pystormbird.lifting_line # type: ignore[import-not-found]
-        import pystormbird.wind # type: ignore[import-not-found]
+        import pystormbird.lifting_line # type: ignore[import-not-found, import-untyped]
+        import pystormbird.wind # type: ignore[import-not-found, import-untyped]
     except ImportError as error:
         raise ImportError(
             "The force tuning of the inflow corrections requires pystormbird, which is an "

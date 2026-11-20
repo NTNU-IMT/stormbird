@@ -2,9 +2,13 @@
 
 This file contains an overview of the changes made to pystormflow, the Python interface to the Stormflow CFD solver. See the [Stormflow change log](../../stormflow/CHANGELOG.md) for changes to the solver, and the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the actuator line model.
 
-## 0.4.1 - Unreleased
+## 0.4.1 - 2026-11-20
 ### Changes
-- Depends on Stormflow 0.4.1 and Stormbird 0.13.1, so that setup files can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. There are no changes to the Python interface itself. Setup files that are valid for pystormflow 0.4.0 give the same results.
+- Depends on the published versions of Stormflow 0.4.1 and Stormbird 0.13.1, so that setup files can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. There are no changes to the Python interface itself. Setup files that are valid for pystormflow 0.4.0 give the same results, except for the bug fixes below.
+
+### Bug fixes
+- From Stormbird 0.13.1: the rate limit of the local wing angles in the controller of the actuator line model (`max_local_wing_angle_change_rate`) works correctly when the wing angle crosses pi. Before, the wings could be turned the wrong way and get stuck, typically with stalled sails.
+- From Stormbird 0.13.1: suction sails with the `PowerToInternalFlow` conversion no longer panic for very small, but non-zero, powers.
 
 ## 0.4.0 - 2026-11-14
 ### Breaking changes

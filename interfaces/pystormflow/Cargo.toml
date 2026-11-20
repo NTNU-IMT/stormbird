@@ -15,9 +15,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = "0.29.0"
-stormath = { version = "0.5.0", path = "../../stormath", features = ["single_precision"] }
-stormbird = { version = "0.13.1", path = "../../stormbird", features = ["single_precision"] }
-stormflow = { version = "0.4.1", path = "../../stormflow" }
+stormath = { version = "0.5.0", features = ["single_precision"] }
+stormbird = { version = "0.13.1", features = ["single_precision"] }
+stormflow = "0.4.1"
 
 [profile.release]
 opt-level = 3

@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to the Stormbird lifting line FMU. See the [Stormbird change log](../../../stormbird/CHANGELOG.md) for changes to the underlying models. The version of the FMU follows the version of Stormbird.
 
-## 0.13.1 - Unreleased
+## 0.13.1 - 2026-11-20
 ### Changes
 - Depends on the published version of Stormbird 0.13.1, which contains bug fixes and one small feature. See the [Stormbird change log](../../../stormbird/CHANGELOG.md) for details. The inputs, outputs and parameters of the FMU are unchanged. The changes that are relevant for users of the FMU are:
     - The line force model in the `sail_model` accepts the new `internal_states` field, with one initial internal state for each wing, in the same way as `local_wing_angles`. This is useful when the FMU is used without a controller.
