@@ -2,7 +2,7 @@
 
 This file contains an overview of the changes made to the Stormbird Rust library. The other crates and packages in the repository have their own change logs.
 
-## 0.13.1 - Unreleased
+## 0.13.1 - 2026-11-20
 ### Features
 - New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, set as a constant value along the span. It is optional in JSON input, and the default, an empty list, gives the same initial internal state of zero as before. The values are kept until they are changed, e.g., by a controller. This makes it simpler to run simulations with a fixed internal state without a controller (no need to override the values manually in the CFD solver). Together with the existing `local_wing_angles`, the operating point of each wing can now be fully set in the builder.
 - `LineForceModelBuilder::check_settings` checks that the number of `internal_states`, if given, matches the number of wings.
