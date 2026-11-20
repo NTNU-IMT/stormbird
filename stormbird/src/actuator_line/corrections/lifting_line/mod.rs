@@ -10,6 +10,8 @@ pub mod builder;
 pub mod straight;
 /// Straight wake, split into panels in the streamwise direction
 pub mod straight_panels;
+/// Free wake, where the shape follows the velocity sampled from the CFD flow field
+pub mod dynamic;
 /// Functionality shared by the wake models that consist of vortex panels
 pub mod panel_wake;
 
@@ -21,6 +23,7 @@ pub use builder::{
     CorrectionWakeBuilder,
     StraightWakeBuilder,
     StraightPanelWakeBuilder,
+    DynamicCorrectionWakeBuilder,
 };
 
 use crate::lifting_line::singularity_elements::horseshoe_vortex::HorseshoeVortex;
@@ -34,6 +37,7 @@ use stormath::transition_functions::cosine_transition_zero_to_one;
 
 use straight::StraightWake;
 use straight_panels::StraightPanelWake;
+use dynamic::DynamicCorrectionWake;
 
 #[derive(Debug, Clone)]
 /// Settings that are shared by all wake models in the correction
@@ -78,6 +82,8 @@ pub enum CorrectionWake {
     Straight(StraightWake),
     /// Straight wake, split into panels in the streamwise direction
     StraightPanels(StraightPanelWake),
+    /// Free wake, where the shape follows the velocity sampled from the CFD flow field
+    Dynamic(DynamicCorrectionWake),
 }
 
 #[derive(Debug, Clone)]
@@ -114,16 +120,57 @@ impl LiftingLineCorrection {
     /// line force model and the sampled velocity at the control points. Does nothing for the
     /// straight wake, which is rebuilt in each call to
     /// [`velocity_correction`](Self::velocity_correction).
+    ///
+    /// The circulation from the previous time step, the time and the time step are only used by the
+    /// dynamic wake, which is updated once per time step.
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
         line_force_model: &LineForceModel,
         ctrl_points_velocity: &[SpatialVector],
+        previous_reference_circulation_strength: &[Float],
+        previous_projected_circulation_strength: &[Float],
+        time: Float,
+        time_step: Float,
     ) {
         match &mut self.wake {
             CorrectionWake::Straight(_) => {},
             CorrectionWake::StraightPanels(wake) => {
                 wake.update_geometry(&self.settings, line_force_model, ctrl_points_velocity);
             },
+            CorrectionWake::Dynamic(wake) => {
+                wake.update(
+                    &self.settings,
+                    line_force_model,
+                    ctrl_points_velocity,
+                    previous_reference_circulation_strength,
+                    previous_projected_circulation_strength,
+                    time,
+                    time_step
+                );
+            },
+        }
+    }
+
+    /// The points in the wake where the velocity must be sampled from the CFD flow field. Empty
+    /// unless the wake is dynamic, and before the first call to [`update`](Self::update).
+    pub fn wake_points_to_sample(&self) -> &[SpatialVector] {
+        match &self.wake {
+            CorrectionWake::Dynamic(wake) => wake.points_to_sample(),
+            _ => &[],
+        }
+    }
+
+    /// Sets the sampled velocity at the wake point with the given index, see
+    /// [`wake_points_to_sample`](Self::wake_points_to_sample). Values that are not finite are
+    /// ignored, so that the previous value is kept.
+    ///
+    /// # Panics
+    /// If the wake is not dynamic, or the index is out of bounds.
+    pub fn set_wake_point_velocity(&mut self, index: usize, velocity: SpatialVector) {
+        match &mut self.wake {
+            CorrectionWake::Dynamic(wake) => wake.set_wake_point_velocity(index, velocity),
+            _ => panic!("Wake point velocities can only be set for the dynamic correction wake"),
         }
     }
 
@@ -156,6 +203,12 @@ impl LiftingLineCorrection {
                 projected_circulation_strength
             ),
             CorrectionWake::StraightPanels(wake) => wake.induced_velocity_difference(
+                &self.settings,
+                line_force_model,
+                reference_circulation_strength,
+                projected_circulation_strength
+            ),
+            CorrectionWake::Dynamic(wake) => wake.induced_velocity_difference(
                 &self.settings,
                 line_force_model,
                 reference_circulation_strength,

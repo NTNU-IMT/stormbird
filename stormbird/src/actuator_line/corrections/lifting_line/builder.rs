@@ -18,6 +18,7 @@ use super::{
     CorrectionWake,
     straight::StraightWake,
     straight_panels::StraightPanelWake,
+    dynamic::DynamicCorrectionWake,
 };
 
 /// A builder for the [LiftingLineCorrection] struct. See the documentation for
@@ -74,6 +75,10 @@ pub enum CorrectionWakeBuilder {
     /// A straight wake, split into panels in the streamwise direction, so that the reference core
     /// length can increase downstream
     StraightPanels(StraightPanelWakeBuilder),
+    /// A free wake, where the shape follows the velocity sampled from the CFD flow field at the
+    /// points of the wake, and the strength of each row of panels is the circulation from earlier
+    /// time steps
+    Dynamic(DynamicCorrectionWakeBuilder),
 }
 
 impl Default for CorrectionWakeBuilder {
@@ -145,6 +150,60 @@ impl Default for StraightPanelWakeBuilder {
             wake_length_factor: default_wake_length_factor(),
             nr_panels_per_line_element: Self::default_nr_panels_per_line_element(),
             first_panel_relative_length: Self::default_first_panel_relative_length(),
+            reference_core_evolution_length_factor: None,
+            far_field_ratio: default_far_field_ratio(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+/// Settings for a dynamic wake, where the shape follows the velocity sampled from the CFD flow
+/// field.
+///
+/// A new row of panels is shed in each time step, so the length of the wake is approximately the
+/// number of panels times the velocity times the time step. The first panel behind each line
+/// element follows the direction of the sampled velocity at the control points, with the given
+/// length. The rest of the points move with the velocity sampled at the points of the wake.
+pub struct DynamicCorrectionWakeBuilder {
+    /// Number of panels in the streamwise direction behind each line element
+    #[serde(default="DynamicCorrectionWakeBuilder::default_nr_panels_per_line_element")]
+    pub nr_panels_per_line_element: usize,
+    /// Length of the first panel, relative to the average chord length
+    #[serde(default="DynamicCorrectionWakeBuilder::default_first_panel_relative_length")]
+    pub first_panel_relative_length: Float,
+    /// Length of the last panel, relative to the average chord length
+    #[serde(default="DynamicCorrectionWakeBuilder::default_last_panel_relative_length")]
+    pub last_panel_relative_length: Float,
+    /// Damping of the changes in the shape of the wake, between 0 (no damping) and 1
+    #[serde(default)]
+    pub shape_damping_factor: Float,
+    /// Optional distance along the wake, relative to the average chord length, over which the
+    /// reference core length grows from the small reference value to the viscous core length of
+    /// the projection width. Same as for the [StraightPanelWakeBuilder]. Note that the length of
+    /// the dynamic wake depends on the time step, and the evolution length should be shorter than
+    /// the wake.
+    #[serde(default)]
+    pub reference_core_evolution_length_factor: Option<Float>,
+    /// Determines how far away from a panel it is necessary to be before the far field method is
+    /// used to calculate the induced velocity, rather than the full method.
+    #[serde(default="default_far_field_ratio")]
+    pub far_field_ratio: Float,
+}
+
+impl DynamicCorrectionWakeBuilder {
+    fn default_nr_panels_per_line_element() -> usize {100}
+    fn default_first_panel_relative_length() -> Float {0.75}
+    fn default_last_panel_relative_length() -> Float {1.0}
+}
+
+impl Default for DynamicCorrectionWakeBuilder {
+    fn default() -> Self {
+        Self {
+            nr_panels_per_line_element: Self::default_nr_panels_per_line_element(),
+            first_panel_relative_length: Self::default_first_panel_relative_length(),
+            last_panel_relative_length: Self::default_last_panel_relative_length(),
+            shape_damping_factor: 0.0,
             reference_core_evolution_length_factor: None,
             far_field_ratio: default_far_field_ratio(),
         }
@@ -228,6 +287,57 @@ impl StraightPanelWakeBuilder {
     }
 }
 
+impl DynamicCorrectionWakeBuilder {
+    fn check_settings(&self, error_messages: &mut Vec<String>) {
+        check(
+            error_messages,
+            self.nr_panels_per_line_element >= 2,
+            format!(
+                "nr_panels_per_line_element must be at least 2, but is {}.",
+                self.nr_panels_per_line_element
+            )
+        );
+
+        check(
+            error_messages,
+            self.first_panel_relative_length > 0.0,
+            format!(
+                "first_panel_relative_length must be positive, but is {}.",
+                self.first_panel_relative_length
+            )
+        );
+
+        check(
+            error_messages,
+            self.last_panel_relative_length > 0.0,
+            format!(
+                "last_panel_relative_length must be positive, but is {}.",
+                self.last_panel_relative_length
+            )
+        );
+
+        check(
+            error_messages,
+            (0.0..=1.0).contains(&self.shape_damping_factor),
+            format!(
+                "shape_damping_factor must be between 0 and 1, but is {}.",
+                self.shape_damping_factor
+            )
+        );
+
+        check(
+            error_messages,
+            self.far_field_ratio > 0.0,
+            format!("far_field_ratio must be positive, but is {}.", self.far_field_ratio)
+        );
+
+        check_reference_core_evolution_length(
+            error_messages,
+            self.reference_core_evolution_length_factor
+        );
+    }
+}
+
 impl LiftingLineCorrectionBuilder {
     fn default_reference_core_length_factor() -> Float {100.0}
 
@@ -256,6 +366,7 @@ impl LiftingLineCorrectionBuilder {
         match &self.wake {
             CorrectionWakeBuilder::Straight(builder) => builder.check_settings(&mut error_messages),
             CorrectionWakeBuilder::StraightPanels(builder) => builder.check_settings(&mut error_messages),
+            CorrectionWakeBuilder::Dynamic(builder) => builder.check_settings(&mut error_messages),
         }
 
         if error_messages.is_empty() {
@@ -299,6 +410,11 @@ impl LiftingLineCorrectionBuilder {
             CorrectionWakeBuilder::StraightPanels(builder) => {
                 CorrectionWake::StraightPanels(
                     StraightPanelWake::new(builder, &settings, line_force_model)?
+                )
+            },
+            CorrectionWakeBuilder::Dynamic(builder) => {
+                CorrectionWake::Dynamic(
+                    DynamicCorrectionWake::new(builder, &settings, line_force_model)?
                 )
             },
         };

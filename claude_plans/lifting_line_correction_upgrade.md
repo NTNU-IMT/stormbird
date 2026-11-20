@@ -2,8 +2,10 @@
 
 Status legend: `[x]` done, `[~]` in progress, `[ ]` not started.
 
-**Current state:** steps 0 and 1 are done and committed (`86e485a`, `a900e6a`). Step 2a is next,
-see its section for the detailed design. Run the tests with `cargo test --release` in `stormbird`
+**Current state:** steps 0 and 1 are done and committed (`86e485a`, `a900e6a`). Step 2a is
+implemented and committed (2026-11-20, together with the fix of the induced velocity points in
+the dynamic wake), see its results section. **Wait for the user's input
+before starting step 2b.** Run the tests with `cargo test --release` in `stormbird`
 (also with `--features parallel` and `--features single_precision`).
 
 ## Goal
@@ -103,18 +105,53 @@ Possible later optimization, if the cost of `StraightPanels` matters: fewer pane
 proportional), or skipping the panels beyond the evolution length when the reference and the
 projected circulation are equal (the two wakes then cancel exactly there).
 
-## Step 2a: dynamic wake in Stormbird  `[ ]`  <- NEXT STEP
+## Step 2a: dynamic wake in Stormbird  `[x]`
 
-Paused by the user before any code was written (the working tree was clean after `a900e6a`). The
-design below is ready to implement. Confirm with the user before starting, as they may want to
-adjust it.
+### Results
+- Implemented as designed below, with the agreed changes. The first free row uses the
+  `Freestream` path of `DynamicWake` with the sampled control point velocity (option (a) agreed with
+  the user): spanwise component and wing motion removed.
+- `DynamicWakeBuilder` bug, fixed in the builder on request of the user: ratio 0 still computed
+  induced velocities at row 0 (the wing points) every step, which was 42 ms of the 44 ms correction
+  update, and half of a lifting line dynamic time step (22 -> 12 ms in `induced_velocity_benchmark`).
+  Now `WakeSettings::points_with_induced_velocities` (a `Range`, from
+  `settings::points_with_induced_velocities`): the ratio of the streamed rows `1..=N-2`, plus rows
+  0 and 1 for `ActualVelocity`. Lifting line results unchanged for `Freestream`/`Chord` with ratio 0
+  or 1; `ActualVelocity` ratio 0 changed by 2e-4, ratios in between by 2e-5 (temporary baseline
+  comparison, rectangular wing). The correction wake needs no override any more.
+- Dynamic vs `Straight` with the same length (uniform velocity, constant circulation, two wings):
+  1.3 % max relative difference, isolated and with interactions.
+- Benchmark on the WSL machine (all numbers about 5x slower than in step 1 on the other machine,
+  also `Straight`), per call, update + correction: `StraightPanels` (50) 0.7 + 11.7 / 0.8 + 29.0 ms,
+  `Dynamic` (100) 1.7 + 17.5 / 1.7 + 43.7 ms serial; with `parallel` 3.2 + 4.8 / 3.2 + 6.3 ms.
+  The benchmark now fills the dynamic wake with circulation before timing (zero-strength panels
+  are skipped), and prints the update and correction times separately.
+- Tests: 7 new in `corrections/lifting_line/tests.rs` and
+  `dynamic_correction_wake_points_through_the_actuator_line` in `actuator_line/tests.rs`. All pass
+  with and without `parallel`; with `single_precision` only the known failure (see notes).
+- Python `DynamicCorrectionWakeBuilder` tested in a temporary venv with pydantic 2.14
+  (`/tmp/sb_venv`): JSON round trip for all three wakes, and the Python output is parsed in the
+  Rust `settings_from_json` test. Book and change logs updated.
+
+### Design
+
+Reviewed with the user on 2026-11-20 (no code written yet). Agreed:
+- Panel lengths and time stepping as in the lifting line dynamic wake: one new row per CFD time
+  step, so the wake length is about `nr_panels * U * dt` (only some chords with typical actuator
+  line time steps). The long first panel (0.75 chord) compared to the later rows (`U dt`) is
+  deliberate. See "Substepping panel wakes from CFD" under possible improvements.
+- `wake_points_to_sample` is empty until the first `update`, so the CFD solver never samples the
+  chord-aligned points from `DynamicWakeBuilder::build`, which are replaced in the first update.
+- The wake follows the CFD velocity only, nothing else (no freestream, no induced velocities from
+  the correction wakes). `first_wake_points_direction` is therefore not a setting (see below).
 
 ### Builder (`builder.rs`)
 New variant `CorrectionWakeBuilder::Dynamic(DynamicCorrectionWakeBuilder)` with:
 - `nr_panels_per_line_element` (default 100, at least 2)
 - `first_panel_relative_length` (default 0.75, positive), relative to the average chord length
 - `last_panel_relative_length` (default 1.0, positive)
-- `first_wake_points_direction: FirstWakePointsDirection` (default `Freestream`)
+- no `first_wake_points_direction` setting: the first free row follows the sampled CFD velocity
+  (see the runtime section for which samples)
 - `shape_damping_factor` (default 0.0, in [0, 1])
 - `reference_core_evolution_length_factor: Option<Float>` (same meaning as for `StraightPanels`)
 - `far_field_ratio` (default 5.0)
@@ -193,10 +230,18 @@ points), change logs (Stormbird, stormbird_setup), Python (`DynamicCorrectionWak
 - `cpp_actuator_line`: `nr_wake_points_to_sample`, `get_wake_point_at_index`,
   `set_wake_point_velocity_at_index`.
 - OpenFOAM: sample before `do_step`, `find_cell` every time step (the points move), one batched
-  reduce over all wake points (not one per point).
+  reduce over all wake points (not one per point). Note: `VGREAT` is finite in double precision
+  (1e300), so the setter's non-finite check does not catch it. Skip points that are not found
+  (cell -1 on all processors) on the C++ side instead, so the previous value is kept.
 - Stormflow: trilinear stencils for the wake points, fetch the cells through
   `cell_centered_velocity_at_cells` (works for CPU and GPU), interpolate and pass in.
 - Optional: export of the correction wake as VTK, for debugging.
+
+## Possible improvements (after the simplest version works)
+
+- **Substepping panel wakes from CFD**: decouple the panel length from the CFD time step, e.g. a
+  new row only every n time steps, or rows with a target length, so that the wake length does not
+  scale with `nr_panels * U * dt`.
 
 ## Open questions
 

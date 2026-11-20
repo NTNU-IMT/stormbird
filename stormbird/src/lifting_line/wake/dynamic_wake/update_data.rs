@@ -116,9 +116,9 @@ impl DynamicWake {
 
     /// Computes the velocity at all the wake points.
     ///
-    /// The velocity is calculated as the sum of the freestream velocity and the induced velocity.
-    /// However, if the settings contains and end-index for the induced velocities, the induced
-    /// velocities can be neglected for the last panels. This is useful for speeding up simulations.
+    /// The velocity is the freestream velocity, plus the induced velocity at the points in
+    /// [`WakeSettings::points_with_induced_velocities`], which are the points where the induced
+    /// velocity is used. The induced velocities are only included after the first two time steps.
     ///
     /// # Argument
     /// * `wake_points_freestream` - A vector containing the freestream velocity at the wake points
@@ -127,14 +127,12 @@ impl DynamicWake {
 
         self.velocity_at_points[..nr_points].copy_from_slice(&wake_points_freestream[..nr_points]);
 
-        let end_index = self.settings.end_index_induced_velocities_on_wake.min(
-            self.points.len()
-        );
+        let range = self.settings.points_with_induced_velocities.clone();
 
-        if end_index > 0 && self.number_of_time_steps_completed > 2 {
-            let u_i_calc: Vec<SpatialVector> = self.induced_velocities(&self.points[0..end_index]);
+        if !range.is_empty() && self.number_of_time_steps_completed > 2 {
+            let u_i_calc: Vec<SpatialVector> = self.induced_velocities(&self.points[range.clone()]);
 
-            for (velocity, &u_i) in self.velocity_at_points[..end_index].iter_mut().zip(&u_i_calc) {
+            for (velocity, &u_i) in self.velocity_at_points[range].iter_mut().zip(&u_i_calc) {
                 *velocity += u_i;
             }
         }

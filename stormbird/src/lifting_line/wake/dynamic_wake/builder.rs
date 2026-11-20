@@ -24,6 +24,7 @@ use super::{
         WakeSettings,
         FirstWakePointsDirection,
         WakeIndices,
+        points_with_induced_velocities,
     },
 };
 
@@ -168,20 +169,17 @@ impl DynamicWakeBuilder {
             }
         }
 
-        // The number of points in the streamwise direction that are affected by induced velocities
-        let ui_affected_stream_index = (self.ratio_of_wake_affected_by_induced_velocities.min(1.0) * 
-            (indices.nr_points_per_line_element - 1) as Float).ceil() as usize;
-
-        let end_index_induced_velocities_on_wake = indices.point_index(
-            ui_affected_stream_index, 
-            indices.nr_points_along_span - 1 
+        let points_with_induced_velocities = points_with_induced_velocities(
+            &indices,
+            self.ratio_of_wake_affected_by_induced_velocities,
+            self.first_wake_points_direction
         );
 
         let settings = WakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
             last_panel_relative_length: self.last_panel_relative_length,
             first_wake_points_direction: self.first_wake_points_direction,
-            end_index_induced_velocities_on_wake,
+            points_with_induced_velocities,
             shape_damping_factor: self.shape_damping_factor,
             steady_state_strength_update: self.steady_state_strength_update,
         };

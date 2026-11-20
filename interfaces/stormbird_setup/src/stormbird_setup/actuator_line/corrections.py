@@ -63,8 +63,56 @@ class StraightPanelWakeBuilder(StormbirdSetupBaseModel):
     to calculate the induced velocity.
     """
 
+class DynamicCorrectionWakeBuilder(StormbirdSetupBaseModel):
+    """
+    Wake model for the lifting line correction, with a free wake where the shape follows the
+    velocity sampled from the CFD flow field at the points of the wake, and the strength of each
+    row of panels is the circulation from earlier time steps. A new row of panels is shed in each
+    time step, so the length of the wake is approximately the number of panels times the velocity
+    times the time step. Requires Stormbird 0.14.0 or newer, and a CFD interface that samples the
+    velocity at the wake points.
+    """
+    nr_panels_per_line_element: int = 100
+    """
+    Number of panels in the streamwise direction behind each line element. Must be at least 2.
+    """
+    first_panel_relative_length: float = 0.75
+    """
+    Length of the first panel, relative to the average chord length. The first panel follows the
+    direction of the sampled velocity at the control points.
+    """
+    last_panel_relative_length: float = 1.0
+    """
+    Length of the last panel, relative to the average chord length.
+    """
+    shape_damping_factor: float = 0.0
+    """
+    Damping of the changes in the shape of the wake, between 0 (no damping) and 1.
+    """
+    reference_core_evolution_length_factor: float | None = None
+    """
+    Optional distance along the wake, relative to the average chord length, over which the reference
+    core length grows to the viscous core length of the projection width. Same as for the
+    StraightPanelWakeBuilder. The length of the dynamic wake depends on the time step, and the
+    evolution length should be shorter than the wake.
+    """
+    far_field_ratio: float = 5.0
+    """
+    Determines how far away from a panel it is necessary to be before the far field method is used
+    to calculate the induced velocity.
+    """
+
+CorrectionWakeBuilder = StraightWakeBuilder | StraightPanelWakeBuilder | DynamicCorrectionWakeBuilder
+
+# The name of the variant of the wake enum in Stormbird, for each builder
+_WAKE_VARIANTS: dict[type, str] = {
+    StraightWakeBuilder: "Straight",
+    StraightPanelWakeBuilder: "StraightPanels",
+    DynamicCorrectionWakeBuilder: "Dynamic",
+}
+
 class LiftingLineCorrectionBuilder(StormbirdSetupBaseModel):
-    wake: StraightWakeBuilder | StraightPanelWakeBuilder = StraightWakeBuilder()
+    wake: CorrectionWakeBuilder = StraightWakeBuilder()
     """
     The wake model used to compute the correction. Requires Stormbird 0.14.0 or newer.
     """
@@ -84,16 +132,16 @@ class LiftingLineCorrectionBuilder(StormbirdSetupBaseModel):
         if isinstance(data, dict) and isinstance(data.get('wake'), dict):
             wake_data = data['wake']
 
-            if 'Straight' in wake_data:
-                data = {**data, 'wake': StraightWakeBuilder(**wake_data['Straight'])}
-            elif 'StraightPanels' in wake_data:
-                data = {**data, 'wake': StraightPanelWakeBuilder(**wake_data['StraightPanels'])}
+            for wake_class, variant in _WAKE_VARIANTS.items():
+                if variant in wake_data:
+                    data = {**data, 'wake': wake_class(**wake_data[variant])}
+                    break
 
         return data
 
     @model_serializer
     def ser_model(self) -> dict[str, Any]:
-        wake_variant = "Straight" if isinstance(self.wake, StraightWakeBuilder) else "StraightPanels"
+        wake_variant = _WAKE_VARIANTS[type(self.wake)]
 
         out: dict[str, Any] = {
             "wake": {wake_variant: self.wake.model_dump(exclude_none=True)},

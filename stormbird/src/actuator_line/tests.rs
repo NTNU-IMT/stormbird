@@ -192,3 +192,80 @@ fn invalid_settings_give_errors() {
     assert!(ActuatorLine::new_from_string("not json").is_err());
     assert!(ActuatorLine::new_from_file("this_file_does_not_exist.json").is_err());
 }
+
+#[test]
+/// The wake points of a dynamic lifting line correction are available after the first call to
+/// `do_step`, only move in the first call of each time step, and can be given sampled velocities
+fn dynamic_correction_wake_points_through_the_actuator_line() {
+    use super::corrections::lifting_line::{
+        LiftingLineCorrectionBuilder,
+        CorrectionWakeBuilder,
+        DynamicCorrectionWakeBuilder,
+    };
+
+    let mut line_force_model = LineForceModelBuilder::new(10);
+
+    line_force_model.add_wing(WingBuilder {
+        section_points: vec![
+            SpatialVector::from([0.0, 0.0, 0.0]),
+            SpatialVector::from([0.0, 0.0, 5.0]),
+        ],
+        chord_vectors: vec![SpatialVector::from([1.0, 0.0, 0.0]); 2],
+        section_model: SectionModel::SingleElementFoil(Foil::default()),
+        ..Default::default()
+    });
+
+    let mut actuator_line = ActuatorLineBuilder {
+        lifting_line_correction: Some(LiftingLineCorrectionBuilder {
+            wake: CorrectionWakeBuilder::Dynamic(DynamicCorrectionWakeBuilder {
+                nr_panels_per_line_element: 20,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        ..ActuatorLineBuilder::new(line_force_model)
+    }.build().unwrap();
+
+    let angle = Float::to_radians(5.0);
+    let velocity = VELOCITY * SpatialVector::from([angle.cos(), angle.sin(), 0.0]);
+
+    actuator_line.ctrl_points_velocity = vec![velocity; actuator_line.line_force_model.nr_span_lines()];
+
+    assert_eq!(actuator_line.nr_wake_points_to_sample(), 0);
+
+    actuator_line.do_step(0.0, TIME_STEP);
+
+    let nr_wake_points = actuator_line.nr_wake_points_to_sample();
+
+    assert_eq!(nr_wake_points, 11 * 21);
+
+    let mut points = actuator_line.wake_points_to_sample().to_vec();
+
+    for time_step_index in 1..5 {
+        let time = time_step_index as Float * TIME_STEP;
+
+        // A sideways component that changes in each time step, so that the wake moves
+        let wake_point_velocity = velocity + SpatialVector::from([0.0, 0.5 * time_step_index as Float, 0.0]);
+
+        actuator_line.set_wake_points_velocity(&vec![wake_point_velocity; nr_wake_points]);
+
+        // Outer iterations
+        for _ in 0..3 {
+            actuator_line.do_step(time, TIME_STEP);
+        }
+
+        let new_points = actuator_line.wake_points_to_sample().to_vec();
+
+        assert_ne!(points, new_points);
+
+        actuator_line.do_step(time, TIME_STEP);
+
+        assert_eq!(new_points, actuator_line.wake_points_to_sample());
+
+        points = new_points;
+    }
+
+    let circulation = &actuator_line.simulation_result.as_ref().unwrap().force_input.circulation_strength;
+
+    assert!(circulation.iter().all(|value| value.is_finite() && *value != 0.0));
+}

@@ -12,6 +12,7 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 
 ### Features
 - New `StraightPanelWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a straight wake that is split into panels, where the reference core length can grow downstream with the `reference_core_evolution_length_factor`. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer.
+- New `DynamicCorrectionWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a free wake where the shape follows the velocity sampled from the CFD flow field. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer, and a CFD interface that samples the velocity at the wake points.
 - New `self_induced_correction` in `InducedVelocitySettings`, with the new `SelfInducedVelocityCorrection` class, to limit the self-induced velocities only.
 
 ## 0.13.1 - 2026-11-20

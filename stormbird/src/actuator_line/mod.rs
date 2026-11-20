@@ -267,11 +267,72 @@ impl ActuatorLine {
     }
 
     /// Updates the wake model of the lifting line correction, if present, based on the current
-    /// sampled velocity at the control points. Called at the start of each call to
-    /// [`solve`](ActuatorLine::solve).
-    pub fn update_lifting_line_correction(&mut self) {
+    /// sampled velocity at the control points and the circulation from the last simulation result.
+    /// Called at the start of each call to [`solve`](ActuatorLine::solve).
+    pub fn update_lifting_line_correction(&mut self, time: Float, time_step: Float) {
+        if self.lifting_line_correction.is_none() {
+            return;
+        }
+
+        let (last_circulation_strength, last_projected_circulation_strength) =
+            self.last_circulation_strengths();
+
         if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
-            lifting_line_correction.update(&self.line_force_model, &self.ctrl_points_velocity);
+            lifting_line_correction.update(
+                &self.line_force_model,
+                &self.ctrl_points_velocity,
+                &last_circulation_strength,
+                &last_projected_circulation_strength,
+                time,
+                time_step
+            );
+        }
+    }
+
+    /// The points in the wake of the lifting line correction where the velocity must be sampled
+    /// from the CFD flow field. Empty unless the correction uses a dynamic wake, and before the
+    /// first call to [`do_step`](Self::do_step).
+    pub fn wake_points_to_sample(&self) -> &[SpatialVector] {
+        if let Some(lifting_line_correction) = &self.lifting_line_correction {
+            lifting_line_correction.wake_points_to_sample()
+        } else {
+            &[]
+        }
+    }
+
+    /// The number of points in [`wake_points_to_sample`](Self::wake_points_to_sample)
+    pub fn nr_wake_points_to_sample(&self) -> usize {
+        self.wake_points_to_sample().len()
+    }
+
+    /// Sets the sampled velocity at the wake point with the given index, see
+    /// [`wake_points_to_sample`](Self::wake_points_to_sample). Values that are not finite, e.g.,
+    /// from points outside the CFD domain, are ignored, so that the previous value is kept.
+    ///
+    /// # Panics
+    /// If there is no dynamic correction wake, or the index is out of bounds.
+    pub fn set_wake_point_velocity_at_index(&mut self, index: usize, velocity: SpatialVector) {
+        let lifting_line_correction = self.lifting_line_correction.as_mut().expect(
+            "Wake point velocities can only be set with a lifting line correction"
+        );
+
+        lifting_line_correction.set_wake_point_velocity(index, velocity);
+    }
+
+    /// Sets the sampled velocity at all the wake points, see
+    /// [`set_wake_point_velocity_at_index`](Self::set_wake_point_velocity_at_index).
+    ///
+    /// # Panics
+    /// If the number of velocities is different from the number of wake points.
+    pub fn set_wake_points_velocity(&mut self, velocity: &[SpatialVector]) {
+        assert_eq!(
+            velocity.len(),
+            self.nr_wake_points_to_sample(),
+            "The number of velocities must be equal to the number of wake points to sample"
+        );
+
+        for (index, &velocity) in velocity.iter().enumerate() {
+            self.set_wake_point_velocity_at_index(index, velocity);
         }
     }
 
@@ -340,8 +401,8 @@ impl ActuatorLine {
 
     /// Takes the estimated velocity at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn solve(&mut self, time: Float, _time_step: Float) -> SolverResult {
-        self.update_lifting_line_correction();
+    pub fn solve(&mut self, time: Float, time_step: Float) -> SolverResult {
+        self.update_lifting_line_correction(time, time_step);
 
         let corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
 

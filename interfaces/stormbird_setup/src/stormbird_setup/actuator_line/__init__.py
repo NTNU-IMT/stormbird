@@ -9,6 +9,7 @@ from .corrections import (
     LiftingLineCorrectionBuilder,
     StraightWakeBuilder,
     StraightPanelWakeBuilder,
+    DynamicCorrectionWakeBuilder,
     TipLossApplication,
     TipLossCorrection,
 )
@@ -17,7 +18,7 @@ from ..lifting_line import SymmetryCondition
 
 __all__ = [
     "ActuatorLineBuilder",
-    "LiftingLineCorrectionBuilder", "StraightWakeBuilder", "StraightPanelWakeBuilder",
+    "LiftingLineCorrectionBuilder", "StraightWakeBuilder", "StraightPanelWakeBuilder", "DynamicCorrectionWakeBuilder",
     "TipLossApplication", "TipLossCorrection",
     "Gaussian", "ProjectionSettings", "SamplingSettings", "SolverSettings",
     "SymmetryCondition"
