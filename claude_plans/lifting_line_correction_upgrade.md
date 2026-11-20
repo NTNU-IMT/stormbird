@@ -239,8 +239,11 @@ points), change logs (Stormbird, stormbird_setup), Python (`DynamicCorrectionWak
 - Rotor example: new variant `ProjectedTipLossAndDynamicLiftingLine` (variant 5 in the README):
   projected tip loss, dynamic wake (100 panels, evolution length 2 diameters), wing interactions.
   `--export-wake-interval` in `run_single_rotor.py` and `run_two_rotors.py`. Not run by me.
-- `cpp_actuator_line` and pystormflow now depend on the local Stormbird/Stormath/Stormflow with
-  `version + path` (as Stormflow already does). Revert to published versions at release.
+- `cpp_actuator_line`, pystormflow and pystormbird now depend on the local
+  Stormbird/Stormath/Stormflow with `version + path` (as Stormflow already does). Revert to
+  published versions at release. pystormbird was added later, as the lifting line examples (also
+  used by the pystormflow plotting) failed against crates.io Stormbird 0.13.1, which does not know
+  the `induced_velocities` solver field written by the current `stormbird_setup`.
 - Fixed on request of the user: `Grid::clamped_floor_index_and_fraction` in Stormflow clamped the
   raw index to `shape - 1 - margin_high`, so the last interval of the stencils was unreachable.
   New tests `stencils_are_exact_in_the_whole_valid_range` and

@@ -26,6 +26,10 @@ wake can be exported at a regular interval, given in seconds:
 
 The files are stored in a folder for each case in correction_wake_single_rotor_stormflow, together
 with a correction_wake.vtk.series file, which opens all the files as one time series in ParaView.
+The wake is also exported at the end of the simulation, so that the last wake matches the flow
+fields from --export-vtk. The last wake can be shown together with the streamlines with:
+
+    python plot_streamlines.py --spin-ratio 3.0 --variant projected_tip_loss_and_dynamic_lifting_line --wake
 '''
 
 import argparse
@@ -92,13 +96,32 @@ class WakeExporter:
         self.interval = interval
         self.next_time = interval
         self.files: list[dict] = []
+        self.has_warned = False
 
     def export_if_time(self, simulation: Simulation, time: float) -> None:
+        '''
+        Exports the wake if the export interval has passed since the last export
+        '''
         if time < self.next_time:
             return
 
-        self.next_time += self.interval
+        while self.next_time <= time:
+            self.next_time += self.interval
 
+        self.export(simulation, time)
+
+    def export_at_end(self, simulation: Simulation, time: float) -> None:
+        '''
+        Exports the wake at the end of the simulation, unless it was just exported
+        '''
+        if len(self.files) == 0 or self.files[-1]["time"] < time:
+            self.export(simulation, time)
+
+    def export(self, simulation: Simulation, time: float) -> None:
+        '''
+        Exports the wake to a new numbered file, and updates the series file. Nothing is exported
+        if the lifting line correction has no wake with panels, or the wake is not initialized yet.
+        '''
         self.folder.mkdir(parents=True, exist_ok=True)
 
         file_name = f"correction_wake_{len(self.files):04d}.vtk"
@@ -109,6 +132,13 @@ class WakeExporter:
             series = {"file-series-version": "1.0", "files": self.files}
 
             (self.folder / "correction_wake.vtk.series").write_text(json.dumps(series, indent=2))
+        elif not self.has_warned:
+            self.has_warned = True
+
+            tqdm.write(
+                "Warning: no wake exported, as the lifting line correction of this variant has no "
+                "wake with panels"
+            )
 
 
 def simulation_builder(
@@ -214,6 +244,9 @@ def simulate_force_history(
                 wake_exporter.export_if_time(simulation, time)
 
             progress.update(min(time_step, progress.total - progress.n))
+
+    if wake_exporter is not None:
+        wake_exporter.export_at_end(simulation, time)
 
     if vtk_export_path is not None:
         vtk_export_path.parent.mkdir(exist_ok=True)
