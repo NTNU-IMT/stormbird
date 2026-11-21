@@ -156,7 +156,7 @@ class Variant(Enum):
 # The recommended variant, used when no variant is given to the scripts
 DEFAULT_VARIANT = Variant.ProjectedTipLossAndDynamicLiftingLine
 
-TIP_LOSS_EXP_FACTOR = 16
+TIP_LOSS_EXP_FACTOR = 32
 
 # Shorthand for all variants on the command line
 ALL_VARIANTS = "all"
