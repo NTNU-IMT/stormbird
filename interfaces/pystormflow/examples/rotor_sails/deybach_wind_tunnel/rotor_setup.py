@@ -76,7 +76,7 @@ LIFT_SLOPE = 2.75
 
 # Limit on the velocity correction from the lifting line correction, as a ratio of the sampled
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
-MAX_CORRECTION_RATIO = 2.0
+MAX_CORRECTION_RATIO = 4.0
 
 # Settings for the dynamic wake in the lifting line correction, used in the variant
 # ProjectedTipLossAndDynamicLiftingLine. A new row of panels is shed in each time step, so the wake
@@ -103,6 +103,7 @@ COURANT_NUMBER = 0.75
 
 # Grid resolution at the rotor, used by both solvers. The chord length is the diameter.
 CELLS_PER_CHORD_LENGTH = 10
+PROJECTION_WIDTH_FACTOR = 0.5
 
 # Default settings for the mesh convergence tests. The resolutions are run from the lowest to the
 # highest.
@@ -352,8 +353,8 @@ def actuator_line_builder(
         line_force_model=line_force_model,
         projection_settings=ProjectionSettings(
             projection_function=Gaussian(
-                chord_factor=0.6,
-                thickness_factor=0.6
+                chord_factor=PROJECTION_WIDTH_FACTOR,
+                thickness_factor=PROJECTION_WIDTH_FACTOR
             ),
         ),
         solver_settings=SolverSettings(damping_factor=0.05),
