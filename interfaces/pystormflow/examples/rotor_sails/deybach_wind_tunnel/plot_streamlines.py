@@ -8,8 +8,8 @@ angular position of the interfering rotor for the two rotor case:
     python plot_streamlines.py --spin-ratio 3.0
     python plot_streamlines.py --angular-position 30 --variant lifting_line
 
-The shape of the wake in the lifting line correction, exported with --export-wake-interval, can be
-shown together with the streamlines with --wake. The last exported wake is shown, colored by the
+The shape of the wake in the lifting line correction, exported together with the flow fields with
+--export-vtk, can be shown together with the streamlines with --wake. The wake is colored by the
 circulation strength of the projected forces:
 
     python plot_streamlines.py --angular-position 0 --variant projected_tip_loss_and_dynamic_lifting_line --wake
@@ -19,7 +19,6 @@ Requires pyvista.
 '''
 
 import argparse
-import json
 from pathlib import Path
 
 import pyvista as pv
@@ -27,26 +26,10 @@ from stormbird_setup.spatial_vector import SpatialVector
 
 import rotor_setup
 from rotor_setup import Variant
-from run_single_rotor import vtk_path, wake_folder
-from run_two_rotors import two_rotors_vtk_path, two_rotors_wake_folder
+from run_single_rotor import correction_wake_path, vtk_path
+from run_two_rotors import two_rotors_vtk_path
 
 NR_STREAMLINES_PER_ROTOR = 100
-
-def last_wake_path(folder: Path) -> Path:
-    '''
-    The path of the last wake file in the series file written by the wake exporter in
-    run_single_rotor.py
-    '''
-    series_path = folder / "correction_wake.vtk.series"
-
-    if not series_path.exists():
-        raise FileNotFoundError(
-            f"No exported wake found in {folder}. Run the case with --export-wake-interval first."
-        )
-
-    files = json.loads(series_path.read_text())["files"]
-
-    return folder / files[-1]["name"]
 
 def plot_streamlines(
     file_path: Path,
@@ -107,6 +90,12 @@ def plot_streamlines(
         )
 
     if wake_path is not None:
+        if not wake_path.exists():
+            raise FileNotFoundError(
+                f"No exported wake found at {wake_path}. Run the case with --export-vtk first, "
+                "with a variant that has a wake with panels in the lifting line correction."
+            )
+
         plotter.add_mesh(
             pv.read(wake_path),
             scalars="projected_strength",
@@ -142,7 +131,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--wake", action="store_true",
-        help="Show the last exported wake of the lifting line correction as well"
+        help="Show the exported wake of the lifting line correction as well"
     )
     parser.add_argument(
         "--save", action="store_true", help="Save the plot to a file instead of showing it"
@@ -154,17 +143,15 @@ if __name__ == '__main__':
 
     if args.angular_position is not None:
         file_path = two_rotors_vtk_path(variant, args.angular_position)
-        folder = two_rotors_wake_folder(variant, args.angular_position)
         rotor_locations = rotor_setup.two_rotors_locations(args.angular_position)
         title = f"{variant.label}, two rotors, angular position {args.angular_position}"
     elif args.spin_ratio is not None:
         file_path = vtk_path(variant, args.spin_ratio)
-        folder = wake_folder(variant, args.spin_ratio)
         rotor_locations = [SpatialVector()]
         title = f"{variant.label}, spin ratio {args.spin_ratio}"
     else:
         parser.error("Either --spin-ratio or --angular-position must be given")
 
-    wake_path = last_wake_path(folder) if args.wake else None
+    wake_path = correction_wake_path(file_path) if args.wake else None
 
     plot_streamlines(file_path, rotor_locations, title, args.save, wake_path)

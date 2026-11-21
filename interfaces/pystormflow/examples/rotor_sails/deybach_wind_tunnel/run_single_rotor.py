@@ -20,20 +20,14 @@ for instance ParaView:
 The VTK files are stored in vtk_single_rotor_stormflow, with the same name as the time series.
 
 For variants with a lifting line correction with panels, i.e., the dynamic wake, the shape of the
-wake can be exported at a regular interval, given in seconds:
-
-    python run_single_rotor.py --variant projected_tip_loss_and_dynamic_lifting_line --export-wake-interval 2.0
-
-The files are stored in a folder for each case in correction_wake_single_rotor_stormflow, together
-with a correction_wake.vtk.series file, which opens all the files as one time series in ParaView.
-The wake is also exported at the end of the simulation, so that the last wake matches the flow
-fields from --export-vtk. The last wake can be shown together with the streamlines with:
+wake at the end of each case is exported together with the flow fields, to a file in the same
+folder with _correction_wake added to the name. The wake can be shown together with the streamlines
+with:
 
     python plot_streamlines.py --spin-ratio 3.0 --variant projected_tip_loss_and_dynamic_lifting_line --wake
 '''
 
 import argparse
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -65,80 +59,19 @@ def vtk_path(variant: Variant, spin_ratio: float) -> Path:
         time_series_path(variant, spin_ratio, Solver.Stormflow).with_suffix(".vtk").name
     )
 
-def wake_folder(variant: Variant, spin_ratio: float) -> Path:
+def correction_wake_path(vtk_export_path: Path) -> Path:
     '''
-    The folder for the exported wake of the lifting line correction in a single rotor case, with
-    the same name as the time series.
+    The path of the VTK file with the wake of the lifting line correction, stored next to the VTK
+    file with the flow fields.
     '''
-    return (
-        Solver.Stormflow.folder / f"correction_wake_single_rotor_{Solver.Stormflow.value}" /
-        time_series_path(variant, spin_ratio, Solver.Stormflow).stem
-    )
+    return vtk_export_path.with_name(f"{vtk_export_path.stem}_correction_wake.vtk")
 
 def add_vtk_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--export-vtk", action="store_true",
-        help="Export the flow fields at the end of each case as VTK files"
+        help="Export the flow fields at the end of each case as VTK files, together with the wake "
+        "of the lifting line correction, for variants with a wake that has panels"
     )
-    parser.add_argument(
-        "--export-wake-interval", type=float, default=None,
-        help="Export the shape of the wake in the lifting line correction with this interval, in "
-        "seconds. Only for variants with a wake that has panels, i.e., the dynamic wake."
-    )
-
-class WakeExporter:
-    '''
-    Exports the wake of the lifting line correction at a regular interval, to numbered VTK files in
-    a folder, together with a ParaView series file with the time of each file.
-    '''
-    def __init__(self, folder: Path, interval: float):
-        self.folder = folder
-        self.interval = interval
-        self.next_time = interval
-        self.files: list[dict] = []
-        self.has_warned = False
-
-    def export_if_time(self, simulation: Simulation, time: float) -> None:
-        '''
-        Exports the wake if the export interval has passed since the last export
-        '''
-        if time < self.next_time:
-            return
-
-        while self.next_time <= time:
-            self.next_time += self.interval
-
-        self.export(simulation, time)
-
-    def export_at_end(self, simulation: Simulation, time: float) -> None:
-        '''
-        Exports the wake at the end of the simulation, unless it was just exported
-        '''
-        if len(self.files) == 0 or self.files[-1]["time"] < time:
-            self.export(simulation, time)
-
-    def export(self, simulation: Simulation, time: float) -> None:
-        '''
-        Exports the wake to a new numbered file, and updates the series file. Nothing is exported
-        if the lifting line correction has no wake with panels, or the wake is not initialized yet.
-        '''
-        self.folder.mkdir(parents=True, exist_ok=True)
-
-        file_name = f"correction_wake_{len(self.files):04d}.vtk"
-
-        if simulation.export_correction_wake_as_vtk(str(self.folder / file_name), binary=True):
-            self.files.append({"name": file_name, "time": time})
-
-            series = {"file-series-version": "1.0", "files": self.files}
-
-            (self.folder / "correction_wake.vtk.series").write_text(json.dumps(series, indent=2))
-        elif not self.has_warned:
-            self.has_warned = True
-
-            tqdm.write(
-                "Warning: no wake exported, as the lifting line correction of this variant has no "
-                "wake with panels"
-            )
 
 
 def simulation_builder(
@@ -168,7 +101,8 @@ def simulation_builder(
             settings=MultigridSettingsBuilder(compute_platform=compute_platform)
         ),
         boundary_condition_type=BoundaryConditionType.WindTunnel,
-        turbulence = TurbulenceSolverBuilder()
+        turbulence = TurbulenceSolverBuilder(),
+        slip_geometries=rotor_setup.slip_geometries(variant, rotor_locations)
     )
 
 def run_case(
@@ -176,17 +110,12 @@ def run_case(
     variant: Variant,
     compute_platform: ComputePlatform,
     export_vtk: bool = False,
-    export_wake_interval: float | None = None,
 ) -> dict[str, float]:
     force_history = simulate_force_history(
         spin_ratio,
         variant,
         compute_platform,
         vtk_export_path=vtk_path(variant, spin_ratio) if export_vtk else None,
-        wake_exporter=(
-            WakeExporter(wake_folder(variant, spin_ratio), export_wake_interval)
-            if export_wake_interval is not None else None
-        ),
     )
 
     write_time_series(force_history, time_series_path(variant, spin_ratio, Solver.Stormflow))
@@ -200,14 +129,14 @@ def simulate_force_history(
     cells_per_chord_length: int = rotor_setup.CELLS_PER_CHORD_LENGTH,
     rotor_locations: list[SpatialVector] | None = None,
     vtk_export_path: Path | None = None,
-    wake_exporter: WakeExporter | None = None,
     end_time: float = rotor_setup.END_TIME,
 ) -> pd.DataFrame:
     '''
     Runs a single case, and returns the force on the first rotor as a function of time. A single
     rotor at the origin is used if no rotor locations are given. The flow fields at the end of the
-    simulation are exported as a VTK file to the given path, if any, and the wake of the lifting
-    line correction with the wake exporter, if any.
+    simulation are exported as a VTK file to the given path, if any. The wake of the lifting line
+    correction is then exported as well, next to the flow fields, if the correction has a wake with
+    panels.
     '''
     builder = simulation_builder(
         spin_ratio, variant, compute_platform, cells_per_chord_length, rotor_locations
@@ -240,18 +169,17 @@ def simulate_force_history(
                 force_x.append(force[0])
                 force_y.append(force[1])
 
-            if wake_exporter is not None:
-                wake_exporter.export_if_time(simulation, time)
-
             progress.update(min(time_step, progress.total - progress.n))
-
-    if wake_exporter is not None:
-        wake_exporter.export_at_end(simulation, time)
 
     if vtk_export_path is not None:
         vtk_export_path.parent.mkdir(exist_ok=True)
 
         simulation.export_fields_as_vtk(str(vtk_export_path), binary=True)
+
+        # Returns False, without writing a file, if the correction has no wake with panels
+        simulation.export_correction_wake_as_vtk(
+            str(correction_wake_path(vtk_export_path)), binary=True
+        )
 
     return pd.DataFrame({"time": time_history, "force.x": force_x, "force.y": force_y})
 
@@ -274,8 +202,6 @@ if __name__ == '__main__':
         for spin_ratio in args.spin_ratios:
             print(f"{variant.label}, spin ratio: {spin_ratio}")
 
-            coefficients = run_case(
-                spin_ratio, variant, compute_platform, args.export_vtk, args.export_wake_interval
-            )
+            coefficients = run_case(spin_ratio, variant, compute_platform, args.export_vtk)
 
             print(f"cl = {coefficients['cl']:.3f}, cd = {coefficients['cd']:.3f}")

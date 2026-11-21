@@ -24,21 +24,15 @@ the results are plotted with plotting.py:
 The flow fields at the end of each case can also be exported as VTK files with --export-vtk. The VTK
 files are stored in vtk_two_rotors_stormflow, with the same name as the time series. The VTK file of
 the single rotor case is only exported if the single rotor case is simulated, and is then stored in
-vtk_single_rotor_stormflow.
+vtk_single_rotor_stormflow. For variants with a lifting line correction with panels, i.e., the
+dynamic wake, the shape of the wake at the end of each case is exported together with the flow
+fields, to a file in the same folder with _correction_wake added to the name.
 
 The experimental variant with a dynamic wake in the lifting line correction, where the wake follows
 the velocity in the CFD solver and the interactions between the rotors are included in the
 correction, is run with:
 
     python run_two_rotors.py --variant projected_tip_loss_and_dynamic_lifting_line --angular-positions 0 90
-
-The shape of the wake can be exported at a regular interval, given in seconds, with
---export-wake-interval. The files are stored in a folder for each case in
-correction_wake_two_rotors_stormflow (and correction_wake_single_rotor_stormflow for the single
-rotor case), together with a correction_wake.vtk.series file, which opens all the files as one time
-series in ParaView:
-
-    python run_two_rotors.py --variant projected_tip_loss_and_dynamic_lifting_line --angular-positions 0 --export-wake-interval 2.0
 '''
 
 import argparse
@@ -57,7 +51,7 @@ from plotting import (
     write_time_series,
 )
 from rotor_setup import Variant
-from run_single_rotor import WakeExporter, add_vtk_arguments, run_case, simulate_force_history
+from run_single_rotor import add_vtk_arguments, run_case, simulate_force_history
 
 
 def two_rotors_vtk_path(variant: Variant, angular_position: float) -> Path:
@@ -70,17 +64,6 @@ def two_rotors_vtk_path(variant: Variant, angular_position: float) -> Path:
         two_rotors_time_series_path(
             variant, angular_position, Solver.Stormflow
         ).with_suffix(".vtk").name
-    )
-
-
-def two_rotors_wake_folder(variant: Variant, angular_position: float) -> Path:
-    '''
-    The folder for the exported wake of the lifting line correction in a two rotor case, with the
-    same name as the time series.
-    '''
-    return (
-        Solver.Stormflow.folder / f"correction_wake_two_rotors_{Solver.Stormflow.value}" /
-        two_rotors_time_series_path(variant, angular_position, Solver.Stormflow).stem
     )
 
 
@@ -116,9 +99,7 @@ if __name__ == '__main__':
         else:
             print(f"{variant.label}, single rotor")
 
-            single_coefficients = run_case(
-                spin_ratio, variant, compute_platform, args.export_vtk, args.export_wake_interval
-            )
+            single_coefficients = run_case(spin_ratio, variant, compute_platform, args.export_vtk)
 
         print(
             f"cl = {single_coefficients['cl']:.3f}, cd = {single_coefficients['cd']:.3f}",
@@ -135,12 +116,6 @@ if __name__ == '__main__':
                 rotor_locations=rotor_setup.two_rotors_locations(angular_position),
                 vtk_export_path=(
                     two_rotors_vtk_path(variant, angular_position) if args.export_vtk else None
-                ),
-                wake_exporter=(
-                    WakeExporter(
-                        two_rotors_wake_folder(variant, angular_position), args.export_wake_interval
-                    )
-                    if args.export_wake_interval is not None else None
                 ),
             )
 
