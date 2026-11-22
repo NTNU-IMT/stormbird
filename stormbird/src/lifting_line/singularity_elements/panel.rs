@@ -37,7 +37,10 @@ impl Panel {
         let bound_vortex_length = (points[1] - points[0]).length();
         let stream_length = (points[2] - points[1]).length();
 
-        let representative_length = bound_vortex_length.max(stream_length);
+        // The point doublet model has no viscous core, so the far field must also start well
+        // outside the core. The core term of the vortex lines differs from one by less than 0.1 %
+        // at five core lengths.
+        let representative_length = bound_vortex_length.max(stream_length).max(viscous_core_length);
 
         let far_field_length_squared = (representative_length * far_field_ratio).powi(2);
 

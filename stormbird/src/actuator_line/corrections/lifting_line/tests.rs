@@ -538,6 +538,172 @@ fn dynamic_correction_converges_to_straight() {
     }
 }
 
+/// Mean value of each component over the given vectors
+fn mean(vectors: &[SpatialVector]) -> SpatialVector {
+    vectors.iter().copied().sum::<SpatialVector>() / vectors.len() as Float
+}
+
+/// Two rotor-like wings, where the second is at the given angular position around the first, four
+/// chord lengths away, with uniform reference circulation and a tip loss on the projected
+/// circulation. Returns the line force model, the velocity, the reference and the projected
+/// circulation.
+fn two_wings_with_projected_tip_loss(
+    angular_position_deg: Float
+) -> (LineForceModel, Vec<SpatialVector>, Vec<Float>, Vec<Float>) {
+    use crate::actuator_line::corrections::tip_loss::{TipLossCorrection, TipLossApplication};
+
+    let angle = angular_position_deg.to_radians();
+    let spacing = 4.0 * CHORD_LENGTH;
+
+    let line_force_model = line_force_model(
+        &[[0.0, 0.0], [-spacing * angle.cos(), -spacing * angle.sin()]], 40
+    );
+
+    let nr_span_lines = line_force_model.nr_span_lines();
+
+    let velocity = vec![SpatialVector::from([8.0, 0.0, 0.0]); nr_span_lines];
+    let reference_circulation_strength = vec![40.0; nr_span_lines];
+
+    let mut projected_circulation_strength = reference_circulation_strength.clone();
+
+    TipLossCorrection {
+        exp_factor: 16.0,
+        maintain_mean_value: false,
+        application: TipLossApplication::ProjectedForces,
+    }.apply(&mut projected_circulation_strength, &line_force_model);
+
+    (line_force_model, velocity, reference_circulation_strength, projected_circulation_strength)
+}
+
+/// Runs the dynamic correction with a constant velocity and circulation until the wake is filled,
+/// with a time step similar to an actuator line simulation with ten cells per chord length, so that
+/// the panels are much shorter than the viscous core length. Returns the velocity correction.
+fn converged_dynamic_correction(
+    builder: LiftingLineCorrectionBuilder,
+    line_force_model: &LineForceModel,
+    velocity: &[SpatialVector],
+    reference_circulation_strength: &[Float],
+    projected_circulation_strength: &[Float],
+) -> Vec<SpatialVector> {
+    let CorrectionWakeBuilder::Dynamic(wake_builder) = &builder.wake else {
+        panic!("Expected a dynamic wake");
+    };
+
+    let time_step = 0.75 * 0.1 * CHORD_LENGTH / velocity[0].length();
+    let nr_time_steps = wake_builder.nr_panels_per_line_element + 2;
+
+    let mut correction = builder.build(VISCOUS_CORE_LENGTH_FACTOR, line_force_model).unwrap();
+
+    for time_step_index in 0..nr_time_steps {
+        correction.update(
+            line_force_model,
+            velocity,
+            reference_circulation_strength,
+            projected_circulation_strength,
+            time_step_index as Float * time_step,
+            time_step
+        );
+    }
+
+    correction.velocity_correction(
+        line_force_model,
+        velocity,
+        reference_circulation_strength,
+        projected_circulation_strength,
+        0.0
+    )
+}
+
+#[test]
+/// With panels much shorter than the viscous core length, as in actuator line simulations, the
+/// far field model of the panels must not be used inside the viscous core. Otherwise, the
+/// correction is too large along the whole span, while it is still close to the straight wake at
+/// the ends.
+fn dynamic_correction_with_short_panels_is_close_to_straight_along_the_span() {
+    let (line_force_model, velocity, reference_circulation_strength, projected_circulation_strength) =
+        two_wings_with_projected_tip_loss(90.0);
+
+    let settings = |wake| LiftingLineCorrectionBuilder {
+        wake,
+        symmetry_condition: SymmetryCondition::Z,
+        ..Default::default()
+    };
+
+    let straight = split_correction(
+        settings(CorrectionWakeBuilder::Straight(StraightWakeBuilder::default())),
+        &line_force_model, &velocity,
+        &reference_circulation_strength, &projected_circulation_strength
+    );
+
+    let dynamic = converged_dynamic_correction(
+        settings(dynamic_with_nr_panels(200)),
+        &line_force_model, &velocity,
+        &reference_circulation_strength, &projected_circulation_strength
+    );
+
+    let mean_straight = mean(&straight);
+    let relative_difference = (mean(&dynamic) - mean_straight).length() / mean_straight.length();
+
+    dbg!(mean_straight, mean(&dynamic), relative_difference);
+
+    assert!(relative_difference < 0.03);
+}
+
+#[test]
+/// The part of the correction that comes from the other wing, i.e., the difference between the
+/// correction with and without wing interactions, is the same for the dynamic wake as for the
+/// straight wake, when the wings are far from the wake of each other. With a tip loss on the
+/// projected forces only, the part is not zero, as the wakes have different circulation.
+fn dynamic_wing_interactions_are_close_to_straight() {
+    for angular_position_deg in [30.0, 90.0] {
+        let (line_force_model, velocity, reference_circulation_strength, projected_circulation_strength) =
+            two_wings_with_projected_tip_loss(angular_position_deg);
+
+        let nr_span_lines_first_wing = line_force_model.wing_indices[0].len();
+
+        let interaction_part = |wake: CorrectionWakeBuilder| -> Vec<SpatialVector> {
+            let corrections: Vec<Vec<SpatialVector>> = [true, false].into_iter().map(
+                |include_wing_interactions| {
+                    let builder = LiftingLineCorrectionBuilder {
+                        wake: wake.clone(),
+                        include_wing_interactions,
+                        symmetry_condition: SymmetryCondition::Z,
+                        ..Default::default()
+                    };
+
+                    if matches!(wake, CorrectionWakeBuilder::Dynamic(_)) {
+                        converged_dynamic_correction(
+                            builder, &line_force_model, &velocity,
+                            &reference_circulation_strength, &projected_circulation_strength
+                        )
+                    } else {
+                        split_correction(
+                            builder, &line_force_model, &velocity,
+                            &reference_circulation_strength, &projected_circulation_strength
+                        )
+                    }
+                }
+            ).collect();
+
+            (0..nr_span_lines_first_wing)
+                .map(|i| corrections[0][i] - corrections[1][i])
+                .collect()
+        };
+
+        let straight = interaction_part(
+            CorrectionWakeBuilder::Straight(StraightWakeBuilder::default())
+        );
+        let dynamic = interaction_part(dynamic_with_nr_panels(200));
+
+        let relative_difference = max_difference(&straight, &dynamic) / max_length(&straight);
+
+        dbg!(angular_position_deg, max_length(&straight), relative_difference);
+
+        assert!(max_length(&straight) > 1e-3);
+        assert!(relative_difference < 0.05);
+    }
+}
+
 #[test]
 /// The strength of row k in the wake is the circulation from k time steps earlier, with the
 /// reference circulation in the reference wake and the projected circulation in the viscous wake.

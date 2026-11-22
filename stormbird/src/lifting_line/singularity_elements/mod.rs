@@ -19,8 +19,8 @@ use stormath::type_aliases::Float;
 #[derive(Clone, Debug)]
 /// Settings and functions to calculate induced velocities from vortex lines and vortex panels.
 pub struct PotentialTheorySettings {
-    /// Distance from a panel, relative to the size of the panel, beyond which a simplified far-field
-    /// model is used for the induced velocity
+    /// Distance from a panel, relative to the size of the panel or the viscous core length, whichever
+    /// is larger, beyond which a simplified far-field model is used for the induced velocity
     pub far_field_ratio: Float,
     /// Optional symmetry condition
     pub symmetry_condition: SymmetryCondition,
