@@ -329,7 +329,7 @@ def actuator_line_builder(
                     ),
                     last_panel_relative_length = 1.0
                 ),
-            ),
+            )
         case Variant.EndDiskAndDynamicLiftingLine:
             tip_loss_correction = TipLossCorrection(
                 exp_factor = TIP_LOSS_EXP_FACTOR_END_DISK,

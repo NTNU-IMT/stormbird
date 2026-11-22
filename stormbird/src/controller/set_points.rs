@@ -324,7 +324,11 @@ impl ControllerSetPoints {
 mod tests {
     use super::*;
 
-    const TOLERANCE: Float = 1e-12;
+    use crate::test_utils::tolerance;
+
+    // Wrapping the angle adds or subtracts 2 pi, which gives a round-off error of a few units in
+    // the last place in single precision
+    const TOLERANCE: Float = tolerance(1e-12, 1e-6);
 
     #[test]
     fn limit_angle_takes_the_shortest_way_across_pi() {
