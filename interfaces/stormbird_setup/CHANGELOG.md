@@ -10,10 +10,16 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 
 - `wake_length_factor` and `virtual_extension_factors` in the `LiftingLineCorrectionBuilder` are moved to the new `StraightWakeBuilder`, which is the default value of the new `wake` field, following the new settings in Stormbird 0.14.0. The other settings are unchanged. Requires Stormbird 0.14.0 or newer.
 
+- The default `background_cells_per_chord` in `OpenFoamShipSettings`, used by `SailsOnShip`, is increased from 1 to 2. The resolution around the sails and at the ship is the same as before, as the refinement levels are set relative to the background mesh, but the mesh is less coarse away from them, which gives larger meshes and different results than before. Set it to 1 to get the old mesh.
+
 ### Features
 - New `StraightPanelWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a straight wake that is split into panels, where the reference core length can grow downstream with the `reference_core_evolution_length_factor`. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer.
 - New `DynamicCorrectionWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a free wake where the shape follows the velocity sampled from the CFD flow field. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer, and a CFD interface that samples the velocity at the wake points.
 - New `self_induced_correction` in `InducedVelocitySettings`, with the new `SelfInducedVelocityCorrection` class, to limit the self-induced velocities only.
+- New `combine_wind_velocities` option in `sails_on_ship_report` and `read_report_cases`. When it is True, cases that only differ in the true wind velocity are shown as one source in the report, i.e., connected with lines in the overview, with the wind velocity of each case in the hover text. This is useful when each test condition has its own wind velocity. False by default, which gives the same report as before.
+
+### Fixes
+- The overview in the sails-on-ship report showed nothing for sources with only one case, e.g., when each test condition has its own true wind velocity, as the simulations are drawn as lines. Such sources are now shown as a short horizontal dash.
 
 ## 0.13.1 - 2026-11-20
 ### Features

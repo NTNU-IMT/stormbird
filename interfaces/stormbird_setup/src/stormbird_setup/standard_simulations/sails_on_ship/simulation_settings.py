@@ -76,7 +76,12 @@ class OpenFoamShipSettings(StormbirdSetupBaseModel):
     domain: ShipDomain = Field(
         default_factory=lambda: ShipDomain(ahead_of_bow=1.5, behind_stern=1.5, side=1.0, height=1.0)
     )
-    background_cells_per_chord: int = 1
+    background_cells_per_chord: int = 2
+    """
+    Resolution of the background mesh. The refinement levels around the sails and at the ship are
+    set from the ratio between those resolutions and this one, so changing it does not change the
+    resolution there, only how far the mesh is coarsened away from them.
+    """
     actuator_line_cells_per_chord: int = 16
     actuator_line_refinement_padding: float = 1.0
     """See RefinementBuilder.padding in the OpenFOAM grid"""
