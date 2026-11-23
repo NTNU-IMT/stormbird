@@ -140,7 +140,7 @@ The maximum width of the figures in the report, in pixels. The figures are cente
 _INITIAL_PLOT_WIDTH = REPORT_MAX_WIDTH - 400
 
 # Spacing between the subplots, as fractions of the plot area
-_OVERVIEW_SPACING = 0.05
+_OVERVIEW_SPACING = 0.08
 _COMPARISON_SPACING = 0.1
 _DETAILED_SPACING = (0.15, 0.09)
 
@@ -988,10 +988,14 @@ def make_overview_figure(
     figure.update_yaxes(title_text="C_T [-]", row=1, col=1)
     figure.update_yaxes(title_text="C_S [-]", row=2, col=1)
     figure.update_yaxes(title_text="Angle of attack [deg]", row=3, col=1)
-    figure.update_xaxes(
-        title_text="Apparent wind direction at mid-span [deg] (0 = head wind, + from starboard)",
-        row=3, col=1
-    )
+    # The x-axis is shown on all the subplots, even though it is shared, so that the values can be
+    # read without scrolling down to the bottom subplot
+    for row in (1, 2, 3):
+        figure.update_xaxes(
+            title_text="Apparent wind direction at mid-span [deg] (0 = head wind, + from starboard)",
+            showticklabels=True,
+            row=row, col=1
+        )
 
     if len(sources) > 1:
         source_text = "Line style: " + ", ".join(
