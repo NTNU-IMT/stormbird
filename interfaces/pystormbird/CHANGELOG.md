@@ -3,6 +3,9 @@
 This file contains an overview of the changes made to pystormbird, the Python interface to the Stormbird library. The version number of pystormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
 ## 0.14.0 - Unreleased
+### Breaking changes
+- `Simulation.set_velocity_linear` and `Simulation.set_velocity_angular` in `pystormbird.lifting_line` take a new, required, keyword-only argument, `in_body_fixed_frame`, which specifies the coordinate system of the input velocity. With `in_body_fixed_frame=True`, the velocity is given in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a ship simulator, and converted to the global coordinate system with the current rotation, so the rotation must be set first. With `in_body_fixed_frame=False`, the velocity is used as a global vector, which is the same as before. Before, the input was always used as a global vector, without any way to see this from the call, and body fixed velocities gave wrong results when the sails were rotated, e.g., with a heading. Existing calls must add `in_body_fixed_frame=False` to keep the same behavior. The coordinate system of the input is independent of the `output_coordinate_system` of the line force model.
+
 ### Changes
 - The `rotor_sails/deybach_wind_tunnel` and `wing_sails/stall_hysteresis` examples use the new `InducedVelocitySettings` in stormbird_setup 0.14.0, instead of `VelocityCorrections`. The settings of the velocity corrections in Stormbird 0.14.0 have changed, see the [Stormbird change log](../../stormbird/CHANGELOG.md). They are set through the JSON input, so there are no changes to the Python interface itself.
 

@@ -99,24 +99,28 @@ pub extern "C" fn lifting_line_simulation_drop(simulation: *mut LiftingLineSimul
 ///
 /// This is the number of values used by the local wing angles and the internal states of the
 /// section models.
+///
+/// Returns -20 if the input pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn lifting_line_simulation_get_number_of_sails(
     simulation: *mut LiftingLineSimulation
 ) -> i32 {
     match simulation_ref(simulation, "lifting_line_simulation_get_number_of_sails") {
         Some(rust_simulation) => rust_simulation.line_force_model.nr_wings() as i32,
-        None => -1
+        None => -STORMBIRD_ERROR_NULL_POINTER
     }
 }
 
 /// Query the simulation for the total number of span lines (control points) in all the sails.
+///
+/// Returns -20 if the input pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn lifting_line_simulation_get_number_of_span_lines(
     simulation: *mut LiftingLineSimulation
 ) -> i32 {
     match simulation_ref(simulation, "lifting_line_simulation_get_number_of_span_lines") {
         Some(rust_simulation) => rust_simulation.line_force_model.nr_span_lines() as i32,
-        None => -1
+        None => -STORMBIRD_ERROR_NULL_POINTER
     }
 }
 
@@ -126,6 +130,8 @@ pub extern "C" fn lifting_line_simulation_get_number_of_span_lines(
 /// This is the number of control points for a quasi-steady simulation, and the control points
 /// plus all the wake points for a dynamic simulation. The number can change between time steps
 /// while a dynamic wake is growing, so it should be queried before each `do_step` call.
+///
+/// Returns -20 if the input pointer is null.
 #[unsafe(no_mangle)]
 pub extern "C" fn lifting_line_simulation_get_number_of_freestream_velocity_points(
     simulation: *mut LiftingLineSimulation
@@ -134,7 +140,7 @@ pub extern "C" fn lifting_line_simulation_get_number_of_freestream_velocity_poin
 
     match simulation_ref(simulation, function_name) {
         Some(rust_simulation) => rust_simulation.get_freestream_velocity_points().len() as i32,
-        None => -1
+        None => -STORMBIRD_ERROR_NULL_POINTER
     }
 }
 
@@ -151,7 +157,7 @@ pub extern "C" fn lifting_line_simulation_has_dynamic_wake(
                 WakeData::QuasiSteady(_) => 0
             }
         },
-        None => -1
+        None => -STORMBIRD_ERROR_NULL_POINTER
     }
 }
 
@@ -211,7 +217,7 @@ pub extern "C" fn lifting_line_simulation_set_translation_only(
         function_name
     ) {
         Some(values) => values,
-        None => return -1
+        None => return -STORMBIRD_ERROR_NULL_POINTER
     };
 
     rust_simulation.line_force_model.set_translation_only(translation_vector);
@@ -238,7 +244,7 @@ pub extern "C" fn lifting_line_simulation_set_rotation_only(
         function_name
     ) {
         Some(values) => values,
-        None => return -1
+        None => return -STORMBIRD_ERROR_NULL_POINTER
     };
 
     rust_simulation.line_force_model.set_rotation_only(rotation_vector);
@@ -303,7 +309,7 @@ pub extern "C" fn lifting_line_simulation_set_translation_with_velocity_using_fi
         function_name
     ) {
         Some(values) => values,
-        None => return -1
+        None => return -STORMBIRD_ERROR_NULL_POINTER
     };
 
     rust_simulation.line_force_model.rigid_body_motion
@@ -339,7 +345,7 @@ pub extern "C" fn lifting_line_simulation_set_rotation_with_velocity_using_finit
         function_name
     ) {
         Some(values) => values,
-        None => return -1
+        None => return -STORMBIRD_ERROR_NULL_POINTER
     };
 
     rust_simulation.line_force_model.rigid_body_motion
@@ -355,6 +361,13 @@ pub extern "C" fn lifting_line_simulation_set_rotation_with_velocity_using_finit
 
 /// Sets the linear velocity of the sails directly, without changing the position.
 ///
+/// The velocity is given in the global coordinate system if `in_body_fixed_frame` is false, and in
+/// the body fixed coordinate system, i.e., the coordinate system that follows the rotation of the
+/// sails, if it is true. In the body fixed coordinate system, this is, e.g., (u, v, w) from a ship
+/// simulator. A body fixed velocity is converted to the global coordinate system, which is how the
+/// motion is stored, using the *current* rotation. The rotation must therefore be set before the
+/// velocity.
+///
 /// Returns 0 on success, or -20 if a pointer is null.
 ///
 /// # Safety
@@ -363,6 +376,7 @@ pub extern "C" fn lifting_line_simulation_set_rotation_with_velocity_using_finit
 pub extern "C" fn lifting_line_simulation_set_velocity_linear(
     simulation: *mut LiftingLineSimulation,
     linear_velocity: *const f64,
+    in_body_fixed_frame: bool,
 ) -> i32 {
     let function_name = "lifting_line_simulation_set_velocity_linear";
 
@@ -372,15 +386,29 @@ pub extern "C" fn lifting_line_simulation_set_velocity_linear(
         function_name
     ) {
         Some(values) => values,
-        None => return -1
+        None => return -STORMBIRD_ERROR_NULL_POINTER
     };
 
-    rust_simulation.line_force_model.rigid_body_motion.velocity_linear = velocity_vector;
+    let motion = &mut rust_simulation.line_force_model.rigid_body_motion;
+
+    motion.velocity_linear = if in_body_fixed_frame {
+        motion.vector_from_body_fixed_to_global_coordinate_system(velocity_vector)
+    } else {
+        velocity_vector
+    };
 
     0
 }
 
 /// Sets the angular velocity of the sails directly, without changing the orientation.
+///
+/// The velocity is given in the global coordinate system if `in_body_fixed_frame` is false, and in
+/// the body fixed coordinate system, i.e., the coordinate system that follows the rotation of the
+/// sails, if it is true. The input is the angular velocity *vector*, not the time derivative of
+/// the rotation angles. In the body fixed coordinate system, this is, e.g., (p, q, r) from a ship
+/// simulator. A body fixed velocity is converted to the global coordinate system, which is how the
+/// motion is stored, using the *current* rotation. The rotation must therefore be set before the
+/// velocity.
 ///
 /// Returns 0 on success, or -20 if a pointer is null.
 ///
@@ -390,6 +418,7 @@ pub extern "C" fn lifting_line_simulation_set_velocity_linear(
 pub extern "C" fn lifting_line_simulation_set_velocity_angular(
     simulation: *mut LiftingLineSimulation,
     angular_velocity: *const f64,
+    in_body_fixed_frame: bool,
 ) -> i32 {
     let function_name = "lifting_line_simulation_set_velocity_angular";
 
@@ -399,10 +428,16 @@ pub extern "C" fn lifting_line_simulation_set_velocity_angular(
         function_name
     ) {
         Some(values) => values,
-        None => return -1
+        None => return -STORMBIRD_ERROR_NULL_POINTER
     };
 
-    rust_simulation.line_force_model.rigid_body_motion.velocity_angular = velocity_vector;
+    let motion = &mut rust_simulation.line_force_model.rigid_body_motion;
+
+    motion.velocity_angular = if in_body_fixed_frame {
+        motion.vector_from_body_fixed_to_global_coordinate_system(velocity_vector)
+    } else {
+        velocity_vector
+    };
 
     0
 }

@@ -41,7 +41,7 @@ Each element in the vectors in the `SectionalForcesInput` corresponds to a line 
 
 The `section_models_internal_state` is the internal state given to the section model on each line element, which is converted from the internal state set on the wing (see the [control variables](#control-variables) below). For some section models, the conversion depends on the local velocity, which means that the motion can also affect the section internal states. For instance, the spin ratio of a rotor sail with a constant rotational speed changes when the felt velocity changes, and the suction coefficient of a suction sail with a constant fan power varies with the local flow conditions. The `amount_of_stall` is the amount of stall used for the lift and drag on each line element, between 0 (no stall) and 1 (full stall), as explained in the [foil model chapter](../sectional_models/foil_model.md). For wings with a [dynamic stall model](../sectional_models/dynamic_stall.md), this is the dynamic amount of stall. The value is zero for section models that do not build on the foil model, such as the rotating cylinder.
 
-The motion velocities can either be automatically calculated based on finite difference and the time history of the motion or set manually if the variables are available from some other sources (e.g., a rigid body solver of a ship). The finite difference for the angular velocity, in `set_translation_and_rotation_with_finite_difference_for_the_velocity`, is computed from the change in the rotation matrix during the time step, rather than from the change in the angles. That is, it finds the single rotation around an axis that takes the body from the old to the new rotation, and divides the rotation angle by the time step. This gives the correct angular velocity vector for all rotation types, also when the angles jump between -π and π. When the velocities are set manually, the angular velocity must be the angular velocity vector in the global coordinate system. An angular velocity in body fixed axes, such as (p, q, r) from a ship simulator, can be converted with `RigidBodyMotion::vector_from_body_fixed_to_global_coordinate_system`.
+The motion velocities can either be automatically calculated based on finite difference and the time history of the motion or set manually if the variables are available from some other sources (e.g., a rigid body solver of a ship). The finite difference for the angular velocity, in `set_translation_and_rotation_with_finite_difference_for_the_velocity`, is computed from the change in the rotation matrix during the time step, rather than from the change in the angles. That is, it finds the single rotation around an axis that takes the body from the old to the new rotation, and divides the rotation angle by the time step. This gives the correct angular velocity vector for all rotation types, also when the angles jump between -π and π. The velocities in `RigidBodyMotion` are always stored in the global coordinate system, as they are used together with the global positions of the line elements. This is independent of the `output_coordinate_system` of the line force model, which only decides the coordinate system of the results. When the velocities are set directly on the `RigidBodyMotion` in Rust, they must therefore be global, and the angular velocity must be the angular velocity vector. Velocities in body fixed axes, such as (u, v, w) and (p, q, r) from a ship simulator, can be converted with `RigidBodyMotion::vector_from_body_fixed_to_global_coordinate_system`. In the Python and C interfaces, the functions that set the velocities take an argument, `in_body_fixed_frame`, that specifies which coordinate system the input is given in, and do the conversion when needed. The same is done in the FMU, with the `motion_velocity_in_body_fixed_frame` parameter. The conversion uses the current rotation, so the rotation must be set before a body fixed velocity.
 
 ## Control variables
 
@@ -87,11 +87,17 @@ simulation.set_translation_and_rotation_with_finite_difference_for_the_velocity(
 simulation.set_translation_only(translation)
 simulation.set_rotation_only(rotation)
 
+# Velocities in the global coordinate system
 linear_velocity = [8.0, 0.0, 0.0]
 angular_velocity = np.radians([0.0, 10.0, 0.0]).tolist()
 
-simulation.set_velocity_linear(linear_velocity)
-simulation.set_velocity_angular(angular_velocity)
+simulation.set_velocity_linear(linear_velocity, in_body_fixed_frame=False)
+simulation.set_velocity_angular(angular_velocity, in_body_fixed_frame=False)
+
+# Or, velocities in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a ship
+# simulator. They are converted with the current rotation, so the rotation must be set first.
+simulation.set_velocity_linear([8.0, 0.0, 0.0], in_body_fixed_frame=True)
+simulation.set_velocity_angular(np.radians([2.0, 0.0, 0.0]).tolist(), in_body_fixed_frame=True)
 
 ```
 

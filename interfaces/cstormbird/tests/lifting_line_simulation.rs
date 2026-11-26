@@ -257,7 +257,7 @@ fn the_velocity_of_the_sails_is_felt_as_a_change_in_the_inflow() {
     let velocity = [5.0, 0.0, 0.0];
 
     assert_eq!(
-        lifting_line_simulation_set_velocity_linear(simulation, velocity.as_ptr()),
+        lifting_line_simulation_set_velocity_linear(simulation, velocity.as_ptr(), false),
         0
     );
 
@@ -279,6 +279,142 @@ fn the_velocity_of_the_sails_is_felt_as_a_change_in_the_inflow() {
         force_without_motion[1],
         force_with_motion[1]
     );
+
+    lifting_line_simulation_drop(simulation);
+}
+
+/// The total force on a new simulation, with a heading of 90 degrees, and the given motion
+/// velocities, set with the given coordinate system for the input.
+fn force_with_heading_and_motion_velocity(
+    linear_velocity: [f64; 3],
+    angular_velocity: [f64; 3],
+    in_body_fixed_frame: bool,
+) -> [f64; 3] {
+    let simulation = new_simulation(QUASI_STEADY_SETUP);
+
+    let rotation = [0.0, 0.0, 90.0_f64.to_radians()];
+
+    // The rotation must be set before a body fixed velocity, as it is used in the conversion
+    assert_eq!(lifting_line_simulation_set_rotation_only(simulation, rotation.as_ptr()), 0);
+
+    assert_eq!(
+        lifting_line_simulation_set_velocity_linear(
+            simulation, linear_velocity.as_ptr(), in_body_fixed_frame
+        ),
+        0
+    );
+
+    assert_eq!(
+        lifting_line_simulation_set_velocity_angular(
+            simulation, angular_velocity.as_ptr(), in_body_fixed_frame
+        ),
+        0
+    );
+
+    let freestream = uniform_freestream(simulation, [10.0, 0.0, 0.0]);
+    let nr_points = freestream.len() / 3;
+
+    let result = lifting_line_simulation_do_step(
+        simulation, 0.0, 1.0, freestream.as_ptr(), nr_points
+    );
+
+    assert!(!result.is_null(), "{}", last_error_message().unwrap_or_default());
+
+    let mut force = [0.0; 3];
+    simulation_result_integrated_forces_sum(result, force.as_mut_ptr());
+
+    simulation_result_drop(result);
+    lifting_line_simulation_drop(simulation);
+
+    force
+}
+
+#[test]
+/// With a heading of 90 degrees, the x-axis of the body points along the global y-axis, and the
+/// y-axis of the body points along the negative global x-axis. A body fixed velocity must
+/// therefore give the same forces as the corresponding global velocity, and different forces from
+/// the same numbers used as a global velocity.
+fn body_fixed_motion_velocities_are_converted_to_the_global_coordinate_system() {
+    let difference = |a: [f64; 3], b: [f64; 3]| {
+        ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
+    };
+
+    let length = |a: [f64; 3]| (a[0].powi(2) + a[1].powi(2) + a[2].powi(2)).sqrt();
+
+    // Surge and roll rate in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r)
+    let body_fixed = force_with_heading_and_motion_velocity([3.0, 0.0, 0.0], [0.1, 0.0, 0.0], true);
+
+    // The same motion in the global coordinate system
+    let global = force_with_heading_and_motion_velocity([0.0, 3.0, 0.0], [0.0, 0.1, 0.0], false);
+
+    // The same numbers, but interpreted as global velocities
+    let wrong_frame = force_with_heading_and_motion_velocity([3.0, 0.0, 0.0], [0.1, 0.0, 0.0], false);
+
+    assert!(
+        difference(body_fixed, global) < 1e-9 * length(global),
+        "body fixed input {:?} should equal global input {:?}", body_fixed, global
+    );
+
+    assert!(
+        difference(body_fixed, wrong_frame) > 1e-2 * length(global),
+        "the coordinate system of the input should matter: {:?} and {:?}", body_fixed, wrong_frame
+    );
+}
+
+#[test]
+/// Null pointers to the getters and the motion setters return the negative of the null pointer
+/// error code, as documented, and store the error with the name of the function.
+fn null_pointers_return_the_null_pointer_error_code() {
+    let null = std::ptr::null_mut();
+
+    let getters: [(&str, extern "C" fn(*mut LiftingLineSimulation) -> i32); 4] = [
+        ("lifting_line_simulation_get_number_of_sails", lifting_line_simulation_get_number_of_sails),
+        ("lifting_line_simulation_get_number_of_span_lines", lifting_line_simulation_get_number_of_span_lines),
+        (
+            "lifting_line_simulation_get_number_of_freestream_velocity_points",
+            lifting_line_simulation_get_number_of_freestream_velocity_points
+        ),
+        ("lifting_line_simulation_has_dynamic_wake", lifting_line_simulation_has_dynamic_wake),
+    ];
+
+    for (name, getter) in getters {
+        stormbird_clear_last_error();
+
+        assert_eq!(getter(null), -STORMBIRD_ERROR_NULL_POINTER, "{}", name);
+        assert_eq!(stormbird_last_error_code(), STORMBIRD_ERROR_NULL_POINTER, "{}", name);
+
+        let message = last_error_message().expect("a failed call should store a message");
+        assert!(message.contains(name), "message was: {}", message);
+    }
+
+    // The motion setters, with a null simulation and with a null vector
+    let simulation = new_simulation(QUASI_STEADY_SETUP);
+    let vector = [0.0; 3];
+
+    for (simulation_pointer, vector_pointer) in [
+        (null, vector.as_ptr()),
+        (simulation, std::ptr::null()),
+    ] {
+        let results = [
+            lifting_line_simulation_set_translation_and_rotation_with_finite_difference_for_the_velocity(
+                simulation_pointer, 1.0, vector_pointer, vector_pointer
+            ),
+            lifting_line_simulation_set_translation_only(simulation_pointer, vector_pointer),
+            lifting_line_simulation_set_rotation_only(simulation_pointer, vector_pointer),
+            lifting_line_simulation_set_translation_with_velocity_using_finite_difference(
+                simulation_pointer, vector_pointer, 1.0
+            ),
+            lifting_line_simulation_set_rotation_with_velocity_using_finite_difference(
+                simulation_pointer, vector_pointer, 1.0
+            ),
+            lifting_line_simulation_set_velocity_linear(simulation_pointer, vector_pointer, false),
+            lifting_line_simulation_set_velocity_angular(simulation_pointer, vector_pointer, true),
+        ];
+
+        for (i, result) in results.iter().enumerate() {
+            assert_eq!(*result, -STORMBIRD_ERROR_NULL_POINTER, "setter number {}", i);
+        }
+    }
 
     lifting_line_simulation_drop(simulation);
 }

@@ -2,6 +2,13 @@
 
 This file contains an overview of the changes made to cstormbird, the C interface to the Stormbird library. The version number of cstormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.14.0 - Unreleased
+### Breaking changes
+- `lifting_line_simulation_set_velocity_linear` and `lifting_line_simulation_set_velocity_angular` take a new `bool in_body_fixed_frame` argument, which specifies the coordinate system of the input velocity. With `true`, the velocity is given in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a ship simulator, and converted to the global coordinate system with the current rotation, so the rotation must be set first. With `false`, the velocity is used as a global vector, which is the same as before. Before, the input was always used as a global vector, and body fixed velocities gave wrong results when the sails were rotated, e.g., with a heading. Existing calls must add `false` as the last argument to keep the same behavior. The coordinate system of the input is independent of the `output_coordinate_system` of the line force model.
+
+### Bug fixes
+- Ten functions of the `LiftingLineSimulation` returned `-1` for a null pointer, rather than `-20` as documented and as stated in the change log for 0.13.0: `lifting_line_simulation_get_number_of_sails`, `_get_number_of_span_lines`, `_get_number_of_freestream_velocity_points`, `_has_dynamic_wake`, `_set_translation_only`, `_set_rotation_only`, `_set_translation_with_velocity_using_finite_difference`, `_set_rotation_with_velocity_using_finite_difference`, `_set_velocity_linear` and `_set_velocity_angular`. They now return `-20`. The error code and message stored for `stormbird_last_error_code` and `stormbird_last_error_message` were already correct.
+
 ## 0.13.1 - 2026-11-20
 ### Changes
 - Depends on the published version of Stormbird 0.13.1, which contains bug fixes and one small feature. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for details. The C functions and the header are unchanged. The changes that are relevant for users of the C interface are:
