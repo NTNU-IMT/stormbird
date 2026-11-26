@@ -685,9 +685,15 @@ impl LineForceModel {
                 velocity
             );
     
+            // The span lines must be in the same coordinate system as the velocity
+            let span_lines = match self.output_coordinate_system {
+                CoordinateSystem::Global => &self.span_lines_global,
+                CoordinateSystem::Body => &self.span_lines_local,
+            };
+
             (0..self.nr_span_lines()).map(
                 |index| {
-                    let lift_direction = self.span_lines_local[index].relative_vector().cross(velocity[index]).normalize();
+                    let lift_direction = span_lines[index].relative_vector().cross(velocity[index]).normalize();
     
                     let lift_area = self.chord_lengths[index] * self.span_lines_local[index].length();
     

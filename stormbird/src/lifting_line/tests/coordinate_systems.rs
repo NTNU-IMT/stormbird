@@ -19,9 +19,23 @@ use stormath::type_aliases::Float;
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
 fn coordinate_systems() {
+    compare_coordinate_systems(Float::to_radians(2.0), false);
+}
+
+#[test]
+/// Same as [`coordinate_systems`], but with the wing far into stall, so that the viscous lift is
+/// a large part of the force. The viscous lift is computed as a separate force, which tests that
+/// its direction is computed in the same coordinate system as the velocity.
+fn coordinate_systems_in_stall() {
+    compare_coordinate_systems(Float::to_radians(60.0), true);
+}
+
+/// Runs the same wing with no motion, and with a translation and rotation where the output is
+/// given in the global and in the body fixed coordinate system, and checks that the forces,
+/// moments and felt velocities agree after transforming them to the same coordinate system.
+fn compare_coordinate_systems(angle_of_attack: Float, check_viscous_lift: bool) {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 1.2;
-    let angle_of_attack = Float::to_radians(2.0);
 
     // Note: adding rotation in any other axis than the x-axis affects the angle of attack, and will 
     // therefore make the comparison between the "fixed" and "body" forces fail.
@@ -134,4 +148,30 @@ fn coordinate_systems() {
     assert!(moment_error_body < 1.0e-4, "moment_error_body: {}", moment_error_body);
     assert!(force_error_global < 1.0e-4, "force_error_global: {}", force_error_global);
     assert!(moment_error_global < 1.0e-4, "moment_error_global: {}", moment_error_global);
+
+    if check_viscous_lift {
+        let viscous_lift_fixed = result_fixed.integrated_forces[0].viscous_lift;
+
+        assert!(
+            viscous_lift_fixed.length() > 0.1 * forces_fixed.length(),
+            "The viscous lift should be a significant part of the force in stall: {:?}, total {:?}",
+            viscous_lift_fixed, forces_fixed
+        );
+    }
+
+    // The felt velocity minus the rotational motion is always returned in the global coordinate
+    // system, as it is used together with the global geometry, e.g., in the measurements of the
+    // apparent wind direction for the controller.
+    let felt_velocity_global = result_global.felt_velocity_minus_rotational_motion();
+    let felt_velocity_body = result_body.felt_velocity_minus_rotational_motion();
+
+    for i in 0..felt_velocity_global.len() {
+        let difference = (felt_velocity_global[i] - felt_velocity_body[i]).length();
+
+        assert!(
+            difference < 1.0e-6 * felt_velocity_global[i].length(),
+            "Felt velocity at control point {}: global {:?}, body {:?}",
+            i, felt_velocity_global[i], felt_velocity_body[i]
+        );
+    }
 }
