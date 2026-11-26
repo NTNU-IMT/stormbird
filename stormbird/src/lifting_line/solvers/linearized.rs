@@ -159,9 +159,10 @@ impl Linearized {
 
         frozen_wake.update_induced_velocities_at_control_points(&circulation_strength);
 
-        ctrl_points_velocity = self.induced_velocities.ctrl_points_velocity(
+        ctrl_points_velocity = self.ctrl_points_velocity_from_solution(
+            line_force_model,
             felt_ctrl_points_freestream,
-            &frozen_wake.induced_velocities_at_control_points
+            frozen_wake
         );
 
         // Calculate corrections on the circulation due to viscous effects
@@ -205,9 +206,10 @@ impl Linearized {
                 }
             }
 
-            ctrl_points_velocity = self.induced_velocities.ctrl_points_velocity(
+            ctrl_points_velocity = self.ctrl_points_velocity_from_solution(
+                line_force_model,
                 felt_ctrl_points_freestream,
-                &frozen_wake.induced_velocities_at_control_points
+                frozen_wake
             );
         }
 
@@ -232,5 +234,22 @@ impl Linearized {
             iterations: 1,
             residual
         }
+    }
+
+    /// The velocity at the control points, with the induced velocities from the current
+    /// circulation in the frozen wake. The velocity along the span is removed, in the same way as
+    /// before the linear system is set up, and as in the iterative solver.
+    fn ctrl_points_velocity_from_solution(
+        &self,
+        line_force_model: &LineForceModel,
+        felt_ctrl_points_freestream: &[SpatialVector],
+        frozen_wake: &FrozenWake
+    ) -> Vec<SpatialVector> {
+        let ctrl_points_velocity = self.induced_velocities.ctrl_points_velocity(
+            felt_ctrl_points_freestream,
+            &frozen_wake.induced_velocities_at_control_points
+        );
+
+        line_force_model.remove_span_velocity(&ctrl_points_velocity, CoordinateSystem::Global)
     }
 }

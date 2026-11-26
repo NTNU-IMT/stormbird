@@ -11,6 +11,7 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 - `wake_length_factor` and `virtual_extension_factors` in the `LiftingLineCorrectionBuilder` are moved to the new `StraightWakeBuilder`, which is the default value of the new `wake` field, following the new settings in Stormbird 0.14.0. The other settings are unchanged. Requires Stormbird 0.14.0 or newer.
 
 - The default `background_cells_per_chord` in `OpenFoamShipSettings`, used by `SailsOnShip`, is increased from 1 to 2. The resolution around the sails and at the ship is the same as before, as the refinement levels are set relative to the background mesh, but the mesh is less coarse away from them, which gives larger meshes and different results than before. Set it to 1 to get the old mesh.
+- `remove_span_velocity` in the actuator line `SamplingSettings` is True by default, following the new default in Stormbird 0.14.0, where the angle of attack also no longer depends on the velocity along the span. Requires Stormbird 0.14.0 or newer.
 
 ### Features
 - New `StraightPanelWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a straight wake that is split into panels, where the reference core length can grow downstream with the `reference_core_evolution_length_factor`. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer.

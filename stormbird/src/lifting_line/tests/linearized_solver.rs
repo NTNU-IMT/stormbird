@@ -14,6 +14,7 @@ use crate::lifting_line::solvers::QuasiSteadySolverBuilder;
 use crate::lifting_line::solvers::linearized::{Linearized, InducedVelocityCorrectionMethod};
 
 use stormath::type_aliases::Float;
+use crate::test_utils::tolerance;
 
 /// Lift coefficients for a rectangular wing with a sharp stall, for the given angles of attack,
 /// simulated with the given linearized solver
@@ -147,4 +148,87 @@ fn viscous_lift_in_the_circulation_keeps_the_post_stall_lift() {
             cl_separate, cl_in_circulation
         );
     }
+}
+
+#[test]
+/// For a pitched wing, the freestream has a component along the span. The velocity in the result
+/// of the linearized solver should not include this component, so that the angles of
+/// attack and the forces are the same as for the iterative solver, which always removes it.
+fn a_pitched_wing_gives_the_same_angles_of_attack_with_both_solvers() {
+    use crate::lifting_line::solvers::iterative::QuasiSteadyIterativeBuilder;
+    use super::test_setup::RectangularWing;
+
+    let pitch = Float::to_radians(30.0);
+
+    let results: Vec<SimulationResult> = [false, true].iter().map(|&iterative| {
+        let mut builder = RectangularWing {
+            aspect_ratio: 5.0,
+            cl_zero_angle: 0.0,
+            angle_of_attack: Float::to_radians(5.0),
+            nr_strips: 32,
+            ..Default::default()
+        }.build();
+
+        builder.rotation = SpatialVector::from([0.0, pitch, 0.0]);
+
+        let mut settings = QuasiSteadySettings::default();
+
+        if iterative {
+            settings.solver = QuasiSteadySolverBuilder::Iterative(
+                QuasiSteadyIterativeBuilder::default()
+            );
+        }
+
+        let mut simulation = SimulationBuilder::new(
+            builder,
+            SimulationSettings::QuasiSteady(settings)
+        ).build().unwrap();
+
+        let freestream = vec![
+            SpatialVector::from([10.0, 0.0, 0.0]);
+            simulation.get_freestream_velocity_points().len()
+        ];
+
+        let mut result = simulation.do_step(0.0, 0.1, &freestream);
+
+        for _ in 0..10 {
+            result = simulation.do_step(0.0, 0.1, &freestream);
+        }
+
+        // The velocity in the result has no component along the span
+        for (i, velocity) in result.force_input.velocity.iter().enumerate() {
+            let span_direction = simulation.line_force_model.span_lines_global[i].direction();
+
+            assert!(
+                velocity.dot(span_direction).abs() < tolerance(1e-9, 1e-6) * velocity.length(),
+                "iterative: {}, span velocity at {}: {}", iterative, i, velocity.dot(span_direction)
+            );
+        }
+
+        result
+    }).collect();
+
+    let (linearized, iterative) = (&results[0], &results[1]);
+
+    for i in 0..linearized.force_input.angles_of_attack.len() {
+        let difference = (
+            linearized.force_input.angles_of_attack[i] - iterative.force_input.angles_of_attack[i]
+        ).to_degrees();
+
+        assert!(
+            difference.abs() < 0.05,
+            "angle of attack at {}: linearized {}, iterative {}",
+            i,
+            linearized.force_input.angles_of_attack[i].to_degrees(),
+            iterative.force_input.angles_of_attack[i].to_degrees()
+        );
+    }
+
+    let force_linearized = linearized.integrated_forces_sum();
+    let force_iterative = iterative.integrated_forces_sum();
+
+    assert!(
+        (force_linearized - force_iterative).length() < 0.01 * force_iterative.length(),
+        "force: linearized {:?}, iterative {:?}", force_linearized, force_iterative
+    );
 }

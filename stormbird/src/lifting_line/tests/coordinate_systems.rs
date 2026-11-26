@@ -15,6 +15,7 @@ use super::test_setup::RectangularWing;
 
 use stormath::spatial_vector::transformations::RotationType;
 use stormath::type_aliases::Float;
+use crate::test_utils::tolerance;
 
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
@@ -174,4 +175,70 @@ fn compare_coordinate_systems(angle_of_attack: Float, check_viscous_lift: bool) 
             i, felt_velocity_global[i], felt_velocity_body[i]
         );
     }
+}
+#[test]
+/// The residual, and therefore the convergence of the iterative solver, should not depend on the
+/// coordinate system of the output. A pitch rotation is used, which changes the angle between the
+/// global velocity and the body fixed span lines.
+fn the_residual_is_independent_of_the_output_coordinate_system() {
+    use crate::lifting_line::solvers::QuasiSteadySolverBuilder;
+    use crate::lifting_line::solvers::iterative::QuasiSteadyIterativeBuilder;
+
+    let rotation = SpatialVector::from([0.0, Float::to_radians(30.0), 0.0]);
+
+    let results: Vec<SimulationResult> = [CoordinateSystem::Global, CoordinateSystem::Body].iter()
+        .map(|&coordinate_system| {
+            let mut builder = RectangularWing {
+                aspect_ratio: 5.0,
+                cl_zero_angle: 0.0,
+                angle_of_attack: Float::to_radians(5.0),
+                nr_strips: 32,
+                ..Default::default()
+            }.build();
+
+            builder.rotation = rotation;
+            builder.output_coordinate_system = coordinate_system;
+
+            let settings = QuasiSteadySettings {
+                solver: QuasiSteadySolverBuilder::Iterative(QuasiSteadyIterativeBuilder::default()),
+                ..Default::default()
+            };
+
+            let mut simulation = SimulationBuilder::new(
+                builder,
+                SimulationSettings::QuasiSteady(settings)
+            ).build().unwrap();
+
+            let freestream = vec![
+                SpatialVector::from([10.0, 0.0, 0.0]);
+                simulation.get_freestream_velocity_points().len()
+            ];
+
+            let mut result = simulation.do_step(0.0, 0.1, &freestream);
+
+            for _ in 0..5 {
+                result = simulation.do_step(0.0, 0.1, &freestream);
+            }
+
+            result
+        }).collect();
+
+    let (global, body) = (&results[0], &results[1]);
+
+    assert!(
+        (global.residual - body.residual).abs() < tolerance(1e-9, 1e-6) + 1e-6 * global.residual,
+        "residual: global {}, body {}", global.residual, body.residual
+    );
+
+    assert_eq!(global.iterations, body.iterations);
+
+    let force_global_in_body = global.integrated_forces_sum().in_rotated_coordinate_system(
+        rotation, RotationType::XYZ
+    );
+    let force_body = body.integrated_forces_sum();
+
+    assert!(
+        (force_global_in_body - force_body).length() < tolerance(1e-9, 1e-6) * force_body.length(),
+        "force: global (in body axes) {:?}, body {:?}", force_global_in_body, force_body
+    );
 }

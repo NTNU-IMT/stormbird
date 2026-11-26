@@ -17,7 +17,7 @@ pub struct SamplingSettings {
 Some of the settings are independent of the sampling methods chosen. In particular, this is true for the following settings:
 
 - `extrapolate_end_velocities`: If true, the velocities at the end control points are extrapolated from the inner control points to avoid edge effects. It is set to false by default.
-- `remove_span_velocity`: If true, the component of the velocity along the actuator line segment is removed from the sampled velocity. It is set to false by default.
+- `remove_span_velocity`: If true, the component of the velocity along the actuator line segment is removed from the sampled velocity. It is set to true by default. The angle of attack is always computed from the velocity in the plane normal to the line segment, but when this setting is false, the velocity along the span is included in the velocity magnitude, and therefore in the size of the forces, and in the direction of the drag.
 - `correction_factor`: A global correction factor applied to all sampled velocities, which can be used to either artificially increase or decrease the velocity magnitude. It is set to 1.0 by default, which means that it does not change the sampled velocities at all.
 
 ## Direct interpolation

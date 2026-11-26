@@ -9,6 +9,7 @@ This file contains an overview of the changes made to pystormflow, the Python in
 
 ### Changes
 - Depends on the local versions of Stormflow, Stormbird and Stormath in this repository (with the version numbers as before), as the new features are not published yet.
+- From Stormbird 0.14.0: `remove_span_velocity` in the sampling settings of the actuator line is true by default, and the angle of attack no longer depends on the velocity along the span. See the Stormbird change log.
 
 ## 0.4.1 - 2026-11-20
 ### Changes

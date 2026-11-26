@@ -13,6 +13,7 @@ This file contains an overview of the changes made to Stormflow, the CFD solver 
 ### Changes
 - The GPU velocity solver keeps the buffers for exchanging data at up to two sets of cells, rather than one, so that the cells of the actuator line are not recreated in each time step when the velocity is also sampled at the wake points.
 - Stormflow depends on the development version of Stormbird in this repository (0.14.0), with the new settings of the lifting line correction. See the [Stormbird change log](../stormbird/CHANGELOG.md).
+- From Stormbird 0.14.0: `remove_span_velocity` in the sampling settings of the actuator line is true by default, and the angle of attack no longer depends on the velocity along the span. The examples already set it to true, and are unchanged. Models that relied on the old default get a different velocity magnitude and drag direction when the sampled velocity has a component along the span.
 
 ## 0.4.1 - 2026-11-20
 ### Changes

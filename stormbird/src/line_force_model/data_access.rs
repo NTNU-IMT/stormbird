@@ -44,11 +44,17 @@ impl LineForceModel {
         self.wing_rotation_data(wing_index)
     }
 
-    /// Returns a vector with the projected area of the wings in the line force model
+    /// Returns a vector with the projected area of the wings in the line force model. Virtual line
+    /// elements are not part of the wings, and are not included, in the same way as they are not
+    /// included in the integrated forces.
     pub fn projected_areas(&self) -> Vec<Float> {
         let mut areas = vec![0.0; self.nr_wings()];
 
         for i in 0..self.nr_span_lines() {
+            if self.line_segment_is_virtual[i] {
+                continue;
+            }
+
             let wing_index = self.wing_index_from_global(i);
 
             areas[wing_index] +=
@@ -77,15 +83,24 @@ impl LineForceModel {
         span_length
     }
 
-    /// Returns the *geometric* aspect ratios of each wing in the line force model
+    /// Returns the *geometric* aspect ratios of each wing in the line force model. Only the real
+    /// line elements are included, both in the span and in the area, so that virtual line elements
+    /// do not change the aspect ratio.
     pub fn aspect_ratios(&self) -> Vec<Float> {
         let areas = self.projected_areas();
-        let span_lengths = self.span_lengths();
+
+        let mut span_lengths = vec![0.0; self.nr_wings()];
+
+        for i in 0..self.nr_span_lines() {
+            if !self.line_segment_is_virtual[i] {
+                span_lengths[self.wing_index_from_global(i)] += self.span_lines_local[i].length();
+            }
+        }
 
         let mut aspect_ratios = vec![0.0; self.nr_wings()];
 
         for i in 0..self.nr_wings() {
-            if span_lengths[i] > 0.0 {
+            if span_lengths[i] > 0.0 && areas[i] > 0.0 {
                 aspect_ratios[i] = (span_lengths[i].powi(2)) / areas[i];
             } else {
                 aspect_ratios[i] = 0.0;
@@ -96,14 +111,9 @@ impl LineForceModel {
     }
 
     /// Integrates the chord length along the span of all wings in the model to return the total
-    /// projected area of the wing.
+    /// projected area of the wings. Virtual line elements are not included, see
+    /// [`projected_areas`](LineForceModel::projected_areas).
     pub fn total_projected_area(&self) -> Float {
-        let mut total_area = 0.0;
-
-        for i in 0..self.nr_span_lines() {
-            total_area += self.chord_lengths[i] * self.span_lines_local[i].length();
-        }
-
-        total_area
+        self.projected_areas().iter().sum()
     }    
 }
