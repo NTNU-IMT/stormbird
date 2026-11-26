@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use stormath::type_aliases::Float;
+use stormath::consts::MIN_POSITIVE;
 
 use crate::lifting_line::prelude::SolverResult;
 use crate::line_force_model::LineForceModel;
@@ -133,6 +134,15 @@ impl Linearized {
 
             for i_row in wing_range.clone() {
                 let u_t = ctrl_points_velocity[i_row].dot(velocity_dir[i_row]);
+
+                // No velocity gives no circulation. The row is otherwise singular, as the lift
+                // from the circulation and the induced angle of attack are divided by the velocity
+                if u_t < MIN_POSITIVE {
+                    equation_matrix[[i_row, i_row]] = 1.0;
+                    rhs[i_row] = 0.0;
+
+                    continue;
+                }
 
                 let columns = (0..skipped_columns.start).chain(skipped_columns.end..nr_unknowns);
 

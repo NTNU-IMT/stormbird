@@ -232,3 +232,45 @@ fn a_pitched_wing_gives_the_same_angles_of_attack_with_both_solvers() {
         "force: linearized {:?}, iterative {:?}", force_linearized, force_iterative
     );
 }
+
+#[test]
+/// Control points with no velocity get zero circulation in the linearized solver. Before, a single
+/// control point without velocity made the equation system singular, and gave NaN for all the
+/// circulation and the forces.
+fn zero_velocity_gives_zero_circulation() {
+    use super::test_setup::RectangularWing;
+
+    let simulation = || SimulationBuilder::new(
+        RectangularWing { angle_of_attack: Float::to_radians(5.0), ..Default::default() }.build(),
+        SimulationSettings::QuasiSteady(QuasiSteadySettings::default())
+    ).build().unwrap();
+
+    // No velocity anywhere
+    let mut sim = simulation();
+    let nr_points = sim.get_freestream_velocity_points().len();
+
+    let result = sim.do_step(0.0, 0.1, &vec![SpatialVector::default(); nr_points]);
+
+    assert!(result.force_input.circulation_strength.iter().all(|gamma| *gamma == 0.0));
+    assert!(result.residual.is_finite());
+    assert_eq!(result.integrated_forces_sum().length(), 0.0);
+
+    // No velocity at the first control point only
+    let mut sim = simulation();
+
+    let mut freestream = vec![SpatialVector::from([10.0, 0.0, 0.0]); nr_points];
+    freestream[0] = SpatialVector::default();
+
+    let result = sim.do_step(0.0, 0.1, &freestream);
+
+    let circulation = &result.force_input.circulation_strength;
+
+    assert_eq!(circulation[0], 0.0);
+    assert!(circulation.iter().all(|gamma| gamma.is_finite()), "{:?}", circulation);
+    assert!(circulation[1..].iter().all(|gamma| *gamma != 0.0), "{:?}", circulation);
+
+    let force = result.integrated_forces_sum();
+
+    assert!(force[0].is_finite() && force[1].is_finite() && force[2].is_finite(), "{:?}", force);
+    assert!(force.length() > 0.0);
+}

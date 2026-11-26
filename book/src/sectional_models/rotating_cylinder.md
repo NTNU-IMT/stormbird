@@ -94,7 +94,9 @@ The default coefficients are taken from equation (9) in the article "[Design, op
     C\_P = 0.0234 \\\, SR - 0.0168 \\\, SR^2 + 0.0143 \\\, SR^3 - 0.0004 \\\, SR^4 + 0.0001 \\\, SR^5
 \\]
 
-The article states that the model is valid for rotors with an aspect ratio of 6 and an end disk diameter of two times the rotor diameter. In the article, the model is used for the whole rotor, together with the apparent wind velocity. In Stormbird, it is applied to each line element, with the local velocity, which is a strip theory assumption. Note also that the spin ratio is zero when the velocity is zero, so the model gives no power for a spinning rotor in still air. 
+The article states that the model is valid for rotors with an aspect ratio of 6 and an end disk diameter of two times the rotor diameter. In the article, the model is used for the whole rotor, together with the apparent wind velocity. In Stormbird, it is applied to each line element, with the local velocity, which is a strip theory assumption. Note also that the spin ratio is zero when the velocity is zero, so the model gives no power for a spinning rotor in still air.
+
+The absolute spin ratio is limited to 7 in the polynomial, which is the range the polynomial is made for, and larger spin ratios use the power coefficient at a spin ratio of 7. The spin ratio is inversely proportional to the velocity, and the polynomial grows quickly with the spin ratio. Without the limit, the power, which is the power coefficient times the velocity cubed, would therefore be proportional to \( 1 / U^2 \) for small velocities, and grow without bounds when the velocity goes to zero. With the limit, the power goes to zero with the velocity instead, in the same way as when the velocity is exactly zero.
 
 The power coefficient is used by the default [input power model](../line_model/input_power.md). Rotor sails can also use a power model that interpolates the power directly from the revolutions per second, which is independent of this coefficient.
 

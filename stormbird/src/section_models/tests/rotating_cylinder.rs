@@ -115,3 +115,29 @@ fn rotating_cylinder_rejects_old_data_based_input() {
 
     assert!(result.is_err());
 }
+
+#[test]
+/// The power polynomial is only used within the range of spin ratios it is made for. Larger spin
+/// ratios, which for instance follow from a small velocity, use the value at the maximum spin
+/// ratio, so that the power does not grow without bounds when the velocity goes to zero.
+fn power_coefficient_is_limited_to_the_supported_spin_ratios() {
+    let cylinder = RotatingCylinder::default();
+
+    let max_spin_ratio = RotatingCylinder::MAX_SPIN_RATIO_POWER_COEFFICIENT;
+
+    assert_eq!(max_spin_ratio, 7.0);
+
+    let at_max = cylinder.power_coefficient(max_spin_ratio);
+
+    for spin_ratio in [7.5, 20.0, 1e12, Float::MAX, -7.5, -1e12] {
+        assert_eq!(cylinder.power_coefficient(spin_ratio), at_max, "spin ratio {}", spin_ratio);
+    }
+
+    // Unchanged within the range
+    let sr: Float = 6.5;
+    let expected = 0.0234 * sr - 0.0168 * sr.powi(2) + 0.0143 * sr.powi(3)
+        - 0.0004 * sr.powi(4) + 0.0001 * sr.powi(5);
+
+    assert!((cylinder.power_coefficient(sr) - expected).abs() < tolerance(1e-12, 1e-5));
+    assert!((cylinder.power_coefficient(-sr) - expected).abs() < tolerance(1e-12, 1e-5));
+}

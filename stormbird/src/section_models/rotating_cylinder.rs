@@ -86,6 +86,12 @@ impl RotatingCylinder {
     // methods. NuTTS conference.
     /// Default initial lift slope
     pub fn default_cl_initial_slope() -> Float {3.0}
+    /// The largest absolute spin ratio used in the power coefficient polynomial. Larger spin ratios
+    /// use the value at this spin ratio, as the polynomial is not made for them, and grows quickly
+    /// outside the range. This happens, for instance, when the velocity is close to zero, as the
+    /// spin ratio is inversely proportional to the velocity.
+    pub const MAX_SPIN_RATIO_POWER_COEFFICIENT: Float = 7.0;
+
     /// Default lift slope at high spin ratios
     pub fn default_cl_high_spin_ratio_slope() -> Float {1.5}
     /// Default spin ratio for the transition between the lift slopes
@@ -159,9 +165,10 @@ impl RotatingCylinder {
     }
 
     /// Calculates the power coefficient from the polynomial model, using the absolute value of the
-    /// spin ratio, as the power does not depend on the direction of rotation.
+    /// spin ratio, as the power does not depend on the direction of rotation. The absolute spin
+    /// ratio is limited to [`MAX_SPIN_RATIO_POWER_COEFFICIENT`](Self::MAX_SPIN_RATIO_POWER_COEFFICIENT).
     pub fn power_coefficient(&self, spin_ratio: Float) -> Float {
-        let spin_ratio_abs = spin_ratio.abs();
+        let spin_ratio_abs = spin_ratio.abs().min(Self::MAX_SPIN_RATIO_POWER_COEFFICIENT);
 
         // Horner's method
         self.power_coefficient_polynomial.iter().rev().fold(0.0, |result, coefficient| {

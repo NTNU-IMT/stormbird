@@ -100,7 +100,8 @@ pub struct Foil {
     /// post-stall behavior. The default value is 20 degrees.
     pub mean_negative_stall_angle: Float,
     #[serde(default="Foil::default_stall_range")]
-    /// The range of the stall transition. The default value is 6 degrees.
+    /// The range of the stall transition. The default value is 6 degrees. A value of zero gives a
+    /// sudden stall, see [`amount_of_stall`](Foil::amount_of_stall).
     pub stall_range: Float,
 }
 
@@ -278,12 +279,28 @@ impl Foil {
 
     /// Calculates the amount of stall for a given angle of attack. Varies between 0 and 1, where 0
     /// means no stall and 1 means full stall.
+    ///
+    /// If the stall range is zero, or less, the stall is sudden, and the amount of stall is a step
+    /// function: 0 below the mean stall angle, 1 above it, and 0.5 exactly at it, which is the
+    /// limit of the sigmoid when the range goes to zero.
     pub fn amount_of_stall(&self, angle_of_attack: Float) -> Float {
         let mean_stall_angle = if angle_of_attack >= 0.0 {
             self.mean_positive_stall_angle.abs()
         } else {
             self.mean_negative_stall_angle.abs()
         };
+
+        if self.stall_range <= 0.0 {
+            let absolute_angle = angle_of_attack.abs();
+
+            return if absolute_angle < mean_stall_angle {
+                0.0
+            } else if absolute_angle > mean_stall_angle {
+                1.0
+            } else {
+                0.5
+            };
+        }
 
         transition_functions::sigmoid_zero_to_one(
             angle_of_attack.abs(),
