@@ -2,6 +2,14 @@
 
 This file contains an overview of the changes made to the Stormbird lifting line FMU. See the [Stormbird change log](../../../stormbird/CHANGELOG.md) for changes to the underlying models. The version of the FMU follows the version of Stormbird.
 
+## 0.14.0 - 2026-11-27
+### Breaking changes
+- Depends on the published versions of Stormbird 0.14.0 and Stormath 0.5.1. See the [Stormbird change log](../../../stormbird/CHANGELOG.md) for details. The inputs and outputs of the FMU are unchanged. The changes that matter most for the `sail_model` in the parameters file and the results are:
+    - The `velocity_corrections` field in the solvers is replaced by `induced_velocities`. `"velocity_corrections": X` becomes `"induced_velocities": {"total_correction": X}`, which gives the same results. `neglect_self_induced_velocities` is moved from the dynamic wake to the same structure.
+    - More input structures reject unknown fields, so input with misspelled or extra fields gives an error rather than being ignored.
+    - Spin ratio set points for rotor sails in the controller (`InternalStateSetPointType::SectionModel`, the default) must change sign to give the same results as before, as the conversion to revolutions per second is fixed. The default sails in stormbird_setup 0.14.0 are updated.
+    - Bug fixes that change the results, e.g., the angle of attack for velocities along the span (heeled or rolling sails) and for chord vectors that are not normal to the span, the direction of the viscous lift with rotation, the averaging of the apparent wind direction in the controller across ±180 degrees, and the controller rate limits with `time_steps_between_updates` larger than one.
+
 ## 0.13.1 - 2026-11-20
 ### Changes
 - Depends on the published version of Stormbird 0.13.1, which contains bug fixes and one small feature. See the [Stormbird change log](../../../stormbird/CHANGELOG.md) for details. The inputs, outputs and parameters of the FMU are unchanged. The changes that are relevant for users of the FMU are:

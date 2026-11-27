@@ -3,7 +3,10 @@ use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
 use stormath::consts::PI;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(try_from = "LogarithmicModelInput")]
 /// Logarithmic model of how velocity varies as a function of height, which also includes optional
 /// stability corrections
 pub struct LogarithmicModel {
@@ -34,6 +37,48 @@ pub struct LogarithmicModel {
     pub unstable_coefficient: Float
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+/// Unchecked version of the logarithmic model, used for deserialization
+struct LogarithmicModelInput {
+    friction_velocity: Float,
+    surface_roughness: Float,
+    #[serde(default)]
+    obukhov_length: Option<Float>,
+    #[serde(default="LogarithmicModel::default_von_karman_constant")]
+    von_karman_constant: Float,
+    #[serde(default="LogarithmicModel::default_stable_coefficient")]
+    stable_coefficient: Float,
+    #[serde(default="LogarithmicModel::default_unstable_coefficient")]
+    unstable_coefficient: Float
+}
+
+impl TryFrom<LogarithmicModelInput> for LogarithmicModel {
+    type Error = Error;
+
+    fn try_from(input: LogarithmicModelInput) -> Result<Self, Self::Error> {
+        if let Some(obukhov_length) = input.obukhov_length {
+            // A length of zero gives a division by zero in the stability correction. A neutral
+            // atmosphere is given by leaving the length out, which is the same as an infinite length.
+            if obukhov_length == 0.0 || obukhov_length.is_nan() {
+                return Err(Error::invalid_input(format!(
+                    "The obukhov_length can not be zero or NaN, but is {}. Leave it out for a                     neutral atmosphere.",
+                    obukhov_length
+                )));
+            }
+        }
+
+        Ok(Self {
+            friction_velocity: input.friction_velocity,
+            surface_roughness: input.surface_roughness,
+            obukhov_length: input.obukhov_length,
+            von_karman_constant: input.von_karman_constant,
+            stable_coefficient: input.stable_coefficient,
+            unstable_coefficient: input.unstable_coefficient,
+        })
+    }
+}
+
 impl LogarithmicModel {
     /// Default Von Karman constant (0.41)
     pub fn default_von_karman_constant() -> Float {0.41}
@@ -42,9 +87,14 @@ impl LogarithmicModel {
     /// Default coefficient for the unstable stability correction (19.3)
     pub fn default_unstable_coefficient() -> Float {19.3}
     
-    /// Returns the velocity at the given height, including the stability correction
+    /// Returns the velocity at the given height, including the stability correction.
+    ///
+    /// The logarithmic profile is negative below the surface roughness height, which would reverse
+    /// the wind. The velocity is therefore limited to zero.
     pub fn velocity_at_height(&self, height: Float) -> Float {
-        self.neutral_velocity_at_height(height) - self.businger_dyer_correction(height)
+        let velocity = self.neutral_velocity_at_height(height) - self.businger_dyer_correction(height);
+
+        velocity.max(0.0)
     }
 
     /// Returns the scale factor of the profile, i.e., the friction velocity divided by the Von Karman
@@ -121,5 +171,43 @@ mod tests {
             test_correction_value < 1e-6, 
             "Value is the unscaled Businger Dyer correction is significantly larger than zero"
         );
+    }
+
+    fn model(obukhov_length: Option<Float>) -> LogarithmicModel {
+        LogarithmicModel{
+            friction_velocity: 0.4,
+            surface_roughness: 0.01,
+            von_karman_constant: LogarithmicModel::default_von_karman_constant(),
+            obukhov_length,
+            stable_coefficient: LogarithmicModel::default_stable_coefficient(),
+            unstable_coefficient: LogarithmicModel::default_unstable_coefficient()
+        }
+    }
+
+    #[test]
+    /// Below the surface roughness height, the logarithmic profile is negative, which is limited to
+    /// zero rather than a reversed wind
+    fn velocity_is_not_negative_below_the_surface_roughness() {
+        for obukhov_length in [None, Some(100.0), Some(-100.0)] {
+            let model = model(obukhov_length);
+
+            assert_eq!(model.velocity_at_height(0.5 * model.surface_roughness), 0.0);
+            assert!(model.velocity_at_height(10.0) > 0.0);
+        }
+    }
+
+    #[test]
+    fn zero_obukhov_length_gives_an_error() {
+        let result: Result<LogarithmicModel, _> = serde_json::from_str(
+            r#"{"friction_velocity": 0.4, "surface_roughness": 0.01, "obukhov_length": 0.0}"#
+        );
+
+        assert!(result.is_err());
+
+        let result: Result<LogarithmicModel, _> = serde_json::from_str(
+            r#"{"friction_velocity": 0.4, "surface_roughness": 0.01, "obukhov_length": -50.0}"#
+        );
+
+        assert!(result.is_ok());
     }
 }

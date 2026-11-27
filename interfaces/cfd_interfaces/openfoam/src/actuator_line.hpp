@@ -157,6 +157,10 @@ namespace Foam {
             // actuator line model
             mutable bool need_update = true;
 
+            /// The time in the last call to add. Used to do some work only once per time step, and
+            /// not in each outer iteration.
+            mutable scalar last_time = -GREAT;
+
             // Store all relevant data
             mutable std::vector<label> interpolation_cells;
             mutable std::vector<vector> ctrl_points;
@@ -184,6 +188,13 @@ namespace Foam {
             /// Ways to estimate the velocity
             void set_integrated_weighted_velocity(const volVectorField& velocity) const;
             void set_interpolated_velocity(const volVectorField& velocity) const;
+
+            /// Samples the velocity at the wake points of the lifting line correction, if the
+            /// correction uses a dynamic wake
+            void set_wake_points_velocity(const volVectorField& velocity) const;
+
+            /// Writes the wake of the lifting line correction, if it has panels, on the master
+            void write_correction_wake() const;
 
             void sync_line_force_model_state() const;
 

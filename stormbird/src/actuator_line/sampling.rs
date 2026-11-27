@@ -22,15 +22,17 @@ pub struct SamplingSettings {
     /// If true, the weights do not depend on the location along the span
     #[serde(default)]
     pub neglect_span_projection: bool,
-    /// Cells with a weight below this value are not used in the sampling
+    /// Cells with a weight below this value, relative to the peak value of the projection weight
+    /// of the dominating line element, are not used in the sampling. See
+    /// [`ActuatorLine::relative_projection_weight`](crate::actuator_line::ActuatorLine::relative_projection_weight).
     #[serde(default="SamplingSettings::default_weight_limit")]
     pub weight_limit: Float,
     /// If true, the velocity at the first and last line element of each wing is extrapolated from the
     /// neighboring line elements
     #[serde(default)]
     pub extrapolate_end_velocities: bool,
-    /// If true, the velocity component along the span is removed
-    #[serde(default)]
+    /// If true, the velocity component along the span is removed. True by default.
+    #[serde(default="SamplingSettings::default_true")]
     pub remove_span_velocity: bool,
     /// Factor multiplied with the sampled velocity
     #[serde(default="SamplingSettings::default_one")]
@@ -39,6 +41,7 @@ pub struct SamplingSettings {
 
 impl SamplingSettings {
     fn default_one() -> Float {1.0}
+    fn default_true() -> bool {true}
     fn default_span_projection_factor() -> Float {0.5}
     fn default_weight_limit() -> Float {0.001}
 }
@@ -51,8 +54,24 @@ impl Default for SamplingSettings {
             neglect_span_projection: false,
             weight_limit: Self::default_weight_limit(),
             extrapolate_end_velocities: false,
-            remove_span_velocity: false,
+            remove_span_velocity: Self::default_true(),
             correction_factor: Self::default_one(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// The velocity along the span is removed by default, both for the default settings and for
+    /// settings read from JSON without the field
+    fn the_span_velocity_is_removed_by_default() {
+        assert!(SamplingSettings::default().remove_span_velocity);
+
+        let from_json: SamplingSettings = serde_json::from_str("{}").unwrap();
+
+        assert!(from_json.remove_span_velocity);
     }
 }

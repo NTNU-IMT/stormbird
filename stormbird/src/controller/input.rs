@@ -110,7 +110,7 @@ impl ControllerInput {
             line_force_model
         );
         
-        let apparent_wind_directions = spanwise_measurement.measure_float_values(
+        let apparent_wind_directions = spanwise_measurement.measure_angle_values(
             &wind_directions, 
             wing_indices.clone(),
         );

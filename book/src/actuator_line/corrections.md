@@ -24,31 +24,72 @@ Normally, the same circulation distribution is used in both wake models. The exc
 ### Wake shape
 One challenge with such an approach is that the shape of the wake must be assumed somehow. This is a trivial task if there is only a single wing, but more difficult if there are multiple wings in close proximity OR wings standing on a ship superstructure. However, the point of the lifting line corrections is **only to compute the error due to a too large projection width**. The effect of a viscous core on the induced velocities is most significant from the wake close to the wing. The effect from the vortices far downstream should be small. The exact wake shape for the correction may, therefore, not be that important.
 
-As a simple solution to this, the lifting line correction in Stormbird assumes a steady wake shape, with a direction equal to the sampled velocity along each wing.
+As a simple solution to this, the lifting line correction in Stormbird can assume a steady wake shape, with a direction equal to the sampled velocity along each wing. Alternatively, the shape can follow the CFD flow field. Three wake models are available:
+
+- `Straight`: one horseshoe vortex for each line element. This is the default.
+- `StraightPanels`: the same straight wake, but split into panels in the streamwise direction. All panels behind a line element have the circulation of the line element, so the wake represents the same vortex system as the horseshoe vortices. The difference is that the viscous core length of the reference model can increase downstream, as explained below.
+- `Dynamic`: a free wake of panels, where the shape follows the velocity sampled from the CFD flow field at the points of the wake, and each row of panels has the circulation from an earlier time step. This wake model is experimental and under development. See the [section on the dynamic wake](#dynamic-wake) below.
+
+### Growth of the reference core length
+When the wings are placed after each other, the tip vortices from an upstream wing can pass close to a downstream wing. With a small reference core length along the whole wake, the reference model then gives very large induced velocities close to the downstream wing, which are not physical, as real vortices get a larger core when moving downstream. This can give a large and unstable correction when the wing interactions are included.
+
+With the `StraightPanels` and `Dynamic` wakes, the reference core length can instead grow from the small reference value at the wing to the viscous core length of the projection width further downstream. The growth follows a quarter of a sine period, the same shape as the `SinIncrease` [evolution in the dynamic wake](../lifting_line/wake.md) of the lifting line, over a distance along the wake that is given by the `reference_core_evolution_length_factor`. The two wake models are then equal downstream of this distance, so that the far wake does not contribute to the correction at all. The correction close to each wing, where the difference in core length matters the most, is kept.
+
+> **Note:** the growth of the core length works slightly differently here than in the dynamic wake of the lifting line simulations. In the lifting line, the `evolution_length_factor` is a fraction of the wake length, and the core length is set from the streamwise index of each panel, so the physical distance depends on the time step and the velocity. In the lifting line correction, the `reference_core_evolution_length_factor` is a physical distance, relative to the average chord length of all wings. It is measured along the streamwise lines of the wake, from the wing, and each panel gets the core length at the average distance of its four corner points. The core length therefore does not depend on the time step or on the number of panels. It is not yet decided which of the two approaches will be kept, so this may change in a future version.
 
 ### Isolated wings or wing interactions
 By default, the correction for each wing is simulated independently. That is, **the correction does NOT affect interaction effects between wings in any way**, only errors due to a too large viscous core on the wing's own wake. This choice is made to keep the correction method local to a single wing, under the assumption that interaction effects are better predicted directly by the actuator line model itself. In other words, the default lifting line correction only corrects for errors in the *self-induced* velocities.
 
-However, a too large viscous core may also cause errors in the wing-to-wing interactions, for instance when wings are placed close to each other. To account for this, the correction can optionally include all wings, by setting `include_wing_interactions` to `true` in the input structure (see below). The wakes of all wings are then included when computing the induced velocities in both wake models, so that the difference between them also contains the error in the velocities induced by the other wings. For a single wing, the two options give identical results.
+However, a too large viscous core may also cause errors in the wing-to-wing interactions, for instance when wings are placed close to each other. To account for this, the correction can optionally include all wings, by setting `include_wing_interactions` to `true` in the input structure (see below). The wakes of all wings are then included when computing the induced velocities in both wake models, so that the difference between them also contains the error in the velocities induced by the other wings. For a single wing, the two options give identical results. When the wings stand in the wake of each other, the interactions should be combined with a growing reference core length, as explained above.
 
-The actual code used to calculate the correction for a given time step is the same as the steady [wake models](../lifting_line/wake.md) used in the lifting line methods.
+The actual code used to calculate the correction is based on the same singularity elements as the [wake models](../lifting_line/wake.md) used in the lifting line methods.
 
 ### Input structure
-To activate the lifting line correction, set a value for `lifting_line_correction` in the `ActuatorLineBuilder`. The available options are shown below:
+To activate the lifting line correction, set a value for `lifting_line_correction` in the `ActuatorLineBuilder`. The available options are shown below, with default values in the comments:
 
 ```rust
 pub struct LiftingLineCorrectionBuilder {
-    pub wake_length_factor: f64,
-    pub symmetry_condition: SymmetryCondition,
-    pub initialization_time: Option<f64>,
-    pub reference_core_length_factor: f64,
-    pub include_wing_interactions: bool,
-    pub max_correction_ratio: Option<f64>,
-    pub virtual_extension_factors: [f64; 2],
+    pub wake: CorrectionWakeBuilder,                  // Default: Straight
+    pub symmetry_condition: SymmetryCondition,        // Default: NoSymmetry
+    pub initialization_time: Option<f64>,             // Default: None
+    pub reference_core_length_factor: f64,            // Default: 100.0
+    pub include_wing_interactions: bool,              // Default: false
+    pub max_correction_ratio: Option<f64>,            // Default: None
+}
+
+pub enum CorrectionWakeBuilder {
+    Straight(StraightWakeBuilder),
+    StraightPanels(StraightPanelWakeBuilder),
+    Dynamic(DynamicCorrectionWakeBuilder),
+}
+
+pub struct StraightWakeBuilder {
+    pub wake_length_factor: f64,                      // Default: 100.0
+    pub virtual_extension_factors: [f64; 2],          // Default: [0.0, 0.0]
+}
+
+pub struct StraightPanelWakeBuilder {
+    pub wake_length_factor: f64,                      // Default: 100.0
+    pub nr_panels_per_line_element: usize,            // Default: 50
+    pub first_panel_relative_length: f64,             // Default: 0.5
+    pub reference_core_evolution_length_factor: Option<f64>, // Default: None
+    pub far_field_ratio: f64,                         // Default: 5.0
+}
+
+pub struct DynamicCorrectionWakeBuilder {
+    pub nr_panels_per_line_element: usize,            // Default: 100
+    pub first_panel_relative_length: f64,             // Default: 0.75
+    pub last_panel_relative_length: f64,              // Default: 1.0
+    pub shape_damping_factor: f64,                    // Default: 0.0
+    pub reference_core_evolution_length_factor: Option<f64>, // Default: None
+    pub far_field_ratio: f64,                         // Default: 5.0
 }
 ```
 
-The `wake_length_factor` is set to 100.0 by default, which means that the wake used for computing lift-induced velocities is assumed to extend 100 chord lengths downstream. The `symmetry_condition` is set to `NoSymmetry` by default. The symmetry condition should generally reflect the same symmetry condition as used in the CFD simulation. For instance, if the bottom of the domain is at the lowest z-coordinate, the symmetry condition should be set to `Z`.
+In JSON, the wake is given with the name of the variant, for instance `"wake": {"StraightPanels": {"reference_core_evolution_length_factor": 2.0}}`.
+
+#### Settings common to all wake models
+The `symmetry_condition` is set to `NoSymmetry` by default. The symmetry condition should generally reflect the same symmetry condition as used in the CFD simulation. For instance, if the bottom of the domain is at the lowest z-coordinate, the symmetry condition should be set to `Z`.
 
 The viscous core length used to represent the actuator line is calculated from the force projection settings, as the average of the `chord_factor` and `thickness_factor` in the [Gaussian projection kernel](force_projection.md) multiplied with the average chord length. The *very small* core length used in the second wake model is then calculated by dividing this value by the `reference_core_length_factor`, which is set to 100.0 by default.
 
@@ -56,10 +97,48 @@ The `initialization_time` is optional, and not used by default. If it is set, th
 
 The `include_wing_interactions` is set to `false` by default, meaning that the correction is computed for each wing in isolation. If set to `true`, the correction includes the induced velocities from all wings, as described in the [section above](#isolated-wings-or-wing-interactions).
 
-Two additional settings are available, which are still experimental:
+The `max_correction_ratio` is still experimental. It is an optional limit on the magnitude of the velocity correction at each control point, as a ratio of the magnitude of the sampled velocity. The direction of the correction is kept. Not used by default. This can be needed for wings with a large circulation at the ends, such as rotor sails, where the correction can otherwise become larger than the freestream velocity at the ends of the wing.
 
-- `max_correction_ratio`: optional limit on the magnitude of the velocity correction at each control point, as a ratio of the magnitude of the sampled velocity. The direction of the correction is kept. Not used by default. This can be needed for wings with a large circulation at the ends, such as rotor sails, where the correction can otherwise become larger than the freestream velocity at the ends of the wing.
-- `virtual_extension_factors`: length of a virtual extension of each wing at the first and the last end, relative to the chord length at that end. The extensions are only included in the reference model with the small viscous core, and carry the circulation of the outermost line element, which moves the tip vortices away from the ends of the wing. This can be used to represent end plates. Zero by default, which means no extensions.
+#### Straight wake
+The `wake_length_factor` is set to 100.0 by default, which means that the wake used for computing lift-induced velocities is assumed to extend 100 chord lengths downstream.
+
+The `virtual_extension_factors` are still experimental. They give the length of a virtual extension of each wing at the first and the last end, relative to the chord length at that end. The extensions are only included in the reference model with the small viscous core, and carry the circulation of the outermost line element, which moves the tip vortices away from the ends of the wing. This can be used to represent end plates. Zero by default, which means no extensions. The extensions are only available for the straight wake at the moment.
+
+#### Straight panel wake
+- `wake_length_factor`: the length of the wake, relative to the average chord length, as for the straight wake.
+- `nr_panels_per_line_element`: the number of panels in the streamwise direction behind each line element. Must be at least 2. The computational cost is proportional to the number of panels.
+- `first_panel_relative_length`: the length of the first panel, relative to the average chord length. The distance from the wing to the streamwise point \( k \) is \( L (k / N)^p \), where \( L \) is the wake length, \( N \) is the number of panels, and the exponent \( p \) is set so that the first panel gets the given length. With the default values, the panels are short close to the wing, where the growth of the core length must be resolved, and get gradually longer downstream.
+- `reference_core_evolution_length_factor`: the distance along the wake, relative to the average chord length, over which the reference core length grows to the viscous core length, as explained [above](#growth-of-the-reference-core-length). The core length is constant if this is not set, which gives almost the same correction as the straight wake. A value that is smaller than the distance between the wings removes the correction from the tip vortices of the upstream wings at the downstream wings.
+- `far_field_ratio`: determines when the induced velocity from a panel is calculated with a simplified far field model, in the same way as for the [dynamic wake](../lifting_line/wake.md).
+
+With a constant core length, the straight panel wake and the straight wake give almost, but not exactly, the same correction. The reason is that the viscous core term of a vortex line depends on the distance to the closest point on the line segment, so that a trailing vortex that is split into several panels is damped slightly less than a single long vortex line close to the start of the trailing vortex. In a test with two wings, the largest difference is a few percent, at the outermost control points.
+
+#### Dynamic wake
+> **Experimental:** the dynamic wake is new in version 0.14.0 and still under development. It has only been tested in simple cases so far, and has not yet been validated systematically. The settings, the default values and the behaviour may change in future versions.
+
+The dynamic wake is a free wake, built in the same way as the [dynamic wake](../lifting_line/wake.md) in the lifting line simulations, but where the shape is set by the CFD flow field:
+
+- The first free row of points follows the direction of the sampled velocity at the control points, with the spanwise component and the motion of the wing removed, and with the length given by `first_panel_relative_length`.
+- The other points move with the velocity sampled from the CFD flow field at the points of the wake. The sampled velocity already contains the velocities induced by the actuator line, so no induced velocities are computed from the wakes themselves.
+- A new row of panels is shed in each time step, and the strength of each row is the circulation from earlier time steps. The first row has the current circulation.
+- The wake is updated once per time step, in the first call with a new time. Outer iterations in the CFD solver therefore do not move the wake.
+
+In the first time step, the wake is initialized as a straight wake along the average sampled velocity, with zero strength. The length of the wake is approximately the number of panels times the velocity times the time step, which is often only some chord lengths with typical time steps in actuator line simulations. The `reference_core_evolution_length_factor` should therefore be shorter than the wake.
+
+The CFD solver must sample the velocity at the points of the wake in each time step, before the actuator line model is solved. The `ActuatorLine` has the following functions for this:
+
+- `wake_points_to_sample` and `nr_wake_points_to_sample`: the points to sample. Empty unless the wake is dynamic, and before the first time step, as the geometry is set there.
+- `set_wake_point_velocity_at_index` and `set_wake_points_velocity`: sets the sampled velocity. Values that are not finite are ignored, so that the previous value is kept.
+
+The wake can be exported as legacy VTK files, to check the shape during a simulation. The OpenFOAM interface writes the wake automatically each time the fields are written, while it must be done explicitly in [Stormflow](stormflow.md#running-a-simulation). The same export is available for the `StraightPanels` wake. The files contain:
+
+- The geometry of the wake, with one quad for each panel.
+- As cell data: `reference_strength` and `projected_strength`, the strength of each panel in the reference model and the model with the viscous core, and `reference_core_length` and `viscous_core_length`, the core length of each panel in the two models. The rows of panels that use the current circulation in the correction (the first row for the dynamic wake, all rows for the straight panel wake) have the circulation from the last time step.
+- As point data, for the dynamic wake only: `sampled_velocity`, the velocity sampled from the CFD solver at each point.
+
+The other settings, `nr_panels_per_line_element`, `last_panel_relative_length`, `shape_damping_factor` and `far_field_ratio`, have the same meaning as in the [dynamic wake](../lifting_line/wake.md) of the lifting line, and `reference_core_evolution_length_factor` the same meaning as for the straight panel wake. Virtual extensions are not available for the dynamic wake.
+
+With a uniform velocity and a constant circulation, the dynamic wake gives almost the same correction as the straight wake with the same length (about 1 % difference in a test with two wings, for the same reason as for the straight panel wake).
 
 Experience from this correction technique is that it works very well for actuator line simulations that only include wings. Even with a **large isotropic projection width**, the result from an actuator line simulation will match the lifting line model almost perfectly. However, it can also create instabilities when combined with complex ship geometries. **The hope is to find a solution to this in the future**, as this type of correction is believed to be very general and promising for practical use cases.
 

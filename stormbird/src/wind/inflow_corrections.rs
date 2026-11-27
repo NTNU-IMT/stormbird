@@ -20,6 +20,7 @@ use stormath::interpolation::linear_interpolation;
 use std::ops::Range;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Structure that stores inflow correction data for multiple sails for a single apparent wind
 /// direction, as a function of a scalar height value. The correction consists of both magnitude
 /// corrections and angle corrections.
@@ -62,6 +63,7 @@ impl InflowCorrectionsSingleDirection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Inflow corrections
 pub struct InflowCorrections {
     /// The apparent wind directions where corrections are given

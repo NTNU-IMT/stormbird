@@ -36,7 +36,8 @@ void Foam::fv::ActuatorLine::set_velocity_sampling_data_integral() const {
 
         double body_force_weight = dominating_line.weight;
 
-        if (body_force_weight > weight_limit) {
+        // The limit is relative to the peak value of the weight of the line element
+        if (dominating_line.relative_weight > weight_limit) {
             this->relevant_cells_for_velocity_sampling.append(cell_id);
 
             this->dominating_line_element_index_sampling.append(
@@ -165,3 +166,55 @@ void Foam::fv::ActuatorLine::set_interpolated_velocity(const volVectorField& vel
         this->model->set_velocity_at_index(i, velocity);
     }
  }
+
+void Foam::fv::ActuatorLine::set_wake_points_velocity(const volVectorField& velocity_field) const {
+    const label nr_points = this->model->nr_wake_points_to_sample();
+
+    if (nr_points == 0) {
+        return;
+    }
+
+    // The points move in each time step, so the cells are searched for every time
+    autoPtr<interpolation<vector>> u_interpolator = interpolation<vector>::New(
+        "cellPoint", velocity_field
+    );
+
+    // The sum of the velocity from the processors that found each point, and the number of such
+    // processors, packed into one field, so that all points are synced with one reduce
+    scalarField packed_values(4 * nr_points, 0.0);
+
+    for (label i = 0; i < nr_points; i++) {
+        std::array<double, 3> point_sb = this->model->get_wake_point_at_index(i);
+
+        const point wake_point(point_sb[0], point_sb[1], point_sb[2]);
+
+        const label cell_id = openfoam_compatibility::find_cell(mesh(), wake_point);
+
+        if (cell_id != -1) {
+            const vector u_sample = u_interpolator->interpolate(wake_point, cell_id);
+
+            packed_values[4 * i] += u_sample[0];
+            packed_values[4 * i + 1] += u_sample[1];
+            packed_values[4 * i + 2] += u_sample[2];
+            packed_values[4 * i + 3] += 1.0;
+        }
+    }
+
+    reduce(packed_values, sumOp<scalarField>());
+
+    // Points that are not found on any processor, i.e., outside the domain, are not set, so that
+    // the model keeps the previous value
+    for (label i = 0; i < nr_points; i++) {
+        const scalar nr_found = packed_values[4 * i + 3];
+
+        if (nr_found > 0.0) {
+            std::array<double, 3> velocity = {
+                packed_values[4 * i] / nr_found,
+                packed_values[4 * i + 1] / nr_found,
+                packed_values[4 * i + 2] / nr_found
+            };
+
+            this->model->set_wake_point_velocity_at_index(i, velocity);
+        }
+    }
+}

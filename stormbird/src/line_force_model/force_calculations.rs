@@ -33,7 +33,6 @@
 //! - [`sectional_added_mass_force`](LineForceModel::sectional_added_mass_force)
 //! - [`sectional_gyroscopic_moments`](LineForceModel::sectional_gyroscopic_moments)
 //! - [`lift_coefficient_from_circulation`](LineForceModel::lift_coefficient_from_circulation)
-//! - [`lift_from_coefficients`](LineForceModel::lift_from_coefficients)
 //! - [`residual`](LineForceModel::residual)
 //! - [`residual_absolute`](LineForceModel::residual_absolute)
 //! - [`average_residual_absolute`](LineForceModel::average_residual_absolute)
@@ -52,6 +51,7 @@ use stormath::consts::MIN_POSITIVE;
 
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Settings for the force calculations
 pub struct ForceCalculationSettings {
     /// If true, the viscous lift is included in the circulation, rather than added as a separate
@@ -110,14 +110,19 @@ impl LineForceModel {
     /// Return the angle of attack at each control point.
     ///
     /// The angle is defined as the rotation from the chord vector to the velocity vector, using the
-    /// span line as the axis of rotation, with right handed positive rotation.
+    /// span line as the axis of rotation, with right handed positive rotation. The velocity and the
+    /// chord vector are projected onto the plane normal to the span line first, so that a velocity
+    /// component along the span, or a chord vector that is not normal to the span line, does not
+    /// change the angle of attack. The angle is zero if there is no velocity normal to the span
+    /// line.
     ///
     /// # Arguments
     /// * `velocity` - the velocity vector at each control point
-    /// * `input_coordinate_system` - An enum defining which coordinate system to use for the output
+    /// * `input_coordinate_system` - the coordinate system of the input velocity, which decides
+    ///   which geometry the velocity is compared with
     pub fn angles_of_attack(
-        &self, 
-        velocity: &[SpatialVector], 
+        &self,
+        velocity: &[SpatialVector],
         input_coordinate_system: CoordinateSystem
     ) -> Vec<Float> {
         let (span_lines, chord_vectors) = match input_coordinate_system {
@@ -126,15 +131,24 @@ impl LineForceModel {
         };
 
         let angles_of_attack: Vec<Float> = (0..velocity.len()).map(|index| {
-            if velocity[index].length() > MIN_POSITIVE {
-                chord_vectors[index].signed_angle_between(
-                    velocity[index],
-                    span_lines[index].direction()
+            let span_direction = span_lines[index].direction();
+
+            let velocity_in_section_plane = velocity[index].project_on_plane(span_direction);
+
+            // The chord vector is projected as well, so that a chord that is not normal to the
+            // span line, e.g., a horizontal chord on a raked span line, is measured in the same
+            // plane as the velocity
+            let chord_in_section_plane = chord_vectors[index].project_on_plane(span_direction);
+
+            if velocity_in_section_plane.length() > MIN_POSITIVE {
+                chord_in_section_plane.signed_angle_between(
+                    velocity_in_section_plane,
+                    span_direction
                 )
             } else {
                 0.0
             }
-            
+
         }).collect();
 
         match &self.angle_of_attack_correction {
@@ -685,9 +699,15 @@ impl LineForceModel {
                 velocity
             );
     
+            // The span lines must be in the same coordinate system as the velocity
+            let span_lines = match self.output_coordinate_system {
+                CoordinateSystem::Global => &self.span_lines_global,
+                CoordinateSystem::Body => &self.span_lines_local,
+            };
+
             (0..self.nr_span_lines()).map(
                 |index| {
-                    let lift_direction = self.span_lines_local[index].relative_vector().cross(velocity[index]).normalize();
+                    let lift_direction = span_lines[index].relative_vector().cross(velocity[index]).normalize();
     
                     let lift_area = self.chord_lengths[index] * self.span_lines_local[index].length();
     
@@ -826,17 +846,22 @@ impl LineForceModel {
 
     /// Calculates the lift coefficient on each line element based on the given circulation and
     /// velocity.
+    ///
+    /// The velocity must be in the global coordinate system, as it is in all the solvers. The
+    /// circulatory force is therefore computed with the global span lines here, independently of
+    /// the output coordinate system of the model, which is only used for the results.
     pub fn lift_coefficient_from_circulation(
-        &self, 
-        strength: &[Float], 
+        &self,
+        strength: &[Float],
         velocity: &[SpatialVector]
     ) -> Vec<Float> {
-        // Calculate the actual forces
-        let force = self.sectional_circulatory_forces(strength, velocity);
-
         (0..self.nr_span_lines()).map(|i_span| {
+            // The magnitude of the circulatory force, as in `sectional_circulatory_forces`
+            let force = strength[i_span] * self.density *
+                velocity[i_span].cross(self.span_lines_global[i_span].relative_vector()).length();
+
             let sign = -strength[i_span].signum();
-            
+
             let lift_area = self.chord_lengths[i_span] * self.span_lines_local[i_span].length();
 
             let force_factor = 0.5 * lift_area * self.density * velocity[i_span].length_squared();
@@ -845,33 +870,8 @@ impl LineForceModel {
                 return 0.0;
             }
 
-            force[i_span].length() * sign / force_factor
+            force.abs() * sign / force_factor
         }).collect()
-    }
-
-    /// Calculates the magnitude of the lift force on each line element based on the given
-    /// coefficients and velocity
-    pub fn lift_from_coefficients(
-        &self, 
-        angles_of_attack: &[Float],
-        internal_states: &[Float],
-        velocity: &[SpatialVector]
-    ) -> Vec<Float> {
-        let (cl, _) = self.lift_coefficients_pre_and_post_stall(
-            angles_of_attack,
-            internal_states,
-            velocity
-        );
-
-        (0..self.nr_span_lines()).map(
-            |i| {
-                let lift_area = self.chord_lengths[i] * self.span_lines_local[i].length();
-
-                let force_factor = 0.5 * lift_area * self.density * velocity[i].length_squared();
-
-                cl[i] * force_factor
-            }
-        ).collect()
     }
 
     /// Returns the difference between the lift coefficient from the circulation and the lift

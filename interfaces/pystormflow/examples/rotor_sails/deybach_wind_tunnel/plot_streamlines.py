@@ -8,6 +8,12 @@ angular position of the interfering rotor for the two rotor case:
     python plot_streamlines.py --spin-ratio 3.0
     python plot_streamlines.py --angular-position 30 --variant lifting_line
 
+The shape of the wake in the lifting line correction, exported together with the flow fields with
+--export-vtk, can be shown together with the streamlines with --wake. The wake is colored by the
+circulation strength of the projected forces:
+
+    python plot_streamlines.py --angular-position 0 --variant projected_tip_loss_and_dynamic_lifting_line --wake
+
 The plot is shown directly by default. Use --save to save it to file instead, next to the VTK file.
 Requires pyvista.
 '''
@@ -20,7 +26,7 @@ from stormbird_setup.spatial_vector import SpatialVector
 
 import rotor_setup
 from rotor_setup import Variant
-from run_single_rotor import vtk_path
+from run_single_rotor import correction_wake_path, vtk_path
 from run_two_rotors import two_rotors_vtk_path
 
 NR_STREAMLINES_PER_ROTOR = 100
@@ -29,11 +35,13 @@ def plot_streamlines(
     file_path: Path,
     rotor_locations: list[SpatialVector],
     title: str,
-    save: bool = False
+    save: bool = False,
+    wake_path: Path | None = None
 ) -> None:
     '''
     Plots streamlines from a line source along the axis of each rotor, colored by the magnitude of
-    the velocity. The rotors are shown as cylinders.
+    the velocity. The rotors are shown as cylinders. If a wake path is given, the wake of the lifting
+    line correction is shown as well, colored by the circulation strength of the projected forces.
     '''
     if not file_path.exists():
         raise FileNotFoundError(
@@ -81,6 +89,21 @@ def plot_streamlines(
             color="lightgray"
         )
 
+    if wake_path is not None:
+        if not wake_path.exists():
+            raise FileNotFoundError(
+                f"No exported wake found at {wake_path}. Run the case with --export-vtk first, "
+                "with a variant that has a wake with panels in the lifting line correction."
+            )
+
+        plotter.add_mesh(
+            pv.read(wake_path),
+            scalars="projected_strength",
+            cmap="coolwarm",
+            opacity=0.6,
+            scalar_bar_args={"title": "Circulation strength [m^2/s]"}
+        )
+
     plotter.add_mesh(fields.outline(), color="black")
     plotter.add_title(title, font_size=10)
     plotter.add_axes()
@@ -107,6 +130,10 @@ if __name__ == '__main__':
         choices=[variant.value for variant in Variant], help="Variant of the case to plot"
     )
     parser.add_argument(
+        "--wake", action="store_true",
+        help="Show the exported wake of the lifting line correction as well"
+    )
+    parser.add_argument(
         "--save", action="store_true", help="Save the plot to a file instead of showing it"
     )
 
@@ -125,4 +152,6 @@ if __name__ == '__main__':
     else:
         parser.error("Either --spin-ratio or --angular-position must be given")
 
-    plot_streamlines(file_path, rotor_locations, title, args.save)
+    wake_path = correction_wake_path(file_path) if args.wake else None
+
+    plot_streamlines(file_path, rotor_locations, title, args.save, wake_path)

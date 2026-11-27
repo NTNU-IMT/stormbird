@@ -11,7 +11,7 @@ from stormbird_setup.lifting_line.solver import Linearized, Iterative
 from stormbird_setup.lifting_line.wake import QuasiSteadyWakeSettings, SymmetryCondition, DynamicWakeBuilder, ViscousCoreLengthEvolution
 from stormbird_setup.utils import revolutions_per_second_from_spin_ratio
 
-from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrections, VelocityCorrectionType
+from stormbird_setup.lifting_line.velocity_corrections import InducedVelocitySettings, TotalVelocityCorrection
 
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
@@ -159,9 +159,10 @@ def simulate_single_case(
         )
 
     if max_induced_velocity_ratio > 0.0:
-        simulation_builder.simulation_settings.solver.velocity_corrections = VelocityCorrections(
-            type = VelocityCorrectionType.MaxInducedVelocityMagnitudeRatio,
-            value = max_induced_velocity_ratio
+        simulation_builder.simulation_settings.solver.induced_velocities = InducedVelocitySettings(
+            total_correction = TotalVelocityCorrection.new_max_induced_velocity_magnitude(
+                max_induced_velocity_ratio
+            )
         )
 
     simulation = Simulation(

@@ -55,6 +55,7 @@ pub fn limit_angle(
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Defines the units of the internal state set point data
 pub enum InternalStateSetPointType {
     #[default]
@@ -73,11 +74,15 @@ pub struct ControllerSetPoints {
     /// The apparent wind directions where the set points are given.
     ///
     /// **Note**: the controller measures the apparent wind direction for each wing as the angle from
-    /// the chord to the velocity, around the span direction of the wing. This is not the same as in
-    /// the wind environment, which measures it around the `wind_rotation_axis`. For sails built from
-    /// the bottom to the top, with the default wind environment, the two have opposite signs, so a
-    /// wind from starboard is negative here. Set points that are mirrored between positive and
-    /// negative directions are not affected. A fix is targeted for the next release.
+    /// the chord to the velocity, around the span direction of the wing, in the plane normal to the
+    /// span. This is not the same as in the wind environment, which measures it around the
+    /// `wind_rotation_axis`. For sails built from the bottom to the top, with the default wind
+    /// environment, the two have opposite signs, so a wind from starboard is negative here. Set
+    /// points that are mirrored between positive and negative directions are not affected. This is
+    /// a known inconsistency, which may be changed in a future version.
+    ///
+    /// The data is not wrapped around ±π. Outside the given directions, the closest set point is
+    /// used, so the data should cover the full range from -π to π.
     pub apparent_wind_directions_data: Vec<Float>,
     /// Optional angle of attack set points at each apparent wind direction
     #[serde(default)]
@@ -111,7 +116,9 @@ pub struct ControllerSetPoints {
 }
 
 impl ControllerSetPoints {
-    /// Returns the new local wing angle, limited by the maximum change rate if given
+    /// Returns the new local wing angle, limited by the maximum change rate if given. The
+    /// `time_step` is the time since the last change of the output, which the change rate is
+    /// multiplied with.
     pub fn get_local_wing_angle(&self, input: &ControllerInput, time_step: Float) -> Float {
         let mut local_wing_angle = self.get_local_wing_angle_without_rate_limit(input);
 
@@ -189,7 +196,8 @@ impl ControllerSetPoints {
     
 
     /// Returns the new internal state of the wing, limited by the maximum value and change rate if
-    /// given
+    /// given. The `time_step` is the time since the last change of the output, which the change
+    /// rate is multiplied with.
     pub fn get_internal_state(
         &self,
         wing_index: usize,
@@ -324,7 +332,11 @@ impl ControllerSetPoints {
 mod tests {
     use super::*;
 
-    const TOLERANCE: Float = 1e-12;
+    use crate::test_utils::tolerance;
+
+    // Wrapping the angle adds or subtracts 2 pi, which gives a round-off error of a few units in
+    // the last place in single precision
+    const TOLERANCE: Float = tolerance(1e-12, 1e-6);
 
     #[test]
     fn limit_angle_takes_the_shortest_way_across_pi() {

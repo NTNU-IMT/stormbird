@@ -39,7 +39,8 @@ pub fn sigmoid_zero_to_one(x: Float, x0: Float, transition_range: Float) -> Floa
 pub fn cosine_transition_zero_to_one(x: Float, x_start: Float, transition_range: Float) -> Float {
     let x_prime = x - x_start;
 
-    if x_prime > transition_range {
+    // Greater or equal, so that a transition range of zero gives a step, rather than NaN from 0/0
+    if x_prime >= transition_range {
         return 1.0;
     } else if x_prime < 0.0 {
         return 0.0;

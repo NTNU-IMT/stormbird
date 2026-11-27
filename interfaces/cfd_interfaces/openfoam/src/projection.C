@@ -32,7 +32,8 @@ void Foam::fv::ActuatorLine::set_projection_data() const {
 
         double body_force_weight = dominating_line.weight;
 
-        if (body_force_weight > weight_limit) {
+        // The limit is relative to the peak value of the weight of the line element
+        if (dominating_line.relative_weight > weight_limit) {
             this->relevant_cells_for_projection.append(cell_id);
 
             this->dominating_line_element_index_projection.append(

@@ -21,7 +21,7 @@ class SamplingSettings(StormbirdSetupBaseModel):
     span_projection_factor: float = 0.5
     neglect_span_projection: bool = False
     extrapolate_end_velocities: bool = False
-    remove_span_velocity: bool = False
+    remove_span_velocity: bool = True
     correction_factor: float = 1.0
 
 class SolverSettings(StormbirdSetupBaseModel):

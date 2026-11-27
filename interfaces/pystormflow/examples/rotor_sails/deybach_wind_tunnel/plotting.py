@@ -8,6 +8,7 @@ lifting line example:
 
     python plotting.py means
     python plotting.py time-series --spin-ratio 3.0 --variant tip_loss_and_lifting_line
+    python plotting.py time-series --angular-position 0 --variant projected_tip_loss_and_dynamic_lifting_line
     python plotting.py time-series --spin-ratio 3.0 --cells-per-chord-length 16
     python plotting.py time-series --angular-position 30
     python plotting.py mesh-convergence --spin-ratio 3.0 --variant all
@@ -419,7 +420,8 @@ def plot_interference_factors(
     positions that are stored.
     '''
     default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    markers = ["s", "^", "v", "D"]
+    # One marker per variant, as the colors are used for the coefficients
+    markers = ["s", "^", "v", "D", "o", "P"]
 
     interference_data = read_interference_data()
     angular_positions = experimental_angular_positions()

@@ -242,3 +242,115 @@ fn dynamic_stall_parameters_require_foil_section_model() {
         ..wing_builder(SectionModel::RotatingCylinder(RotatingCylinder::default()))
     }).is_err());
 }
+
+#[test]
+/// The angle of attack is the angle in the plane of the section, i.e., normal to the span line.
+/// A velocity component along the span should therefore not change the angle of attack.
+fn the_span_velocity_does_not_change_the_angle_of_attack() {
+    let line_force_model = build(wing_builder(SectionModel::SingleElementFoil(Foil::default())));
+
+    let nr_span_lines = line_force_model.nr_span_lines();
+
+    for angle in [-170.0, -60.0, -10.0, 0.0, 5.0, 30.0, 120.0] {
+        let angle_rad = Float::to_radians(angle);
+
+        // The span is along the z-axis and the chord along the x-axis
+        let in_plane = SpatialVector::new(angle_rad.cos(), angle_rad.sin(), 0.0) * 8.0;
+        let with_span_component = in_plane + SpatialVector::new(0.0, 0.0, 5.0);
+
+        let expected = line_force_model.angles_of_attack(
+            &vec![in_plane; nr_span_lines], CoordinateSystem::Global
+        );
+
+        let calculated = line_force_model.angles_of_attack(
+            &vec![with_span_component; nr_span_lines], CoordinateSystem::Global
+        );
+
+        for i in 0..nr_span_lines {
+            assert!(
+                (calculated[i] - expected[i]).abs() < tolerance(1e-12, 1e-5),
+                "angle {}: {} with span velocity, {} without",
+                angle, calculated[i].to_degrees(), expected[i].to_degrees()
+            );
+
+            assert!(
+                (expected[i].to_degrees() - angle).abs() < tolerance(1e-9, 1e-3),
+                "angle {}: {}", angle, expected[i].to_degrees()
+            );
+        }
+    }
+
+    // A velocity along the span only has no angle of attack
+    let along_span = line_force_model.angles_of_attack(
+        &vec![SpatialVector::new(0.0, 0.0, 3.0); nr_span_lines], CoordinateSystem::Global
+    );
+
+    assert!(along_span.iter().all(|angle| *angle == 0.0), "{:?}", along_span);
+}
+
+#[test]
+/// The chord vector is projected onto the plane normal to the span line, in the same way as the
+/// velocity, so that a chord that is not normal to the span line, e.g., a horizontal chord on a
+/// raked span line, does not change the angle of attack.
+fn a_chord_along_the_span_does_not_change_the_angle_of_attack() {
+    let rake = Float::to_radians(10.0);
+
+    // Span line in the x-z plane, raked 10 degrees backwards, with a horizontal chord
+    let span_top = SpatialVector::new(10.0 * rake.sin(), 0.0, 10.0 * rake.cos());
+
+    let line_force_model = build(WingBuilder {
+        section_points: vec![SpatialVector::new(0.0, 0.0, 0.0), span_top],
+        chord_vectors: vec![SpatialVector::new(CHORD_LENGTH, 0.0, 0.0); 2],
+        section_model: SectionModel::SingleElementFoil(Foil::default()),
+        ..Default::default()
+    });
+
+    let nr_span_lines = line_force_model.nr_span_lines();
+
+    for angle in [-30.0, 0.0, 5.0, 20.0] {
+        let angle_rad = Float::to_radians(angle);
+
+        let velocity = SpatialVector::new(angle_rad.cos(), angle_rad.sin(), 0.0) * 8.0;
+
+        let calculated = line_force_model.angles_of_attack(
+            &vec![velocity; nr_span_lines], CoordinateSystem::Global
+        );
+
+        // The in-plane angle. The projected chord is along (cos(rake), 0, -sin(rake)), and the
+        // projected velocity has the components cos(a) cos(rake) along the chord and sin(a)
+        // along the y-axis. Without the projection of the chord, the angle at a = 0 was -10 deg.
+        let expected = (angle_rad.tan() / rake.cos()).atan();
+
+        for angle_i in calculated {
+            assert!(
+                (angle_i - expected).abs() < tolerance(1e-9, 1e-4),
+                "angle {}: {} calculated, {} expected",
+                angle, angle_i.to_degrees(), expected.to_degrees()
+            );
+        }
+    }
+}
+
+#[test]
+/// Virtual line elements are not part of the wing, so their area should not be included in the
+/// projected area, in the same way as they are not included in the integrated forces.
+fn the_projected_area_excludes_virtual_line_elements() {
+    let line_force_model = build(wing_builder(SectionModel::SingleElementFoil(Foil::default())));
+
+    // Only the segment from z = 0 to z = 10 is real
+    let real_area = CHORD_LENGTH * 10.0;
+
+    let areas = line_force_model.projected_areas();
+
+    assert_eq!(areas.len(), 1);
+    assert!((areas[0] - real_area).abs() < tolerance(1e-9, 1e-4), "area: {}", areas[0]);
+    assert!(
+        (line_force_model.total_projected_area() - real_area).abs() < tolerance(1e-9, 1e-4),
+        "total area: {}", line_force_model.total_projected_area()
+    );
+
+    // The aspect ratio of the real wing: a span of 10 and an area of 20
+    let aspect_ratios = line_force_model.aspect_ratios();
+
+    assert!((aspect_ratios[0] - 5.0).abs() < tolerance(1e-9, 1e-4), "aspect ratio: {}", aspect_ratios[0]);
+}

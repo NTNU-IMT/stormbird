@@ -15,6 +15,7 @@ use serde::{Serialize, Deserialize};
 use crate::error::Error;
 
 use crate::common_utils::forces_and_moments::{
+    CoordinateSystem,
     IntegratedValues,
     SectionalForces,
     SectionalForcesInput
@@ -136,15 +137,25 @@ impl SimulationResult {
         angles_of_attack
     }
 
-    /// Returns the felt velocity at each control point, but with the motion due to rotational 
-    /// motion subtracted. 
+    /// Returns the felt velocity at each control point, but with the motion due to rotational
+    /// motion subtracted.
+    ///
+    /// The result is always in the global coordinate system, also when the force input is given in
+    /// the body fixed coordinate system, as the rotational motion is computed from the global
+    /// angular velocity and control points.
     pub fn felt_velocity_minus_rotational_motion(&self) -> Vec<SpatialVector> {
         let nr_span_lines = self.nr_span_lines();
         let mut out: Vec<SpatialVector> = Vec::with_capacity(nr_span_lines);
 
         for i in 0..nr_span_lines {
+            let felt_velocity = match self.force_input.coordinate_system {
+                CoordinateSystem::Global => self.force_input.velocity[i],
+                CoordinateSystem::Body => self.rigid_body_motion
+                    .vector_from_body_fixed_to_global_coordinate_system(self.force_input.velocity[i]),
+            };
+
             out.push(
-                self.force_input.velocity[i] + 
+                felt_velocity +
                 self.rigid_body_motion.rotation_velocity_at_point(self.ctrl_points[i])
             )
         }

@@ -128,6 +128,17 @@
                 Math.abs(this.mean_positive_stall_angle) :
                 Math.abs(this.mean_negative_stall_angle);
 
+            // A stall range of zero, or less, gives a step function, as in the Rust code
+            if (this.stall_range <= 0.0) {
+                const absoluteAngle = Math.abs(angleOfAttack);
+
+                if (absoluteAngle < meanStallAngle) {
+                    return 0.0;
+                }
+
+                return absoluteAngle > meanStallAngle ? 1.0 : 0.5;
+            }
+
             return sigmoidZeroToOne(Math.abs(angleOfAttack), meanStallAngle, this.stall_range);
         }
     }

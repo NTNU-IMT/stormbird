@@ -18,6 +18,13 @@ for instance ParaView:
     python run_single_rotor.py --export-vtk
 
 The VTK files are stored in vtk_single_rotor_stormflow, with the same name as the time series.
+
+For variants with a lifting line correction with panels, i.e., the dynamic wake, the shape of the
+wake at the end of each case is exported together with the flow fields, to a file in the same
+folder with _correction_wake added to the name. The wake can be shown together with the streamlines
+with:
+
+    python plot_streamlines.py --spin-ratio 3.0 --variant projected_tip_loss_and_dynamic_lifting_line --wake
 '''
 
 import argparse
@@ -52,10 +59,18 @@ def vtk_path(variant: Variant, spin_ratio: float) -> Path:
         time_series_path(variant, spin_ratio, Solver.Stormflow).with_suffix(".vtk").name
     )
 
+def correction_wake_path(vtk_export_path: Path) -> Path:
+    '''
+    The path of the VTK file with the wake of the lifting line correction, stored next to the VTK
+    file with the flow fields.
+    '''
+    return vtk_export_path.with_name(f"{vtk_export_path.stem}_correction_wake.vtk")
+
 def add_vtk_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--export-vtk", action="store_true",
-        help="Export the flow fields at the end of each case as VTK files"
+        help="Export the flow fields at the end of each case as VTK files, together with the wake "
+        "of the lifting line correction, for variants with a wake that has panels"
     )
 
 
@@ -86,20 +101,21 @@ def simulation_builder(
             settings=MultigridSettingsBuilder(compute_platform=compute_platform)
         ),
         boundary_condition_type=BoundaryConditionType.WindTunnel,
-        turbulence = TurbulenceSolverBuilder()
+        turbulence = TurbulenceSolverBuilder(),
+        slip_geometries=rotor_setup.slip_geometries(variant, rotor_locations)
     )
 
 def run_case(
     spin_ratio: float,
     variant: Variant,
     compute_platform: ComputePlatform,
-    export_vtk: bool = False
+    export_vtk: bool = False,
 ) -> dict[str, float]:
     force_history = simulate_force_history(
         spin_ratio,
         variant,
         compute_platform,
-        vtk_export_path=vtk_path(variant, spin_ratio) if export_vtk else None
+        vtk_export_path=vtk_path(variant, spin_ratio) if export_vtk else None,
     )
 
     write_time_series(force_history, time_series_path(variant, spin_ratio, Solver.Stormflow))
@@ -112,18 +128,19 @@ def simulate_force_history(
     compute_platform: ComputePlatform,
     cells_per_chord_length: int = rotor_setup.CELLS_PER_CHORD_LENGTH,
     rotor_locations: list[SpatialVector] | None = None,
-    vtk_export_path: Path | None = None
+    vtk_export_path: Path | None = None,
+    end_time: float = rotor_setup.END_TIME,
 ) -> pd.DataFrame:
     '''
     Runs a single case, and returns the force on the first rotor as a function of time. A single
     rotor at the origin is used if no rotor locations are given. The flow fields at the end of the
-    simulation are exported as a VTK file to the given path, if any.
+    simulation are exported as a VTK file to the given path, if any. The wake of the lifting line
+    correction is then exported as well, next to the flow fields, if the correction has a wake with
+    panels.
     '''
     builder = simulation_builder(
         spin_ratio, variant, compute_platform, cells_per_chord_length, rotor_locations
     )
-
-    end_time = rotor_setup.END_TIME
 
     simulation = Simulation(builder.to_json_string())
 
@@ -158,6 +175,11 @@ def simulate_force_history(
         vtk_export_path.parent.mkdir(exist_ok=True)
 
         simulation.export_fields_as_vtk(str(vtk_export_path), binary=True)
+
+        # Returns False, without writing a file, if the correction has no wake with panels
+        simulation.export_correction_wake_as_vtk(
+            str(correction_wake_path(vtk_export_path)), binary=True
+        )
 
     return pd.DataFrame({"time": time_history, "force.x": force_x, "force.y": force_y})
 

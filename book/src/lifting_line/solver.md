@@ -8,7 +8,7 @@ Two solvers currently exist: a linearized solver with viscous corrections and a 
 
 The linearized solver creates an equation system like the original lifting line method. The lift-induced velocities are assumed to only affect the angle of attack and the lift as a function of angle of attack is assumed to be linear. More in depth explanations may be found in text books like Anderson (2005).
 
-The result of applying the normal lifting line assumptions is a linear equation system that can be solved using a conventional linear algebra solver. The linearized solver therefore works by first setting up the equation system as a matrix and a right-hand side vector, before solving it using conventional Gaussian elimination.
+The result of applying the normal lifting line assumptions is a linear equation system that can be solved using a conventional linear algebra solver. The linearized solver therefore works by first setting up the equation system as a matrix and a right-hand side vector, before solving it using conventional Gaussian elimination. Control points without any velocity get zero circulation, as the equations are otherwise singular.
 
 However, the **procedure above is only the first step**. Due to the assumption of linear lift as a function of angle of attack, the resulting circulation that is returned from the solver is without any stall- or other non-linear effects on the lift. To account for this, a simplified viscous correction method is applied after solving for the circulation strength using a linear solver. It consists of the following steps:
 
@@ -48,7 +48,7 @@ As an equation, the residual, \\(r\\), for a line element is calculated as follo
     r\_i = C\_L(\Gamma\_{i}) - C\_L(\Gamma\_{i, estimated})
 \\]
 
-The value of this residual *should* go towards zero with successive iterations. Since the value is calculated from the lift-coefficients, it is not dependent on the geometrical dimensions or the freestream velocity. The solver will stop if the average absolute value of the residual over all line elements goes below the `residual_tolerance_absolute` value in the solver settings below. The solver will also stop if the maximum change in the circulation strength between two iterations goes below the `strength_difference_tolerance` value.
+The value of this residual *should* go towards zero with successive iterations. Since the value is calculated from the lift-coefficients, it is not dependent on the geometrical dimensions or the freestream velocity. The solver will stop if the average absolute value of the residual over all line elements goes below the `residual_tolerance_absolute` value in the solver settings below. The solver will also stop if the maximum difference between the new estimate of the circulation strength and the current value, before the damping is applied, goes below the `strength_difference_tolerance` value.
 
 
 ## Solver settings
@@ -72,7 +72,7 @@ For the linearized settings, the following source code shows the available field
 
 ```rust
 pub struct Linearized {
-    pub velocity_corrections: VelocityCorrections,
+    pub induced_velocities: InducedVelocitySettings,
     pub disable_viscous_corrections: bool,
     pub induced_velocity_correction_method: InducedVelocityCorrectionMethod
 }
@@ -83,7 +83,7 @@ pub enum InducedVelocityCorrectionMethod {
 }
 ```
 
-The only one that could be interesting to modify is the `VelocityCorrections`. They are explained in their own section below. The other two are mainly for testing purposes and not necessary to adjust for normal use cases. The `induced_velocity_correction_method` selects whether the lift-induced velocities are recalculated after the viscous correction (`FullCorrection`) or not (`NoCorrection`), as explained above.
+The only one that could be interesting to modify is the `induced_velocities`, which are explained in [their own section below](#induced-velocities-and-velocity-corrections). The other two are mainly for testing purposes and not necessary to adjust for normal use cases. The `induced_velocity_correction_method` selects whether the lift-induced velocities are recalculated after the viscous correction (`FullCorrection`) or not (`NoCorrection`), as explained above.
 
 ### Non-linear settings
 
@@ -95,7 +95,7 @@ pub struct Iterative {
     pub damping_factor: f64,
     pub residual_tolerance_absolute: f64,
     pub strength_difference_tolerance: f64,
-    pub velocity_corrections: VelocityCorrections,
+    pub induced_velocities: InducedVelocitySettings,
     pub use_raw_circulation_during_iterations: bool,
     pub start_with_linearized_solution: bool,
     pub correction_factor_initial_solution: f64,
@@ -116,27 +116,54 @@ An explanation of each field is given below:
 - `damping_factor`: Determines how fast the circulation distribution should be updated as explained in the *iterative damped iterations* section above. It is set to 0.04 as default when using a quasi-steady wake, and 0.05 when using a dynamic wake.
 - `residual_tolerance_absolute`: A value used to determine when the solution is converged based on the residual. The default value is 1e-4.
 - `strength_difference_tolerance`: A value used to determine when the solution is converged based on the maximum difference between the previous and next estimated circulation strength. The default value is 1e-6.
-- `velocity_corrections`: An option to add corrections to the estimated velocity, to handle singularities and difficult cases.
+- `induced_velocities`: Settings for how the lift-induced velocities are used, including options to neglect the self-induced velocities and to add corrections to handle singularities and difficult cases. See the [section below](#induced-velocities-and-velocity-corrections).
 - `use_raw_circulation_during_iterations`: A boolean that can be set to true if the [circulation corrections](../line_model/circulation_strength.md) in the line force model should be skipped when estimating the circulation strength during the iterations. The default is false. This option is only available for dynamic simulations.
 - `start_with_linearized_solution`: A boolean that can be set to true if you want the first iteration to estimate the circulation distribution using a linear solver. The rest of the iterations will then use the normal non-linear iterations to update from the linearized solver.
 - `correction_factor_initial_solution`: A factor that the initial circulation distribution, i.e., the solution from the previous time step, is multiplied with before the first iteration. The default value is 1.0, which means no correction.
-- `variable_to_update`: Determines which variable the damping factor is applied to in each iteration. The default is `CirculationStrength`, which corresponds to the equation above. If set to `AngleOfAttack`, the damping is instead applied to the update of the angle of attack on each line element, and the circulation strength is then calculated directly from the damped angles of attack.
+- `variable_to_update`: Determines which variable the damping factor is applied to in each iteration. The default is `CirculationStrength`, which corresponds to the equation above. If set to `AngleOfAttack`, the damping is instead applied to the update of the angle of attack on each line element, and the circulation strength is then calculated directly from the damped angles of attack. Note that the convergence test does not work with this option at the moment, so the solver always runs `max_iterations_per_time_step` iterations.
 
-## Velocity corrections
-Velocity corrections are special models that can be used to alter the resulting lift-induced velocities computed from the circulation distributions in the solvers. The purpose is two-fold. For one, applying corrections to the lift-induced velocities may stabilize the solver. Second, the velocity corrections may be used to correct for physical effects that are not directly part of the line force model such as end-disks. The drag on rotor sails, in particular, may be estimated to be too high compared to values estimated with high-fidelity CFD simulations without some corrections applied to the lift-induced velocities, which is likely due to the presence of the large end-disks on such sails.
+## Induced velocities and velocity corrections
+The lift-induced velocities at the control points are always computed in two parts:
 
-The velocity corrections are represented by an enum that looks like the following:
+- **Self-induced** velocities: the velocities induced on a wing by its own wake.
+- **Other-induced** velocities: the velocities induced on a wing by the wakes of all the other wings.
+
+For a single wing, all the induced velocities are self-induced. The two parts are computed together, in the same loops, so the split does not make the simulations slower. It makes it possible to treat the two parts differently, which is controlled by the `induced_velocities` field in the solver settings:
 
 ```rust
-pub enum VelocityCorrections {
-    #[default]
+pub struct InducedVelocitySettings {
+    pub neglect_self_induced_velocities: bool,                     // Default: false
+    pub self_induced_correction: SelfInducedVelocityCorrection,    // Default: NoCorrection
+    pub total_correction: TotalVelocityCorrection,                 // Default: NoCorrection
+}
+
+pub enum SelfInducedVelocityCorrection {
+    NoCorrection,
+    MaxInducedVelocityMagnitudeRatio(f64),
+}
+
+pub enum TotalVelocityCorrection {
     NoCorrection,
     MaxInducedVelocityMagnitudeRatio(f64),
     FixedMagnitudeEqualToFreestream,
 }
 ```
 
-The default is to use no corrections, so that the lift-induced velocities from the solver are calculated based on the raw circulation strength. Then there are two correction methods to choose from:
+The velocity at each control point is computed in the following order:
 
-- `MaxInducedVelocityMagnitudeRatio` makes sure the lift-induced velocity magnitude never exceeds a ratio of the freestream velocity. The ratio is supplied as an input. A typical value could be to set the ratio to 1.0, which would be the same as saying that the lift-induced velocity should never exceed the freestream magnitude.
-- `FixedMagnitudeEqualToFreestream` computes a velocity vector based on the raw lift-induced velocity and the freestream that is limited in magnitude to the freestream velocity but allowed to rotate freely. That is, this correction allows the lift-induced velocity to change the orientation of the effective velocity at each line segment, but not the magnitude. This can, for instance, be used to force the non-linear solver to behave more like a linear solver.
+1. The self-induced velocity is set to zero if `neglect_self_induced_velocities` is true, and is otherwise corrected with the `self_induced_correction`.
+2. The induced velocity is the sum of the self-induced velocity from step 1 and the other-induced velocity.
+3. The `total_correction` is applied, together with the freestream velocity.
+
+### Neglecting the self-induced velocities
+If `neglect_self_induced_velocities` is true, only the velocities induced by other wings are included. This is useful if the effect of the self-induced velocities is accounted for in another way, for instance with CFD data, and the only reason for running the lifting line simulation is to calculate the wing-to-wing interaction. It works for both quasi-steady and dynamic simulations. **Warning**: this should probably always be used in combination with a [prescribed circulation shape](../line_model/circulation_strength.md) in the line force model, to maintain a realistic circulation distribution.
+
+### Velocity corrections
+Velocity corrections are special models that can be used to alter the resulting lift-induced velocities computed from the circulation distributions in the solvers. The purpose is two-fold. For one, applying corrections to the lift-induced velocities may stabilize the solver. Second, the velocity corrections may be used to correct for physical effects that are not directly part of the line force model such as end-disks. The drag on rotor sails, in particular, may be estimated to be too high compared to values estimated with high-fidelity CFD simulations without some corrections applied to the lift-induced velocities, which is likely due to the presence of the large end-disks on such sails.
+
+The default is to use no corrections, so that the lift-induced velocities from the solver are calculated based on the raw circulation strength. The available corrections are:
+
+- `MaxInducedVelocityMagnitudeRatio` makes sure the magnitude of the lift-induced velocity never exceeds a ratio of the freestream velocity. The ratio is supplied as an input. A typical value could be to set the ratio to 1.0, which would be the same as saying that the lift-induced velocity should never exceed the freestream magnitude. As a `self_induced_correction`, only the self-induced velocity is limited, while the velocities induced by other wings are kept as they are. As a `total_correction`, the sum of the self-induced and the other-induced velocities is limited.
+- `FixedMagnitudeEqualToFreestream` is only available as a `total_correction`. It computes a velocity vector based on the raw lift-induced velocity and the freestream that is limited in magnitude to the freestream velocity but allowed to rotate freely. That is, this correction allows the lift-induced velocity to change the orientation of the effective velocity at each line segment, but not the magnitude. This can, for instance, be used to force the non-linear solver to behave more like a linear solver.
+
+The two corrections can be combined, for instance to limit the self-induced velocity close to the ends of a wing with a large circulation at the ends, such as a rotor sail, without limiting the interaction with other wings.

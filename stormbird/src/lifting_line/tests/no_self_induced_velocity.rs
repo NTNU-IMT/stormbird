@@ -3,23 +3,36 @@
 // License: GPL v3.0 (see separate file LICENSE or https://www.gnu.org/licenses/gpl-3.0.html)
 
 use crate::lifting_line::prelude::*;
-use crate::lifting_line::simulation_builder::{ 
+use crate::lifting_line::simulation_builder::{
     SimulationBuilder,
     SimulationSettings,
     DynamicSettings,
+    QuasiSteadySettings,
 };
-use crate::lifting_line::wake::dynamic_wake::builder::DynamicWakeBuilder;
+use crate::lifting_line::solvers::{
+    Solver,
+    QuasiSteadySolverBuilder,
+    iterative::{Iterative, QuasiSteadyIterativeBuilder},
+    velocity_corrections::InducedVelocitySettings,
+};
 
 use stormath::type_aliases::Float;
 
-#[test]
-/// This tests whether the lift and drag coefficients are correct for a steady simulation of two 
-/// sails when the "neglect_self_induced_velocity" flag is set to true. The sails are placed far
-/// apart so that the induced velocities should be very close to zero. 
-/// 
-/// The test was created as a result of a bug where the lift and drag coefficients were not correct
-/// with multiple sails, but correct with only one sail.
-fn no_self_induced_velocity() {
+fn neglect_self_induced_velocities() -> InducedVelocitySettings {
+    InducedVelocitySettings {
+        neglect_self_induced_velocities: true,
+        ..Default::default()
+    }
+}
+
+/// Simulates two rotor sails that are placed far apart, so that the velocities induced by the
+/// other sail should be very close to zero, and returns the relative error in the lift coefficient
+/// compared to the two-dimensional value.
+fn relative_lift_error_for_two_sails_far_apart(
+    simulation_settings: SimulationSettings,
+    nr_time_steps: usize,
+    time_step: Float,
+) -> Float {
     let nr_strips = 10;
     let diameter  = 1.0;
     let span      = 5.0;
@@ -27,23 +40,13 @@ fn no_self_induced_velocity() {
 
     let spin_ratio = 2.0;
 
-    let revolutions_per_second = -RotatingCylinder::revolutions_per_second_from_spin_ratio(
+    let revolutions_per_second = RotatingCylinder::revolutions_per_second_from_spin_ratio(
         spin_ratio, diameter, velocity_mag
     );
 
     let section_model = RotatingCylinder::default();
 
     let mut line_force_model_builder = LineForceModelBuilder::new(nr_strips);
-    
-    /*line_force_model_builder.prescribed_circulation = Some(
-        PrescribedCirculation{
-            shape: PrescribedCirculationShape{
-                outer_power: 0.25,
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    );*/
 
     let chord_vector = SpatialVector::from([diameter, 0.0, 0.0]);
 
@@ -67,28 +70,15 @@ fn no_self_induced_velocity() {
             non_zero_circulation_at_ends: [false, false],
             ..Default::default()
         };
-    
+
         line_force_model_builder.add_wing(wing_builder);
     }
-
-    let wake = DynamicWakeBuilder {
-        neglect_self_induced_velocities: true,
-        ..Default::default()
-    };
-
-    let settings = DynamicSettings{
-        wake,
-        ..Default::default()
-    };
-    
-    let nr_time_steps = 100;
-    let time_step = 0.5;
 
     let velocity = SpatialVector::from([velocity_mag, 0.0, 0.0]);
 
     let mut sim = SimulationBuilder::new(
         line_force_model_builder,
-        SimulationSettings::Dynamic(settings)
+        simulation_settings
     ).build().unwrap();
 
     sim.line_force_model.set_internal_state(
@@ -104,7 +94,7 @@ fn no_self_induced_velocity() {
 
     for i in 0..nr_time_steps {
         let time = (i as Float) * time_step;
-        
+
         result = sim.do_step(time, time_step, &input_freestream_velocity);
     }
 
@@ -115,15 +105,58 @@ fn no_self_induced_velocity() {
 
     dbg!(cd, cl);
 
-    //let cd_data = 1.497;
+    //let cd_data = 1.497;  TODO make the drag comparison work again
     let cl_data = section_model.lift_coefficient(spin_ratio);
 
-    //let cd_error = cd - cd_data;  TODO make this work again
     let cl_error = cl - cl_data;
 
     dbg!(cl_error.abs() / cl_data);
 
-    //assert!(cd_error.abs() / cd_data < 0.0005);
-    assert!(cl_error.abs() / cl_data < 0.0001);
+    cl_error.abs() / cl_data
+}
 
+#[test]
+/// This tests whether the lift and drag coefficients are correct for a steady simulation of two
+/// sails when the "neglect_self_induced_velocity" flag is set to true. The sails are placed far
+/// apart so that the induced velocities should be very close to zero.
+///
+/// The test was created as a result of a bug where the lift and drag coefficients were not correct
+/// with multiple sails, but correct with only one sail.
+fn no_self_induced_velocity() {
+    let settings = DynamicSettings{
+        solver: Solver::Iterative(Iterative {
+            induced_velocities: neglect_self_induced_velocities(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let relative_error = relative_lift_error_for_two_sails_far_apart(
+        SimulationSettings::Dynamic(settings),
+        100,
+        0.5
+    );
+
+    assert!(relative_error < 0.0001);
+}
+
+#[test]
+/// Same as [`no_self_induced_velocity`], but with a quasi-steady simulation, which is supported now
+/// that the setting is part of the solver rather than the dynamic wake.
+fn no_self_induced_velocity_quasi_steady() {
+    let settings = QuasiSteadySettings {
+        solver: QuasiSteadySolverBuilder::Iterative(QuasiSteadyIterativeBuilder {
+            induced_velocities: neglect_self_induced_velocities(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let relative_error = relative_lift_error_for_two_sails_far_apart(
+        SimulationSettings::QuasiSteady(settings),
+        1,
+        1.0
+    );
+
+    assert!(relative_error < 0.0001);
 }

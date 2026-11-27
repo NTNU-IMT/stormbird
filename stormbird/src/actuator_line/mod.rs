@@ -250,8 +250,133 @@ impl ActuatorLine {
         }
     }
 
+    /// The circulation strength from the last simulation result, both the circulation that the
+    /// forces on the wings are computed from and the circulation that the projected forces are
+    /// computed from. Zero before the first time step.
+    fn last_circulation_strengths(&self) -> (Vec<Float>, Vec<Float>) {
+        if let Some(result) = &self.simulation_result {
+            (
+                result.force_input.circulation_strength.clone(),
+                self.projected_circulation_strength.clone()
+            )
+        } else {
+            let zero_strength = vec![0.0; self.line_force_model.nr_span_lines()];
+
+            (zero_strength.clone(), zero_strength)
+        }
+    }
+
+    /// Updates the wake model of the lifting line correction, if present, based on the current
+    /// sampled velocity at the control points and the circulation from the last simulation result.
+    /// Called at the start of each call to [`solve`](ActuatorLine::solve).
+    pub fn update_lifting_line_correction(&mut self, time: Float, time_step: Float) {
+        if self.lifting_line_correction.is_none() {
+            return;
+        }
+
+        let (last_circulation_strength, last_projected_circulation_strength) =
+            self.last_circulation_strengths();
+
+        if let Some(lifting_line_correction) = &mut self.lifting_line_correction {
+            lifting_line_correction.update(
+                &self.line_force_model,
+                &self.ctrl_points_velocity,
+                &last_circulation_strength,
+                &last_projected_circulation_strength,
+                time,
+                time_step
+            );
+        }
+    }
+
+    /// The points in the wake of the lifting line correction where the velocity must be sampled
+    /// from the CFD flow field. Empty unless the correction uses a dynamic wake, and before the
+    /// first call to [`do_step`](Self::do_step).
+    pub fn wake_points_to_sample(&self) -> &[SpatialVector] {
+        if let Some(lifting_line_correction) = &self.lifting_line_correction {
+            lifting_line_correction.wake_points_to_sample()
+        } else {
+            &[]
+        }
+    }
+
+    /// The wake of the lifting line correction as a legacy VTK PolyData buffer, with the
+    /// circulation from the last simulation result. See
+    /// [`LiftingLineCorrection::wake_as_vtk`] for the content. None if there is no correction, if
+    /// the correction uses the straight wake, which has no panels, or before the first call to
+    /// [`do_step`](Self::do_step).
+    pub fn correction_wake_as_vtk(&self, binary: bool) -> Option<Vec<u8>> {
+        let lifting_line_correction = self.lifting_line_correction.as_ref()?;
+
+        let (last_circulation_strength, last_projected_circulation_strength) =
+            self.last_circulation_strengths();
+
+        lifting_line_correction.wake_as_vtk(
+            &last_circulation_strength,
+            &last_projected_circulation_strength,
+            binary
+        )
+    }
+
+    /// Writes the wake of the lifting line correction to a legacy VTK file, see
+    /// [`correction_wake_as_vtk`](Self::correction_wake_as_vtk). Returns false, without writing a
+    /// file, if there is no wake to export.
+    ///
+    /// # Errors
+    /// If the file can not be written.
+    pub fn write_correction_wake_to_vtk_file<P: AsRef<Path>>(
+        &self,
+        file_path: P,
+        binary: bool
+    ) -> Result<bool, Error> {
+        let Some(content) = self.correction_wake_as_vtk(binary) else {
+            return Ok(false);
+        };
+
+        std::fs::write(file_path, content)?;
+
+        Ok(true)
+    }
+
+    /// The number of points in [`wake_points_to_sample`](Self::wake_points_to_sample)
+    pub fn nr_wake_points_to_sample(&self) -> usize {
+        self.wake_points_to_sample().len()
+    }
+
+    /// Sets the sampled velocity at the wake point with the given index, see
+    /// [`wake_points_to_sample`](Self::wake_points_to_sample). Values that are not finite, e.g.,
+    /// from points outside the CFD domain, are ignored, so that the previous value is kept.
+    ///
+    /// # Panics
+    /// If there is no dynamic correction wake, or the index is out of bounds.
+    pub fn set_wake_point_velocity_at_index(&mut self, index: usize, velocity: SpatialVector) {
+        let lifting_line_correction = self.lifting_line_correction.as_mut().expect(
+            "Wake point velocities can only be set with a lifting line correction"
+        );
+
+        lifting_line_correction.set_wake_point_velocity(index, velocity);
+    }
+
+    /// Sets the sampled velocity at all the wake points, see
+    /// [`set_wake_point_velocity_at_index`](Self::set_wake_point_velocity_at_index).
+    ///
+    /// # Panics
+    /// If the number of velocities is different from the number of wake points.
+    pub fn set_wake_points_velocity(&mut self, velocity: &[SpatialVector]) {
+        assert_eq!(
+            velocity.len(),
+            self.nr_wake_points_to_sample(),
+            "The number of velocities must be equal to the number of wake points to sample"
+        );
+
+        for (index, &velocity) in velocity.iter().enumerate() {
+            self.set_wake_point_velocity_at_index(index, velocity);
+        }
+    }
+
     /// Computes a corrected velocity at the control points, based on the sampling settings, and,
-    /// if present, the lifting line correction.
+    /// if present, the lifting line correction. The wake model of the lifting line correction must
+    /// be updated first, see [`update_lifting_line_correction`](Self::update_lifting_line_correction).
     pub fn corrected_ctrl_points_velocity(&self, time: Float) -> Vec<SpatialVector> {
         let mut corrected_velocity = if self.sampling_settings.remove_span_velocity {
             self.line_force_model.remove_span_velocity(
@@ -264,16 +389,7 @@ impl ActuatorLine {
 
         if let Some(lifting_line_correction) = &self.lifting_line_correction {
             let (last_circulation_strength, last_projected_circulation_strength) =
-                if let Some(result) = &self.simulation_result {
-                    (
-                        result.force_input.circulation_strength.clone(),
-                        self.projected_circulation_strength.clone()
-                    )
-                } else {
-                    let zero_strength = vec![0.0; self.line_force_model.nr_span_lines()];
-
-                    (zero_strength.clone(), zero_strength)
-                };
+                self.last_circulation_strengths();
 
             let ll_velocity_correction = lifting_line_correction.velocity_correction(
                 &self.line_force_model,
@@ -323,7 +439,9 @@ impl ActuatorLine {
 
     /// Takes the estimated velocity at the control points as input and calculates a simulation
     /// result from the line force model.
-    pub fn solve(&mut self, time: Float, _time_step: Float) -> SolverResult {
+    pub fn solve(&mut self, time: Float, time_step: Float) -> SolverResult {
+        self.update_lifting_line_correction(time, time_step);
+
         let corrected_ctrl_points_velocity = self.corrected_ctrl_points_velocity(time);
 
         let angles_of_attack = self.line_force_model.angles_of_attack(
@@ -538,23 +656,51 @@ impl ActuatorLine {
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 
         for i in 0..self.line_force_model.nr_span_lines() {
-            let wing_index = self.line_force_model.wing_index_from_global(i);
-            let wing_range = &self.line_force_model.wing_indices[wing_index];
-
-            let is_at_wing_start = i == wing_range.start;
-            let is_at_wing_end   = i == wing_range.end - 1;
-
             projection_values.push(
                 self.projection_settings.projection_value_at_point(
                     point,
                     chord_vectors[i],
                     &span_lines[i],
-                    [is_at_wing_start, is_at_wing_end]
+                    self.is_at_wing_ends(i)
                 )
             );
         }
 
         projection_values
+    }
+
+    /// Whether the line element is the first and/or the last line element on its wing
+    fn is_at_wing_ends(&self, line_index: usize) -> [bool; 2] {
+        let wing_index = self.line_force_model.wing_index_from_global(line_index);
+        let wing_range = &self.line_force_model.wing_indices[wing_index];
+
+        [line_index == wing_range.start, line_index == wing_range.end - 1]
+    }
+
+    /// The largest value of the projection weight of a line element, which is at its control point
+    pub fn peak_projection_weight(&self, line_index: usize) -> Float {
+        let span_line = &self.line_force_model.span_lines_global[line_index];
+
+        self.projection_settings.projection_value_at_point(
+            span_line.ctrl_point(),
+            self.line_force_model.chord_vectors_global[line_index],
+            span_line,
+            self.is_at_wing_ends(line_index)
+        )
+    }
+
+    /// The projection weight of a line element, relative to its peak value, see
+    /// [`peak_projection_weight`](Self::peak_projection_weight). This is the value that is compared
+    /// with the `weight_limit` in the sampling and projection settings, so that the limit does not
+    /// depend on the size of the line elements.
+    pub fn relative_projection_weight(&self, line_index: usize, weight: Float) -> Float {
+        let peak_weight = self.peak_projection_weight(line_index);
+
+        if peak_weight > 0.0 {
+            weight / peak_weight
+        } else {
+            0.0
+        }
     }
 
     /// Computes the sum of the projection weights for all line elements at a given point in space.

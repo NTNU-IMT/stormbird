@@ -159,7 +159,25 @@ impl SpanwiseMeasurement {
 
         out
     }
-    
+
+    /// Returns the mean of the angles on each wing, over the part of the span given by the
+    /// measurement settings. The mean is computed through the sine and cosine of the angles, so
+    /// that it is correct also when the angles are spread across ±π. The result is between -π and
+    /// π.
+    pub fn measure_angle_values(
+        &self,
+        values: &[Float],
+        wing_indices: Vec<Range<usize>>,
+    ) -> Vec<Float> {
+        let sin_values: Vec<Float> = values.iter().map(|value| value.sin()).collect();
+        let cos_values: Vec<Float> = values.iter().map(|value| value.cos()).collect();
+
+        let mean_sin = self.measure_float_values(&sin_values, wing_indices.clone());
+        let mean_cos = self.measure_float_values(&cos_values, wing_indices);
+
+        mean_sin.iter().zip(&mean_cos).map(|(sin, cos)| sin.atan2(*cos)).collect()
+    }
+
     /// Returns the representative angle of attack for each wing
     pub fn measure_angles_of_attack(&self, simulation_result: &SimulationResult) -> Vec<Float> {
         self.measure_float_values(
@@ -201,7 +219,7 @@ impl SpanwiseMeasurement {
                 line_force_model
             );
     
-        self.measure_float_values(
+        self.measure_angle_values(
             &wind_directions, 
             simulation_result.wing_indices.clone()
         )
@@ -373,6 +391,30 @@ mod tests {
         let measured = measurement.measure_float_values(&values, model.wing_indices.clone());
 
         assert_eq!(measured, vec![30.0]);
+    }
+
+    #[test]
+    /// Angles on both sides of ±π, e.g., the apparent wind direction for a tail wind, are averaged
+    /// to ±π, and not to zero as an arithmetic mean would give
+    fn angles_are_averaged_across_pi() {
+        let model = model_with_wings(&[5]);
+
+        let measurement = build(-0.25, 0.25, &model);
+
+        let pi = stormath::consts::PI;
+        let delta = 0.02;
+        let values = vec![0.0, pi - delta, -pi + delta, pi - 0.5 * delta, 0.0];
+
+        let measured = measurement.measure_angle_values(&values, model.wing_indices.clone());
+
+        assert!(pi - measured[0].abs() < 0.01, "Measured angle: {}", measured[0]);
+
+        // Away from ±π, the result is close to the arithmetic mean
+        let values = vec![0.0, 0.1, 0.2, 0.3, 0.0];
+
+        let measured = measurement.measure_angle_values(&values, model.wing_indices.clone());
+
+        assert!((measured[0] - 0.2).abs() < 1e-3);
     }
 
     #[test]

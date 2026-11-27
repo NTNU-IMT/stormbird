@@ -86,12 +86,45 @@ impl Simulation {
         self.data.line_force_model.set_rotation_only(SpatialVector::from(rotation))
     }
 
-    pub fn set_velocity_linear(&mut self, linear_velocity: [f64; 3]) {
-        self.data.line_force_model.rigid_body_motion.velocity_linear = SpatialVector::from(linear_velocity);
+    #[pyo3(signature=(linear_velocity, *, in_body_fixed_frame))]
+    /// Sets the linear velocity of the sails directly, without changing the position.
+    ///
+    /// The velocity is given in the global coordinate system if `in_body_fixed_frame` is false, and
+    /// in the body fixed coordinate system, i.e., the coordinate system that follows the rotation
+    /// of the sails, if it is true, e.g., (u, v, w) from a ship simulator. A body fixed velocity is
+    /// converted to the global coordinate system, which is how the motion is stored, using the
+    /// *current* rotation. The rotation must therefore be set before the velocity.
+    pub fn set_velocity_linear(&mut self, linear_velocity: [f64; 3], in_body_fixed_frame: bool) {
+        let motion = &mut self.data.line_force_model.rigid_body_motion;
+
+        let velocity = SpatialVector::from(linear_velocity);
+
+        motion.velocity_linear = if in_body_fixed_frame {
+            motion.vector_from_body_fixed_to_global_coordinate_system(velocity)
+        } else {
+            velocity
+        };
     }
 
-    pub fn set_velocity_angular(&mut self, angular_velocity: [f64; 3]) {
-        self.data.line_force_model.rigid_body_motion.velocity_angular = SpatialVector::from(angular_velocity);
+    #[pyo3(signature=(angular_velocity, *, in_body_fixed_frame))]
+    /// Sets the angular velocity of the sails directly, without changing the orientation.
+    ///
+    /// The input is the angular velocity *vector*, not the time derivative of the rotation angles.
+    /// It is given in the global coordinate system if `in_body_fixed_frame` is false, and in the
+    /// body fixed coordinate system if it is true, e.g., (p, q, r) from a ship simulator. A body
+    /// fixed velocity is converted to the global coordinate system, which is how the motion is
+    /// stored, using the *current* rotation. The rotation must therefore be set before the
+    /// velocity.
+    pub fn set_velocity_angular(&mut self, angular_velocity: [f64; 3], in_body_fixed_frame: bool) {
+        let motion = &mut self.data.line_force_model.rigid_body_motion;
+
+        let velocity = SpatialVector::from(angular_velocity);
+
+        motion.velocity_angular = if in_body_fixed_frame {
+            motion.vector_from_body_fixed_to_global_coordinate_system(velocity)
+        } else {
+            velocity
+        };
     }
     
     pub fn reset_previous_circulation_strength(&mut self) {

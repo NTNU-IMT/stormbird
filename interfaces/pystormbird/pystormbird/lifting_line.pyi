@@ -25,8 +25,29 @@ class Simulation:
 
     def set_translation_only(self, translation: list[float]) -> None: ...
     def set_rotation_only(self, rotation: list[float]) -> None: ...
-    def set_velocity_linear(self, linear_velocity: list[float]) -> None: ...
-    def set_velocity_angular(self, angular_velocity: list[float]) -> None: ...
+    def set_velocity_linear(
+        self, linear_velocity: list[float], *, in_body_fixed_frame: bool
+    ) -> None:
+        """Sets the linear velocity of the sails, without changing the position.
+
+        The velocity is in the global coordinate system if `in_body_fixed_frame` is False, and in
+        the body fixed coordinate system if it is True, e.g., (u, v, w) from a ship simulator. A
+        body fixed velocity is converted with the *current* rotation, so set the rotation first.
+        """
+        ...
+
+    def set_velocity_angular(
+        self, angular_velocity: list[float], *, in_body_fixed_frame: bool
+    ) -> None:
+        """Sets the angular velocity vector of the sails, without changing the orientation.
+
+        This is the angular velocity vector, not the time derivative of the rotation angles. It is
+        in the global coordinate system if `in_body_fixed_frame` is False, and in the body fixed
+        coordinate system if it is True, e.g., (p, q, r) from a ship simulator. A body fixed
+        velocity is converted with the *current* rotation, so set the rotation first.
+        """
+        ...
+
     def reset_previous_circulation_strength(self) -> None: ...
     def set_local_wing_angles(self, local_wing_angles: list[float]) -> None: ...
     def internal_state(self) -> list[float]: ...

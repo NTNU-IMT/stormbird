@@ -16,6 +16,7 @@ use power_model::PowerModel;
 use logarithmic_model::LogarithmicModel;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Structure used to represent how the velocity magnitude might change as a function of height.
 pub enum VelocityVariation {
     /// Variant representing no variation. That is, constant velocity at all heights

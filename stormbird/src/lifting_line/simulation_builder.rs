@@ -154,7 +154,7 @@ impl SimulationBuilder {
             }
         };
 
-        let frozen_wake = FrozenWake::initialize(nr_of_lines);
+        let frozen_wake = FrozenWake::initialize(line_force_model.wing_indices.clone());
 
         let solver = match &self.simulation_settings {
             SimulationSettings::Dynamic(settings) => {

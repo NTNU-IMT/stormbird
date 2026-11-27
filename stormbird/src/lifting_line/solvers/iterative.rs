@@ -12,11 +12,12 @@ use stormath::type_aliases::Float;
 use crate::line_force_model::prelude::*;
 use crate::common_utils::prelude::*;
 use crate::lifting_line::wake::prelude::*;
-use super::velocity_corrections::VelocityCorrections;
+use super::velocity_corrections::InducedVelocitySettings;
 
 use super::linearized::{Linearized, InducedVelocityCorrectionMethod};
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// The variable that is updated in each iteration of the iterative solver
 pub enum VariableToUpdate {
     /// The circulation strength is updated directly, with damping
@@ -45,9 +46,9 @@ pub struct QuasiSteadyIterativeBuilder {
     /// The solver stops when the maximum change in the circulation strength is below this value
     #[serde(default="Iterative::default_strength_difference_tolerance")]
     pub strength_difference_tolerance: Float,
-    /// Optional empirical corrections of the velocity
+    /// How the induced velocities are used, including optional empirical corrections
     #[serde(default)]
-    pub velocity_corrections: VelocityCorrections,
+    pub induced_velocities: InducedVelocitySettings,
     /// If true, the iterations start from the solution of the linearized solver
     #[serde(default)]
     pub start_with_linearized_solution: bool,
@@ -74,7 +75,7 @@ impl QuasiSteadyIterativeBuilder {
             damping_factor: self.damping_factor,
             residual_tolerance_absolute: self.residual_tolerance_absolute,
             strength_difference_tolerance: self.strength_difference_tolerance,
-            velocity_corrections: self.velocity_corrections.clone(),
+            induced_velocities: self.induced_velocities.clone(),
             use_raw_circulation_during_iterations: false,
             start_with_linearized_solution: self.start_with_linearized_solution,
             correction_factor_initial_solution: self.correction_factor_initial_solution,
@@ -100,9 +101,9 @@ pub struct Iterative {
     /// The solver stops when the maximum change in the circulation strength is below this value
     #[serde(default="Iterative::default_strength_difference_tolerance")]
     pub strength_difference_tolerance: Float,
-    /// Optional empirical corrections of the velocity
+    /// How the induced velocities are used, including optional empirical corrections
     #[serde(default)]
-    pub velocity_corrections: VelocityCorrections,
+    pub induced_velocities: InducedVelocitySettings,
     /// If true, the circulation corrections in the line force model are not applied during the
     /// iterations
     #[serde(default="Iterative::default_use_raw_circulation_during_iterations")]
@@ -357,9 +358,16 @@ impl Iterative {
 
         if self.start_with_linearized_solution {
             // The full correction gives the same initial solution as in earlier versions, which
-            // models tuned with the iterative solver depend on
+            // models tuned with the iterative solver depend on. The corrections of the velocities
+            // are not used for the initial solution, but the self-induced velocities are neglected
+            // if they are neglected in the iterations.
             let linearized_solver = Linearized {
                 induced_velocity_correction_method: InducedVelocityCorrectionMethod::FullCorrection,
+                induced_velocities: InducedVelocitySettings {
+                    neglect_self_induced_velocities:
+                        self.induced_velocities.neglect_self_induced_velocities,
+                    ..Default::default()
+                },
                 ..Default::default()
             };
 
@@ -383,34 +391,19 @@ impl Iterative {
         frozen_wake: &mut FrozenWake,
         circulation_strength: &[Float],
     ) -> Vec<SpatialVector> {
-        let nr_ctrl_points = line_force_model.nr_span_lines();
-        
-        let mut ctrl_points_velocity = vec![SpatialVector::default(); nr_ctrl_points];
-
         frozen_wake.update_induced_velocities_at_control_points(
             circulation_strength
         );
 
-        let corrected_velocity = self.velocity_corrections.corrected_velocity(
+        let ctrl_points_velocity = self.induced_velocities.ctrl_points_velocity(
             felt_ctrl_points_freestream,
             &frozen_wake.induced_velocities_at_control_points
         );
 
-        if let Some(velocity) = corrected_velocity {
-            ctrl_points_velocity = velocity
-        } else {
-            for i in 0..nr_ctrl_points {
-                ctrl_points_velocity[i] = felt_ctrl_points_freestream[i] +
-                    frozen_wake.induced_velocities_at_control_points[i];
-            }
-        }
-
-        ctrl_points_velocity = line_force_model.remove_span_velocity(
+        line_force_model.remove_span_velocity(
             &ctrl_points_velocity,
             CoordinateSystem::Global
-        );
-
-        ctrl_points_velocity
+        )
     }
 
     
@@ -423,7 +416,7 @@ impl Default for Iterative {
             damping_factor: Iterative::default_damping_factor(),
             residual_tolerance_absolute: Iterative::default_residual_tolerance_absolute(),
             strength_difference_tolerance: Iterative::default_strength_difference_tolerance(),
-            velocity_corrections: VelocityCorrections::default(),
+            induced_velocities: InducedVelocitySettings::default(),
             use_raw_circulation_during_iterations: Iterative::default_use_raw_circulation_during_iterations(),
             start_with_linearized_solution: false,
             correction_factor_initial_solution: Iterative::default_one(),
@@ -439,7 +432,7 @@ impl Default for QuasiSteadyIterativeBuilder {
             damping_factor: QuasiSteadyIterativeBuilder::default_damping_factor(),
             residual_tolerance_absolute: Iterative::default_residual_tolerance_absolute(),
             strength_difference_tolerance: Iterative::default_strength_difference_tolerance(),
-            velocity_corrections: VelocityCorrections::default(),
+            induced_velocities: InducedVelocitySettings::default(),
             start_with_linearized_solution: false,
             correction_factor_initial_solution: QuasiSteadyIterativeBuilder::default_one(),
             variable_to_update: VariableToUpdate::default()

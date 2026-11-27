@@ -256,6 +256,9 @@ struct FieldBindGroups {
     ghost_cells: Vec<(wgpu::BindGroup, [u32; 3])>,
 }
 
+/// The number of sets of cells that the buffers for exchanging data are kept for
+const MAX_NR_CELL_SAMPLINGS: usize = 2;
+
 /// Buffers for exchanging data with the actuator line model, for a specific set of cells
 struct CellSampling {
     cell_indices: Vec<usize>,
@@ -313,8 +316,12 @@ pub struct VelocitySolverGPU {
     limit_velocity_bind_groups: Option<[wgpu::BindGroup; 2]>,
     max_velocity_workgroups: [u32; 3],
 
-    /// Created on the first request for data at a set of cells, and recreated if the cells change
-    cell_sampling: Option<CellSampling>,
+    /// Created on the first request for data at a set of cells, and recreated if the cells change.
+    /// Up to `MAX_NR_CELL_SAMPLINGS` sets of cells are kept, with the most recently used last, so
+    /// that the cells of the actuator line, which are used in every time step, are not recreated
+    /// when the velocity is also sampled at other cells, e.g., at the wake points of the lifting
+    /// line correction.
+    cell_samplings: Vec<CellSampling>,
 }
 
 impl VelocitySolverGPU {
@@ -553,7 +560,7 @@ impl VelocitySolverGPU {
             limited_values_counter_buffer,
             limit_velocity_bind_groups,
             max_velocity_workgroups: dispatch_reduce(nr_extended_cells),
-            cell_sampling: None,
+            cell_samplings: Vec::new(),
             context,
         }
     }
@@ -677,7 +684,7 @@ impl VelocitySolverGPU {
 
         self.prepare_cell_sampling(cell_indices);
 
-        let cell_sampling = self.cell_sampling.as_ref().unwrap();
+        let cell_sampling = self.cell_samplings.last().unwrap();
 
         let mut encoder = self.create_encoder();
 
@@ -707,7 +714,7 @@ impl VelocitySolverGPU {
 
         self.prepare_cell_sampling(cell_indices);
 
-        let cell_sampling = self.cell_sampling.as_ref().unwrap();
+        let cell_sampling = self.cell_samplings.last().unwrap();
 
         self.context.write_buffer(
             &cell_sampling.cell_values_buffer,
@@ -834,11 +841,16 @@ impl VelocitySolverGPU {
         }
     }
 
-    /// Makes sure `self.cell_sampling` matches `cell_indices`. The buffers are only recreated if
-    /// the cells change, which normally never happens after the first time step.
+    /// Makes sure that the last element in `self.cell_samplings` matches `cell_indices`. The
+    /// buffers are only created if the cells are not among the last `MAX_NR_CELL_SAMPLINGS` sets of
+    /// cells that were used.
     fn prepare_cell_sampling(&mut self, cell_indices: &[usize]) {
-        if let Some(cell_sampling) = &self.cell_sampling &&
-            cell_sampling.cell_indices == cell_indices {
+        if let Some(position) = self.cell_samplings.iter()
+            .position(|cell_sampling| cell_sampling.cell_indices == cell_indices) {
+            let cell_sampling = self.cell_samplings.remove(position);
+
+            self.cell_samplings.push(cell_sampling);
+
             return;
         }
 
@@ -859,13 +871,19 @@ impl VelocitySolverGPU {
             &cell_values_buffer
         ];
 
-        self.cell_sampling = Some(CellSampling {
+        let cell_sampling = CellSampling {
             cell_indices: cell_indices.to_vec(),
             gather_bind_group: self.kernels.gather_cells.bind_group(&self.context, &buffers),
             scatter_bind_group: self.kernels.scatter_cells.bind_group(&self.context, &buffers),
             cell_values_buffer,
             workgroups: dispatch_1d(cell_indices.len()),
-        });
+        };
+
+        if self.cell_samplings.len() == MAX_NR_CELL_SAMPLINGS {
+            self.cell_samplings.remove(0);
+        }
+
+        self.cell_samplings.push(cell_sampling);
     }
 }
 

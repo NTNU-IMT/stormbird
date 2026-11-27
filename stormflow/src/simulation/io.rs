@@ -3,6 +3,8 @@ use super::Simulation;
 use stormath::type_aliases::Float;
 use stormath::spatial_vector::SpatialVector;
 
+use crate::error::Error;
+
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
@@ -321,6 +323,30 @@ impl Simulation {
         }
 
         if binary { writeln!(w).unwrap(); }
+    }
+
+    /// The wake of the lifting line correction in the actuator line model as a legacy VTK
+    /// PolyData buffer, see `stormbird::actuator_line::ActuatorLine::correction_wake_as_vtk`. None
+    /// if there is no actuator line model, no lifting line correction, or no wake with panels to
+    /// export, or before the first time step of the actuator line model.
+    pub fn correction_wake_as_vtk(&self, binary: bool) -> Option<Vec<u8>> {
+        self.actuator_line.as_ref()?.model.correction_wake_as_vtk(binary)
+    }
+
+    /// Exports the wake of the lifting line correction to a VTK legacy file, see
+    /// [`Simulation::correction_wake_as_vtk`]. Returns false, without writing a file, if there is
+    /// no wake to export.
+    ///
+    /// # Errors
+    /// If the file can not be written.
+    pub fn export_correction_wake_as_vtk(&self, file_path: &str, binary: bool) -> Result<bool, Error> {
+        let Some(content) = self.correction_wake_as_vtk(binary) else {
+            return Ok(false);
+        };
+
+        std::fs::write(file_path, content)?;
+
+        Ok(true)
     }
 
     /// Export the current simulation fields to a VTK legacy file.

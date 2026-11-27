@@ -184,3 +184,33 @@ fn lift_slope_reduction_with_zero_range() {
     assert!((cl_model - cl_expected).abs() < 1e-12);
     assert!(cl_model.is_finite());
 }
+
+#[test]
+/// A stall range of zero, or less, gives a sudden stall, i.e., the amount of stall is a step
+/// function of the angle of attack, which is 0.5 exactly at the mean stall angle. Before, the
+/// amount of stall was NaN exactly at the stall angle.
+fn stall_with_zero_range_is_a_step() {
+    let stall_angle = Float::to_radians(15.0);
+
+    for stall_range in [0.0, -0.1] {
+        let foil = Foil {
+            mean_positive_stall_angle: stall_angle,
+            mean_negative_stall_angle: stall_angle,
+            stall_range,
+            ..Default::default()
+        };
+
+        for sign in [1.0, -1.0] {
+            assert_eq!(foil.amount_of_stall(sign * (stall_angle - 1e-6)), 0.0);
+            assert_eq!(foil.amount_of_stall(sign * stall_angle), 0.5);
+            assert_eq!(foil.amount_of_stall(sign * (stall_angle + 1e-6)), 1.0);
+        }
+
+        let (cl_pre, cl_post) = foil.lift_coefficients_pre_and_post_stall(
+            stall_angle, foil.amount_of_stall(stall_angle)
+        );
+
+        assert!(cl_pre.is_finite() && cl_post.is_finite(), "{} {}", cl_pre, cl_post);
+        assert!(foil.drag_coefficient(stall_angle).is_finite());
+    }
+}

@@ -14,6 +14,7 @@ use std::str::FromStr;
 use crate::error::Error;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Number of points in the smoothing window
 pub enum WindowSize {
     /// Five points

@@ -18,6 +18,7 @@ from enum import Enum
 import numpy as np
 from stormbird_setup.actuator_line import (
     ActuatorLineBuilder,
+    DynamicCorrectionWakeBuilder,
     Gaussian,
     LiftingLineCorrectionBuilder,
     ProjectionSettings,
@@ -28,12 +29,6 @@ from stormbird_setup.actuator_line import (
     TipLossCorrection,
 )
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
-from stormbird_setup.controller import (
-    ControllerBuilder,
-    ControllerSetPoints,
-    InternalStateSetPointType,
-)
-from stormbird_setup.input_power import InputPowerDataType, InputPowerModel
 from stormbird_setup.line_force_model import (
     ForceCorrection,
     LineForceModelBuilder,
@@ -43,6 +38,8 @@ from stormbird_setup.section_models import RotatingCylinder, SectionModel
 from stormbird_setup.spatial_vector import SpatialVector
 from stormbird_setup.utils import revolutions_per_second_from_spin_ratio
 from stormbird_setup.wind import WindCondition
+
+from stormbird_setup.stormflow import GeometryBuilder, Disk, Cuboid
 
 # The experiments are done in model scale, but the simulations are run in full scale. All dimensions
 # of the rotor and the wind tunnel are scaled with the same factor.
@@ -56,6 +53,8 @@ MODEL_SCALE_TUNNEL_HEIGHT = 3.0
 
 DIAMETER = 5.0
 SCALE_FACTOR = DIAMETER / MODEL_SCALE_DIAMETER
+
+END_DISK_FACTOR = 1.75
 
 HEIGHT = MODEL_SCALE_HEIGHT * SCALE_FACTOR
 ASPECT_RATIO = HEIGHT/DIAMETER
@@ -77,6 +76,16 @@ LIFT_SLOPE = 2.75
 # velocity. Stabilizes the simulations, and avoids a too large correction at the ends of the rotor.
 MAX_CORRECTION_RATIO = 2.0
 
+# Settings for the dynamic wake in the lifting line correction, used in the variant
+# ProjectedTipLossAndDynamicLiftingLine. A new row of panels is shed in each time step, so the wake
+# is approximately the number of panels times the velocity times the time step long. With the
+# Courant number and the resolution below, this is roughly 5-6 diameters with 100 panels, which
+# reaches past the interfering rotor in the two rotor case. The reference core length grows to the
+# projection width over the evolution length, so that the tip vortices from one rotor do not give a
+# singular correction at the other rotor.
+DYNAMIC_WAKE_NR_PANELS = 400
+DYNAMIC_WAKE_REFERENCE_CORE_EVOLUTION_LENGTH_FACTOR = None
+
 # Both solvers are incompressible, with the pressure divided by the density. The projected forces
 # are not divided by the density, so it must be one in the line force model.
 DENSITY = 1.0
@@ -92,6 +101,9 @@ COURANT_NUMBER = 0.75
 
 # Grid resolution at the rotor, used by both solvers. The chord length is the diameter.
 CELLS_PER_CHORD_LENGTH = 10
+PROJECTION_WIDTH_FACTOR = 0.6
+TIP_LOSS_EXP_FACTOR = 16
+TIP_LOSS_EXP_FACTOR_END_DISK = 16
 
 # Default settings for the mesh convergence tests. The resolutions are run from the lowest to the
 # highest.
@@ -99,9 +111,6 @@ MESH_TEST_SPIN_RATIO = 3.0
 MESH_TEST_CELLS_PER_CHORD_LENGTH = [4, 6, 8, 10]
 
 SPIN_RATIOS = np.arange(0.5, 4.01, 0.5).tolist()
-
-# The rotor speed is increased linearly from zero over this time, to get a smooth start
-SPIN_UP_TIME = 5.0
 
 END_TIME = 40.0
 
@@ -114,6 +123,8 @@ AVERAGING_TIME = 10.0
 TWO_ROTORS_SPIN_RATIO = 2.5
 TWO_ROTORS_SPACING = 4.0 * DIAMETER
 
+
+
 class Variant(Enum):
     '''
     Variants of the actuator line model, with different combinations of the lifting line
@@ -124,10 +135,14 @@ class Variant(Enum):
     TipLossAndLiftingLine = "tip_loss_and_lifting_line"
     TipLossAndLiftingLineAndAdditionalCDi = "tip_loss_and_lifting_line_and_additional_cdi"
     ProjectedTipLossAndLiftingLine = "projected_tip_loss_and_lifting_line"
+    ProjectedTipLossAndDynamicLiftingLine = "projected_tip_loss_and_dynamic_lifting_line"
+    EndDiskAndDynamicLiftingLine = "end_disk_and_dynamic_lifting_line"
 
     @property
     def label(self) -> str:
         match self:
+            case Variant.ProjectedTipLossAndDynamicLiftingLine:
+                return "projected tip loss and dynamic lifting line"
             case Variant.ProjectedTipLossAndLiftingLine:
                 return "projected tip loss and lifting line"
             case Variant.LiftingLine:
@@ -138,11 +153,13 @@ class Variant(Enum):
                 return "tip loss and lifting line"
             case Variant.TipLossAndLiftingLineAndAdditionalCDi:
                 return "tip loss and lifting line and additional CDi"
+            case Variant.EndDiskAndDynamicLiftingLine:
+                return "end disk and dynamic lifting line"
 
 # The recommended variant, used when no variant is given to the scripts
-DEFAULT_VARIANT = Variant.ProjectedTipLossAndLiftingLine
+DEFAULT_VARIANT = Variant.ProjectedTipLossAndDynamicLiftingLine
 
-TIP_LOSS_EXP_FACTOR = 16
+
 
 # Shorthand for all variants on the command line
 ALL_VARIANTS = "all"
@@ -245,42 +262,30 @@ def actuator_line_builder(
 
 
     for location in rotor_locations:
+        section_points=[
+            SpatialVector(x=location.x, y=location.y, z=FOUNDATION_HEIGHT),
+            SpatialVector(x=location.x, y=location.y, z=FOUNDATION_HEIGHT + HEIGHT)
+        ]
+        
         line_force_model.add_wing_builder(
             WingBuilder(
-                section_points=[
-                    SpatialVector(x=location.x, y=location.y, z=FOUNDATION_HEIGHT),
-                    SpatialVector(x=location.x, y=location.y, z=FOUNDATION_HEIGHT + HEIGHT)
-                ],
-                chord_vectors=[SpatialVector(x=DIAMETER), SpatialVector(x=DIAMETER)],
+                section_points=section_points,
+                chord_vectors=[SpatialVector(x=DIAMETER)] * len(section_points),
                 section_model=section_model(),
                 non_zero_circulation_at_ends=(True, True),
-                input_power_model=InputPowerModel(input_power_type=InputPowerDataType.NoPower),
                 force_correction = ForceCorrection(
                     lift_induced_drag_correction = lift_induced_drag_correction
                 )
             )
         )
 
-    # The internal state can not be given directly in the setup, so a controller with a constant set
-    # point is used. The set point is given directly as revolutions per second, computed from the
-    # freestream velocity, so that the spin ratio is defined in the same way as in the comparison
-    # data. The controller needs one set point for each rotor.
     revolutions_per_second = revolutions_per_second_from_spin_ratio(
         spin_ratio=spin_ratio,
         diameter=DIAMETER,
         velocity=VELOCITY
     )
 
-    set_points = ControllerSetPoints(
-        apparent_wind_directions_data=[-np.pi, np.pi],
-        internal_state_data=[revolutions_per_second, revolutions_per_second],
-        internal_state_set_point_type=InternalStateSetPointType.Wing,
-        wing_internal_state_max_change_rate=(
-            max(abs(revolutions_per_second), 1e-6) / SPIN_UP_TIME
-        ),
-    )
-
-    controller = ControllerBuilder(set_points=[set_points] * len(rotor_locations))
+    line_force_model.internal_states = [revolutions_per_second] * len(rotor_locations)
 
     match variant:
         case Variant.TipLossAndLiftingLine | Variant.TipLossAndLiftingLineAndAdditionalCDi:
@@ -305,6 +310,43 @@ def actuator_line_builder(
                 max_correction_ratio=MAX_CORRECTION_RATIO,
                 include_wing_interactions=False
             )
+        case Variant.ProjectedTipLossAndDynamicLiftingLine:
+            # Experimental. The same as ProjectedTipLossAndLiftingLine, but with a dynamic wake in
+            # the lifting line correction, where the shape follows the velocity in the CFD
+            # solver, and with the interactions between the rotors included in the correction.
+            tip_loss_correction = TipLossCorrection(
+                exp_factor = TIP_LOSS_EXP_FACTOR,
+                application = TipLossApplication.ProjectedForces
+            )
+            lifting_line_correction = LiftingLineCorrectionBuilder(
+                symmetry_condition=SymmetryCondition.Z,
+                max_correction_ratio=MAX_CORRECTION_RATIO,
+                include_wing_interactions=True,
+                wake=DynamicCorrectionWakeBuilder(
+                    nr_panels_per_line_element=DYNAMIC_WAKE_NR_PANELS,
+                    reference_core_evolution_length_factor=(
+                        DYNAMIC_WAKE_REFERENCE_CORE_EVOLUTION_LENGTH_FACTOR
+                    ),
+                    last_panel_relative_length = 1.0
+                ),
+            )
+        case Variant.EndDiskAndDynamicLiftingLine:
+            tip_loss_correction = TipLossCorrection(
+                exp_factor = TIP_LOSS_EXP_FACTOR_END_DISK,
+                application = TipLossApplication.ProjectedForces
+            )
+            lifting_line_correction = LiftingLineCorrectionBuilder(
+                symmetry_condition=SymmetryCondition.Z,
+                max_correction_ratio=MAX_CORRECTION_RATIO,
+                include_wing_interactions=True,
+                wake=DynamicCorrectionWakeBuilder(
+                    nr_panels_per_line_element=DYNAMIC_WAKE_NR_PANELS,
+                    reference_core_evolution_length_factor=(
+                        DYNAMIC_WAKE_REFERENCE_CORE_EVOLUTION_LENGTH_FACTOR
+                    ),
+                    last_panel_relative_length = 1.0
+                ),
+            )
         case Variant.LiftingLine:
             lifting_line_correction = LiftingLineCorrectionBuilder(
                 symmetry_condition=SymmetryCondition.Z,
@@ -319,17 +361,63 @@ def actuator_line_builder(
         line_force_model=line_force_model,
         projection_settings=ProjectionSettings(
             projection_function=Gaussian(
-                chord_factor=0.6,
-                thickness_factor=0.6
+                chord_factor=PROJECTION_WIDTH_FACTOR,
+                thickness_factor=PROJECTION_WIDTH_FACTOR
             ),
         ),
         solver_settings=SolverSettings(damping_factor=0.05),
         sampling_settings=SamplingSettings(remove_span_velocity=True),
         tip_loss_correction=tip_loss_correction,
         lifting_line_correction=lifting_line_correction,
-        controller=controller,
         write_iterations_full_result=100,
     )
+
+def slip_geometries(
+    variant: Variant,
+    rotor_locations: list[SpatialVector] | None = None
+) -> list[GeometryBuilder]:
+    if rotor_locations is None:
+        rotor_locations = [SpatialVector()]
+    
+    match variant:
+        case Variant.EndDiskAndDynamicLiftingLine:
+            out = []
+            for location in rotor_locations:
+                center = location.model_copy()
+                center.z += HEIGHT
+                thickness = 0.25 * DIAMETER
+                out.append(
+                    GeometryBuilder(
+                        geometry = Disk(
+                            center = center ,
+                            normal = SpatialVector(z=1.0),
+                            radius = END_DISK_FACTOR * DIAMETER,
+                            thickness = thickness
+                        )
+                    )
+                )
+
+                center_cuboid = location.model_copy()
+                center_cuboid.z = 0.0
+
+                half_extents = SpatialVector(
+                    x = 0.5 * DIAMETER,
+                    y = 0.5 * DIAMETER,
+                    z = FOUNDATION_HEIGHT
+                )
+                out.append(
+                    GeometryBuilder(
+                        geometry = Cuboid(
+                            center = center_cuboid,
+                            half_extents = half_extents
+                        )
+                    )
+                )
+
+            return out
+        case _:
+            return []
+        
 
 def force_coefficients(
     time: list[float],

@@ -280,8 +280,12 @@ impl WingBuilder {
             let segment_distance = specified_sections_span_distance[i+1] - 
                 specified_sections_span_distance[i];
             
+            // The small tolerance removes round-off errors before the rounding up, which otherwise
+            // could give one more section than requested, e.g., 30.0 / (30.0 / 13.0) = 13.000000000000002
+            let relative_nr_sections = segment_distance / ds_average;
+
             nr_sections_locally.push(
-                (segment_distance / ds_average).ceil() as usize
+                ((relative_nr_sections - 1e-4).ceil() as usize).max(1)
             );
 
             ds_locally.push(
@@ -418,6 +422,30 @@ mod tests {
 
     fn assert_invalid_input(result: Result<SingleWing, Error>) {
         assert!(matches!(result, Err(Error::InvalidInput(_))), "Expected an invalid input error");
+    }
+
+    #[test]
+    /// Round-off in the span distance divided by the average section length gave one section too
+    /// many for some combinations, e.g., a span of 30 with 13 sections
+    fn single_segment_gets_the_requested_number_of_sections() {
+        for span in [1.0, 3.0, 11.0, 12.5, 30.0, 47.3] {
+            for nr_sections in 1..=100 {
+                let wing_builder = WingBuilder {
+                    section_points: vec![
+                        SpatialVector::from([0.0, 0.0, 0.0]),
+                        SpatialVector::from([0.0, 0.0, span]),
+                    ],
+                    ..simple_wing_builder()
+                };
+
+                let single_wing = wing_builder.build(nr_sections).unwrap();
+
+                assert_eq!(
+                    single_wing.span_lines_local.len(), nr_sections,
+                    "Wrong number of sections for span {} and {} sections", span, nr_sections
+                );
+            }
+        }
     }
 
     #[test]

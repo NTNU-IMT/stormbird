@@ -90,4 +90,19 @@ class Simulation:
     def do_steps_until_end_time(self, end_time: float, courant_number: float) -> None: ...
     def export_fields_as_vtk(self, file_path: str, binary: bool) -> None: ...
     def fields_as_vtk(self, binary: bool) -> bytes: ...
+    def export_correction_wake_as_vtk(self, file_path: str, binary: bool) -> bool:
+        """
+        Writes the wake of the lifting line correction in the actuator line model to a VTK legacy
+        file, with the geometry, the strength and the core length of the panels, and the sampled
+        velocity at the points for the dynamic wake. Returns False, without writing a file, if
+        there is nothing to export: no lifting line correction, the straight wake, which has no
+        panels, or before the first time step of the actuator line model.
+        """
+        ...
+    def correction_wake_as_vtk(self, binary: bool) -> bytes | None:
+        """
+        The VTK legacy file content of the wake of the lifting line correction, see
+        export_correction_wake_as_vtk, or None if there is nothing to export.
+        """
+        ...
     def get_stormbird_simulation_result(self) -> SimulationResult | None: ...

@@ -16,8 +16,10 @@ use crate::line_force_model::span_line::SpanLine;
 /// Gaussian projection function, with separate widths in the chord, thickness and span directions
 pub struct Gaussian {
     /// Width in the chord direction, relative to the chord length
+    #[serde(default = "Gaussian::default_width_factor")]
     pub chord_factor: Float,
     /// Width in the thickness direction, relative to the chord length
+    #[serde(default = "Gaussian::default_width_factor")]
     pub thickness_factor: Float,
     /// Width of the Gaussian falloff of the force beyond the ends of the line elements where it is
     /// enabled, typically the ends of the wings, relative to the length of each line element. Zero
@@ -29,8 +31,8 @@ pub struct Gaussian {
 impl Default for Gaussian {
     fn default() -> Self {
         Self {
-            chord_factor: 0.4,
-            thickness_factor: 0.4,
+            chord_factor: Self::default_width_factor(),
+            thickness_factor: Self::default_width_factor(),
             span_falloff_factor: Self::default_span_falloff_factor(),
         }
     }
@@ -38,6 +40,7 @@ impl Default for Gaussian {
 
 impl Gaussian {
     fn default_span_falloff_factor() -> Float {0.0}
+    fn default_width_factor() -> Float {0.4}
 
     /// Computes the projection value at a given point in space.
     ///

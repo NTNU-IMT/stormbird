@@ -19,10 +19,14 @@ velocities, the wind profile, and whether the sail settings are fixed or set by 
 values of the fixed sail settings, i.e., the angles of attack and the internal state, are not part
 of the source, as they often vary with the wind direction. They are shown in the hover text and in
 the detailed view instead. A different controller setup should therefore be a different setup name.
+With the option combine_wind_velocities, the true wind velocity is not part of the source either,
+so that test conditions with different wind velocities are shown as one source. The wind velocity is
+then shown in the hover text.
 Each wing has its own color, the same in all figures. The simulations are shown as lines without
 markers in the overview and the detailed view, so that they are easy to tell apart from the reference
 values, which are shown as markers. In the overview, each source has its own line style, and
-marker style for the reference values. The cases in a
+marker style for the reference values. A source with only one case is shown as a short horizontal
+dash, as a line through a single point is not visible. The cases in a
 source are connected with lines, sorted by the apparent wind direction. Several cases with the same
 wind direction, e.g., with different angles of attack, are connected in the order of the angles of
 attack. The overview and the comparison have buttons to show either the force coefficients of each
@@ -136,7 +140,7 @@ The maximum width of the figures in the report, in pixels. The figures are cente
 _INITIAL_PLOT_WIDTH = REPORT_MAX_WIDTH - 400
 
 # Spacing between the subplots, as fractions of the plot area
-_OVERVIEW_SPACING = 0.05
+_OVERVIEW_SPACING = 0.08
 _COMPARISON_SPACING = 0.1
 _DETAILED_SPACING = (0.15, 0.09)
 
@@ -195,6 +199,11 @@ class ReportCase:
     """Spanwise "height", "circulation" and "aoa_deg" of each wing, from the last full result"""
     distribution_time: float
     references: list[ReportReference] = field(default_factory=list)
+    combine_wind_velocities: bool = False
+    """
+    If True, cases that only differ in the true wind velocity belong to the same source, see
+    source_key
+    """
 
     @property
     def true_wind_direction_deg(self) -> float:
@@ -207,14 +216,15 @@ class ReportCase:
     def source_key(self) -> tuple[Any, ...]:
         '''
         The case name without the true wind direction and the values of the fixed sail settings,
-        see the module documentation
+        see the module documentation. The true wind velocity is also left out, i.e., None, if
+        combine_wind_velocities is True.
         '''
         condition = self.condition
 
         return (
             self.setup_name,
             self.solver,
-            condition.true_wind_velocity,
+            None if self.combine_wind_velocities else condition.true_wind_velocity,
             condition.ship_velocity,
             condition.wind_profile,
             condition.angle_of_attack is not None,
@@ -255,7 +265,8 @@ def _source_sort_key(source: tuple[Any, ...]) -> tuple[Any, ...]:
     return (
         setup_name or "",
         list(CfdSolver).index(solver),
-        true_wind_velocity,
+        # None when the wind velocities are combined, see ReportCase.source_key
+        -1.0 if true_wind_velocity is None else true_wind_velocity,
         ship_velocity,
         list(WindProfile).index(wind_profile),
         fixed,
@@ -295,6 +306,22 @@ def _source_labels(sources: list[tuple[Any, ...]]) -> dict[tuple[Any, ...], str]
         labels[source] = ", ".join(parts)
 
     return labels
+
+
+def _simulation_line_mode(nr_points: int, color: str) -> dict[str, Any]:
+    '''
+    The mode and marker of a simulation trace in the overview. The simulations are shown as lines,
+    so that they are easy to tell apart from the reference values, which are markers. A line through
+    a single point is not visible, so a source with only one case is shown as a short horizontal
+    dash instead, which is not one of the marker symbols of the reference values.
+    '''
+    if nr_points > 1:
+        return {"mode": "lines"}
+
+    return {
+        "mode": "markers",
+        "marker": dict(symbol="line-ew-open", size=16, line=dict(color=color, width=3)),
+    }
 
 
 def _wrap_angle(angle: float) -> float:
@@ -599,11 +626,16 @@ def read_report_cases(
     results_folder: Path | str,
     averaging_fraction: float = DEFAULT_AVERAGING_FRACTION,
     reference_files: list[Path | str] | None = None,
+    combine_wind_velocities: bool = False,
 ) -> list[ReportCase]:
     '''
     All cases in the results folder that can be used in the report, sorted by source and then by
     apparent wind direction, with the matching reference values. The reference data is read from
     the given files, or, if not given, from the reference files in the results folder.
+
+    By default, cases with different true wind velocities belong to different sources, i.e., they
+    are shown as separate lines in the overview. With combine_wind_velocities, they belong to the
+    same source, e.g., when each test condition has its own wind velocity.
     '''
     result_files = [
         file_path for file_path in sorted(Path(results_folder).glob("*.json"))
@@ -615,6 +647,9 @@ def read_report_cases(
         for file_path in result_files
         if (case := read_report_case(file_path, averaging_fraction)) is not None
     ]
+
+    for case in cases:
+        case.combine_wind_velocities = combine_wind_velocities
 
     if reference_files is None:
         reference_files = list(reference_files_in_folder(results_folder))
@@ -683,6 +718,10 @@ def _case_label(case: ReportCase, source_labels: dict[tuple[Any, ...], str]) -> 
         source_labels[case.source_key()],
         f"TWD {case.true_wind_direction_deg:.0f} deg (AWD {case.apparent_wind_direction_deg:.1f} deg)",
     ]
+
+    # The wind velocity is not part of the source label when the wind velocities are combined
+    if case.combine_wind_velocities:
+        parts.append(f"TWV {case.condition.true_wind_velocity:.2f} m/s")
 
     sail_settings = case.sail_settings_text()
 
@@ -878,14 +917,13 @@ def make_overview_figure(
                     go.Scatter(
                         x=[case.apparent_wind_direction_deg for case in wing_cases],
                         y=y,
-                        # Lines only, so that the markers are the reference values
-                        mode="lines",
                         name=name,
                         # One legend entry per wing and source, which toggles it in all rows
                         legendgroup=name,
                         showlegend=(row == 1),
                         line=dict(color=color, dash=dash),
                         text=hover_text(wing_cases),
+                        **_simulation_line_mode(len(wing_cases), color),
                     ),
                     row, wing_level=True
                 )
@@ -919,12 +957,12 @@ def make_overview_figure(
                 go.Scatter(
                     x=x,
                     y=[case.total_mean[key] for case in source_cases],
-                    mode="lines",
                     name=total_name,
                     legendgroup=total_name,
                     showlegend=(row == 1),
                     line=dict(color=_TOTAL_COLOR, dash=dash, width=3),
                     text=hover_text(source_cases),
+                    **_simulation_line_mode(len(source_cases), _TOTAL_COLOR),
                 ),
                 row, total=True
             )
@@ -950,10 +988,14 @@ def make_overview_figure(
     figure.update_yaxes(title_text="C_T [-]", row=1, col=1)
     figure.update_yaxes(title_text="C_S [-]", row=2, col=1)
     figure.update_yaxes(title_text="Angle of attack [deg]", row=3, col=1)
-    figure.update_xaxes(
-        title_text="Apparent wind direction at mid-span [deg] (0 = head wind, + from starboard)",
-        row=3, col=1
-    )
+    # The x-axis is shown on all the subplots, even though it is shared, so that the values can be
+    # read without scrolling down to the bottom subplot
+    for row in (1, 2, 3):
+        figure.update_xaxes(
+            title_text="Apparent wind direction at mid-span [deg] (0 = head wind, + from starboard)",
+            showticklabels=True,
+            row=row, col=1
+        )
 
     if len(sources) > 1:
         source_text = "Line style: " + ", ".join(
@@ -1346,6 +1388,7 @@ def sails_on_ship_report(
     output_file: Path | str | None = None,
     averaging_fraction: float = DEFAULT_AVERAGING_FRACTION,
     reference_files: list[Path | str] | None = None,
+    combine_wind_velocities: bool = False,
 ) -> Path:
     '''
     Writes an HTML report of all the result files in the results folder that follow the naming
@@ -1354,6 +1397,9 @@ def sails_on_ship_report(
     if not given, from the files in the results folder that end in REFERENCE_FILE_SUFFIX. The report
     is written to the output file, or to "sails_on_ship_report.html" in the results folder if not
     given. Returns the path of the report.
+
+    With combine_wind_velocities, cases that only differ in the true wind velocity are shown as one
+    source, i.e., connected with lines in the overview, see read_report_cases. False by default.
     '''
     results_folder = Path(results_folder)
 
@@ -1361,7 +1407,9 @@ def sails_on_ship_report(
         results_folder / DEFAULT_REPORT_FILE_NAME if output_file is None else Path(output_file)
     )
 
-    cases = read_report_cases(results_folder, averaging_fraction, reference_files)
+    cases = read_report_cases(
+        results_folder, averaging_fraction, reference_files, combine_wind_velocities
+    )
 
     if len(cases) == 0:
         raise ValueError(f"No result files for the report in {results_folder}")

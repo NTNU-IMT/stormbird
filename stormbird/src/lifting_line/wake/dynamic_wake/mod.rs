@@ -27,9 +27,16 @@ use settings::*;
 ///
 /// The induced velocities are calculated from vortex panels and their strengths.
 ///
-/// The wake points and panels are assumed to be organized as a structured surface where indices
-/// are streamwise-major. That means, the first panels right behind the wings are also the first
-/// panels in the vector of panels in the wake.
+/// The wake points and panels are organized as a structured surface, stored as rows in the
+/// streamwise direction. The stream index is the outer (slow) index and the span index is the inner
+/// (fast) index, so the flat index is `stream_index * nr_along_span + span_index` (see
+/// [`WakeIndices`]). Each row covers all wings, ordered as in the line force model. That means:
+/// - The first row, i.e., the first `nr_panels_along_span` panels, are the panels right behind
+///   the wings, which carry the circulation strength of the line elements.
+/// - The panels of a single wing are not one contiguous range, but one contiguous segment in each
+///   row.
+/// - Each wing has one more point along the span than panels, so the span index of the points of
+///   a panel is offset by the wing index.
 ///
 /// A typical use case is as follows:
 /// - For each time step, the points in the wake lying exactly on the wing lines are updated to
@@ -84,7 +91,7 @@ impl DynamicWake {
     ///
     /// The indices are ordered in a counter-clockwise manner. The first index is for the bottom
     /// left corner when viewing the panel from above.
-    fn panel_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
+    pub fn panel_point_indices(&self, panel_stream_index: usize, panel_span_index: usize) -> [usize; 4] {
         let wing_index = self.wing_index(panel_span_index);
 
         [

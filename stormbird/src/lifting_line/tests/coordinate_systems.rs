@@ -15,13 +15,28 @@ use super::test_setup::RectangularWing;
 
 use stormath::spatial_vector::transformations::RotationType;
 use stormath::type_aliases::Float;
+use crate::test_utils::tolerance;
 
 #[test]
 /// Test that checks whether the global and body coordinate systems give the same result.
 fn coordinate_systems() {
+    compare_coordinate_systems(Float::to_radians(2.0), false);
+}
+
+#[test]
+/// Same as [`coordinate_systems`], but with the wing far into stall, so that the viscous lift is
+/// a large part of the force. The viscous lift is computed as a separate force, which tests that
+/// its direction is computed in the same coordinate system as the velocity.
+fn coordinate_systems_in_stall() {
+    compare_coordinate_systems(Float::to_radians(60.0), true);
+}
+
+/// Runs the same wing with no motion, and with a translation and rotation where the output is
+/// given in the global and in the body fixed coordinate system, and checks that the forces,
+/// moments and felt velocities agree after transforming them to the same coordinate system.
+fn compare_coordinate_systems(angle_of_attack: Float, check_viscous_lift: bool) {
     let aspect_ratio = 5.0;
     let cl_zero_angle = 1.2;
-    let angle_of_attack = Float::to_radians(2.0);
 
     // Note: adding rotation in any other axis than the x-axis affects the angle of attack, and will 
     // therefore make the comparison between the "fixed" and "body" forces fail.
@@ -134,4 +149,96 @@ fn coordinate_systems() {
     assert!(moment_error_body < 1.0e-4, "moment_error_body: {}", moment_error_body);
     assert!(force_error_global < 1.0e-4, "force_error_global: {}", force_error_global);
     assert!(moment_error_global < 1.0e-4, "moment_error_global: {}", moment_error_global);
+
+    if check_viscous_lift {
+        let viscous_lift_fixed = result_fixed.integrated_forces[0].viscous_lift;
+
+        assert!(
+            viscous_lift_fixed.length() > 0.1 * forces_fixed.length(),
+            "The viscous lift should be a significant part of the force in stall: {:?}, total {:?}",
+            viscous_lift_fixed, forces_fixed
+        );
+    }
+
+    // The felt velocity minus the rotational motion is always returned in the global coordinate
+    // system, as it is used together with the global geometry, e.g., in the measurements of the
+    // apparent wind direction for the controller.
+    let felt_velocity_global = result_global.felt_velocity_minus_rotational_motion();
+    let felt_velocity_body = result_body.felt_velocity_minus_rotational_motion();
+
+    for i in 0..felt_velocity_global.len() {
+        let difference = (felt_velocity_global[i] - felt_velocity_body[i]).length();
+
+        assert!(
+            difference < 1.0e-6 * felt_velocity_global[i].length(),
+            "Felt velocity at control point {}: global {:?}, body {:?}",
+            i, felt_velocity_global[i], felt_velocity_body[i]
+        );
+    }
+}
+#[test]
+/// The residual, and therefore the convergence of the iterative solver, should not depend on the
+/// coordinate system of the output. A pitch rotation is used, which changes the angle between the
+/// global velocity and the body fixed span lines.
+fn the_residual_is_independent_of_the_output_coordinate_system() {
+    use crate::lifting_line::solvers::QuasiSteadySolverBuilder;
+    use crate::lifting_line::solvers::iterative::QuasiSteadyIterativeBuilder;
+
+    let rotation = SpatialVector::from([0.0, Float::to_radians(30.0), 0.0]);
+
+    let results: Vec<SimulationResult> = [CoordinateSystem::Global, CoordinateSystem::Body].iter()
+        .map(|&coordinate_system| {
+            let mut builder = RectangularWing {
+                aspect_ratio: 5.0,
+                cl_zero_angle: 0.0,
+                angle_of_attack: Float::to_radians(5.0),
+                nr_strips: 32,
+                ..Default::default()
+            }.build();
+
+            builder.rotation = rotation;
+            builder.output_coordinate_system = coordinate_system;
+
+            let settings = QuasiSteadySettings {
+                solver: QuasiSteadySolverBuilder::Iterative(QuasiSteadyIterativeBuilder::default()),
+                ..Default::default()
+            };
+
+            let mut simulation = SimulationBuilder::new(
+                builder,
+                SimulationSettings::QuasiSteady(settings)
+            ).build().unwrap();
+
+            let freestream = vec![
+                SpatialVector::from([10.0, 0.0, 0.0]);
+                simulation.get_freestream_velocity_points().len()
+            ];
+
+            let mut result = simulation.do_step(0.0, 0.1, &freestream);
+
+            for _ in 0..5 {
+                result = simulation.do_step(0.0, 0.1, &freestream);
+            }
+
+            result
+        }).collect();
+
+    let (global, body) = (&results[0], &results[1]);
+
+    assert!(
+        (global.residual - body.residual).abs() < tolerance(1e-9, 1e-6) + 1e-6 * global.residual,
+        "residual: global {}, body {}", global.residual, body.residual
+    );
+
+    assert_eq!(global.iterations, body.iterations);
+
+    let force_global_in_body = global.integrated_forces_sum().in_rotated_coordinate_system(
+        rotation, RotationType::XYZ
+    );
+    let force_body = body.integrated_forces_sum();
+
+    assert!(
+        (force_global_in_body - force_body).length() < tolerance(1e-9, 1e-6) * force_body.length(),
+        "force: global (in body axes) {:?}, body {:?}", force_global_in_body, force_body
+    );
 }

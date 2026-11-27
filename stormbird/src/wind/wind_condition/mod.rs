@@ -19,6 +19,7 @@ use velocity_variation::VelocityVariation;
 use discretized_spectrum::DiscretizedSpectrum;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// The wind condition defines the true wind parameters for a given instance. This includes:
 /// - The direction of the true wind
 /// - How the velocity varies with height

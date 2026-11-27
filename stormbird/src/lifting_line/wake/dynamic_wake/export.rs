@@ -170,6 +170,7 @@ impl DynamicWake {
                 ("strength", self.strengths.clone()),
                 ("viscous_core_length", self.panels_viscous_core_length.clone()),
             ],
+            &[],
             binary
         )
     }

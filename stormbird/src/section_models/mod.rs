@@ -101,6 +101,7 @@ pub fn integrate_power_coefficient(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Sectional model for a wing, that can be of multiple variants
 pub enum SectionModel {
     /// A single-element foil with fixed properties

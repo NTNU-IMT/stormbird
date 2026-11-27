@@ -24,6 +24,7 @@ use super::{
         WakeSettings,
         FirstWakePointsDirection,
         WakeIndices,
+        points_with_induced_velocities,
     },
 };
 
@@ -56,6 +57,16 @@ pub enum ViscousCoreLengthEvolution {
     SinIncrease(SinIncreasedViscousCoreLength)
 }
 
+impl ViscousCoreLengthEvolution {
+    /// The blending factor between the first and the last viscous core length in the
+    /// `SinIncrease` evolution, as a function of the relative position along the evolution length.
+    /// The factor follows a quarter of a sine period, from zero at the start to one at the end of
+    /// the evolution length, and is one after that.
+    pub fn sin_increase_factor(relative_position: Float) -> Float {
+        (0.5 * PI * relative_position.clamp(0.0, 1.0)).sin()
+    }
+}
+
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,10 +83,10 @@ pub struct DynamicWakeBuilder {
     /// How the viscous core length should evolve behind the wake.
     pub viscous_core_length_evolution: ViscousCoreLengthEvolution,
     #[serde(default="DynamicWakeBuilder::default_first_panel_relative_length")]
-    /// Length of the first panel in the wake, relative to the chord length
+    /// Length of the first panel in the wake, relative to the average chord length
     pub first_panel_relative_length: Float,
     #[serde(default="DynamicWakeBuilder::default_last_panel_relative_length")]
-    /// Factor used to calculate the length of the final panel, relative to the chord length.
+    /// Factor used to calculate the length of the final panel, relative to the average chord length.
     pub last_panel_relative_length: Float,
     #[serde(default)]
     /// Determines which direction to use for the first wake panels, right behind the wings
@@ -98,19 +109,10 @@ pub struct DynamicWakeBuilder {
     /// freely), while a value of 1.0 means that the wake points are fixed in space.
     pub shape_damping_factor: Float,
     #[serde(default)]
-    /// Option to neglect the induced velocities on a wing from the wake of the same wing. This is
-    /// useful if the effect of self-induced velocities on lift and drag is calculated in another
-    /// way, for example with CFD, and the only reason for running lifting-line simulations is to
-    /// calculate the wing-to-wing interaction.
-    ///
-    /// **WARNING**: should probably always be used in combination with a prescribed circulation
-    /// shape in the line force model to maintain a realistic local shape.
-    pub neglect_self_induced_velocities: bool,
-    #[serde(default)]
     /// Switch to set the strength update to be "steady-state"
     pub steady_state_strength_update: bool,
     #[serde(default="DynamicWakeBuilder::default_initial_relative_wake_length")]
-    /// Length of wake during initialization, relative to the chord length
+    /// Length of wake during initialization, relative to the average chord length
     pub initial_relative_wake_length: Float,
 }
 
@@ -167,22 +169,18 @@ impl DynamicWakeBuilder {
             }
         }
 
-        // The number of points in the streamwise direction that are affected by induced velocities
-        let ui_affected_stream_index = (self.ratio_of_wake_affected_by_induced_velocities.min(1.0) * 
-            (indices.nr_points_per_line_element - 1) as Float).ceil() as usize;
-
-        let end_index_induced_velocities_on_wake = indices.point_index(
-            ui_affected_stream_index, 
-            indices.nr_points_along_span - 1 
+        let points_with_induced_velocities = points_with_induced_velocities(
+            &indices,
+            self.ratio_of_wake_affected_by_induced_velocities,
+            self.first_wake_points_direction
         );
 
         let settings = WakeSettings {
             first_panel_relative_length: self.first_panel_relative_length,
             last_panel_relative_length: self.last_panel_relative_length,
             first_wake_points_direction: self.first_wake_points_direction,
-            end_index_induced_velocities_on_wake,
+            points_with_induced_velocities,
             shape_damping_factor: self.shape_damping_factor,
-            neglect_self_induced_velocities: self.neglect_self_induced_velocities,
             steady_state_strength_update: self.steady_state_strength_update,
         };
 
@@ -271,15 +269,15 @@ impl DynamicWakeBuilder {
 
                         let length_before_last_value_is_used = (wake_indices.nr_panels_per_line_element - 1) as Float * evolution_settings.evolution_length_factor;
 
-                        // Converts to [0, 1]
                         let relative_stream_value = if length_before_last_value_is_used == 0.0 {
                             1.0
                         } else {
-                            (i_stream as Float / length_before_last_value_is_used).clamp(0.0, 1.0)
+                            i_stream as Float / length_before_last_value_is_used
                         };
 
-                        let sin_input = 0.5 * relative_stream_value * PI; // Converts to [0, PI/2]
-                        let sin_factor = sin_input.sin(); // Converts to [0, 1]
+                        let sin_factor = ViscousCoreLengthEvolution::sin_increase_factor(
+                            relative_stream_value
+                        );
 
                         viscous_core_length_raw * (1.0 - sin_factor) +
                         final_viscous_core_length * sin_factor
@@ -327,7 +325,6 @@ impl Default for DynamicWakeBuilder {
             ratio_of_wake_affected_by_induced_velocities: Default::default(),
             far_field_ratio: PotentialTheorySettings::default_far_field_ratio(),
             shape_damping_factor: 0.0,
-            neglect_self_induced_velocities: false,
             steady_state_strength_update: false,
             initial_relative_wake_length: Self::default_initial_relative_wake_length(),
         }

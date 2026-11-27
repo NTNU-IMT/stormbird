@@ -173,6 +173,7 @@ impl QuasiSteadyWake {
                 ("strength", self.strengths.clone()),
                 ("viscous_core_length", viscous_core_lengths),
             ],
+            &[],
             binary
         )
     }

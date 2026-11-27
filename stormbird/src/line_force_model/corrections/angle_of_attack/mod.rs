@@ -5,6 +5,7 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[derive(Default)]
 /// Optional correction of the angles of attack on the line elements. At the moment, the only
 /// option is no correction. The enum is kept so that corrections can be added later without

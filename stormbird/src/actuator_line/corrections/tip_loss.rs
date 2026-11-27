@@ -10,6 +10,7 @@ use stormath::consts::PI;
 use crate::line_force_model::LineForceModel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Determines where the tip loss correction is applied in an actuator line simulation
 pub enum TipLossApplication {
     #[default]

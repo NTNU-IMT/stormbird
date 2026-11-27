@@ -1014,3 +1014,49 @@ fn suction_depends_on_velocity_and_not_on_angle_of_attack() {
         }
     }
 }
+
+#[test]
+/// A fan efficiency that is not positive, and misspelled fields, give errors when the model is read
+fn invalid_input_gives_errors() {
+    let model_json = |conversion: &str| format!(
+        r#"{{
+            "varying_foil": {{"internal_state_data": [0.0], "foils_data": [{{}}]}},
+            "internal_state_conversion": {}
+        }}"#,
+        conversion
+    );
+
+    let internal_flow = r#"{"cp_no_suction": -0.5, "cp_suction_gradient": -20.0, "loss_coefficient": 10.0, "porous_fraction": 0.3}"#;
+
+    let with_efficiency = |efficiency: &str| model_json(&format!(
+        r#"{{"PowerToInternalFlow": {{"internal_flow": {}, "{}": 0.7}}}}"#, internal_flow, efficiency
+    ));
+
+    assert!(ActiveAirFlowFoil::new_from_string(&with_efficiency("fan_efficiency")).is_ok());
+    assert!(ActiveAirFlowFoil::new_from_string(&with_efficiency("fan_eficiency")).is_err());
+
+    for fan_efficiency in ["0.0", "-0.5"] {
+        let json = model_json(&format!(
+            r#"{{"PowerToInternalFlow": {{"internal_flow": {}, "fan_efficiency": {}}}}}"#,
+            internal_flow, fan_efficiency
+        ));
+
+        assert!(ActiveAirFlowFoil::new_from_string(&json).is_err());
+    }
+
+    let fan = |reference_rotational_speed: &str| format!(
+        r#"{{"curves": {{"Dimensional": {{
+            "reference_rotational_speed": {},
+            "reference_density": 1.225,
+            "data": {{"flow_data": [0.0, 1.0], "pressure_data": [100.0, 50.0], "power_data": [10.0, 20.0]}}
+        }}}}}}"#,
+        reference_rotational_speed
+    );
+
+    let fan_model = |speed: &str| model_json(&format!(
+        r#"{{"FanSpeedToInternalFlow": {{"internal_flow": {}, "fan": {}}}}}"#, internal_flow, fan(speed)
+    ));
+
+    assert!(ActiveAirFlowFoil::new_from_string(&fan_model("20.0")).is_ok());
+    assert!(ActiveAirFlowFoil::new_from_string(&fan_model("0.0")).is_err());
+}

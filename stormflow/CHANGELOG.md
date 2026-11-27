@@ -2,6 +2,25 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
+## 0.5.0 - 2026-11-27
+### Breaking changes
+- Stormflow now depends on version 0.14.0 of Stormbird and version 0.5.1 of Stormath, which change the input to the actuator line model. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details. The most important changes for Stormflow setup files are:
+  - The wake specific settings of the lifting line correction are moved into the new `wake` field, e.g., `"wake_length_factor": 100.0` becomes `"wake": {"Straight": {"wake_length_factor": 100.0}}`. Setup files that only use the common settings are unchanged.
+  - More input structures reject unknown fields, so setup files with misspelled or extra fields give an error rather than ignoring them.
+  - Spin ratio set points for rotor sails in the controller must change sign to give the same results as before, as the conversion to revolutions per second is fixed in Stormbird.
+
+### Features
+- The velocity is sampled at the wake points of the lifting line correction in the actuator line model, when the correction uses the new `Dynamic` wake in Stormbird. The cell-centered velocity is interpolated linearly to the points in each time step, before the actuator line model is solved. Points outside the domain are not sampled, so that they keep the previous velocity.
+- New `Simulation::correction_wake_as_vtk` and `Simulation::export_correction_wake_as_vtk`, to export the wake of the lifting line correction as a legacy VTK file, for the `StraightPanels` and `Dynamic` wakes.
+
+### Bug fixes
+- The trilinear and tricubic interpolation stencils (`Grid::trilinear_stencil_at`, `trilinear_stencil_at_interior`, `tricubic_stencil_at` and `tricubic_stencil_at_interior`) could not reach the last interval of their valid range on each axis. A point in that interval was clamped to the lower sample, which gives a constant value in the interval instead of the interpolated one. The stencils are used for the slip mirror and zero gradient boundary conditions, the wall model and the wall treatment of the turbulence model, on both the CPU and the GPU, as the stencils are built on the CPU. The effect is usually small, as only points close to the end of the grid on an axis are affected, e.g., on the coarse levels of the multigrid pressure solver: in a coarse test with a rotor sail with end disks, one zero gradient stencil was affected, and the forces changed by about 1e-5 relative over 60 time steps, while a test with the SOBC1 superstructure gave identical results.
+- From Stormbird 0.14.0: the `weight_limit` in the sampling settings, which selects the cells that interact with the actuator line, is relative to the largest projection weight of each line element, rather than an absolute value of the projection kernel. With the absolute value, the selection depended on the size of the sails.
+
+### Changes
+- The GPU velocity solver keeps the buffers for exchanging data at up to two sets of cells, rather than one, so that the cells of the actuator line are not recreated in each time step when the velocity is also sampled at the wake points.
+- From Stormbird 0.14.0: `remove_span_velocity` in the sampling settings of the actuator line is true by default, and the angle of attack no longer depends on the velocity along the span. The examples already set it to true, and are unchanged. Models that relied on the old default get a different velocity magnitude and drag direction when the sampled velocity has a component along the span.
+
 ## 0.4.1 - 2026-11-20
 ### Changes
 - Stormflow now depends on version 0.13.1 of Stormbird, so that the line force model in the actuator line can use the new `internal_states` setting in the `LineForceModelBuilder`, which sets the initial internal state of each wing. Setup files that are valid for Stormflow 0.4.0 give the same results. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details.

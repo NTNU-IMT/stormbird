@@ -16,7 +16,7 @@ from stormbird_setup.line_force_model import LineForceModelBuilder, WingBuilder
 from stormbird_setup.lifting_line.simulation_builder import SimulationBuilder, DynamicSettings, QuasiSteadySettings
 from stormbird_setup.lifting_line.solver import Iterative
 from stormbird_setup.lifting_line.wake import DynamicWakeBuilder, QuasiSteadyWakeSettings, SymmetryCondition
-from stormbird_setup.lifting_line.velocity_corrections import VelocityCorrections
+from stormbird_setup.lifting_line.velocity_corrections import InducedVelocitySettings, TotalVelocityCorrection
 
 from stormbird_setup.circulation_corrections import CirculationCorrectionBuilder
 
@@ -79,7 +79,9 @@ def build_simulation(*, dynamic: bool, dynamic_stall: DynamicStallModelBuilder |
     solver = Iterative(
         max_iterations_per_time_step = 100,
         damping_factor = 0.05,
-        velocity_corrections = VelocityCorrections.new_max_induced_velocity_magnitude()
+        induced_velocities = InducedVelocitySettings(
+            total_correction = TotalVelocityCorrection.new_max_induced_velocity_magnitude()
+        )
     )
 
     if dynamic:

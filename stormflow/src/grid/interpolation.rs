@@ -119,8 +119,10 @@ impl Grid {
     /// enclosing `point`, for a field whose index `[0, 0, 0]` sits at physical location
     /// `field_origin`. `margin_low`/`margin_high` reserve that many extra cells below/above the
     /// returned index (so a stencil spanning `index - margin_low ..= index + 1 + margin_high` is
-    /// always in bounds). Points outside the resulting valid range are clamped to the nearest
-    /// valid stencil rather than extrapolated indefinitely.
+    /// always in bounds). The valid range of the fractional index is therefore from `margin_low`
+    /// to `shape - 1 - margin_high + 1`, where the last interval uses the highest base index with
+    /// a fraction up to one. Points outside the valid range are clamped to the nearest valid
+    /// stencil rather than extrapolated indefinitely.
     fn clamped_floor_index_and_fraction(
         &self,
         field_origin: SpatialVector,
@@ -135,11 +137,15 @@ impl Grid {
         for axis in 0..3 {
             let raw_index = (point[axis] - field_origin[axis]) * self.inv_cell_length[axis];
 
+            // The highest base index, and the highest fractional index, which is reached with the
+            // highest base index and a fraction of one
+            let max_base_index = shape[axis] - 1 - margin_high;
+
             let min_index = margin_low as Float;
-            let max_index = (shape[axis] - 1 - margin_high) as Float;
+            let max_index = (max_base_index + 1) as Float;
 
             let clamped_index = raw_index.clamp(min_index, max_index);
-            let floor_index = (clamped_index.floor() as usize).clamp(margin_low, shape[axis] - 1 - margin_high);
+            let floor_index = (clamped_index.floor() as usize).clamp(margin_low, max_base_index);
 
             i0[axis] = floor_index;
             t[axis] = clamped_index - floor_index as Float;
@@ -286,6 +292,103 @@ mod tests {
         let actual = grid.interpolate_cell_centered_scalar(&values, point);
 
         assert!((actual - expected).abs() < 1e-3, "expected {expected}, got {actual}");
+    }
+
+    /// Evaluates a field at the cell centers of the given layout, and checks that the stencil
+    /// reproduces it at points along the x-axis, from `start_index` to `end_index` in fractional
+    /// cell indices relative to the field origin. Includes the end points.
+    fn check_stencil_along_x(
+        f: impl Fn(SpatialVector) -> Float,
+        interior_layout: bool,
+        stencil_value: impl Fn(&Grid, SpatialVector, SpatialVector, &[Float]) -> Float,
+        start_index: Float,
+        end_index: Float,
+        tolerance: Float,
+    ) {
+        let grid = test_grid();
+
+        let (nr_cells, field_origin) = if interior_layout {
+            (grid.nr_interior_cells(), grid.cell_center([0, 0, 0]))
+        } else {
+            (grid.nr_extended_cells(), grid.cell_center_extended([0, 0, 0]))
+        };
+
+        let values: Vec<Float> = (0..nr_cells).map(|i| {
+            let center = if interior_layout {
+                grid.cell_center(grid.interior_indices_from_flat_index(i))
+            } else {
+                grid.cell_center_extended(grid.extended_indices_from_flat_index(i))
+            };
+
+            f(center)
+        }).collect();
+
+        let nr_points = 41;
+
+        for k in 0..nr_points {
+            let index = start_index + (end_index - start_index) * k as Float / (nr_points - 1) as Float;
+
+            let point = field_origin + SpatialVector::new(index, 3.3, 4.6);
+
+            let expected = f(point);
+            let actual = stencil_value(&grid, field_origin, point, &values);
+
+            assert!(
+                (actual - expected).abs() < tolerance,
+                "fractional index {index}: expected {expected}, got {actual}"
+            );
+        }
+    }
+
+    #[test]
+    /// The stencils must reproduce the field in their whole valid range, including the last
+    /// interval before the highest valid index
+    fn stencils_are_exact_in_the_whole_valid_range() {
+        let grid = test_grid();
+
+        let linear = |p: SpatialVector| 2.0 * p[0] - 3.0 * p[1] + 0.5 * p[2] + 1.0;
+        let cubic = |p: SpatialVector| p[0].powi(3) - 2.0 * p[0].powi(2) + p[1] + p[2].powi(3);
+
+        let interior_last = (grid.interior_shape[0] - 1) as Float;
+        let extended_last = (grid.extended_shape[0] - 1) as Float;
+
+        // Trilinear: all cell centers
+        check_stencil_along_x(linear, true, |grid, origin, point, values| {
+            grid.trilinear_stencil_at_interior(origin, point).sample_scalar(values, grid.interior_stride)
+        }, 0.0, interior_last, 1e-3);
+
+        check_stencil_along_x(linear, false, |grid, origin, point, values| {
+            grid.trilinear_stencil_at(origin, point).sample_scalar(values, grid.extended_stride)
+        }, 0.0, extended_last, 1e-3);
+
+        // Tricubic: one cell center is needed below, and two above, the enclosing pair
+        check_stencil_along_x(cubic, true, |grid, origin, point, values| {
+            grid.tricubic_stencil_at_interior(origin, point).sample_scalar(values, grid.interior_stride)
+        }, 1.0, interior_last - 1.0, 1e-2);
+
+        check_stencil_along_x(cubic, false, |grid, origin, point, values| {
+            grid.tricubic_stencil_at(origin, point).sample_scalar(values, grid.extended_stride)
+        }, 1.0, extended_last - 1.0, 1e-2);
+    }
+
+    #[test]
+    /// Points outside the valid range are clamped to the nearest valid stencil
+    fn stencils_clamp_points_outside_the_valid_range() {
+        let grid = test_grid();
+
+        let origin = grid.cell_center([0, 0, 0]);
+        let last = (grid.interior_shape[0] - 1) as Float;
+
+        let beyond = grid.trilinear_stencil_at_interior(origin, origin + SpatialVector::new(last + 2.5, 0.0, 0.0));
+        let at_end = grid.trilinear_stencil_at_interior(origin, origin + SpatialVector::new(last, 0.0, 0.0));
+
+        assert_eq!(beyond.base_index, at_end.base_index);
+        assert_eq!(beyond.weights, at_end.weights);
+        assert_eq!(at_end.weights[0], [0.0, 1.0]);
+
+        let below = grid.trilinear_stencil_at_interior(origin, origin - SpatialVector::new(1.5, 0.0, 0.0));
+
+        assert_eq!(below.weights[0], [1.0, 0.0]);
     }
 
     #[test]

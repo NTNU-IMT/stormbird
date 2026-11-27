@@ -203,6 +203,19 @@ impl Simulation {
             &actuator_line.cell_indices_to_check
         );
 
+        // The wake points of a dynamic lifting line correction are sampled before the model is
+        // stepped, at the positions from the previous time step
+        let wake_point_stencils = actuator_line.wake_point_stencils(&self.grid);
+
+        if !wake_point_stencils.is_empty() {
+            let wake_cell_velocities = self.velocity_solver.cell_centered_velocity_at_cells(
+                &self.grid,
+                &wake_point_stencils.cell_indices
+            );
+
+            actuator_line.set_wake_points_velocity(&wake_point_stencils, &wake_cell_velocities);
+        }
+
         actuator_line.step_model(time, time_step, &self.grid, &cell_velocities);
 
         let body_force = actuator_line.compute_body_force(&cell_velocities);

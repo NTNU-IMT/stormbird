@@ -224,6 +224,7 @@ impl SpanVariation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// The internal state of a wing, which can either be constant along the span, or vary along the
 /// span. The meaning of the value depends on the section model of the wing.
 pub enum WingInternalState {

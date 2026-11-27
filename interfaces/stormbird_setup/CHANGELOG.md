@@ -2,6 +2,31 @@
 
 This file contains an overview of the changes made to stormbird_setup, the Python library for setting up Stormbird models. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
+## 0.14.0 - Unreleased
+### Breaking changes
+- `VelocityCorrections` and `VelocityCorrectionType` are replaced by `InducedVelocitySettings`, following the new settings in Stormbird 0.14.0. The `velocity_corrections` field in `Linearized` and `Iterative` is replaced by `induced_velocities`. The old corrections are now set as the `total_correction`, with the new `TotalVelocityCorrection` class, e.g., `InducedVelocitySettings(total_correction = TotalVelocityCorrection.new_max_induced_velocity_magnitude(2.0))`. Requires Stormbird 0.14.0 or newer.
+- `neglect_self_induced_velocities` is moved from the `DynamicWakeBuilder` to `InducedVelocitySettings`, so that it is set in the solver, and also works for quasi-steady simulations.
+- `SolverType.solver` in the default sails takes an `induced_velocities` argument instead of `velocity_corrections`, and `rotor_sail_velocity_corrections` is renamed to `rotor_sail_induced_velocities`. The rotor sails use the same limit as before, now as a `total_correction`.
+
+- `wake_length_factor` and `virtual_extension_factors` in the `LiftingLineCorrectionBuilder` are moved to the new `StraightWakeBuilder`, which is the default value of the new `wake` field, following the new settings in Stormbird 0.14.0. The other settings are unchanged. Requires Stormbird 0.14.0 or newer.
+
+- The default `background_cells_per_chord` in `OpenFoamShipSettings`, used by `SailsOnShip`, is increased from 1 to 2. The resolution around the sails and at the ship is the same as before, as the refinement levels are set relative to the background mesh, but the mesh is less coarse away from them, which gives larger meshes and different results than before. Set it to 1 to get the old mesh.
+- The internal state set points of the default rotor sails (`rotor_sail_controller_set_points`) have the opposite sign, -3 for negative and 3 for positive apparent wind directions. Stormbird 0.14.0 fixes the sign of the conversion from a spin ratio set point to revolutions per second in the controller, so that the set point is the spin ratio on the line elements. The default rotor sails give the same results as before. Custom rotor sail set points given as spin ratio must change sign to give the same results. See the Stormbird change log.
+- `remove_span_velocity` in the actuator line `SamplingSettings` is True by default, following the new default in Stormbird 0.14.0, where the angle of attack also no longer depends on the velocity along the span. Requires Stormbird 0.14.0 or newer.
+
+### Features
+- New `StraightPanelWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a straight wake that is split into panels, where the reference core length can grow downstream with the `reference_core_evolution_length_factor`. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer.
+- New `DynamicCorrectionWakeBuilder`, which can be used as the `wake` in the `LiftingLineCorrectionBuilder`, for a free wake where the shape follows the velocity sampled from the CFD flow field. See the Stormbird change log for more. Requires Stormbird 0.14.0 or newer, and a CFD interface that samples the velocity at the wake points.
+- New `self_induced_correction` in `InducedVelocitySettings`, with the new `SelfInducedVelocityCorrection` class, to limit the self-induced velocities only.
+- New `combine_wind_velocities` option in `sails_on_ship_report` and `read_report_cases`. When it is True, cases that only differ in the true wind velocity are shown as one source in the report, i.e., connected with lines in the overview, with the wind velocity of each case in the hover text. This is useful when each test condition has its own wind velocity. False by default, which gives the same report as before.
+
+### Fixes
+- The overview in the sails-on-ship report showed nothing for sources with only one case, e.g., when each test condition has its own true wind velocity, as the simulations are drawn as lines. Such sources are now shown as a short horizontal dash.
+
+### Changes
+- The optional `force-tuning` dependency requires pystormbird 0.14.0 or later, as the JSON input written by this version is only valid for Stormbird 0.14.0.
+- The warning for an actuator line with a dynamic stall model and damping of the circulation says that the time lag is about `1 / damping_factor` calls to the model, i.e., outer iterations in the CFD solver, rather than time steps.
+
 ## 0.13.1 - 2026-11-20
 ### Features
 - New `internal_states` field in the `LineForceModelBuilder`, with one initial internal state for each wing, following the new setting in Stormbird 0.13.1. The default is `None`, which gives the same initial internal state of zero as before, and the field is then not written to the JSON input, so the builder can still be used with older versions of Stormbird. When it is set, the number of values must match the number of wings, and `add_wing_builder` adds an internal state of zero for each new wing. Together with the existing `local_wing_angles`, this makes it possible to run actuator line simulations in OpenFOAM with a fixed angle of attack and internal state, without a controller. Requires Stormbird 0.13.1 or newer when it is set.

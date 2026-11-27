@@ -26,7 +26,9 @@ pub struct LineForceModelBuilder {
     /// Builders for each wing in the model
     pub wing_builders: Vec<WingBuilder>,
     /// Nr sections to discretize the wing into. That is, each wing in the wing builder vector will
-    /// end up having a number of sections equal to this variable.
+    /// end up having a number of sections equal to this variable, unless the wing builder has its
+    /// own value. For wings with more than two section points, the number of sections in each
+    /// segment between the points is rounded up, so the total can be slightly larger.
     pub nr_sections: usize,
     /// The density of the fluid
     #[serde(default = "LineForceModel::default_density")]

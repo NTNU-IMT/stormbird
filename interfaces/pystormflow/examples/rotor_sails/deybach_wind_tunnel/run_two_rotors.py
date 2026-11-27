@@ -24,7 +24,15 @@ the results are plotted with plotting.py:
 The flow fields at the end of each case can also be exported as VTK files with --export-vtk. The VTK
 files are stored in vtk_two_rotors_stormflow, with the same name as the time series. The VTK file of
 the single rotor case is only exported if the single rotor case is simulated, and is then stored in
-vtk_single_rotor_stormflow.
+vtk_single_rotor_stormflow. For variants with a lifting line correction with panels, i.e., the
+dynamic wake, the shape of the wake at the end of each case is exported together with the flow
+fields, to a file in the same folder with _correction_wake added to the name.
+
+The experimental variant with a dynamic wake in the lifting line correction, where the wake follows
+the velocity in the CFD solver and the interactions between the rotors are included in the
+correction, is run with:
+
+    python run_two_rotors.py --variant projected_tip_loss_and_dynamic_lifting_line --angular-positions 0 90
 '''
 
 import argparse
@@ -108,7 +116,7 @@ if __name__ == '__main__':
                 rotor_locations=rotor_setup.two_rotors_locations(angular_position),
                 vtk_export_path=(
                     two_rotors_vtk_path(variant, angular_position) if args.export_vtk else None
-                )
+                ),
             )
 
             write_time_series(

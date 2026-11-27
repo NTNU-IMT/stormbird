@@ -87,10 +87,15 @@ impl ActuatorLineBuilder {
     }
 
     /// Checks that the settings are consistent. At the moment, this checks the settings of the line
-    /// force model, see [`LineForceModelBuilder::check_settings`], and that the number of
-    /// iterations between each full result is written is not zero.
+    /// force model, see [`LineForceModelBuilder::check_settings`], the settings of the lifting line
+    /// correction, if used, see [`LiftingLineCorrectionBuilder::check_settings`], and that the
+    /// number of iterations between each full result is written is not zero.
     pub fn check_settings(&self) -> Result<(), Error> {
         self.line_force_model.check_settings()?;
+
+        if let Some(lifting_line_correction) = &self.lifting_line_correction {
+            lifting_line_correction.check_settings()?;
+        }
 
         if self.write_iterations_full_result == 0 {
             return Err(Error::invalid_input(
@@ -104,7 +109,8 @@ impl ActuatorLineBuilder {
     /// Constructs an actuator line model from the builder data.
     ///
     /// # Errors
-    /// If the settings are not consistent, see [`check_settings`](Self::check_settings), or if the
+    /// If the settings are not consistent, see [`check_settings`](Self::check_settings), if
+    /// `extrapolate_end_velocities` is used on a wing with less than three line elements, or if the
     /// controller can not be built.
     pub fn build(&self) -> Result<ActuatorLine, Error> {
         self.check_settings()?;
@@ -113,11 +119,23 @@ impl ActuatorLineBuilder {
 
         let nr_span_lines = line_force_model.nr_span_lines();
 
+        if self.sampling_settings.extrapolate_end_velocities {
+            for (wing_index, wing_range) in line_force_model.wing_indices.iter().enumerate() {
+                if wing_range.len() < 3 {
+                    return Err(Error::invalid_input(format!(
+                        "extrapolate_end_velocities requires at least three line elements on each                         wing, but wing {} has {}",
+                        wing_index,
+                        wing_range.len()
+                    )));
+                }
+            }
+        }
+
         if line_force_model.has_dynamic_stall() && self.solver_settings.damping_factor < 1.0 {
             eprintln!(
                 "Warning: the actuator line model has a dynamic stall model, but the damping \
                 factor of the circulation is {}. The damping acts as an additional time lag of \
-                about {:.1} time steps, which also affects the dynamic response of the forces.",
+                about {:.1} calls to the model, i.e., time steps times outer iterations in the                 CFD solver, which also affects the dynamic response of the forces.",
                 self.solver_settings.damping_factor,
                 1.0 / self.solver_settings.damping_factor
             );
@@ -135,7 +153,7 @@ impl ActuatorLineBuilder {
             );
 
             Some(
-                lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)
+                lifting_line_correction_builder.build(viscous_core_length_factor, &line_force_model)?
             )
         } else {
             None

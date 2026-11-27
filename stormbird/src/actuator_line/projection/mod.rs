@@ -28,7 +28,9 @@ pub struct ProjectionSettings {
     /// than at the control points
     #[serde(default)]
     pub realign_to_local_velocity_at_each_cell: bool,
-    /// Cells with a projection weight below this value do not get any force
+    /// Cells with a projection weight below this value, relative to the peak value of the
+    /// projection weight of the dominating line element, do not get any force. See
+    /// [`ActuatorLine::relative_projection_weight`](crate::actuator_line::ActuatorLine::relative_projection_weight).
     #[serde(default="ProjectionSettings::default_weight_limit")]
     pub weight_limit: Float,
     /// If true, the sectional drag forces are also projected onto the grid

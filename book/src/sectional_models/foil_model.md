@@ -142,7 +142,7 @@ The transition from pre-stall to post-stall behavior is controlled by the *amoun
     s(\alpha) = \frac{1}{1 + e^{-k\_s (|\alpha| - \alpha\_s)}}, \quad k\_s = \frac{4.595}{\Delta\_s}
 \\]
 
-where \\( \Delta\_s \\) is `stall_range` and \\( \alpha\_s \\) is the mean stall angle, given by `mean_positive_stall_angle` for positive angles of attack and `mean_negative_stall_angle` for negative angles of attack. Both stall angles are given as positive values. The amount of stall is 0.01 at \\( |\alpha| = \alpha\_s - \Delta\_s \\), 0.5 at the mean stall angle, and 0.99 at \\( |\alpha| = \alpha\_s + \Delta\_s \\). The full transition therefore takes place over an interval of \\( 2 \Delta\_s \\) around the mean stall angle.
+where \\( \Delta\_s \\) is `stall_range` and \\( \alpha\_s \\) is the mean stall angle, given by `mean_positive_stall_angle` for positive angles of attack and `mean_negative_stall_angle` for negative angles of attack. Both stall angles are given as positive values. The amount of stall is 0.01 at \\( |\alpha| = \alpha\_s - \Delta\_s \\), 0.5 at the mean stall angle, and 0.99 at \\( |\alpha| = \alpha\_s + \Delta\_s \\). The full transition therefore takes place over an interval of \\( 2 \Delta\_s \\) around the mean stall angle. A `stall_range` of zero gives a sudden stall, where the amount of stall is a step function: 0 below the mean stall angle, 1 above it, and 0.5 exactly at it.
 
 Note that the stall angles are measured from zero angle of attack, and not from the zero-lift angle. For a foil with camber, flap or suction, the stall angles for positive and negative angles of attack will therefore typically be different.
 
