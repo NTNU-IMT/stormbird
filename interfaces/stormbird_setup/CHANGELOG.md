@@ -24,6 +24,7 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 - The overview in the sails-on-ship report showed nothing for sources with only one case, e.g., when each test condition has its own true wind velocity, as the simulations are drawn as lines. Such sources are now shown as a short horizontal dash.
 
 ### Changes
+- The optional `force-tuning` dependency requires pystormbird 0.14.0 or later, as the JSON input written by this version is only valid for Stormbird 0.14.0.
 - The warning for an actuator line with a dynamic stall model and damping of the circulation says that the time lag is about `1 / damping_factor` calls to the model, i.e., outer iterations in the CFD solver, rather than time steps.
 
 ## 0.13.1 - 2026-11-20

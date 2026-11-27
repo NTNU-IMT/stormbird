@@ -2,8 +2,13 @@
 
 This file contains an overview of the changes made to cstormbird, the C interface to the Stormbird library. The version number of cstormbird follows the version number of the Stormbird Rust library. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for changes to the underlying models.
 
-## 0.14.0 - Unreleased
+## 0.14.0 - 2026-11-27
 ### Breaking changes
+- Depends on the published versions of Stormbird 0.14.0 and Stormath 0.5.1. See the [Stormbird change log](../../stormbird/CHANGELOG.md) for details. The changes that matter most for the setup strings and the results are:
+    - The `velocity_corrections` field in the solvers is replaced by `induced_velocities`. `"velocity_corrections": X` becomes `"induced_velocities": {"total_correction": X}`, which gives the same results. `neglect_self_induced_velocities` is moved from the dynamic wake to the same structure.
+    - More input structures reject unknown fields, so input with misspelled or extra fields gives an error rather than being ignored.
+    - Spin ratio set points for rotor sails in the controller (`InternalStateSetPointType::SectionModel`, the default) must change sign to give the same results as before, as the conversion to revolutions per second is fixed. The default sails in stormbird_setup 0.14.0 are updated.
+    - Bug fixes that change the results, e.g., the angle of attack for velocities along the span (heeled or rolling sails) and for chord vectors that are not normal to the span, the direction of the viscous lift with rotation, the averaging of the apparent wind direction in the controller across ±180 degrees, and the controller rate limits with `time_steps_between_updates` larger than one.
 - `lifting_line_simulation_set_velocity_linear` and `lifting_line_simulation_set_velocity_angular` take a new `bool in_body_fixed_frame` argument, which specifies the coordinate system of the input velocity. With `true`, the velocity is given in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a ship simulator, and converted to the global coordinate system with the current rotation, so the rotation must be set first. With `false`, the velocity is used as a global vector, which is the same as before. Before, the input was always used as a global vector, and body fixed velocities gave wrong results when the sails were rotated, e.g., with a heading. Existing calls must add `false` as the last argument to keep the same behavior. The coordinate system of the input is independent of the `output_coordinate_system` of the line force model.
 
 ### Bug fixes

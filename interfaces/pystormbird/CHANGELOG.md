@@ -9,7 +9,7 @@ This file contains an overview of the changes made to pystormbird, the Python in
 
 ### Changes
 - The `rotor_sails/deybach_wind_tunnel` and `wing_sails/stall_hysteresis` examples use the new `InducedVelocitySettings` in stormbird_setup 0.14.0, instead of `VelocityCorrections`. The settings of the velocity corrections in Stormbird 0.14.0 have changed, see the [Stormbird change log](../../stormbird/CHANGELOG.md). They are set through the JSON input, so there are no changes to the Python interface itself.
-- Depends on the local versions of Stormbird 0.14.0 and Stormath 0.5.1, with the bug fixes listed in their change logs, e.g., the angle of attack for chord vectors that are not normal to the span, the sign of the spin ratio set points of rotor sails in the controller, and the averaging of the apparent wind direction in the controller.
+- Depends on the published versions of Stormbird 0.14.0 and Stormath 0.5.1, with the bug fixes listed in their change logs, e.g., the angle of attack for chord vectors that are not normal to the span, the sign of the spin ratio set points of rotor sails in the controller, and the averaging of the apparent wind direction in the controller.
 
 ## 0.13.1 - 2026-11-20
 ### Features

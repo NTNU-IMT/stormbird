@@ -8,7 +8,7 @@ This file contains an overview of the changes made to pystormflow, the Python in
 - The new `Dynamic` wake of the lifting line correction is supported, with the velocity at the wake points sampled by Stormflow. See the Stormflow and Stormbird change logs.
 
 ### Changes
-- Depends on the local versions of Stormflow, Stormbird and Stormath in this repository (with the version numbers as before), as the new features are not published yet.
+- Depends on the published versions of Stormflow 0.5.0, Stormbird 0.14.0 and Stormath 0.5.1. The version number follows Stormflow. See their change logs for the breaking changes in the input, e.g., the new `wake` field in the lifting line correction.
 - From Stormbird 0.14.0: `remove_span_velocity` in the sampling settings of the actuator line is true by default, and the angle of attack no longer depends on the velocity along the span. See the Stormbird change log.
 - From Stormbird 0.14.0: the `weight_limit` in the sampling settings is relative to the largest projection weight of each line element. See the Stormflow and Stormbird change logs for this and the other bug fixes.
 

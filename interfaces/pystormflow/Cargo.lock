@@ -919,7 +919,7 @@ dependencies = [
 
 [[package]]
 name = "pystormflow"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "pyo3",
  "stormath",
@@ -1131,6 +1131,8 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "stormath"
 version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4eb47d4c8f3ccfde48987a612e7e285e70145abc8fca4a6bd5d3883e224672f1"
 dependencies = [
  "rand",
  "rayon",
@@ -1139,7 +1141,9 @@ dependencies = [
 
 [[package]]
 name = "stormbird"
-version = "0.13.1"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6f9ec36c21d6937b27c8e90f2accfc0a6b163533220585f55c0fe82a2c33f48"
 dependencies = [
  "serde",
  "serde_json",
@@ -1148,7 +1152,9 @@ dependencies = [
 
 [[package]]
 name = "stormflow"
-version = "0.4.1"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44b4bad7dc322817f68facce1cae8a7df5591a747b6fc763f95d8d45fdc71a0a"
 dependencies = [
  "bytemuck",
  "clap",
