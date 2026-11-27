@@ -123,6 +123,7 @@ impl FanCurveData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "FanCurvesInput")]
 /// Fan curves for a single fan, giving the pressure rise and power as a function of the volume
 /// flow. The curves are scaled to different rotational speeds, n, and densities, rho, using the fan
 /// affinity laws. The rotational speed is given in revolutions per second.
@@ -149,6 +150,51 @@ pub enum FanCurves {
         /// The non-dimensional fan curve data
         data: FanCurveData,
     },
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+/// Unchecked version of the fan curves, used for deserialization
+enum FanCurvesInput {
+    Dimensional {
+        reference_rotational_speed: Float,
+        reference_density: Float,
+        data: FanCurveData,
+    },
+    NonDimensional {
+        diameter: Float,
+        data: FanCurveData,
+    },
+}
+
+impl TryFrom<FanCurvesInput> for FanCurves {
+    type Error = Error;
+
+    fn try_from(input: FanCurvesInput) -> Result<Self, Self::Error> {
+        let check_positive = |value: Float, name: &str| -> Result<(), Error> {
+            if value > 0.0 && value.is_finite() {
+                Ok(())
+            } else {
+                Err(Error::invalid_input(format!(
+                    "The {} of the fan curves must be larger than zero, but is {}", name, value
+                )))
+            }
+        };
+
+        match input {
+            FanCurvesInput::Dimensional { reference_rotational_speed, reference_density, data } => {
+                check_positive(reference_rotational_speed, "reference_rotational_speed")?;
+                check_positive(reference_density, "reference_density")?;
+
+                Ok(Self::Dimensional { reference_rotational_speed, reference_density, data })
+            },
+            FanCurvesInput::NonDimensional { diameter, data } => {
+                check_positive(diameter, "diameter")?;
+
+                Ok(Self::NonDimensional { diameter, data })
+            },
+        }
+    }
 }
 
 impl FanCurves {

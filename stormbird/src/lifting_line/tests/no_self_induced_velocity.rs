@@ -40,7 +40,7 @@ fn relative_lift_error_for_two_sails_far_apart(
 
     let spin_ratio = 2.0;
 
-    let revolutions_per_second = -RotatingCylinder::revolutions_per_second_from_spin_ratio(
+    let revolutions_per_second = RotatingCylinder::revolutions_per_second_from_spin_ratio(
         spin_ratio, diameter, velocity_mag
     );
 

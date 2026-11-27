@@ -18,6 +18,7 @@ use internal_flow::InternalFlow;
 use fan::Fan;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Defines how the internal state set on the wing is converted to the internal state used by the
 /// foil model on each segment.
 ///
@@ -65,6 +66,7 @@ impl InternalStateConversion {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "ActiveAirFlowFoilInput")]
 /// A foil section with active air flow, e.g., suction.
 ///
 /// The internal state of the foil model is either the suction coefficient or the power
@@ -74,6 +76,35 @@ pub struct ActiveAirFlowFoil {
     pub varying_foil: VaryingFoil,
     /// How the wing internal state is converted to the internal state of the foil model
     pub internal_state_conversion: InternalStateConversion,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+/// Unchecked version of the active air flow foil, used for deserialization
+struct ActiveAirFlowFoilInput {
+    varying_foil: VaryingFoil,
+    internal_state_conversion: InternalStateConversion,
+}
+
+impl TryFrom<ActiveAirFlowFoilInput> for ActiveAirFlowFoil {
+    type Error = Error;
+
+    fn try_from(input: ActiveAirFlowFoilInput) -> Result<Self, Self::Error> {
+        if let InternalStateConversion::PowerToInternalFlow { fan_efficiency, .. } =
+            &input.internal_state_conversion
+        {
+            if !(*fan_efficiency > 0.0 && fan_efficiency.is_finite()) {
+                return Err(Error::invalid_input(format!(
+                    "The fan_efficiency must be larger than zero, but is {}", fan_efficiency
+                )));
+            }
+        }
+
+        Ok(Self {
+            varying_foil: input.varying_foil,
+            internal_state_conversion: input.internal_state_conversion,
+        })
+    }
 }
 
 impl std::fmt::Display for ActiveAirFlowFoil {

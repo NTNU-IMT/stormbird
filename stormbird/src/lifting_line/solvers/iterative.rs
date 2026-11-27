@@ -17,6 +17,7 @@ use super::velocity_corrections::InducedVelocitySettings;
 use super::linearized::{Linearized, InducedVelocityCorrectionMethod};
 
 #[derive(Debug, Default, Copy, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// The variable that is updated in each iteration of the iterative solver
 pub enum VariableToUpdate {
     /// The circulation strength is updated directly, with damping

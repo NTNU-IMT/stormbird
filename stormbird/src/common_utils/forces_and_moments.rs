@@ -12,6 +12,7 @@ use stormath::type_aliases::Float;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// The coordinate system that forces, moments and other vector quantities are given in
 pub enum CoordinateSystem {
     /// The global, or earth-fixed, coordinate system

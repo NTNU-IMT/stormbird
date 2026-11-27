@@ -11,6 +11,7 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 - `wake_length_factor` and `virtual_extension_factors` in the `LiftingLineCorrectionBuilder` are moved to the new `StraightWakeBuilder`, which is the default value of the new `wake` field, following the new settings in Stormbird 0.14.0. The other settings are unchanged. Requires Stormbird 0.14.0 or newer.
 
 - The default `background_cells_per_chord` in `OpenFoamShipSettings`, used by `SailsOnShip`, is increased from 1 to 2. The resolution around the sails and at the ship is the same as before, as the refinement levels are set relative to the background mesh, but the mesh is less coarse away from them, which gives larger meshes and different results than before. Set it to 1 to get the old mesh.
+- The internal state set points of the default rotor sails (`rotor_sail_controller_set_points`) have the opposite sign, -3 for negative and 3 for positive apparent wind directions. Stormbird 0.14.0 fixes the sign of the conversion from a spin ratio set point to revolutions per second in the controller, so that the set point is the spin ratio on the line elements. The default rotor sails give the same results as before. Custom rotor sail set points given as spin ratio must change sign to give the same results. See the Stormbird change log.
 - `remove_span_velocity` in the actuator line `SamplingSettings` is True by default, following the new default in Stormbird 0.14.0, where the angle of attack also no longer depends on the velocity along the span. Requires Stormbird 0.14.0 or newer.
 
 ### Features
@@ -21,6 +22,9 @@ This file contains an overview of the changes made to stormbird_setup, the Pytho
 
 ### Fixes
 - The overview in the sails-on-ship report showed nothing for sources with only one case, e.g., when each test condition has its own true wind velocity, as the simulations are drawn as lines. Such sources are now shown as a short horizontal dash.
+
+### Changes
+- The warning for an actuator line with a dynamic stall model and damping of the circulation says that the time lag is about `1 / damping_factor` calls to the model, i.e., outer iterations in the CFD solver, rather than time steps.
 
 ## 0.13.1 - 2026-11-20
 ### Features

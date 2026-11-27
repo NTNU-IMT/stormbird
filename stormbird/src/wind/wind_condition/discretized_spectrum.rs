@@ -10,6 +10,7 @@ use stormath::consts::TAU;
 use crate::error::Error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Structure used to represent a spectrum as discrete harmonic signals. The discrete variables must 
 /// be set externally. Typically, they are generated from a gust spectrum.
 pub struct DiscretizedSpectrum {

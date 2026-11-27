@@ -998,6 +998,11 @@ fn invalid_settings_are_reported() {
             reference_core_length_factor: 0.0,
             ..Default::default()
         },
+        // An initialization time of zero gave NaN in the ramp of the correction
+        LiftingLineCorrectionBuilder {
+            initialization_time: Some(0.0),
+            ..Default::default()
+        },
         LiftingLineCorrectionBuilder {
             wake: straight_with_extensions([-1.0, 0.0]),
             ..Default::default()

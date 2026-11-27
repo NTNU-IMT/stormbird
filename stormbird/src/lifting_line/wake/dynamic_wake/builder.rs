@@ -83,10 +83,10 @@ pub struct DynamicWakeBuilder {
     /// How the viscous core length should evolve behind the wake.
     pub viscous_core_length_evolution: ViscousCoreLengthEvolution,
     #[serde(default="DynamicWakeBuilder::default_first_panel_relative_length")]
-    /// Length of the first panel in the wake, relative to the chord length
+    /// Length of the first panel in the wake, relative to the average chord length
     pub first_panel_relative_length: Float,
     #[serde(default="DynamicWakeBuilder::default_last_panel_relative_length")]
-    /// Factor used to calculate the length of the final panel, relative to the chord length.
+    /// Factor used to calculate the length of the final panel, relative to the average chord length.
     pub last_panel_relative_length: Float,
     #[serde(default)]
     /// Determines which direction to use for the first wake panels, right behind the wings
@@ -112,7 +112,7 @@ pub struct DynamicWakeBuilder {
     /// Switch to set the strength update to be "steady-state"
     pub steady_state_strength_update: bool,
     #[serde(default="DynamicWakeBuilder::default_initial_relative_wake_length")]
-    /// Length of wake during initialization, relative to the chord length
+    /// Length of wake during initialization, relative to the average chord length
     pub initial_relative_wake_length: Float,
 }
 

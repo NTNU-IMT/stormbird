@@ -178,7 +178,9 @@ impl RotatingCylinder {
 
 
     /// Helper function to calculate revolutions per second from a target spin ratio, diameter and
-    /// velocity.
+    /// velocity. The inverse of
+    /// [`spin_ratio_from_revolutions_per_second`](Self::spin_ratio_from_revolutions_per_second), so
+    /// a positive spin ratio gives negative revolutions per second.
     pub fn revolutions_per_second_from_spin_ratio(
         spin_ratio: Float, 
         diameter: Float, 
@@ -190,12 +192,15 @@ impl RotatingCylinder {
             let circumference = PI * diameter;
             let tangential_velocity = velocity * spin_ratio;
             
-            tangential_velocity / circumference
+            -tangential_velocity / circumference
         }
     }
 
     /// Calculates non-dimensional spin ratio, defined as the ratio of the surface velocity of the 
     /// cylinder to the free stream velocity.
+    ///
+    /// The sign convention is that positive revolutions per second, i.e., a rotation around the
+    /// span direction following the right hand rule, gives a negative spin ratio.
     pub fn spin_ratio_from_revolutions_per_second(
         revolutions_per_second: Float,
         diameter: Float, 

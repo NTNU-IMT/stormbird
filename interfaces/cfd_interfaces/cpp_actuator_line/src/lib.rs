@@ -14,7 +14,11 @@ use std::path::Path;
 mod ffi {
     struct DominatingLineWeight {
         line_index: usize,
+        /// The projection weight of the dominating line element at the point
         weight: f64,
+        /// The weight relative to the peak value of the line element, which is compared with the
+        /// weight limits
+        relative_weight: f64,
     }
 
     extern "Rust" {
@@ -189,7 +193,9 @@ impl CppActuatorLine {
             SpatialVector::from(*point)
         );
 
-        ffi::DominatingLineWeight { line_index, weight }
+        let relative_weight = self.model.relative_projection_weight(line_index, weight);
+
+        ffi::DominatingLineWeight { line_index, weight, relative_weight }
     }
 
     pub fn do_step(&mut self, time: f64, time_step: f64) {

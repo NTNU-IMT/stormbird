@@ -5,9 +5,11 @@ This file contains an overview of the changes made to pystormbird, the Python in
 ## 0.14.0 - Unreleased
 ### Breaking changes
 - `Simulation.set_velocity_linear` and `Simulation.set_velocity_angular` in `pystormbird.lifting_line` take a new, required, keyword-only argument, `in_body_fixed_frame`, which specifies the coordinate system of the input velocity. With `in_body_fixed_frame=True`, the velocity is given in the body fixed coordinate system, e.g., (u, v, w) and (p, q, r) from a ship simulator, and converted to the global coordinate system with the current rotation, so the rotation must be set first. With `in_body_fixed_frame=False`, the velocity is used as a global vector, which is the same as before. Before, the input was always used as a global vector, without any way to see this from the call, and body fixed velocities gave wrong results when the sails were rotated, e.g., with a heading. Existing calls must add `in_body_fixed_frame=False` to keep the same behavior. The coordinate system of the input is independent of the `output_coordinate_system` of the line force model.
+- `RotatingCylinder.revolutions_per_second_from_spin_ratio` in `pystormbird.section_models` returns the opposite sign, so that it is the inverse of `spin_ratio_from_revolutions_per_second`, and the same as the helper function in `stormbird_setup.utils`. See the Stormbird change log.
 
 ### Changes
 - The `rotor_sails/deybach_wind_tunnel` and `wing_sails/stall_hysteresis` examples use the new `InducedVelocitySettings` in stormbird_setup 0.14.0, instead of `VelocityCorrections`. The settings of the velocity corrections in Stormbird 0.14.0 have changed, see the [Stormbird change log](../../stormbird/CHANGELOG.md). They are set through the JSON input, so there are no changes to the Python interface itself.
+- Depends on the local versions of Stormbird 0.14.0 and Stormath 0.5.1, with the bug fixes listed in their change logs, e.g., the angle of attack for chord vectors that are not normal to the span, the sign of the spin ratio set points of rotor sails in the controller, and the averaging of the apparent wind direction in the controller.
 
 ## 0.13.1 - 2026-11-20
 ### Features

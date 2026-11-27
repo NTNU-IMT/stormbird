@@ -19,6 +19,7 @@ use iterative::{
 use linearized::Linearized;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// The solver used to find the circulation strength in a lifting line simulation
 pub enum Solver {
     /// Iterative solver
@@ -34,6 +35,7 @@ impl Default for Solver {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Builder for the solver in quasi-steady simulations
 pub enum QuasiSteadySolverBuilder {
     /// Iterative solver

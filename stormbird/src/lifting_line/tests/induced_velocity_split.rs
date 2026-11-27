@@ -173,14 +173,21 @@ fn check_dynamic_wake(symmetry_condition: SymmetryCondition, steady_state_streng
         &reference_other_induced
     );
 
-    // The total is also checked against the induced velocity function of the wake
-    if !steady_state_strength_update {
-        let total = frozen_wake.induced_velocities_at_control_points.total();
-        let total_wake = wake.induced_velocities(ctrl_points);
-
-        for (u_i, u_i_wake) in total.iter().zip(&total_wake) {
-            assert!((*u_i - *u_i_wake).length() < tolerance(1e-10, 1e-4) * u_i_wake.length().max(1.0));
+    // With the steady state strength update, the stored wake must have the strength of the first
+    // panels in all rows after the time step, so that the post-processing of the wake, and the
+    // induced velocities at the wake points, are consistent with the solution
+    if steady_state_strength_update {
+        for panel_index in 0..wake.strengths.len() {
+            assert_eq!(wake.strengths[panel_index], strengths[panel_index % nr_span_lines]);
         }
+    }
+
+    // The total is also checked against the induced velocity function of the wake
+    let total = frozen_wake.induced_velocities_at_control_points.total();
+    let total_wake = wake.induced_velocities(ctrl_points);
+
+    for (u_i, u_i_wake) in total.iter().zip(&total_wake) {
+        assert!((*u_i - *u_i_wake).length() < tolerance(1e-10, 1e-4) * u_i_wake.length().max(1.0));
     }
 }
 

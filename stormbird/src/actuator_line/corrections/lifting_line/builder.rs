@@ -355,6 +355,17 @@ impl LiftingLineCorrectionBuilder {
             )
         );
 
+        if let Some(initialization_time) = self.initialization_time {
+            check(
+                &mut error_messages,
+                initialization_time > 0.0,
+                format!(
+                    "initialization_time must be positive, but is {}. Leave it out to use the full                     correction from the start.",
+                    initialization_time
+                )
+            );
+        }
+
         if let Some(max_correction_ratio) = self.max_correction_ratio {
             check(
                 &mut error_messages,

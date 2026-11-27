@@ -48,7 +48,7 @@ As an equation, the residual, \\(r\\), for a line element is calculated as follo
     r\_i = C\_L(\Gamma\_{i}) - C\_L(\Gamma\_{i, estimated})
 \\]
 
-The value of this residual *should* go towards zero with successive iterations. Since the value is calculated from the lift-coefficients, it is not dependent on the geometrical dimensions or the freestream velocity. The solver will stop if the average absolute value of the residual over all line elements goes below the `residual_tolerance_absolute` value in the solver settings below. The solver will also stop if the maximum change in the circulation strength between two iterations goes below the `strength_difference_tolerance` value.
+The value of this residual *should* go towards zero with successive iterations. Since the value is calculated from the lift-coefficients, it is not dependent on the geometrical dimensions or the freestream velocity. The solver will stop if the average absolute value of the residual over all line elements goes below the `residual_tolerance_absolute` value in the solver settings below. The solver will also stop if the maximum difference between the new estimate of the circulation strength and the current value, before the damping is applied, goes below the `strength_difference_tolerance` value.
 
 
 ## Solver settings
@@ -120,7 +120,7 @@ An explanation of each field is given below:
 - `use_raw_circulation_during_iterations`: A boolean that can be set to true if the [circulation corrections](../line_model/circulation_strength.md) in the line force model should be skipped when estimating the circulation strength during the iterations. The default is false. This option is only available for dynamic simulations.
 - `start_with_linearized_solution`: A boolean that can be set to true if you want the first iteration to estimate the circulation distribution using a linear solver. The rest of the iterations will then use the normal non-linear iterations to update from the linearized solver.
 - `correction_factor_initial_solution`: A factor that the initial circulation distribution, i.e., the solution from the previous time step, is multiplied with before the first iteration. The default value is 1.0, which means no correction.
-- `variable_to_update`: Determines which variable the damping factor is applied to in each iteration. The default is `CirculationStrength`, which corresponds to the equation above. If set to `AngleOfAttack`, the damping is instead applied to the update of the angle of attack on each line element, and the circulation strength is then calculated directly from the damped angles of attack.
+- `variable_to_update`: Determines which variable the damping factor is applied to in each iteration. The default is `CirculationStrength`, which corresponds to the equation above. If set to `AngleOfAttack`, the damping is instead applied to the update of the angle of attack on each line element, and the circulation strength is then calculated directly from the damped angles of attack. Note that the convergence test does not work with this option at the moment, so the solver always runs `max_iterations_per_time_step` iterations.
 
 ## Induced velocities and velocity corrections
 The lift-induced velocities at the control points are always computed in two parts:

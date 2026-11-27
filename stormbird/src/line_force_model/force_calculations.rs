@@ -51,6 +51,7 @@ use stormath::consts::MIN_POSITIVE;
 
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Settings for the force calculations
 pub struct ForceCalculationSettings {
     /// If true, the viscous lift is included in the circulation, rather than added as a separate
@@ -109,10 +110,11 @@ impl LineForceModel {
     /// Return the angle of attack at each control point.
     ///
     /// The angle is defined as the rotation from the chord vector to the velocity vector, using the
-    /// span line as the axis of rotation, with right handed positive rotation. The velocity is
-    /// projected onto the plane normal to the span line first, so that a velocity component along
-    /// the span does not change the angle of attack. The angle is zero if there is no velocity
-    /// normal to the span line.
+    /// span line as the axis of rotation, with right handed positive rotation. The velocity and the
+    /// chord vector are projected onto the plane normal to the span line first, so that a velocity
+    /// component along the span, or a chord vector that is not normal to the span line, does not
+    /// change the angle of attack. The angle is zero if there is no velocity normal to the span
+    /// line.
     ///
     /// # Arguments
     /// * `velocity` - the velocity vector at each control point
@@ -133,8 +135,13 @@ impl LineForceModel {
 
             let velocity_in_section_plane = velocity[index].project_on_plane(span_direction);
 
+            // The chord vector is projected as well, so that a chord that is not normal to the
+            // span line, e.g., a horizontal chord on a raked span line, is measured in the same
+            // plane as the velocity
+            let chord_in_section_plane = chord_vectors[index].project_on_plane(span_direction);
+
             if velocity_in_section_plane.length() > MIN_POSITIVE {
-                chord_vectors[index].signed_angle_between(
+                chord_in_section_plane.signed_angle_between(
                     velocity_in_section_plane,
                     span_direction
                 )

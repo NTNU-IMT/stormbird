@@ -2,6 +2,14 @@
 
 This file contains an overview of the changes made to Stormath, the mathematical utilities used by Stormbird.
 
+## 0.5.1 - Unreleased
+### Bug fixes
+- `area_of_quadrilateral` used Brahmagupta's formula, which is only exact for quadrilaterals with all corners on a circle, e.g., rectangles. Skewed shapes got a too large area, e.g., a parallelogram with unit sides and an angle of 30 degrees got the area 1.0 instead of 0.5. The area is now half the length of the cross product of the diagonals, which is exact for all planar quadrilaterals. In Stormbird, the area is used in the far field model of the vortex panels in the dynamic wake, where skewed panels therefore induced too large velocities far from the panels, e.g., behind sails on a heeled ship.
+- `cosine_transition_zero_to_one` returned NaN when the `transition_range` was zero and `x` was equal to `x_start`. It now returns one, i.e., a step.
+
+### Changes
+- `SpatialVector`, `RotationType` and `WindowSize` reject unknown fields in JSON input, e.g., a misspelled component of a vector, rather than ignoring them.
+
 ## 0.5.0 - 2026-11-14
 ### Breaking changes
 - The `YawPitchRoll` variant of `RotationType` and the `SpatialVector::rotate_yaw_pitch_roll` function are removed. The rotation was by definition the same as `XYZ`, as yaw, pitch and roll around the rotated axes is the same as rotations around the fixed x, y and z axes, in that order. Use `XYZ` instead. JSON input with `"YawPitchRoll"` gives an error.

@@ -5,7 +5,10 @@ use serde::{Serialize, Deserialize};
 use stormath::type_aliases::Float;
 use stormath::spatial_vector::SpatialVector;
 
+use crate::error::Error;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Settings for the complete sail model that is unique to that model. That is, settings that are
 /// not natural to put in either the lifting line simulation, wind environment, or the control system
 pub struct CompleteSailModelSettings {
@@ -29,7 +32,8 @@ pub struct CompleteSailModelSettings {
     /// Switch to determine whether the sails are retractable or not.
     #[serde(default)]
     pub retractable: bool,
-    /// A vector defining the direction of the thrust
+    /// A vector defining the direction of the thrust. It is normalized before use, so only the
+    /// direction matters.
     #[serde(default="CompleteSailModelSettings::default_thrust_direction")]
     pub thrust_direction: SpatialVector
 }
@@ -53,4 +57,64 @@ impl CompleteSailModelSettings {
     fn default_allowed_relative_internal_state_error() -> Float {1e-3}
     fn default_nr_loadings_to_test_during_optimization() -> usize {10}
     fn default_thrust_direction() -> SpatialVector {SpatialVector::new(-1.0, 0.0, 0.0)}
+}
+
+impl CompleteSailModelSettings {
+    /// Checks that the settings are valid
+    pub fn check_settings(&self) -> Result<(), Error> {
+        if self.max_controller_iterations == 0 {
+            return Err(Error::invalid_input("max_controller_iterations must be at least one"));
+        }
+
+        if self.nr_loadings_to_test_during_optimization < 2 {
+            return Err(Error::invalid_input(format!(
+                "nr_loadings_to_test_during_optimization must be at least two, as the loadings are                 distributed from zero to the max loading, but is {}",
+                self.nr_loadings_to_test_during_optimization
+            )));
+        }
+
+        let thrust_direction_length = self.thrust_direction.length();
+
+        if !thrust_direction_length.is_finite() || thrust_direction_length == 0.0 {
+            return Err(Error::invalid_input(format!(
+                "thrust_direction must be a finite vector with a length larger than zero, but is {:?}",
+                self.thrust_direction
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_settings_give_errors() {
+        assert!(CompleteSailModelSettings::default().check_settings().is_ok());
+
+        for nr_loadings in [0, 1] {
+            let settings = CompleteSailModelSettings {
+                nr_loadings_to_test_during_optimization: nr_loadings,
+                ..Default::default()
+            };
+
+            assert!(settings.check_settings().is_err());
+        }
+
+        let settings = CompleteSailModelSettings {
+            thrust_direction: SpatialVector::default(),
+            ..Default::default()
+        };
+
+        assert!(settings.check_settings().is_err());
+
+        let settings = CompleteSailModelSettings {
+            max_controller_iterations: 0,
+            ..Default::default()
+        };
+
+        assert!(settings.check_settings().is_err());
+    }
 }

@@ -165,8 +165,9 @@ impl LineForceModel {
     /// shape, but where the averaged value still is the same as what is calculated from the raw 
     /// lifting line theory.
     /// 
-    /// The shape is enforced on the circulation divided by the square of the velocity,
-    /// so that changes due to external velocity variations (e.g., velocity due to rotational 
+    /// The shape is enforced on the circulation divided by the magnitude of the velocity, which is
+    /// proportional to the lift coefficient times the chord length, so that changes due to external
+    /// velocity variations (e.g., velocity due to rotational 
     /// motion, atmospheric boundary layer, interactions with a another structure, etc.) are taken 
     /// into account.
     /// 
@@ -191,22 +192,22 @@ impl LineForceModel {
             velocity
         );
 
-        let velocity_squared: Vec<Float> = velocity.iter().map(
-            |v| v.length_squared()
+        let velocity_magnitude: Vec<Float> = velocity.iter().map(
+            |v| v.length()
         ).collect();
 
-        let mut gamma_divided_by_u2 = Vec::with_capacity(raw_circulation_strength.len());
+        let mut gamma_divided_by_u = Vec::with_capacity(raw_circulation_strength.len());
 
         for i in 0..raw_circulation_strength.len() {
-            if velocity_squared[i] < MIN_POSITIVE {
-                gamma_divided_by_u2.push(0.0);
+            if velocity_magnitude[i] < MIN_POSITIVE {
+                gamma_divided_by_u.push(0.0);
             } else {
-                gamma_divided_by_u2.push(raw_circulation_strength[i] / velocity_squared[i]);
+                gamma_divided_by_u.push(raw_circulation_strength[i] / velocity_magnitude[i]);
             }
         }
 
-        let averaged_gamma_divided_by_u2 = self.wing_averaged_values(
-            &gamma_divided_by_u2
+        let averaged_gamma_divided_by_u = self.wing_averaged_values(
+            &gamma_divided_by_u
         );
 
         let effective_relative_span_distance = &self.ctrl_point_spanwise_distance_circulation_model;
@@ -220,7 +221,7 @@ impl LineForceModel {
                 local_shape_vector.push(
                     PrescribedCirculationShape::from_curve_fit(
                         &effective_relative_span_distance[wing_indices.clone()], 
-                        &gamma_divided_by_u2[wing_indices.clone()], 
+                        &gamma_divided_by_u[wing_indices.clone()], 
                         &prescribed_circulation.shape.as_params_vector()
                     )
                 )
@@ -237,7 +238,7 @@ impl LineForceModel {
             let wing_indices = self.wing_indices[wing_index].clone();
 
             let local_effective_relative_span_distance = effective_relative_span_distance[wing_indices.clone()].to_vec();
-            let local_velocity_squared = velocity_squared[wing_indices.clone()].to_vec();
+            let local_velocity_magnitude = velocity_magnitude[wing_indices.clone()].to_vec();
 
             let local_prescribed_circulation_shape_values = prescribed_shape_vector[wing_index].get_values(
                 &local_effective_relative_span_distance
@@ -250,14 +251,14 @@ impl LineForceModel {
                 let factor = if averaged_averaged_prescribed_circulation_value == 0.0 {
                     0.0
                 } else {
-                    averaged_gamma_divided_by_u2[wing_index] / 
+                    averaged_gamma_divided_by_u[wing_index] / 
                     averaged_averaged_prescribed_circulation_value
                 };
 
                 out.push(
                     factor * 
                     local_prescribed_circulation_shape_values[i] * 
-                    local_velocity_squared[i]
+                    local_velocity_magnitude[i]
                 );
             }
         }

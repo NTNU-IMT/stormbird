@@ -43,6 +43,10 @@ pub struct Controller {
     pub start_time: Float,
     /// Internal variable to keep track of the number of time steps executed
     pub time_step_index: usize,
+    /// Time of the last update of the output. None before the first update. Used to limit the
+    /// change rates over the time since the last update, rather than a single time step, as the
+    /// output is only changed every `time_steps_between_updates` time step.
+    pub last_update_time: Option<Float>,
     /// Switch to determine which velocity to use when measuring the apparent wind direction
     pub use_input_velocity_for_apparent_wind_direction: bool,
     /// Optional moving average filters for the input, one for each wing
@@ -139,8 +143,23 @@ impl Controller {
         self.time_step_index += 1;
         
         if first_time_step || (time_to_update && initialization_done) {
-            let local_wing_angles = self.get_local_wing_angles(time_step, inputs, line_force_model);
-            let internal_states = self.get_internal_states(time_step, inputs, line_force_model);
+            // The output is kept constant between the updates, so the change rates are limited
+            // over the time since the last update. The time step is used for the first update, and
+            // if the time has not increased, e.g., if a simulation is restarted from an earlier
+            // time.
+            let time_since_last_update = match self.last_update_time {
+                Some(last_update_time) if time > last_update_time => time - last_update_time,
+                _ => time_step,
+            };
+
+            self.last_update_time = Some(time);
+
+            let local_wing_angles = self.get_local_wing_angles(
+                time_since_last_update, inputs, line_force_model
+            );
+            let internal_states = self.get_internal_states(
+                time_since_last_update, inputs, line_force_model
+            );
             
             return Some(
                 ControllerOutput {

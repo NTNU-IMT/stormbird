@@ -142,7 +142,9 @@ The option to `curve_fit_shape_parameters` is currently experimental. It will cu
 The `PrescribedCirculationShape` parameters in the structure are used to force the circulation to always follow a mathematical shape that looks like the equation below, where \\(s\\) is the local non-dimensional span distance, varying from -0.5 to 0.5 along each wing:
 
 \\[
-    \Gamma(s) = \Gamma\_0 (1.0 - (2 s)^{\text{inner\_power}})^{\text{outer\_power}}
+    \Gamma(s) = \Gamma\_0 \\, U(s) \left(1.0 - |2 s|^{\text{inner\_power}}\right)^{\text{outer\_power}}
 \\]
+
+where \\(U(s)\\) is the magnitude of the local velocity. The shape is therefore applied to the circulation divided by the velocity, which is proportional to the lift coefficient times the chord length, so that a velocity that varies along the span, e.g., in a boundary layer, is taken into account. \\(\Gamma\_0\\) is set so that the mean value of \\(\Gamma / U\\) over each wing is the same as for the raw circulation.
 
 The default values are to set `inner_power` to 2.0 and `outer_power` to 0.5. This corresponds to an elliptic distribution.

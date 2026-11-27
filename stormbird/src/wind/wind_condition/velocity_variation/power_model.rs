@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use stormath::type_aliases::Float;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// A standard power model for how the wind velocity varies as a function of height
 pub struct PowerModel {
     /// The reference velocity for the model. The value is the velocity at the *reference height*, 

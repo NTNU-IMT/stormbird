@@ -141,3 +141,23 @@ fn power_coefficient_is_limited_to_the_supported_spin_ratios() {
     assert!((cylinder.power_coefficient(sr) - expected).abs() < tolerance(1e-12, 1e-5));
     assert!((cylinder.power_coefficient(-sr) - expected).abs() < tolerance(1e-12, 1e-5));
 }
+
+#[test]
+/// The conversion from spin ratio to revolutions per second is the inverse of the conversion from
+/// revolutions per second to spin ratio, including the sign
+fn spin_ratio_conversions_are_inverse() {
+    let diameter = 5.0;
+    let velocity = 8.0;
+
+    for spin_ratio in [-3.0, -0.5, 0.0, 1.0, 3.0] {
+        let revolutions_per_second = RotatingCylinder::revolutions_per_second_from_spin_ratio(
+            spin_ratio, diameter, velocity
+        );
+
+        let spin_ratio_back = RotatingCylinder::spin_ratio_from_revolutions_per_second(
+            revolutions_per_second, diameter, velocity
+        );
+
+        assert!((spin_ratio - spin_ratio_back).abs() < 1e-5);
+    }
+}

@@ -316,7 +316,8 @@ impl WindEnvironment {
     /// Measures the apparent wind direction based on the input velocity vectors, where the sign is
     /// defined by the local, non-rotated, chord vector and rotation-axis of each wing in the line
     /// force model. This, then, gives the wind direction relative to the local coordinate system
-    /// for each wing. A direction of zero means that the flow is aligned with the non-rotated chord
+    /// for each wing. A direction of zero means that the flow is aligned with the non-rotated chord.
+    /// The direction is measured in the plane normal to the span of each wing.
     pub fn apparent_wind_direction_from_velocity_and_line_force_model(
         &self,
         velocity: &[SpatialVector],
@@ -338,9 +339,12 @@ impl WindEnvironment {
 
             let chord_local_transformed = line_force_model.rigid_body_motion.transform_vector(chord_local_non_transformed);
 
+            // Both vectors are projected onto the plane normal to the span, so that the velocity
+            // along the span does not affect the direction, in the same way as for the angle of
+            // attack
             out.push(
-                chord_local_transformed.signed_angle_between(
-                    velocity_i,
+                chord_local_transformed.project_on_plane(rotation_axis).signed_angle_between(
+                    velocity_i.project_on_plane(rotation_axis),
                     rotation_axis
                 )
             );

@@ -22,7 +22,9 @@ pub struct SamplingSettings {
     /// If true, the weights do not depend on the location along the span
     #[serde(default)]
     pub neglect_span_projection: bool,
-    /// Cells with a weight below this value are not used in the sampling
+    /// Cells with a weight below this value, relative to the peak value of the projection weight
+    /// of the dominating line element, are not used in the sampling. See
+    /// [`ActuatorLine::relative_projection_weight`](crate::actuator_line::ActuatorLine::relative_projection_weight).
     #[serde(default="SamplingSettings::default_weight_limit")]
     pub weight_limit: Float,
     /// If true, the velocity at the first and last line element of each wing is extrapolated from the

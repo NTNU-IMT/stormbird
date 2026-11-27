@@ -30,6 +30,7 @@ pub struct VaryingFoil {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Unchecked version of the varying foil, used for deserialization
 struct VaryingFoilInput {
     internal_state_data: Vec<Float>,

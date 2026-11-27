@@ -164,7 +164,7 @@ impl CompleteSailModel {
                 loadings_to_test[i]
             );
 
-            let thrust = result.integrated_forces_sum().dot(self.settings.thrust_direction);
+            let thrust = result.integrated_forces_sum().dot(self.settings.thrust_direction.normalize());
             let delivered_power = thrust * ship_speed;
             let input_power = result.input_power_sum();
 

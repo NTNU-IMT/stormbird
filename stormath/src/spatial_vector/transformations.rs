@@ -9,6 +9,7 @@ use super::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Defines how the rotation angles in a rotation vector, [x, y, z], are applied.
 ///
 /// The rotation vector always contains the angle around the x-axis, the angle around the y-axis

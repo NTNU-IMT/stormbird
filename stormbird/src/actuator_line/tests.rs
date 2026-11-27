@@ -185,6 +185,15 @@ fn invalid_settings_give_errors() {
         ..ActuatorLineBuilder::new(builder.clone())
     }.build().is_err());
 
+    // The extrapolation of the end velocities needs at least three line elements on each wing
+    let mut builder_with_two_sections = builder.clone();
+    builder_with_two_sections.nr_sections = 2;
+
+    let mut extrapolating_builder = ActuatorLineBuilder::new(builder_with_two_sections);
+    extrapolating_builder.sampling_settings.extrapolate_end_velocities = true;
+
+    assert!(extrapolating_builder.build().is_err());
+
     builder.local_wing_angles = vec![0.0, 0.0];
 
     assert!(ActuatorLineBuilder::new(builder).build().is_err());
@@ -279,4 +288,65 @@ fn dynamic_correction_wake_points_through_the_actuator_line() {
     std::fs::remove_file(&file_path).unwrap();
 
     assert_eq!(Some(content), actuator_line.correction_wake_as_vtk(true));
+}
+
+#[test]
+/// The relative projection weight, which is compared with the weight limits, is one at the control
+/// points, and does not depend on the size of the wing, unlike the projection weight itself
+fn relative_projection_weight_does_not_depend_on_the_size() {
+    let relative_weights: Vec<Float> = [1.0, 20.0].iter().map(|&scale: &Float| {
+        let mut line_force_model = LineForceModelBuilder::new(10);
+
+        line_force_model.add_wing(WingBuilder {
+            section_points: vec![
+                SpatialVector::from([0.0, 0.0, 0.0]),
+                SpatialVector::from([0.0, 0.0, 5.0 * scale]),
+            ],
+            chord_vectors: vec![SpatialVector::from([scale, 0.0, 0.0]); 2],
+            section_model: SectionModel::SingleElementFoil(Foil::default()),
+            ..Default::default()
+        });
+
+        let actuator_line = ActuatorLineBuilder::new(line_force_model).build().unwrap();
+
+        let line_index = 3;
+        let ctrl_point = actuator_line.line_force_model.span_lines_global[line_index].ctrl_point();
+
+        let (index_at_ctrl_point, weight_at_ctrl_point) =
+            actuator_line.dominating_line_element_and_weight_at_point(ctrl_point);
+
+        assert_eq!(index_at_ctrl_point, line_index);
+        assert!(
+            (actuator_line.relative_projection_weight(line_index, weight_at_ctrl_point) - 1.0).abs()
+                < tolerance(1e-12, 1e-5)
+        );
+
+        // Half a chord downstream of the control point
+        let point = ctrl_point + SpatialVector::from([0.5 * scale, 0.0, 0.0]);
+
+        let (index, weight) = actuator_line.dominating_line_element_and_weight_at_point(point);
+
+        actuator_line.relative_projection_weight(index, weight)
+    }).collect();
+
+    assert!(relative_weights[0] > 0.0 && relative_weights[0] < 1.0);
+    assert!((relative_weights[0] - relative_weights[1]).abs() < tolerance(1e-12, 1e-5));
+}
+
+#[test]
+/// Unknown fields give errors, and the widths of the Gaussian projection have default values, so
+/// that one of them can be given alone
+fn projection_settings_from_json() {
+    use super::projection::ProjectionSettings;
+
+    let settings: ProjectionSettings = serde_json::from_str(
+        r#"{"projection_function": {"chord_factor": 0.3}}"#
+    ).unwrap();
+
+    assert_eq!(settings.projection_function.chord_factor, 0.3);
+    assert_eq!(settings.projection_function.thickness_factor, 0.4);
+
+    assert!(serde_json::from_str::<ProjectionSettings>(
+        r#"{"projection_function": {"chord_facter": 0.3}}"#
+    ).is_err());
 }

@@ -17,6 +17,7 @@ use stormath::matrix::Matrix;
 use super::velocity_corrections::InducedVelocitySettings;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// How the induced velocities are updated after the viscous correction of the circulation
 pub enum InducedVelocityCorrectionMethod {
     /// The induced velocities from the linear solution are used. The circulation is then corrected

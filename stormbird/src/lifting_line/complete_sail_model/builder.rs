@@ -49,7 +49,13 @@ impl CompleteSailModelBuilder {
     }
 
     /// Builds the complete sail model
+    ///
+    /// # Errors
+    /// If the settings are not valid, see [`CompleteSailModelSettings::check_settings`], or if the
+    /// lifting line simulation or the controller can not be built.
     pub fn build(&self) -> Result<CompleteSailModel, Error> {
+        self.settings.check_settings()?;
+
         let lifting_line_simulation = self.lifting_line_simulation.build()?;
 
         let line_force_model = &lifting_line_simulation.line_force_model;

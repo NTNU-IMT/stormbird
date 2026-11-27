@@ -57,7 +57,10 @@ impl ActuatorLineInterface {
         for i in 0..results.len() {
             let (flat_index, line_index, projection_weight) = results[i];
 
-            if projection_weight > model.sampling_settings.weight_limit {
+            // The limit is relative to the peak value of the weight of the line element
+            let relative_weight = model.relative_projection_weight(line_index, projection_weight);
+
+            if relative_weight > model.sampling_settings.weight_limit {
                 cell_indices_to_check.push(flat_index);
                 dominating_line_indices.push(line_index);
                 dominating_line_weights.push(projection_weight);

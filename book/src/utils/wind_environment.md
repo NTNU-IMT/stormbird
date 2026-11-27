@@ -64,7 +64,7 @@ pub struct LogarithmicModel {
 }
 ```
 
-For the power model, the `reference_height` is set to 10 m by default and the `power_factor` to 1/9. For the logarithmic model, the `friction_velocity` and `surface_roughness` must be specified. The `obukhov_length` is optional, and can be used to correct the profile for non-neutral (stable or unstable) atmospheric conditions. The remaining fields have default values that should be useful in most cases.
+For the power model, the `reference_height` is set to 10 m by default and the `power_factor` to 1/9. For the logarithmic model, the `friction_velocity` and `surface_roughness` must be specified. The `obukhov_length` is optional, and can be used to correct the profile for non-neutral (stable or unstable) atmospheric conditions. It can not be zero; leave it out for a neutral atmosphere. Below the surface roughness height, where the logarithmic profile is negative, the velocity is set to zero. The remaining fields have default values that should be useful in most cases.
 
 ## Inflow corrections
 The `inflow_corrections` variable is a data structure used to store corrections to the freestream velocity due to anything that might disturb the inflow. That is, it is primarily intended to model the wind disturbances caused by the ship itself. The data structure is set up such that the correction can depend on both the spanwise position along each sail and the apparent wind direction.

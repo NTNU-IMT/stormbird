@@ -83,6 +83,7 @@ impl ControllerBuilder {
             time_steps_between_updates: self.time_steps_between_updates,
             start_time: self.start_time,
             time_step_index: 0,
+            last_update_time: None,
             use_input_velocity_for_apparent_wind_direction: self.use_input_velocity_for_apparent_wind_direction,
             input_filters,
         })
@@ -189,5 +190,52 @@ mod tests {
 
         assert!((output_unfiltered.local_wing_angles[0] - 0.3).abs() < tol);
         assert!((output_filtered.local_wing_angles[0] - 0.2).abs() < tol);
+    }
+
+    #[test]
+    /// The output is only changed every `time_steps_between_updates` time step, so the change rate
+    /// is limited over the time since the last update, and not a single time step
+    fn rate_limit_uses_the_time_since_the_last_update() {
+        let model = single_wing_model();
+        let time_step = 0.1;
+        let max_change_rate = 0.1;
+        let nr_steps_between_updates = 10;
+
+        let builder = ControllerBuilder {
+            set_points: vec![ControllerSetPoints {
+                max_local_wing_angle_change_rate: Some(max_change_rate),
+                ..controller_builder(None).set_points[0].clone()
+            }],
+            time_steps_between_updates: nr_steps_between_updates,
+            ..controller_builder(None)
+        };
+
+        let mut controller = builder.build(&model).unwrap();
+
+        // A large angle of attack, so that the wing angle is always limited by the change rate
+        let mut current_local_wing_angle = 0.0;
+        let nr_time_steps = 10 * nr_steps_between_updates;
+
+        for i in 0..nr_time_steps {
+            let time = i as Float * time_step;
+
+            let controller_input = ControllerInput {
+                current_local_wing_angle,
+                ..input(2.0)
+            };
+
+            if let Some(output) = controller.update(time, time_step, &[controller_input], &model) {
+                current_local_wing_angle = output.local_wing_angles[0];
+            }
+        }
+
+        // The first update, at t = 0, uses a single time step. The last update is at t = 9.0
+        let last_update_time = (nr_time_steps - nr_steps_between_updates) as Float * time_step;
+        let expected = max_change_rate * (time_step + last_update_time);
+
+        assert!(
+            (current_local_wing_angle - expected).abs() < tolerance(1e-9, 1e-5),
+            "Local wing angle: {}, expected: {}", current_local_wing_angle, expected
+        );
     }
 }

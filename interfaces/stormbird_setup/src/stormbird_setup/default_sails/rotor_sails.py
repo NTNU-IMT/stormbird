@@ -23,10 +23,14 @@ def rotor_sail_controller_set_points() -> ControllerSetPoints:
     '''
     Best guess for the controller of a rotor sail, with a maximum spin ratio of 3. The set points are
     given as spin ratio, and are converted to revolutions per second by the controller.
+
+    The sign of the spin ratio follows the section model, where positive revolutions per second
+    gives a negative spin ratio, and the apparent wind direction follows the sign convention of the
+    controller, where a wind from starboard has a negative direction.
     '''
     return ControllerSetPoints(
         apparent_wind_directions_data = np.radians([-180, -40, -15, 15, 40, 180]).tolist(),
-        internal_state_data = [3.0, 3.0, 0.0, 0.0, -3.0, -3.0]
+        internal_state_data = [-3.0, -3.0, 0.0, 0.0, 3.0, 3.0]
     )
 
 def rotor_sail_induced_velocities() -> InducedVelocitySettings:

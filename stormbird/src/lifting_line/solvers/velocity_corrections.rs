@@ -48,6 +48,7 @@ pub struct InducedVelocitySettings {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Empirical correction of the self-induced velocities
 pub enum SelfInducedVelocityCorrection {
     /// No correction
@@ -59,6 +60,7 @@ pub enum SelfInducedVelocityCorrection {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Empirical correction of the total velocity
 pub enum TotalVelocityCorrection {
     /// No correction

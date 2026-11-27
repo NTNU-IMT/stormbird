@@ -19,7 +19,7 @@ pub struct CompleteSailModelSettings {
     pub max_controller_iterations: usize,               // Default: 10
     pub allowed_angle_error: Float,                     // Default: 0.1 degrees, in radians
     pub allowed_relative_internal_state_error: Float,   // Default: 0.001
-    pub nr_loadings_to_test_during_optimization: usize, // Default: 10
+    pub nr_loadings_to_test_during_optimization: usize, // Default: 10, at least 2
     pub retractable: bool,                              // Default: false
     pub thrust_direction: SpatialVector,                // Default: (-1, 0, 0)
 }
@@ -74,7 +74,7 @@ Without a controller, the sail settings are not changed, so `simulate_steady_sta
     P\_{effective} = \mathbf{F} \cdot \mathbf{e}\_{thrust} \\, V\_{ship} - P\_{input}
 \\]
 
-where \\( \mathbf{F} \\) is the sum of the forces on all sails, \\( \mathbf{e}\_{thrust} \\) is the `thrust_direction`, and \\( P\_{input} \\) is the sum of the [input power](../line_model/input_power.md) for all sails. This is mainly useful for sails that need power, such as rotor sails and suction sails. For these sails, the maximum thrust does not necessarily give the best net result. It can also be used to reduce the loading in conditions where the full set points give a drag rather than thrust. If `retractable` is `true`, and the best effective power is still negative, the sails are assumed to be retracted, and the forces, moments and input power in the returned result are set to zero. Without a controller, the loading has no effect, so only a single simulation is run, while the check for retractable sails is still applied.
+where \\( \mathbf{F} \\) is the sum of the forces on all sails, \\( \mathbf{e}\_{thrust} \\) is the `thrust_direction`, normalized to unit length, and \\( P\_{input} \\) is the sum of the [input power](../line_model/input_power.md) for all sails. This is mainly useful for sails that need power, such as rotor sails and suction sails. For these sails, the maximum thrust does not necessarily give the best net result. It can also be used to reduce the loading in conditions where the full set points give a drag rather than thrust. If `retractable` is `true`, and the best effective power is still negative, the sails are assumed to be retracted, and the forces, moments and input power in the returned result are set to zero. Without a controller, the loading has no effect, so only a single simulation is run, while the check for retractable sails is still applied.
 
 ### Simple output
 The methods above return a full [`SimulationResult`](../line_model/force_calculations.md), which contains sectional values, the input to the force calculations, and more. Usually only the total values for each sail are needed. Both methods therefore also have a `_simple_output` variant, which takes the same arguments but returns a list with one `SingleSailResult` for each sail:

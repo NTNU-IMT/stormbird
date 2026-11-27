@@ -289,6 +289,49 @@ fn the_span_velocity_does_not_change_the_angle_of_attack() {
 }
 
 #[test]
+/// The chord vector is projected onto the plane normal to the span line, in the same way as the
+/// velocity, so that a chord that is not normal to the span line, e.g., a horizontal chord on a
+/// raked span line, does not change the angle of attack.
+fn a_chord_along_the_span_does_not_change_the_angle_of_attack() {
+    let rake = Float::to_radians(10.0);
+
+    // Span line in the x-z plane, raked 10 degrees backwards, with a horizontal chord
+    let span_top = SpatialVector::new(10.0 * rake.sin(), 0.0, 10.0 * rake.cos());
+
+    let line_force_model = build(WingBuilder {
+        section_points: vec![SpatialVector::new(0.0, 0.0, 0.0), span_top],
+        chord_vectors: vec![SpatialVector::new(CHORD_LENGTH, 0.0, 0.0); 2],
+        section_model: SectionModel::SingleElementFoil(Foil::default()),
+        ..Default::default()
+    });
+
+    let nr_span_lines = line_force_model.nr_span_lines();
+
+    for angle in [-30.0, 0.0, 5.0, 20.0] {
+        let angle_rad = Float::to_radians(angle);
+
+        let velocity = SpatialVector::new(angle_rad.cos(), angle_rad.sin(), 0.0) * 8.0;
+
+        let calculated = line_force_model.angles_of_attack(
+            &vec![velocity; nr_span_lines], CoordinateSystem::Global
+        );
+
+        // The in-plane angle. The projected chord is along (cos(rake), 0, -sin(rake)), and the
+        // projected velocity has the components cos(a) cos(rake) along the chord and sin(a)
+        // along the y-axis. Without the projection of the chord, the angle at a = 0 was -10 deg.
+        let expected = (angle_rad.tan() / rake.cos()).atan();
+
+        for angle_i in calculated {
+            assert!(
+                (angle_i - expected).abs() < tolerance(1e-9, 1e-4),
+                "angle {}: {} calculated, {} expected",
+                angle, angle_i.to_degrees(), expected.to_degrees()
+            );
+        }
+    }
+}
+
+#[test]
 /// Virtual line elements are not part of the wing, so their area should not be included in the
 /// projected area, in the same way as they are not included in the integrated forces.
 fn the_projected_area_excludes_virtual_line_elements() {

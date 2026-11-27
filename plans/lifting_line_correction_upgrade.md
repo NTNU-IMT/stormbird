@@ -295,9 +295,19 @@ Design:
 ## Open questions
 
 - How virtual extensions should work for the panel wakes, in particular the dynamic wake.
+- The core length evolution differs between the lifting line dynamic wake (`evolution_length_factor`
+  = fraction of the wake length, by streamwise panel index, so it depends on dt and U) and the
+  correction wakes (`reference_core_evolution_length_factor` = physical distance in average chords,
+  measured along the wake, average of the four panel corners). The user will decide later which one
+  to keep (the new one may make more sense). Noted in the book (`actuator_line/corrections.md`,
+  "Growth of the reference core length") on 2026-11-27, together with the experimental note on the
+  `Dynamic` correction wake.
 
 ## Notes
 
-- `controller::set_points::tests::limit_angle_takes_the_shortest_way_across_pi` fails with the
-  `single_precision` feature (used by Stormflow). It is from 0.13.1 and not related to this work.
-  All other tests pass in single and double precision, with and without `parallel`.
+- All tests pass in single and double precision, with and without `parallel` (checked
+  2026-11-27). The earlier single precision failure in
+  `controller::set_points::tests::limit_angle_takes_the_shortest_way_across_pi` was fixed in
+  `cfb21c8`.
+- The general pre-release review on 2026-11-27 fixed several bugs outside this feature (see the
+  change logs). Deferred issues are listed in [known_missing_features.md](known_missing_features.md).

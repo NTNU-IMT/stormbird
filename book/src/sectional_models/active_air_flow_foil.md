@@ -146,7 +146,7 @@ The power delivered to the flow is the internal suction times the total volume f
     P = \frac{s \sum\_i Q\_i}{\eta}
 \\]
 
-The default value of the fan efficiency is 1.0.
+The default value of the fan efficiency is 1.0. It must be larger than zero.
 
 ## Fan model
 
@@ -230,7 +230,7 @@ Note that, since the internal pressure is uniform within a compartment, it is on
 ## Solving for the internal suction
 The internal suction is not known directly, and must be found from the internal state of the wing, for each compartment. For a given internal suction, the suction coefficient on each line element is found directly, as described [above](#the-suction-coefficient-on-each-line-element). The total volume flow through the compartment, and therefore the power, is a nonlinear function of the internal suction, which means that a solver is needed:
 
-- For the `PowerToInternalFlow` conversion, the internal suction is the value where the power equals the power given as the internal state of the wing, found with the [secant method](https://en.wikipedia.org/wiki/Secant_method).
+- For the `PowerToInternalFlow` conversion, the internal suction is the value where the power equals the power given as the internal state of the wing, found with [Brent's method](https://en.wikipedia.org/wiki/Brent%27s_method), in a bracket from the internal suction where the flow starts, to an upper value that is increased until the power is exceeded.
 - For the `FanSpeedToInternalFlow` conversion, the internal suction is given by the operating point of the fans, found with [Brent's method](https://en.wikipedia.org/wiki/Brent%27s_method). Brent's method always keeps the solution within a bracket, which is known in this case: the internal suction is always between the value where the flow into the sail starts and the maximum pressure rise of the fans.
 
 The settings for the solver can be set through the `solver_settings` field, but the default values should normally be sufficient:

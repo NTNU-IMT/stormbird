@@ -9,6 +9,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use super::*;
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Vec3 {
     x: Float,
     y: Float,

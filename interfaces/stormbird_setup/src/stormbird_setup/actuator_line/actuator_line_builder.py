@@ -48,8 +48,8 @@ class ActuatorLineBuilder(StormbirdSetupBaseModel):
             warnings.warn(
                 "The actuator line model has a dynamic stall model, but the damping factor of the "
                 f"circulation is {damping_factor}. The damping acts as an additional time lag of "
-                f"about {time_lag:.1f} time steps, which also affects the dynamic "
-                "response of the forces."
+                f"about {time_lag:.1f} calls to the model, i.e., time steps times outer "
+                "iterations in the CFD solver, which also affects the dynamic response of the forces."
             )
 
         return self

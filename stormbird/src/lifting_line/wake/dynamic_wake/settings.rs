@@ -59,6 +59,7 @@ impl WakeIndices {
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 /// Enum to specify what type of direction to use when updating the first wake points, right behind 
 /// the wing
 pub enum FirstWakePointsDirection {
@@ -75,9 +76,9 @@ pub enum FirstWakePointsDirection {
 #[derive(Debug, Clone)]
 /// Settings for the wake
 pub struct WakeSettings {
-    /// The length of the first panel, relative to the local chord length
+    /// The length of the first panel, relative to the average chord length
     pub first_panel_relative_length: Float,
-    /// The length of the last panel, relative to the local chord length
+    /// The length of the last panel, relative to the average chord length
     pub last_panel_relative_length: Float,
     /// Which direction to use for the first wake points
     pub first_wake_points_direction: FirstWakePointsDirection,

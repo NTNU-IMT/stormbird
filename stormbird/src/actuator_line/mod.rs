@@ -656,23 +656,51 @@ impl ActuatorLine {
         let mut projection_values = Vec::with_capacity(self.line_force_model.nr_span_lines());
 
         for i in 0..self.line_force_model.nr_span_lines() {
-            let wing_index = self.line_force_model.wing_index_from_global(i);
-            let wing_range = &self.line_force_model.wing_indices[wing_index];
-
-            let is_at_wing_start = i == wing_range.start;
-            let is_at_wing_end   = i == wing_range.end - 1;
-
             projection_values.push(
                 self.projection_settings.projection_value_at_point(
                     point,
                     chord_vectors[i],
                     &span_lines[i],
-                    [is_at_wing_start, is_at_wing_end]
+                    self.is_at_wing_ends(i)
                 )
             );
         }
 
         projection_values
+    }
+
+    /// Whether the line element is the first and/or the last line element on its wing
+    fn is_at_wing_ends(&self, line_index: usize) -> [bool; 2] {
+        let wing_index = self.line_force_model.wing_index_from_global(line_index);
+        let wing_range = &self.line_force_model.wing_indices[wing_index];
+
+        [line_index == wing_range.start, line_index == wing_range.end - 1]
+    }
+
+    /// The largest value of the projection weight of a line element, which is at its control point
+    pub fn peak_projection_weight(&self, line_index: usize) -> Float {
+        let span_line = &self.line_force_model.span_lines_global[line_index];
+
+        self.projection_settings.projection_value_at_point(
+            span_line.ctrl_point(),
+            self.line_force_model.chord_vectors_global[line_index],
+            span_line,
+            self.is_at_wing_ends(line_index)
+        )
+    }
+
+    /// The projection weight of a line element, relative to its peak value, see
+    /// [`peak_projection_weight`](Self::peak_projection_weight). This is the value that is compared
+    /// with the `weight_limit` in the sampling and projection settings, so that the limit does not
+    /// depend on the size of the line elements.
+    pub fn relative_projection_weight(&self, line_index: usize, weight: Float) -> Float {
+        let peak_weight = self.peak_projection_weight(line_index);
+
+        if peak_weight > 0.0 {
+            weight / peak_weight
+        } else {
+            0.0
+        }
     }
 
     /// Computes the sum of the projection weights for all line elements at a given point in space.
