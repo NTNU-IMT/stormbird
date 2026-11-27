@@ -2,7 +2,13 @@
 
 This file contains an overview of the changes made to Stormflow, the CFD solver specialized for actuator line simulations with Stormbird.
 
-## Unreleased
+## 0.5.0 - 2026-11-27
+### Breaking changes
+- Stormflow now depends on version 0.14.0 of Stormbird and version 0.5.1 of Stormath, which change the input to the actuator line model. See the [Stormbird change log](../stormbird/CHANGELOG.md) for details. The most important changes for Stormflow setup files are:
+  - The wake specific settings of the lifting line correction are moved into the new `wake` field, e.g., `"wake_length_factor": 100.0` becomes `"wake": {"Straight": {"wake_length_factor": 100.0}}`. Setup files that only use the common settings are unchanged.
+  - More input structures reject unknown fields, so setup files with misspelled or extra fields give an error rather than ignoring them.
+  - Spin ratio set points for rotor sails in the controller must change sign to give the same results as before, as the conversion to revolutions per second is fixed in Stormbird.
+
 ### Features
 - The velocity is sampled at the wake points of the lifting line correction in the actuator line model, when the correction uses the new `Dynamic` wake in Stormbird. The cell-centered velocity is interpolated linearly to the points in each time step, before the actuator line model is solved. Points outside the domain are not sampled, so that they keep the previous velocity.
 - New `Simulation::correction_wake_as_vtk` and `Simulation::export_correction_wake_as_vtk`, to export the wake of the lifting line correction as a legacy VTK file, for the `StraightPanels` and `Dynamic` wakes.
@@ -13,7 +19,6 @@ This file contains an overview of the changes made to Stormflow, the CFD solver 
 
 ### Changes
 - The GPU velocity solver keeps the buffers for exchanging data at up to two sets of cells, rather than one, so that the cells of the actuator line are not recreated in each time step when the velocity is also sampled at the wake points.
-- Stormflow depends on the development version of Stormbird in this repository (0.14.0), with the new settings of the lifting line correction. See the [Stormbird change log](../stormbird/CHANGELOG.md).
 - From Stormbird 0.14.0: `remove_span_velocity` in the sampling settings of the actuator line is true by default, and the angle of attack no longer depends on the velocity along the span. The examples already set it to true, and are unchanged. Models that relied on the old default get a different velocity magnitude and drag direction when the sampled velocity has a component along the span.
 
 ## 0.4.1 - 2026-11-20
